@@ -14,3 +14,19 @@ class Platform(unittest.TestCase):
    source=Path(d)/'source';dest=Path(d)/'dest';source.write_bytes(b'new');dest.write_bytes(b'old')
    with self.assertRaises(FileExistsError):publish_new(source,dest)
    self.assertEqual(dest.read_bytes(),b'old');dest.unlink();publish_new(source,dest);self.assertEqual(dest.read_bytes(),b'new')
+ def test_portable_preferences_and_credentials(self):
+  import sys
+  from c64u_browser.credentials import Credentials
+  from c64u_browser.profiles import Preferences
+  with tempfile.TemporaryDirectory() as d,patch.object(sys,'frozen',True,create=True),patch.object(sys,'executable',str(Path(d)/'Argonaut.exe')):
+   (Path(d)/'portable.flag').touch()
+   self.assertEqual(Preferences().path,Path(d)/'Data'/'argonaut'/'config.json')
+   creds=Credentials();self.assertTrue(creds.session_only);self.assertEqual(creds.get('id'),'')
+   from c64u_browser.api import BrowserError
+   with self.assertRaises(BrowserError):creds.set('id','secret')
+   creds.delete('id')
+ def test_nonportable_does_not_use_application_folder(self):
+  import sys
+  from c64u_browser.platform_support import portable_root
+  with tempfile.TemporaryDirectory() as d,patch.object(sys,'frozen',True,create=True),patch.object(sys,'executable',str(Path(d)/'Argonaut.exe')):
+   self.assertIsNone(portable_root())
