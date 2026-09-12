@@ -52,6 +52,22 @@ Profiles and preferences use `$XDG_CONFIG_HOME/argonaut` (normally
 `~/.config/argonaut`). Saved passwords use the desktop Secret Service.
 Removing or upgrading the package preserves user preferences.
 
+## Screenshots
+
+Argonaut running on Windows and connected to a C64 Ultimate.
+
+**Files — local and C64U storage side by side.**
+
+![Windows Files tab showing local folders and C64U USB2 storage](docs/images/windows-files.png)
+
+**Settings — search, favorites, ROM selection, and backup controls.**
+
+![Windows Settings tab showing Memory and ROMs](docs/images/windows-settings.png)
+
+**Streams — live C64U screen preview with audio receiving.**
+
+![Windows Streams tab displaying a live C64 Christmas-tree animation](docs/images/windows-streams.png)
+
 ## Run from source
 
 Install Python 3.11+, PyGObject, GTK 4.8+, libsecret introspection,
