@@ -6,6 +6,16 @@ Features include connection profiles, local and C64U USB/SD file management,
 settings and favorites, ROM selection, configuration backups and Undo,
 live screen preview, screenshots, and WebM recordings.
 
+## macOS (Apple Silicon)
+
+Download the [Mac release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.2)
+for **macOS 15 or newer**. Open the DMG and drag Argonaut into Applications.
+The ZIP contains the same app. Python, GTK, and media libraries are included.
+Profiles use `~/Library/Application Support/argonaut`; passwords use macOS Keychain.
+
+This build is ad-hoc signed and has not been Apple-notarized. macOS may require
+**Privacy & Security → Open Anyway** for the first launch.
+
 ## Windows 10/11 (64-bit)
 
 Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.1):
