@@ -4,7 +4,7 @@ Argonaut controls and manages a C64 Ultimate from your computer. It provides
 file transfers, settings and favorites, ROM selection, configuration backups,
 and live screen preview with audio.
 
-This guide covers the Debian 0.1.0, Windows 0.1.1, and Apple Silicon Mac 0.1.2
+This guide covers the Debian 0.1.3, Windows 0.1.1, and Apple Silicon Mac 0.1.2
 releases. Available settings and actions depend on the connected C64U firmware.
 
 ## 1. Install Argonaut
@@ -13,14 +13,14 @@ Choose the package for your computer; the release numbers differ by platform.
 
 | Computer | Download | Install |
 | --- | --- | --- |
-| Debian 13 | [Debian 0.1.0](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.0) | Download the `.deb` and run the command below. |
+| Debian 13 | [Debian 0.1.3](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.3) | Download the `.deb` and run the command below. |
 | Windows 10/11, 64-bit | [Windows 0.1.1](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.1) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
 | Apple Silicon Mac, macOS 15 or newer | [Mac 0.1.2](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.2) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
 
 On Debian, open a terminal in the folder containing the downloaded package:
 
 ```sh
-sudo apt install ./argonaut-c64u_0.1.0_all.deb
+sudo apt install ./argonaut-c64u_0.1.3_all.deb
 ```
 
 Windows and Mac packages include Python, GTK, and the media libraries.
