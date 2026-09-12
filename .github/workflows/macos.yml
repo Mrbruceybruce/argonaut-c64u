@@ -1,0 +1,55 @@
+name: macOS Apple Silicon test package
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Mac runtime
+        run: |
+          test "$(uname -m)" = arm64
+          brew install python@3.13 pygobject3 gtk4 gstreamer adwaita-icon-theme
+          "$(brew --prefix python@3.13)/bin/python3.13" -m venv --system-site-packages .venv
+          .venv/bin/python -m pip install pyinstaller keyring
+          .venv/bin/python -c "import gi; gi.require_version('Gtk','4.0'); from gi.repository import Gtk"
+      - name: Unit tests
+        run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+      - name: Build app
+        run: .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
+      - name: Check relocated app with minimal environment
+        run: |
+          mkdir -p "$RUNNER_TEMP/Argonaut App Test"
+          ditto dist/Argonaut.app "$RUNNER_TEMP/Argonaut App Test/Argonaut.app"
+          codesign --verify --deep --strict "$RUNNER_TEMP/Argonaut App Test/Argonaut.app"
+          .venv/bin/python - <<'PYTHON'
+          import os, subprocess
+          from pathlib import Path
+          folder=Path(os.environ['RUNNER_TEMP'])/'Argonaut App Test'
+          report=folder/'self-test.json'
+          env=dict(os.environ,PATH='/usr/bin:/bin:/usr/sbin:/sbin')
+          for key in ('PYTHONPATH','GI_TYPELIB_PATH','DYLD_LIBRARY_PATH','GST_PLUGIN_PATH'):
+              env.pop(key,None)
+          subprocess.run([str(folder/'Argonaut.app/Contents/MacOS/Argonaut'),'--self-test',str(report)],env=env,check=True,timeout=90)
+          assert report.is_file()
+          print(report.read_text())
+          PYTHON
+      - name: Create DMG and ZIP
+        run: |
+          mkdir -p mac-package artifacts
+          ditto dist/Argonaut.app mac-package/Argonaut.app
+          cp packaging/macos/README.txt LICENSE COPYRIGHT mac-package/
+          brew info --json=v2 --installed > mac-package/Homebrew-packages.json
+          ln -s /Applications mac-package/Applications
+          hdiutil create -volname Argonaut -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-0.1.2-macOS-AppleSilicon-Test.dmg
+          ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-0.1.2-macOS-AppleSilicon-Test.zip
+          git archive --format=zip --prefix=argonaut-0.1.2/ -o artifacts/argonaut-0.1.2-source.zip HEAD
+          shasum -a 256 artifacts/* > artifacts/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Argonaut-macOS-AppleSilicon-test
+          path: artifacts/
+          if-no-files-found: error
