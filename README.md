@@ -6,6 +6,21 @@ Features include connection profiles, local and C64U USB/SD file management,
 settings and favorites, ROM selection, configuration backups and Undo,
 live screen preview, screenshots, and WebM recordings.
 
+## Windows 10/11 (64-bit)
+
+Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.1):
+
+- **Setup.exe** installs Argonaut for your Windows user, adds a Start menu shortcut,
+  and provides an uninstaller. Profiles use AppData; saved passwords use Windows
+  Credential Manager.
+- **Portable.zip** can be extracted to a writable thumb-drive folder. Keep
+  `Argonaut.exe`, `_internal`, and `portable.flag` together. Settings and profiles
+  travel in the adjacent `Data` folder; passwords last only for the current session.
+  Exit Argonaut before ejecting the drive.
+
+Both include the required runtime and are unsigned. Add the C64U address manually
+in Connections. See [Windows instructions](packaging/windows/README.txt) for details.
+
 ## Debian 13 installation
 
 Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/latest) and install it with:
