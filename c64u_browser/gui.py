@@ -69,6 +69,11 @@ class Browser(Gtk.Application):
         return button
 
     def do_activate(self):
+        # A second launcher activation must present the existing app, not create
+        # another main window sharing the same worker and shutdown handler.
+        if getattr(self, 'window', None) in self.get_windows():
+            self.window.present()
+            return
         self.window = Gtk.ApplicationWindow(application=self, title='Argonaut — C64 Ultimate Control & Management')
         self.window.set_default_size(1050, 650)
         self.window.connect('close-request', self.close)
@@ -206,7 +211,16 @@ class Browser(Gtk.Application):
         sensitivity = [(widget, widget.get_sensitive()) for widget in self.busy_controls]
         for widget, _ in sensitivity: widget.set_sensitive(False)
         self.status.set_text('Working…')
-        future = self.pool.submit(task)
+        try:
+            future = self.pool.submit(task)
+        except Exception as exc:
+            self.busy = False
+            for widget, sensitive in sensitivity: widget.set_sensitive(sensitive)
+            error = BrowserError('Could not start the operation. Close and reopen Argonaut. '+str(exc))
+            try: done(error)
+            except Exception: pass
+            self.status.set_text(str(error))
+            return
         def finish():
             self.busy = False
             for widget, sensitive in sensitivity: widget.set_sensitive(sensitive)
@@ -761,6 +775,8 @@ class Browser(Gtk.Application):
         if self.recovery:self.recovery.close()
         self.streams_tab.close()
         self.pool.shutdown(wait=False)
+        # Child windows must not keep an application with a stopped worker alive.
+        self.quit()
         return False
 
 
