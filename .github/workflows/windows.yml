@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/windows.yml'
       - 'packaging/windows/**'
+      - 'tests/**'
+      - 'c64u_browser/**'
 permissions:
   contents: read
 jobs:
