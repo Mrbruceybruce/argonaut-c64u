@@ -36,10 +36,10 @@ in Connections. See [Windows instructions](packaging/windows/README.txt) for det
 
 ## Debian 13 installation
 
-Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.0) and install it with:
+Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.3) and install it with:
 
 ```sh
-sudo apt install ./argonaut-c64u_0.1.0_all.deb
+sudo apt install ./argonaut-c64u_0.1.3_all.deb
 ```
 
 Launch **Argonaut** from the application menu, or run `argonaut`.
