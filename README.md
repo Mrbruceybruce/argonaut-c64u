@@ -6,6 +6,9 @@ Features include connection profiles, local and C64U USB/SD file management,
 settings and favorites, ROM selection, configuration backups and Undo,
 live screen preview, screenshots, and WebM recordings.
 
+Start with the [quick-start guide](docs/QUICK-START.md) for connection setup,
+file transfers, settings, backups, and preview.
+
 ## macOS (Apple Silicon)
 
 Download the [Mac release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.2)
@@ -33,7 +36,7 @@ in Connections. See [Windows instructions](packaging/windows/README.txt) for det
 
 ## Debian 13 installation
 
-Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/latest) and install it with:
+Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.0) and install it with:
 
 ```sh
 sudo apt install ./argonaut-c64u_0.1.0_all.deb
