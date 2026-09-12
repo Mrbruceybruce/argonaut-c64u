@@ -2,9 +2,9 @@
 """Build a Debian binary package using only Python and dpkg-deb."""
 import argparse,os,shutil,subprocess,tempfile
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path(__file__).resolve().parents[1]);p.add_argument('--output',type=Path,default=Path('dist'));args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path(__file__).resolve().parents[1]);p.add_argument('--output',type=Path,default=Path('dist'));p.add_argument('--version',default='0.1.0');args=p.parse_args()
 source=args.source.resolve();assets=Path(__file__).resolve().parent;out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
-version='0.1.0';epoch=int(os.environ.get('SOURCE_DATE_EPOCH','1789240332'))
+version=args.version;epoch=int(os.environ.get('SOURCE_DATE_EPOCH','1789240332'))
 with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
  root=Path(temp)
  def write(name,text,mode=0o644):
