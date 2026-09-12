@@ -8,7 +8,7 @@ live screen preview, screenshots, and WebM recordings.
 
 ## Debian 13 installation
 
-Download the Debian package and install it with:
+Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/latest) and install it with:
 
 ```sh
 sudo apt install ./argonaut-c64u_0.1.0_all.deb
@@ -29,7 +29,7 @@ Removing or upgrading the package preserves user preferences.
 Install Python 3.11+, PyGObject, GTK 4.8+, libsecret introspection,
 GStreamer introspection and base/good plugins, iproute2 and Adwaita icons.
 The complete Debian dependency list is in `packaging/build_deb.py`.
-Run `./argonaut` in a graphical desktop session.
+Run `python3 -m c64u_browser.gui` in a graphical desktop session.
 
 ## Build and test
 
