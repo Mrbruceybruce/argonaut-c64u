@@ -16,6 +16,7 @@ def config_base():
     if root is not None:return root/"Data"
     if sys.platform == 'win32':
         return Path(os.environ.get('APPDATA') or Path.home()/'AppData'/'Roaming')
+    if sys.platform == 'darwin':return Path.home()/'Library'/'Application Support'
     base=os.environ.get('XDG_CONFIG_HOME','')
     return Path(base) if base and Path(base).is_absolute() else Path.home()/'.config'
 

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
-"""GNOME libsecret only: no plaintext or alternate-backend fallback."""
+"""Native credential stores only; no plaintext fallback."""
 import sys
 from .api import BrowserError
 from .platform_support import portable_root
@@ -8,6 +8,9 @@ from .platform_support import portable_root
 class Credentials:
     def __new__(cls):
         if portable_root() is not None:return SessionCredentials()
+        if sys.platform == "darwin":
+            from .macos_credentials import MacOSCredentials
+            return MacOSCredentials()
         if sys.platform == "win32":
             from .windows_credentials import WindowsCredentials
             return WindowsCredentials()

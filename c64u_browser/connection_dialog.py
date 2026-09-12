@@ -48,7 +48,7 @@ class ConnectionDialog:
             entry=Gtk.Entry(hexpand=True);row.append(entry);self.fields[key]=entry
         self.password = Gtk.PasswordEntry(show_peek_icon=True,placeholder_text='Network password (blank: use saved password)')
         self.controls.append(self.password)
-        self.remember = Gtk.CheckButton(label='Store entered password in '+('Windows Credential Manager' if sys.platform=='win32' else 'GNOME keyring'))
+        self.remember = Gtk.CheckButton(label='Store entered password in '+('Windows Credential Manager' if sys.platform=='win32' else 'macOS Keychain' if sys.platform=='darwin' else 'GNOME keyring'))
         if getattr(app.credentials,"session_only",False) is True:
             self.remember.set_label("Portable mode: passwords stay in this session only")
             self.remember.set_sensitive(False)
