@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Argonaut
+Comment=Control and manage your C64 Ultimate
+Exec=argonaut
+Icon=argonaut
+Terminal=false
+Categories=Network;FileTransfer;
+Keywords=C64;Commodore;Ultimate;SID;
+StartupNotify=true
