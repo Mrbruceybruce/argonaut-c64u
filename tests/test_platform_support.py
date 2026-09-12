@@ -20,7 +20,7 @@ class Platform(unittest.TestCase):
   from c64u_browser.profiles import Preferences
   with tempfile.TemporaryDirectory() as d,patch.object(sys,'frozen',True,create=True),patch.object(sys,'executable',str(Path(d)/'Argonaut.exe')):
    (Path(d)/'portable.flag').touch()
-   self.assertEqual(Preferences().path,Path(d)/'Data'/'argonaut'/'config.json')
+   self.assertEqual(Preferences().path,Path(d).resolve()/'Data'/'argonaut'/'config.json')
    creds=Credentials();self.assertTrue(creds.session_only);self.assertEqual(creds.get('id'),'')
    from c64u_browser.api import BrowserError
    with self.assertRaises(BrowserError):creds.set('id','secret')
