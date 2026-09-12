@@ -1,12 +1,11 @@
-name: Windows test package
+name: Windows packages
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/windows.yml'
-      - 'packaging/windows/**'
-      - 'tests/**'
-      - 'c64u_browser/**'
+    inputs:
+      publish:
+        description: Publish Windows 0.1.1 after all checks pass
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -14,7 +13,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -47,8 +46,28 @@ jobs:
           if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Startup test timed out' }
           if ($process.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Packaged startup failed' }
           Get-Content $report
+      - name: Build installer and portable ZIP; test install and uninstall
+        shell: pwsh
+        run: ./packaging/windows/package.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: Argonaut-Windows-x64-test
-          path: dist/Argonaut/
+          name: Argonaut-Windows-0.1.1
+          path: release-assets/
           if-no-files-found: error
+
+  publish:
+    if: inputs.publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: Argonaut-Windows-0.1.1
+          path: release-assets
+      - name: Publish both Windows packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create v0.1.1 release-assets/* --target "$GITHUB_SHA" --latest=false --title "Argonaut 0.1.1 — Windows" --notes-file packaging/windows/RELEASE.md
