@@ -1,4 +1,4 @@
-#define AppVersion "0.1.1"
+#define AppVersion "0.1.3"
 [Setup]
 AppId=Argonaut-C64U
 AppName=Argonaut
