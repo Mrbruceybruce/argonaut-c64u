@@ -3,9 +3,11 @@
 """GNOME libsecret only: no plaintext or alternate-backend fallback."""
 import sys
 from .api import BrowserError
+from .platform_support import portable_root
 
 class Credentials:
     def __new__(cls):
+        if portable_root() is not None:return SessionCredentials()
         if sys.platform == "win32":
             from .windows_credentials import WindowsCredentials
             return WindowsCredentials()
@@ -42,3 +44,12 @@ class Credentials:
     def delete(self, profile_id):
         if self.error: raise BrowserError(self.error)
         self.call(self.secret.password_clear_sync, self.schema, {'profile-id': profile_id}, None)
+
+
+class SessionCredentials:
+    """Portable profiles never read or write the host credential store."""
+    error=None
+    session_only=True
+    def get(self,profile_id):return ''
+    def set(self,profile_id,password):raise BrowserError('Portable mode keeps passwords for this session only.')
+    def delete(self,profile_id):pass

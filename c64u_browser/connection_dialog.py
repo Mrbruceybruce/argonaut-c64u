@@ -49,6 +49,9 @@ class ConnectionDialog:
         self.password = Gtk.PasswordEntry(show_peek_icon=True,placeholder_text='Network password (blank: use saved password)')
         self.controls.append(self.password)
         self.remember = Gtk.CheckButton(label='Store entered password in '+('Windows Credential Manager' if sys.platform=='win32' else 'GNOME keyring'))
+        if getattr(app.credentials,"session_only",False) is True:
+            self.remember.set_label("Portable mode: passwords stay in this session only")
+            self.remember.set_sensitive(False)
         self.controls.append(self.remember)
         self.auto = Gtk.CheckButton(label='Connect automatically at startup when this profile is selected')
         self.controls.append(self.auto)

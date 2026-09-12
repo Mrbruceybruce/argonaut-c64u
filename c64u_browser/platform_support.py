@@ -5,7 +5,15 @@ import posixpath
 import sys
 from pathlib import Path
 
+def portable_root():
+    if getattr(sys,"frozen",False):
+        root=Path(sys.executable).resolve().parent
+        if (root/"portable.flag").is_file():return root
+    return None
+
 def config_base():
+    root=portable_root()
+    if root is not None:return root/"Data"
     if sys.platform == 'win32':
         return Path(os.environ.get('APPDATA') or Path.home()/'AppData'/'Roaming')
     base=os.environ.get('XDG_CONFIG_HOME','')
