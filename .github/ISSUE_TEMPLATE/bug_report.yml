@@ -1,0 +1,55 @@
+name: Bug report
+description: Report something that is not working in Argonaut.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [quick-start guide](https://github.com/Mrbruceybruce/argonaut-c64u/blob/main/docs/QUICK-START.md) and existing issues first. Please remove passwords and private details from attachments.
+  - type: input
+    id: version
+    attributes:
+      label: Argonaut version and package
+      placeholder: "Example: 0.1.1 Windows installer, or source commit"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and hardware
+      placeholder: "Example: Debian 13; Windows 11 x64 VM; macOS 15 Apple Silicon"
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: C64U firmware and model
+      description: Use the connected-device information. Enter unknown or not connected if unavailable.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the tab, action, selected settings or file types, and whether it happens every time.
+      placeholder: |
+        1. Open...
+        2. Select...
+        3. Click...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Connection and storage details
+      description: If relevant, describe Ethernet or Wi-Fi, VM networking, local or C64U files, and USB/SD storage. No passwords are needed.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Error text and screenshots
+      description: Paste the exact error or attach a screenshot. Say whether the C64U, Argonaut, or both became unresponsive, and how you recovered.

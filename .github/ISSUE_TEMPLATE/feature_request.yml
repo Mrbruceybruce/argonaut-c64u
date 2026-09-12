@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest an improvement to Argonaut.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the task and what currently makes it difficult.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested change
+      description: Describe the behavior you would like and where it belongs in the app.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workaround or alternatives
+  - type: input
+    id: environment
+    attributes:
+      label: Relevant platform or firmware
+      placeholder: "If platform-specific, include OS, Argonaut version, and C64U firmware."
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples or screenshots
+      description: Optional. Remove passwords and private details before attaching files.
