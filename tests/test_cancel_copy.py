@@ -14,7 +14,7 @@ class CancelTests(TestCase):
             root=Path(d);source=root/'source';source.write_bytes(b'a'*2000000)
             def progress(n):self.check()
             with self.assertRaises(BrowserError):local_copy(source,root/'dest',progress)
-            self.assertEqual(list(root.iterdir()),[source])
+            self.assertEqual(len(list(root.iterdir())),1);self.assertTrue(next(root.iterdir()).samefile(source))
             folder=root/'folder';folder.mkdir()
             plan=build_plan(None,True,root,['source'],True,folder)
             progress.check=self.check

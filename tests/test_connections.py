@@ -1,3 +1,4 @@
+import os
 import json
 import os
 from pathlib import Path
@@ -65,7 +66,7 @@ class Connections(unittest.TestCase):
             loaded=Preferences(prefs.path).load()
             self.assertEqual(loaded.selected(),p);self.assertEqual(len(loaded.profiles),2)
             self.assertNotIn('password',prefs.path.read_text())
-            self.assertEqual(prefs.path.stat().st_mode & 0o777,0o600)
+            if os.name != "nt":self.assertEqual(prefs.path.stat().st_mode & 0o777,0o600)
 
     def test_old_profile_without_optional_details(self):
         p=Profile(id='old',name='Old profile',host='c64.local').validate()

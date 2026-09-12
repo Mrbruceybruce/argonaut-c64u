@@ -64,6 +64,7 @@ class FolderTests(unittest.TestCase):
         self.assertEqual(copy.call_args.args[2:4],('/USB2/folder',['a']))
     def test_case_collision_remote_destination_rejected(self):
         (self.src/'folder'/'B').write_text('collision')
+        if (self.src/'folder'/'B').samefile(self.src/'folder'/'b'):self.skipTest('Filesystem is case insensitive; distinct b and B cannot exist')
         client=Mock(); client.list_directory.return_value=('/USB2',[])
         with self.assertRaises(BrowserError): build_plan(client,True,self.src,['folder'],False,'/USB2')
     def test_upload_creates_parent_directories_before_files(self):

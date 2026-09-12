@@ -22,7 +22,7 @@ class Transfers(unittest.TestCase):
             target = Path(directory)/'file'
             self.assertEqual(download(Mock(), '/USB2/file', target)['bytes'], 3)
             self.assertEqual(target.read_bytes(), b'abc')
-            self.assertEqual(list(Path(directory).iterdir()), [target])
+            self.assertEqual(len(list(Path(directory).iterdir())),1);self.assertTrue(next(Path(directory).iterdir()).samefile(target))
 
     def test_existing_file(self):
         with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect:
