@@ -67,8 +67,14 @@ python3 packaging/build_deb.py --output dist
 ```
 
 See `packaging/RELEASE-NOTES.md` for validation and known limitations.
-The SuperCPU Detect freeze reported during an Undo test remains unresolved.
+The [C64U freeze reported during an Undo test involving SuperCPU Detect](https://github.com/Mrbruceybruce/argonaut-c64u/issues/1) remains unresolved.
 Other firmware versions may expose different capabilities.
+
+## Feedback
+
+Use the [bug-report or feature-request form](https://github.com/Mrbruceybruce/argonaut-c64u/issues/new/choose)
+to report a problem or suggest an improvement. Bug reports should include your
+OS, Argonaut package version, C64U firmware, and steps to reproduce.
 
 ## License
 
