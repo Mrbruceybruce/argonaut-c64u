@@ -1,11 +1,6 @@
-name: Windows packages
+name: Windows test packages
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish Windows 0.1.1 after all checks pass
-        type: boolean
-        default: false
 permissions:
   contents: read
 jobs:
@@ -51,23 +46,6 @@ jobs:
         run: ./packaging/windows/package.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: Argonaut-Windows-0.1.1
+          name: Argonaut-Windows-0.1.3
           path: release-assets/
           if-no-files-found: error
-
-  publish:
-    if: inputs.publish
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
-        with:
-          name: Argonaut-Windows-0.1.1
-          path: release-assets
-      - name: Publish both Windows packages
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create v0.1.1 release-assets/* --target "$GITHUB_SHA" --latest=false --title "Argonaut 0.1.1 — Windows" --notes-file packaging/windows/RELEASE.md

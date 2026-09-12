@@ -44,12 +44,12 @@ jobs:
           cp packaging/macos/README.txt LICENSE COPYRIGHT mac-package/
           brew info --json=v2 --installed > mac-package/Homebrew-packages.json
           ln -s /Applications mac-package/Applications
-          hdiutil create -volname Argonaut -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-0.1.2-macOS-AppleSilicon-Test.dmg
-          ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-0.1.2-macOS-AppleSilicon-Test.zip
-          git archive --format=zip --prefix=argonaut-0.1.2/ -o artifacts/argonaut-0.1.2-source.zip HEAD
+          hdiutil create -volname Argonaut -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-0.1.3-macOS-AppleSilicon-Test.dmg
+          ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-0.1.3-macOS-AppleSilicon-Test.zip
+          git archive --format=zip --prefix=argonaut-0.1.3/ -o artifacts/argonaut-0.1.3-source.zip HEAD
           shasum -a 256 artifacts/* > artifacts/SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: Argonaut-macOS-AppleSilicon-test
+          name: Argonaut-macOS-AppleSilicon-0.1.3-test
           path: artifacts/
           if-no-files-found: error
