@@ -1,3 +1,4 @@
+from .platform_support import local_roots, contains_path
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Compact storage selectors for mounted local volumes and C64U media."""
@@ -18,7 +19,7 @@ class DriveButtons:
  def refresh(self):
   while self.box.get_first_child():self.box.remove(self.box.get_first_child())
   if self.local:
-   locations=[('Home',str(Path.home()),'user-home-symbolic'),('Computer','/','drive-harddisk-symbolic')]
+   locations=[('Home',str(Path.home()),'user-home-symbolic')]+local_roots()
    seen={path for _,path,_ in locations}
    for mount in self.monitor.get_mounts():
     path=mount.get_root().get_path()
@@ -26,7 +27,7 @@ class DriveButtons:
      locations.append((mount.get_name(),path,'drive-removable-media-symbolic'));seen.add(path)
    self.paths=[path for _,path,_ in locations]
    current=str(self.app.local)
-   matches=[p for p in self.paths if current==p or current.startswith(p.rstrip('/')+'/')]
+   matches=[p for p in self.paths if contains_path(p,current)]
    self.app.local_root=Path(max(matches,key=len)) if matches else Path.home()
    selected=str(self.app.local_root)
   else:

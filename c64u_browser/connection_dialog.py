@@ -1,3 +1,4 @@
+import sys
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Connection UI delegates transport, discovery and persistence to shared components."""
@@ -47,7 +48,7 @@ class ConnectionDialog:
             entry=Gtk.Entry(hexpand=True);row.append(entry);self.fields[key]=entry
         self.password = Gtk.PasswordEntry(show_peek_icon=True,placeholder_text='Network password (blank: use saved password)')
         self.controls.append(self.password)
-        self.remember = Gtk.CheckButton(label='Store entered password in GNOME keyring')
+        self.remember = Gtk.CheckButton(label='Store entered password in '+('Windows Credential Manager' if sys.platform=='win32' else 'GNOME keyring'))
         self.controls.append(self.remember)
         self.auto = Gtk.CheckButton(label='Connect automatically at startup when this profile is selected')
         self.controls.append(self.auto)
@@ -152,7 +153,7 @@ class ConnectionDialog:
         entered, remember = self.password.get_text(), self.remember.get_active()
         def done(p):
             self.current_id=p.id; self.reload(); self.app.update_connection_header()
-            password_note=('Password saved in GNOME keyring.' if remember else 'Entered password is available for this session only.') if entered else 'Saved password unchanged.'
+            password_note=('Password saved in the system credential store.' if remember else 'Entered password is available for this session only.') if entered else 'Saved password unchanged.'
             self.status.set_text('Profile saved. '+password_note)
         self.submit(lambda:self.persist(p,entered,remember),done)
 

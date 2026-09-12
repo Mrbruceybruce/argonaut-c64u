@@ -1,3 +1,4 @@
+from .platform_support import publish_new
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Conservative transfers, separate from presentation and device controls."""
@@ -69,14 +70,14 @@ def download(client, source, destination, progress=lambda n: None):
             raise BrowserError('Remote size changed or transfer was incomplete; no destination published.')
         # Hard-link publication is atomic and refuses even a concurrently created destination.
         check()
-        os.link(temporary, destination)
+        publish_new(temporary, destination)
         return {'path': str(destination), 'bytes': count, 'sha256': digest.hexdigest()}
     except (OSError, EOFError, ftplib.Error, ValueError) as exc:
         raise BrowserError(f'Download failed: {exc}') from exc
     finally:
         if ftp is not None:
             ftp.close()
-        if temporary is not None:
+        if temporary is not None and os.path.exists(temporary):
             os.unlink(temporary)
 
 

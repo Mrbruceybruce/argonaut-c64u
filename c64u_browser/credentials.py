@@ -1,9 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """GNOME libsecret only: no plaintext or alternate-backend fallback."""
+import sys
 from .api import BrowserError
 
 class Credentials:
+    def __new__(cls):
+        if sys.platform == "win32":
+            from .windows_credentials import WindowsCredentials
+            return WindowsCredentials()
+        return super().__new__(cls)
+
     def __init__(self):
         self.error = None
         try:

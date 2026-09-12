@@ -1,3 +1,4 @@
+from .platform_support import publish_new
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """File-only copies; remote work shares the verified transfer implementation."""
@@ -46,10 +47,10 @@ def local_copy(source, destination, progress):
         if verified.digest() != digest.digest():
             raise BrowserError('Copy verification failed.')
         getattr(progress, 'check', lambda:None)()
-        os.link(temporary, destination)
+        publish_new(temporary, destination)
         return {'path': str(destination)}
     finally:
-        if temporary is not None: os.unlink(temporary)
+        if temporary is not None and os.path.exists(temporary): os.unlink(temporary)
 
 
 def copy_files(client, source_local, parent, names, local, destination, progress=lambda n: None):

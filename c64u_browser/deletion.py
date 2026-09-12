@@ -1,3 +1,4 @@
+from .platform_support import parents
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Review a bounded deletion snapshot; never recursively delete unseen entries."""
@@ -36,7 +37,7 @@ def prepare(client,local,targets):
         if path in seen:return
         if depth>64 or len(seen)>=10000:raise BrowserError('Select fewer than 10,000 items and 64 folder levels.')
         seen.add(path)
-        if local and Path(path).absolute()==Path('/'):raise BrowserError('Cannot delete the filesystem root.')
+        if local and Path(path).absolute().parent==Path(path).absolute():raise BrowserError('Cannot delete the filesystem root.')
         if not local and (path=='/' or storage_root(path)==path):raise BrowserError('Cannot delete a storage root.')
         item=snapshot(client,local,path)
         if item.kind=='dir':
@@ -55,11 +56,9 @@ def delete_reviewed(client,local,targets,items):
             raise BrowserError('Contents changed since review. Review the deletion again.')
         directories={i.path:i for i in items if i.kind=='dir'}
         for item in items:
-            parent=str(Path(item.path).parent)
-            while parent!='/':
+            for parent in parents(item.path,local):
                 if parent in directories and snapshot(client,local,parent)!=directories[parent]:
                     raise BrowserError('Parent folder changed: '+parent)
-                parent=str(Path(parent).parent)
             if snapshot(client,local,item.path)!=item:
                 raise BrowserError('Item changed since review: '+item.path)
             if local:

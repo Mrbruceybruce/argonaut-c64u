@@ -1,3 +1,4 @@
+from .platform_support import parents, contains_path
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Read-only recursive planning followed by conservative, sequential copying."""
@@ -71,7 +72,7 @@ def build_plan(client, source_local, parent, names, local, destination, check=la
         if source_kind == 'dir' and source_local == local:
             src = str(Path(source).resolve()) if local else str(source).casefold()
             dst = str(destination) if local else str(destination).casefold()
-            if dst == src or dst.startswith(src.rstrip('/')+'/'):
+            if (contains_path(src,dst) if local else dst == src or dst.startswith(src.rstrip('/')+'/')):
                 raise BrowserError('A folder cannot be copied into itself or one of its subfolders.')
         key = str(dest) if local else str(dest).casefold()
         if key in seen: raise BrowserError('Two source names map to the same destination: '+str(dest))
@@ -112,11 +113,9 @@ def execute_plan(client, plan, source_local, local, progress=lambda n:None):
                 raise BrowserError('Source changed since the copy was prepared: '+str(step.source))
             # Recheck every destination ancestor used by this plan, so a changed
             # directory cannot redirect later writes through a local symlink.
-            ancestor = posixpath.dirname(str(step.destination))
-            while ancestor and ancestor != '/':
+            for ancestor in parents(step.destination,local):
                 if ancestor in checked_directories and kind(client,local,ancestor) != 'dir':
                     raise BrowserError('Destination folder changed: '+ancestor)
-                ancestor = posixpath.dirname(ancestor)
             target_kind = kind(client,local,step.destination)
             if step.signature is not None:
                 replace_file(client,step,source_local,local,progress)

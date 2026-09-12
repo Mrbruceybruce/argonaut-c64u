@@ -57,10 +57,11 @@ class Profile:
     def client(self, password=''):
         return UltimateClient(self.host, password, port=self.ftp_port, http_port=self.http_port)
 
+from .platform_support import config_base
+
 class Preferences:
     def __init__(self, path=None):
-        base = os.environ.get('XDG_CONFIG_HOME', '')
-        base = Path(base) if base and Path(base).is_absolute() else Path.home()/'.config'
+        base = config_base()
         self.path = Path(path) if path else base/'argonaut'/'config.json'
         self.profiles = []
         self.selected_id = None
