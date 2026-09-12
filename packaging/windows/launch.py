@@ -7,7 +7,13 @@ if '--self-test' in sys.argv:
  from gi.repository import Gtk,Gio,Gst
  from c64u_browser.gui import Browser
  from c64u_browser.profiles import Preferences
- from c64u_browser.platform_support import publish_new,local_roots
+ from c64u_browser.platform_support import publish_new,local_roots,portable_root
+ from c64u_browser.credentials import Credentials
+ root=portable_root()
+ if root:
+  assert Preferences().path == root/"Data"/"argonaut"/"config.json"
+  assert getattr(Credentials(),"session_only",False)
+  prefs=Preferences();prefs.save();assert prefs.path.is_file()
  Gst.init(None)
  for name in ['appsrc','audioconvert','audioresample','autoaudiosink','webmmux','vp8enc','vorbisenc','videoconvert']:
   assert Gst.ElementFactory.find(name),name
@@ -19,6 +25,8 @@ if '--self-test' in sys.argv:
   src=Path(d)/'a';dst=Path(d)/'b';src.write_bytes(b'test');publish_new(src,dst);assert dst.read_bytes()==b'test'
  Path(sys.argv[sys.argv.index('--self-test')+1]).write_text(json.dumps({'result':'passed','platform':sys.platform}))
 else:
- os.chdir(Path.home())
+ from c64u_browser.platform_support import portable_root
+ root=portable_root()
+ os.chdir(root or Path.home())
  from c64u_browser.gui import main
  main()

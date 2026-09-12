@@ -1,19 +1,31 @@
-Argonaut — Windows x64 test build
+Argonaut 0.1.1 — Windows x64
 
-Extract the entire ZIP into a folder, then open Argonaut.exe.
-Keep the _internal folder beside the executable. No Python or MSYS2 installation is needed.
+PORTABLE ZIP
+Extract the entire ZIP into a writable folder on your thumb drive.
+Open Argonaut.exe. Keep _internal and portable.flag beside the executable.
+Profiles, favorites and configuration recovery data stay in Data\argonaut.
+Passwords are session-only and never read from or written to the host credential store.
+Exit Argonaut before safely removing the drive. Keep portable.flag when upgrading;
+replace the application files but preserve your Data folder.
+Saved screenshot/recording locations are absolute paths; choose a new destination
+if a drive letter changes or you move to another PC.
 
-Windows 10/11 x64 is the initial test target. This build is unsigned.
-Preferences: %APPDATA%\argonaut. Passwords: Windows Credential Manager.
-Use a bridged network adapter in a VM. Connect to the C64U by its LAN address.
-Screen preview requires Ethernet on the C64U and inbound UDP 11000–11001.
-If Windows Firewall asks, allow access only on your trusted private network.
+INSTALLER
+Run the Setup EXE. Installation is per-user; administrator rights are not required.
+The installer adds a Start-menu shortcut and optional desktop shortcut.
+Uninstall through Windows Settings > Apps. Profiles remain in %APPDATA%\argonaut,
+and saved passwords remain in Windows Credential Manager. Uninstall preserves them.
 
-Initial limitations: automatic subnet suggestions and MAC fallback are Linux-only;
-enter the device IP/subnet manually and use the C64U Default unique ID.
-Click Refresh to rescan local drives after USB insertion/removal.
+No Python or MSYS2 installation is needed. Windows 10/11 x64 is the initial target.
+These builds are unsigned. In a VM use bridged networking and connect by LAN IP.
+Preview needs Ethernet on the C64U and inbound UDP 11000–11001 on the Windows PC.
+Neither package changes firewall rules. Allow only your trusted private network.
+
+Automatic subnet suggestions and MAC fallback remain Linux-only; enter the IP/subnet
+manually and use the C64U Default unique ID. Refresh rescans local drives.
 The SuperCPU Detect freeze documented in the Debian release remains unresolved.
 
-Argonaut: GPL-3.0-or-later, copyright 2026 Bruce Marcus. See LICENSE/COPYRIGHT.
-Runtime libraries retain their own licenses, included under _internal/third-party-licenses.
-The build workflow records MSYS2 package versions for the runtime dependencies.
+Argonaut: GPL-3.0-or-later, copyright 2026 Bruce Marcus. See LICENSE and COPYRIGHT.
+Runtime libraries retain their own licenses under _internal/third-party-licenses.
+MSYS2-PACKAGES.txt records build dependency versions; upstream source packages:
+https://mirror.msys2.org/mingw/sources/
