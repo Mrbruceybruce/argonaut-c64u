@@ -11,6 +11,6 @@ pyz=PYZ(a.pure)
 exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Argonaut',console=False,target_arch='arm64')
 coll=COLLECT(exe,a.binaries,a.datas,name='Argonaut')
 app=BUNDLE(coll,name='Argonaut.app',bundle_identifier='org.argonaut.c64u',
- info_plist={'CFBundleShortVersionString':'0.1.2','CFBundleVersion':'0.1.2',
+ info_plist={'CFBundleShortVersionString':'0.1.3','CFBundleVersion':'0.1.3',
  'NSHighResolutionCapable':True,'LSMinimumSystemVersion':'15.0',
  'NSLocalNetworkUsageDescription':'Argonaut connects to your C64 Ultimate to manage files, settings, and screen preview.'})
