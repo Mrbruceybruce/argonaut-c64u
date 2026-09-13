@@ -21,6 +21,11 @@ if '--self-test' in sys.argv:
  with tempfile.TemporaryDirectory() as d:
   app=Browser();app.preferences=Preferences(Path(d)/'config.json');app.set_flags(Gio.ApplicationFlags.NON_UNIQUE);app.register(None);app.activate()
   assert app.window and local_roots()
+  from c64u_browser.about import show_about
+  from c64u_browser.version import ASSETS,build_info
+  assert (ASSETS/'about-background.png').is_file() and (ASSETS/'argonaut.png').is_file()
+  assert build_info()['version']=='0.1.4' and 'unpackaged' not in build_info()['build']
+  about=show_about(app);assert about is show_about(app);about.close();assert app.about_window is None
   app.recovery.close();app.window.close();app.quit()
   src=Path(d)/'a';dst=Path(d)/'b';src.write_bytes(b'test');publish_new(src,dst);assert dst.read_bytes()==b'test'
  Path(sys.argv[sys.argv.index('--self-test')+1]).write_text(json.dumps({'result':'passed','platform':sys.platform}))

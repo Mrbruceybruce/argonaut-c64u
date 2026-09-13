@@ -10,7 +10,7 @@ $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler is unavailable' }
 & $iscc packaging/windows/installer.iss
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
-$setup = Join-Path $assets 'Argonaut-0.1.3-Windows-x64-Setup.exe'
+$setup = Join-Path $assets 'Argonaut-0.1.4-Windows-x64-Setup.exe'
 $installed = Join-Path $env:RUNNER_TEMP 'Argonaut Install Test'
 Run-Checked $setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installed`"")
 if (Test-Path "$installed\portable.flag") { throw 'Installer incorrectly enabled portable mode' }
@@ -31,8 +31,8 @@ Run-Checked "$bundle\Argonaut.exe" @('--self-test',"`"$report`"")
 if (-not (Test-Path $report)) { throw 'Portable executable self-test failed' }
 if (-not (Test-Path "$bundle\Data\argonaut\config.json")) { throw 'Portable preferences missing' }
 Remove-Item "$bundle\Data" -Recurse -Force
-Compress-Archive -Path "$bundle\*" -DestinationPath "$assets\Argonaut-0.1.3-Windows-x64-Portable.zip"
-git archive --format=zip --prefix=argonaut-0.1.3/ -o "$assets\argonaut-0.1.3-source.zip" HEAD
+Compress-Archive -Path "$bundle\*" -DestinationPath "$assets\Argonaut-0.1.4-Windows-x64-Portable.zip"
+git archive --format=zip --prefix=argonaut-0.1.4/ -o "$assets\argonaut-0.1.4-source.zip" HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
 Get-ChildItem $assets -File | Sort-Object Name | ForEach-Object {
   $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
