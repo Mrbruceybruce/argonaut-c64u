@@ -13,11 +13,12 @@ jobs:
         run: |
           test "$(uname -m)" = x86_64
           # The hosted Intel image includes python.org symlinks that conflict
-          # with Homebrew. Remove only these known links on this disposable VM.
+          # with Homebrew. Preserve these links outside PATH on this disposable VM.
+          mkdir -p "$RUNNER_TEMP/python-links"
           for name in idle3.13 pip3.13 pydoc3.13 python3.13 python3.13-config; do
             link="/usr/local/bin/$name"
-            if [ -L "$link" ] && [ "$(readlink "$link")" = "/Library/Frameworks/Python.framework/Versions/3.13/bin/$name" ]; then
-              rm "$link"
+            if [ -L "$link" ]; then
+              mv "$link" "$RUNNER_TEMP/python-links/$name"
             fi
           done
           brew install python@3.13 pygobject3 gtk4 gstreamer adwaita-icon-theme
