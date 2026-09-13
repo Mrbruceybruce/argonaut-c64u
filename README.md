@@ -94,6 +94,12 @@ See `packaging/RELEASE-NOTES.md` for validation and known limitations.
 The [C64U freeze reported during an Undo test involving SuperCPU Detect](https://github.com/Mrbruceybruce/argonaut-c64u/issues/1) remains unresolved.
 Other firmware versions may expose different capabilities.
 
+## Development roadmap
+
+See the [feature roadmap](docs/ROADMAP.md) and the
+[focused OBS integration proposal](docs/OBS-INTEGRATION-PROPOSAL.md).
+These are plans; existing WebM recording remains supported.
+
 ## Feedback
 
 Use the [bug-report or feature-request form](https://github.com/Mrbruceybruce/argonaut-c64u/issues/new/choose)
