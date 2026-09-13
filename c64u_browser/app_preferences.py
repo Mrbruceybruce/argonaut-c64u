@@ -25,7 +25,7 @@ def validate(options):
 
 
 def show_preferences(app):
-    from gi.repository import Gtk
+    from gi.repository import Gtk,Gio
     from pathlib import Path
     if app.preferences_error:
         app.status.set_text(app.preferences_error);return
@@ -41,9 +41,32 @@ def show_preferences(app):
     row=Gtk.Box(spacing=8);box.append(row);row.append(Gtk.Label(label='Preview scale (%)'))
     scale=Gtk.SpinButton.new_with_range(50,200,1);scale.set_value(prefs.app_options['preview_scale']);row.append(scale)
     folders={}
+    active_chooser=[None]
+    def close_chooser(*_):
+        if active_chooser[0]:
+            active_chooser[0].destroy();active_chooser[0]=None
+        return False
+    dialog.connect('close-request',close_chooser)
+    def browse(_,entry,label):
+        if active_chooser[0]:return
+        chooser=Gtk.FileChooserNative.new('Choose '+label.lower(),dialog,Gtk.FileChooserAction.SELECT_FOLDER,'Select','Cancel')
+        chooser.set_modal(True);active_chooser[0]=chooser
+        current=Path(entry.get_text()).expanduser() if entry.get_text() else Path.home()
+        if current.is_dir():chooser.set_current_folder(Gio.File.new_for_path(str(current.absolute())))
+        def chosen(_,code):
+            selected=chooser.get_file() if code==Gtk.ResponseType.ACCEPT else None
+            close_chooser()
+            if selected:
+                path=selected.get_path()
+                if path:entry.set_text(path)
+                else:error.set_text('Choose a local folder.')
+        chooser.connect('response',chosen);chooser.show()
     for key,label in [('screenshot_folder','Screenshot folder'),('recording_folder','Recording folder')]:
         box.append(Gtk.Label(label=label,xalign=0))
-        entry=Gtk.Entry(text=getattr(prefs,key),placeholder_text='Last used, or home if blank',hexpand=True);box.append(entry);folders[key]=entry
+        folderrow=Gtk.Box(spacing=8);box.append(folderrow)
+        entry=Gtk.Entry(text=getattr(prefs,key),placeholder_text='Last used, or home if blank',hexpand=True);folderrow.append(entry);folders[key]=entry
+        button=Gtk.Button(label='Browse…');folderrow.append(button)
+        button.connect('clicked',browse,entry,label)
     note=Gtk.Label(label='Preview audio applies to the next preview session. Reset keeps connection profiles and C64U settings.',wrap=True,xalign=0);box.append(note)
     error=Gtk.Label(wrap=True,xalign=0);box.append(error)
     reset=Gtk.Button(label='Reset preferences');box.append(reset)
@@ -55,6 +78,7 @@ def show_preferences(app):
         for entry in folders.values():entry.set_text('')
     reset.connect('clicked',reset_fields)
     def response(_,code):
+        close_chooser()
         if code!=Gtk.ResponseType.OK:dialog.destroy();return
         values={key:entry.get_text().strip() for key,entry in folders.items()}
         for key,value in values.items():
