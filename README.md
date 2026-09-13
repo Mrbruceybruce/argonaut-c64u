@@ -11,7 +11,7 @@ file transfers, settings, backups, and preview.
 
 ## macOS (Apple Silicon)
 
-Download the [Mac release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.2)
+Download the [Mac release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4)
 for **macOS 15 or newer**. Open the DMG and drag Argonaut into Applications.
 The ZIP contains the same app. Python, GTK, and media libraries are included.
 Profiles use `~/Library/Application Support/argonaut`; passwords use macOS Keychain.
@@ -21,7 +21,7 @@ This build is ad-hoc signed and has not been Apple-notarized. macOS may require
 
 ## Windows 10/11 (64-bit)
 
-Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.1):
+Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4):
 
 - **Setup.exe** installs Argonaut for your Windows user, adds a Start menu shortcut,
   and provides an uninstaller. Profiles use AppData; saved passwords use Windows
@@ -36,10 +36,10 @@ in Connections. See [Windows instructions](packaging/windows/README.txt) for det
 
 ## Debian 13 installation
 
-Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.3) and install it with:
+Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4) and install it with:
 
 ```sh
-sudo apt install ./argonaut-c64u_0.1.3_all.deb
+sudo apt install ./argonaut-c64u_0.1.4_all.deb
 ```
 
 Launch **Argonaut** from the application menu, or run `argonaut`.
@@ -51,6 +51,8 @@ Installation does not change firewall rules or device settings.
 Profiles and preferences use `$XDG_CONFIG_HOME/argonaut` (normally
 `~/.config/argonaut`). Saved passwords use the desktop Secret Service.
 Removing or upgrading the package preserves user preferences.
+
+Use **About** beside Connections to check the running version and build identifier.
 
 ## Screenshots
 
