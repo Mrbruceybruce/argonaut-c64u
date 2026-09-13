@@ -22,8 +22,20 @@ class StreamsTab:
         self.capture_button.connect('clicked',self.capture)
         self.capture_chooser=None
         self.audio=Gtk.CheckButton(label='Play audio on this computer',active=True);row.append(self.audio)
-        self.picture=Gtk.Picture(hexpand=True,vexpand=True,can_shrink=True)
-        self.picture.set_size_request(384,240);self.box.append(self.picture)
+        zoomrow=Gtk.Box(spacing=8);self.box.append(zoomrow)
+        zoomrow.append(Gtk.Label(label='Preview scale'))
+        self.zoom=Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL,1,4,.25)
+        self.zoom.set_hexpand(True);self.zoom.set_draw_value(False);self.zoom.set_value(2)
+        self.zoom.set_tooltip_text('Enlarge the preview. Scroll to see areas outside the window.')
+        zoomrow.append(self.zoom)
+        self.zoom_label=Gtk.Label(label='200%');zoomrow.append(self.zoom_label)
+        self.preview_height=240
+        self.picture=Gtk.Picture(can_shrink=True,halign=Gtk.Align.CENTER,valign=Gtk.Align.CENTER)
+        self.preview_scroll=Gtk.ScrolledWindow(hexpand=True,vexpand=True,min_content_height=200)
+        self.preview_scroll.set_policy(Gtk.PolicyType.AUTOMATIC,Gtk.PolicyType.AUTOMATIC)
+        self.preview_scroll.set_child(self.picture);self.box.append(self.preview_scroll)
+        self.zoom.connect('value-changed',self.scale_preview)
+        self.scale_preview()
         self.status=Gtk.Label(xalign=0,wrap=True);self.box.append(self.status)
         self.capture_status=Gtk.Label(xalign=0,wrap=True,selectable=True);self.box.append(self.capture_status)
         self.box.append(Gtk.Label(label='Requires wired Ethernet on the C64U. Preview includes the Ultimate menu on tested Spiffy 1.1.0s2 firmware. Colors use a standard preview palette. Starting video replaces any existing video/debug stream; audio replaces any existing audio stream.',xalign=0,wrap=True))
@@ -85,6 +97,8 @@ class StreamsTab:
                 rgb=rgb_frame(packed)
                 texture=Gdk.MemoryTexture.new(384,height,Gdk.MemoryFormat.R8G8B8,GLib.Bytes.new(rgb),384*3)
                 self.picture.set_paintable(texture)
+                if height!=self.preview_height:
+                    self.preview_height=height;self.scale_preview()
                 self.capture_button.set_sensitive(self.capture_chooser is None)
             if self.recorder and not self.recorder.finishing:
                 try:self.recorder.feed((height,rgb) if frame else None,samples)
@@ -196,3 +210,8 @@ class StreamsTab:
             if self.client is not client:return
             self.text_status.set_text(str(result) if isinstance(result,Exception) else f'Sent {result} bytes. Check the C64U screen.')
         self.app.run(task,done)
+
+    def scale_preview(self,*_):
+        factor=self.zoom.get_value()
+        self.zoom_label.set_text(f'{factor*100:.0f}%')
+        self.picture.set_size_request(round(384*factor),round(self.preview_height*factor))
