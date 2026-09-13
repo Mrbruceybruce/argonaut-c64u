@@ -4,6 +4,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import posixpath
+import sys
 import time
 import uuid
 from threading import Event
@@ -67,6 +68,19 @@ class Browser(Gtk.Application):
         button.set_tooltip_text(label)
         button.update_property([Gtk.AccessibleProperty.LABEL], [label])
         return button
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        # GTK's macOS/Quartz backend only enables the app-menu "Quit" item and
+        # the Cmd+Q accelerator if an "app.quit" action actually exists; without
+        # this, both stay permanently disabled on macOS (Linux/Windows menus are
+        # unaffected, since this app doesn't build its own menubar there).
+        quit_action = Gio.SimpleAction.new('quit', None)
+        quit_action.connect('activate', lambda *_: self.close())
+        self.add_action(quit_action)
+        accel = '<Meta>q' if sys.platform == 'darwin' else '<Primary>q'
+        self.set_accels_for_action('app.quit', [accel])
+
 
     def do_activate(self):
         # A second launcher activation must present the existing app, not create
