@@ -44,14 +44,20 @@ class VideoDecoder:
             return self.height,bytes(self.buffer[:192*self.height])
 
 class AudioDecoder:
-    def __init__(self):self.sequence=None;self.missing=0;self.invalid=0
+    def __init__(self):self.sequence=None;self.missing=0;self.invalid=0;self.resets=0;self.late=0
     def feed(self,data):
         if len(data)!=770:self.invalid+=1;return
         sequence=struct.unpack_from('<H',data)[0]
         if self.sequence is not None:
             delta=(sequence-self.sequence)&0xffff
-            if delta==0 or delta>=0x8000:return
-            self.missing+=delta-1
+            if delta==0:return
+            if sequence==0 and 4096 < self.sequence < 65000:
+                self.resets+=1
+            elif delta>=0x8000:
+                self.late+=1;return
+            elif delta>4096:
+                self.resets+=1
+            else:self.missing+=delta-1
         self.sequence=sequence
         return data[2:]
 
@@ -63,6 +69,7 @@ class Receiver:
         self.sockets={};self.stopping=threading.Event();self.lock=threading.Lock()
         self.video=VideoDecoder();self.audio=AudioDecoder();self.latest=None
         self.samples=deque(maxlen=24);self.frames=0;self.audio_packets=0
+        self.video_packets=0;self.video_superseded=0;self.audio_evictions=0;self.with_audio=audio
         self.last_video=0;self.last_audio=0;self.error='';self.started=time.monotonic()
         try:
             for name,port in [('video',11000)]+([('audio',11001)] if audio else []):
@@ -82,14 +89,18 @@ class Receiver:
                     data,peer=sock.recvfrom(2048)
                     if peer[0]!=self.peer:continue
                     name=self.sockets[sock]
-                    if name=='video':
-                        frame=self.video.feed(data)
-                        if frame:
-                            with self.lock:self.latest=frame;self.frames+=1;self.last_video=time.monotonic()
-                    else:
-                        pcm=self.audio.feed(data)
-                        if pcm:
-                            with self.lock:self.samples.append(pcm);self.audio_packets+=1;self.last_audio=time.monotonic()
+                    with self.lock:
+                        if name=='video':
+                            self.video_packets+=1
+                            frame=self.video.feed(data)
+                            if frame:
+                                if self.latest is not None:self.video_superseded+=1
+                                self.latest=frame;self.frames+=1;self.last_video=time.monotonic()
+                        else:
+                            pcm=self.audio.feed(data)
+                            if pcm:
+                                if len(self.samples)==self.samples.maxlen:self.audio_evictions+=1
+                                self.samples.append(pcm);self.audio_packets+=1;self.last_audio=time.monotonic()
         except (OSError,ValueError) as exc:
             if not self.stopping.is_set():self.error=str(exc)
 
@@ -98,6 +109,18 @@ class Receiver:
             frame=self.latest;self.latest=None
             samples=list(self.samples);self.samples.clear()
         return frame,samples
+
+    def snapshot(self):
+        with self.lock:
+            now=time.monotonic()
+            return dict(peer=self.peer,address=self.address,frames=self.frames,
+                video_packets=self.video_packets,audio_packets=self.audio_packets,
+                invalid_video=self.video.invalid,incomplete_video=self.video.incomplete,
+                invalid_audio=self.audio.invalid,missing_audio=self.audio.missing,
+                audio_resets=self.audio.resets,audio_evictions=self.audio_evictions,
+                video_superseded=self.video_superseded,with_audio=self.with_audio,
+                video_age=now-self.last_video if self.last_video else None,
+                audio_age=now-self.last_audio if self.last_audio else None)
 
     def close(self):
         self.stopping.set()
@@ -110,7 +133,7 @@ class AudioOutput:
         import gi
         gi.require_version('Gst','1.0')
         from gi.repository import Gst
-        self.Gst=Gst;Gst.init(None)
+        self.Gst=Gst;Gst.init(None);self.dropped=0
         self.pipeline=Gst.parse_launch('appsrc name=source is-live=true format=time do-timestamp=true block=false max-bytes=8192 caps="audio/x-raw,format=S16LE,rate=48000,channels=2,layout=interleaved" ! queue max-size-buffers=24 max-size-bytes=0 max-size-time=0 leaky=downstream ! audioconvert ! audioresample ! autoaudiosink sync=false')
         self.source=self.pipeline.get_by_name('source')
         self.pipeline.set_state(Gst.State.PLAYING)
@@ -121,7 +144,8 @@ class AudioOutput:
         if message:
             error,_=message.parse_error();raise RuntimeError(error.message)
         for chunk in chunks:
-            if self.source.get_property('current-level-bytes')>8192:continue
+            if self.source.get_property('current-level-bytes')>8192:
+                self.dropped+=1;continue
             buffer=Gst.Buffer.new_allocate(None,len(chunk),None);buffer.fill(0,chunk)
             self.source.emit('push-buffer',buffer)
 

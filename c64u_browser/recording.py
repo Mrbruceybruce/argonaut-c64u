@@ -6,13 +6,22 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from .platform_support import publish_new
 import gi
 gi.require_version('Gst','1.0')
 from gi.repository import Gst
 
+def destination_signature(path):
+ p=Path(path)
+ if not os.path.lexists(p):return None
+ if p.is_symlink() or not p.is_file():raise RuntimeError('Recording destination is not a regular file.')
+ st=p.stat();return (st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns)
+
 class Recorder:
- def __init__(self,path,height,audio=True):
+ def __init__(self,path,height,audio=True,expected=None):
   Gst.init(None)
+  if destination_signature(path)!=expected:raise RuntimeError('Recording destination changed or already exists; choose a new file.')
+  self.expected=expected;self.frames=0
   self.path=path;self.height=height;self.audio=audio;self.started=time.monotonic()
   self.finishing=False;self.done=False;self.error='';self.audio_pts=None;self.last_video=-1
   fd,self.temporary=tempfile.mkstemp(prefix='.argonaut-recording-',suffix='.webm',dir=Path(path).parent);os.close(fd)
@@ -41,7 +50,7 @@ class Recorder:
    height,rgb=frame
    if height!=self.height:raise RuntimeError('Video mode changed; start a new recording for the new mode.')
    pts=max(now,self.last_video+1);self.last_video=pts
-   self.push(self.video,rgb,pts,Gst.SECOND//30)
+   self.push(self.video,rgb,pts,Gst.SECOND//30);self.frames+=1
   if self.sound and samples:
    duration=len(samples)*192*Gst.SECOND//48000
    if self.audio_pts is None:self.audio_pts=max(0,now-duration)
@@ -62,6 +71,10 @@ class Recorder:
    if not message:raise RuntimeError('Timed out finalizing recording.')
    if message.type==Gst.MessageType.ERROR:raise RuntimeError(message.parse_error()[0].message)
    self.pipeline.set_state(Gst.State.NULL)
-   os.replace(self.temporary,self.path)
+   if destination_signature(self.path)!=self.expected:raise RuntimeError('Recording destination changed; the new recording was not published.')
+   if self.expected is None:
+    publish_new(self.temporary,self.path)
+    if os.path.exists(self.temporary):os.unlink(self.temporary)
+   else:os.replace(self.temporary,self.path)
   except Exception as exc:self.error=(self.error+' '+str(exc)).strip()+f' Partial file: {self.temporary}'
   finally:self.pipeline.set_state(Gst.State.NULL);self.done=True
