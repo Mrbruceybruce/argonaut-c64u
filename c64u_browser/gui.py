@@ -79,7 +79,7 @@ class Browser(Gtk.Application):
         from .version import ASSETS
         Gtk.IconTheme.get_for_display(self.window.get_display()).add_search_path(str(ASSETS))
         self.window.set_icon_name('argonaut')
-        self.window.set_default_size(1050, 650)
+        self.window.set_default_size(1200, 850)
         self.window.connect('close-request', self.close)
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         for side in ('top', 'bottom', 'start', 'end'): getattr(outer, 'set_margin_' + side)(12)
