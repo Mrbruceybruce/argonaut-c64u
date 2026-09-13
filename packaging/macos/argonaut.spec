@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from pathlib import Path
+import platform
 root=Path(SPECPATH).parents[1]
 a=Analysis([str(root/'packaging/windows/launch.py')],pathex=[str(root)],
  datas=[(str(root/'c64u_browser/assets'),'c64u_browser/assets'),(str(root/'c64u_browser/_build.json'),'c64u_browser'),(str(root/'LICENSE'),'.'),(str(root/'COPYRIGHT'),'.')],
@@ -8,7 +9,7 @@ a=Analysis([str(root/'packaging/windows/launch.py')],pathex=[str(root)],
  'gstreamer':{'include_plugins':['coreelements','app','audioconvert','audioresample','autodetect','osxaudio','videoconvertscale','vpx','vorbis','ogg','matroska','typefindfunctions','playback','volume']}},
  excludes=['gi.repository.Secret'])
 pyz=PYZ(a.pure)
-exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Argonaut',console=False,target_arch='arm64')
+exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Argonaut',console=False,target_arch=platform.machine())
 coll=COLLECT(exe,a.binaries,a.datas,name='Argonaut')
 app=BUNDLE(coll,name='Argonaut.app',icon=str(root/'packaging/icons/argonaut.icns'),bundle_identifier='org.argonaut.c64u',
  info_plist={'CFBundleShortVersionString':'0.1.4','CFBundleVersion':'0.1.4',
