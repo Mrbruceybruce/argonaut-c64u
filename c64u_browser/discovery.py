@@ -65,8 +65,8 @@ def query(sock, name, kind=12):
     sock.sendto(struct.pack('!6H',0,0,1,0,0,0)+q+struct.pack('!HH',kind,0x8001), ('224.0.0.251',5353))
 
 
-def ident_scan(seconds=2):
-    """Maintainer's json + nonce protocol; one broadcast per connected IPv4 LAN."""
+def ident_scan(seconds=3):
+    """Maintainer's json + nonce protocol; repeated bounded broadcasts on connected IPv4 LANs."""
     nonce = 'argo-' + uuid.uuid4().hex[:12]
     candidates = {}
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -76,17 +76,23 @@ def ident_scan(seconds=2):
             raise BrowserError('Discovery reply port 64640 is busy. Close another scan and retry, or use Scan subnet.') from exc
         sock.settimeout(.2)
         networks = [ipaddress.ip_network(n) for n in local_networks()]
-        for network in networks:
-            sock.sendto(('json'+nonce).encode(), (str(network.broadcast_address), 64))
-        sock.sendto(('json'+nonce).encode(), ('255.255.255.255', 64))
-        deadline = time.monotonic()+seconds
+        if not networks:raise BrowserError('No connected private IPv4 network found. Check the network connection or connect by IP address.')
+        targets={str(n.broadcast_address) for n in networks}|{'255.255.255.255'}
+        deadline=time.monotonic()+seconds
+        next_send=0
         while time.monotonic()<deadline:
+            if time.monotonic()>=next_send:
+                for target in targets:
+                    try:sock.sendto(('json'+nonce).encode(),(target,64))
+                    except OSError:pass
+                next_send=time.monotonic()+1
             try:
                 payload, sender = sock.recvfrom(4096)
                 if sender[1] != 64 or not any(ipaddress.ip_address(sender[0]) in n for n in networks): continue
                 data = json.loads(payload)
                 if not isinstance(data,dict) or data.get('your_string') != nonce: continue
                 if not all(isinstance(data.get(k),str) and data[k] for k in ('product','firmware_version','hostname')): continue
+                if 'ultimate' not in data['product'].lower():continue
                 candidates[sender[0],80] = Candidate(sender[0],80,'Ultimate Ident (UDP 64)',info={'ident':data})
             except socket.timeout: pass
             except (ValueError, UnicodeError): continue
@@ -146,12 +152,17 @@ def avahi_scan(seconds=3):
         context.pop_thread_default()
 
 
-def standard_scan(seconds=5):
-    results = ident_scan()
-    notes = [f'Ultimate Ident: {len(results)} replies.']
+def standard_scan(seconds=5, known_hosts=()):
+    try:
+        results=ident_scan()
+        notes=[f'Ultimate Ident: {len(results)} replies.']
+    except (OSError,BrowserError) as exc:
+        results={};notes=[str(exc)]
+    for host,port in known_hosts:
+        results.setdefault((host,port),Candidate(host,port,'Saved profile address'))
     try:
         advertised=avahi_scan()
-        results.update(advertised)
+        for key,candidate in advertised.items():results.setdefault(key,candidate)
         notes.append(f'Avahi mDNS: {len(advertised)} candidate services.')
     except Exception:
         notes.append('Avahi unavailable; using direct mDNS queries.')
@@ -200,23 +211,17 @@ def standard_scan(seconds=5):
 
 def verify(candidate):
     try:
-        candidate.info = UltimateClient(candidate.host, timeout=.8, http_port=candidate.port).test_connection()
+        candidate.info = UltimateClient(candidate.host, timeout=2, http_port=candidate.port).test_connection()
         candidate.status = 'Verified Ultimate · '+candidate.info['info']['firmware_version']
     except ConnectionFailure as exc:
-        if exc.kind == 'authentication': candidate.status = 'Password required · identity unverified'
+        if exc.kind == 'authentication' and candidate.info.get('ident'):
+            candidate.status = 'Ultimate advertisement · password required; identity unverified'
         else: return None
     except (OSError, ValueError, BrowserError): return None
     return candidate
 
 
-def local_networks():
-    try:
-        rows = json.loads(subprocess.check_output(['ip','-j','-4','address','show','up'], timeout=3))
-        return sorted({str(ipaddress.ip_interface(f"{a['local']}/{a['prefixlen']}").network)
-                       for row in rows if row['ifname'] != 'lo'
-                       for a in row.get('addr_info',[]) if a.get('scope') == 'global'
-                       and ipaddress.ip_address(a['local']).is_private})
-    except (OSError, ValueError, subprocess.SubprocessError): return []
+from .local_networks import local_networks
 
 
 def preferred_subnet(networks, hosts=()):

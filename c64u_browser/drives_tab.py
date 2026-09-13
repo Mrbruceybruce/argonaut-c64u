@@ -3,6 +3,8 @@
 """Drive presentation uses the active shared client; no transport URLs here."""
 import posixpath
 from gi.repository import Gtk
+from .api import BrowserError
+from .disk_run import mount_and_run, validate_path
 
 
 class DrivesTab:
@@ -34,6 +36,9 @@ class DrivesTab:
             access=Gtk.DropDown.new_from_strings(['Write-protected','Read/write image','Changes in memory only'])
             row.append(access)
             app.button(row,'Mount…',lambda d=drive:self.mount(d))
+            if drive=='a':
+                run=app.button(row,'Mount & Run…',self.mount_run)
+                run.set_tooltip_text('Run a temporary D64 copy on Drive A. Requires network DMA service; original image is unchanged.')
             controls.append(Gtk.Label(label='Select an image in Files, then use it here, or enter its C64U path. Local files must be uploaded first.',xalign=0,wrap=True))
             self.cards[drive]={'status':status,'controls':controls,'path':path,'access':access,'type':mode}
         self.bind(None)
@@ -80,7 +85,7 @@ class DrivesTab:
             if info.get('type') in ('1541','1571','1581'):
                 card['type'].set_selected(('1541','1571','1581').index(info['type']))
 
-    def confirm(self, drive, title, detail, operation):
+    def confirm(self, drive, title, detail, operation, success='Command completed; drive status refreshed.'):
         if not self.client or not self.loaded or self.app.busy:return
         client=self.client
         dialog=Gtk.Dialog(title=title,transient_for=self.app.window,modal=True)
@@ -92,7 +97,7 @@ class DrivesTab:
             def task():
                 operation(client)
                 return client.read_drives()
-            self.request(task,'Command completed; drive status refreshed.',action=True)
+            self.request(task,success,action=True)
         dialog.connect('response',response);dialog.present()
         return dialog
 
@@ -123,3 +128,13 @@ class DrivesTab:
     def change_type(self, drive):
         mode=('1541','1571','1581')[self.cards[drive]['type'].get_selected()]
         return self.confirm(drive,'Change drive type',f'Switch to {mode}? This also loads its configured ROM, replacing any temporary ROM.',lambda client:client.set_drive_type(drive,mode))
+
+    def mount_run(self):
+        path=self.cards['a']['path'].get_text()
+        try:validate_path(path)
+        except BrowserError as exc:
+            self.message.set_text(str(exc));return
+        return self.confirm('a','Mount & Run',
+            f'Run {path} on Drive A?\n\nThis interrupts the current C64 program and replaces the mounted disk with a temporary copy. Changes are not saved to the original image; the selected mount write mode does not apply.\n\nRequires network DMA service on the C64U.',
+            lambda client:mount_and_run(client,path),
+            'Mount & Run command sent. Check the C64U screen to confirm the program started; disk changes use a temporary copy.')
