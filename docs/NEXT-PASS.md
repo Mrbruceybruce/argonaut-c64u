@@ -2,7 +2,7 @@
 
 ## Mount & Run
 
-Add Mount & Run beside Mount in the Drive A card on the Drives tab.
+Implemented locally; hardware validation pending. Mount & Run sits beside Mount in the Drive A card on the Drives tab.
 Use the selected C64U image path. Initial support is D64 only and requires
 the C64U DMA service. Firmware's network command runs a temporary copy on
 Drive A; the UI must explain that the original image and selected mount
