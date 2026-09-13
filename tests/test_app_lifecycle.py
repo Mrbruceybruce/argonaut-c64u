@@ -45,3 +45,19 @@ class Lifecycle(unittest.TestCase):
         app=SimpleNamespace(busy=True,status=Mock(),pool=Mock(),quit=Mock())
         self.assertTrue(Browser.close(app))
         app.pool.shutdown.assert_not_called();app.quit.assert_not_called()
+
+
+@unittest.skipIf(Browser is None, 'GTK runtime unavailable')
+class QuitAction(unittest.TestCase):
+    def test_quit_uses_window_close_handlers(self):
+        app=SimpleNamespace(window=Mock(),quit=Mock(),pool=Mock())
+        Browser.request_quit(app)
+        app.window.close.assert_called_once_with()
+        app.quit.assert_not_called()
+        app.pool.shutdown.assert_not_called()
+
+    def test_quit_before_activation_shuts_down_worker(self):
+        app=SimpleNamespace(quit=Mock(),pool=Mock())
+        Browser.request_quit(app)
+        app.pool.shutdown.assert_called_once_with(wait=False)
+        app.quit.assert_called_once_with()

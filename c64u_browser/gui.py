@@ -80,11 +80,20 @@ class Browser(Gtk.Application):
         # this, both stay permanently disabled on macOS (Linux/Windows menus are
         # unaffected, since this app doesn't build its own menubar there).
         quit_action = Gio.SimpleAction.new('quit', None)
-        quit_action.connect('activate', lambda *_: self.close())
+        quit_action.connect('activate', self.request_quit)
         self.add_action(quit_action)
         accel = '<Meta>q' if sys.platform == 'darwin' else '<Primary>q'
         self.set_accels_for_action('app.quit', [accel])
 
+
+    def request_quit(self,*_):
+        window=getattr(self,'window',None)
+        if window is not None:
+            # Preserve close-request handlers: saved geometry and busy guard.
+            window.close()
+        else:
+            self.pool.shutdown(wait=False)
+            self.quit()
 
     def do_activate(self):
         # A second launcher activation must present the existing app, not create
