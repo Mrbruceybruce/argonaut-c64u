@@ -6,10 +6,12 @@ from pathlib import Path
 
 def metadata(source, version):
     source = Path(source).resolve()
-    build = ''
+    build = os.environ.get('ARGONAUT_SOURCE_COMMIT','')
+    if build and (len(build)!=40 or any(c not in '0123456789abcdef' for c in build)):
+        raise ValueError('ARGONAUT_SOURCE_COMMIT must be a full Git commit ID')
     try:
         root = subprocess.check_output(['git','-C',str(source),'rev-parse','--show-toplevel'],stderr=subprocess.DEVNULL,text=True).strip()
-        if Path(root).resolve() == source:
+        if not build and Path(root).resolve() == source:
             build = subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()
             dirty = subprocess.check_output(['git','-C',str(source),'status','--porcelain','--untracked-files=no'],text=True).strip()
             if dirty: build += '-modified'
@@ -20,7 +22,9 @@ def metadata(source, version):
         files = sorted((source/'c64u_browser').glob('*.py')) + sorted((source/'c64u_browser/assets').glob('*'))
         for path in files:
             if path.is_file():
-                digest.update(path.relative_to(source).as_posix().encode()+b'\0'+path.read_bytes())
+                data=path.read_bytes()
+                if path.suffix in ('.py','.svg','.json','.txt'):data=data.replace(b'\r\n',b'\n')
+                digest.update(path.relative_to(source).as_posix().encode()+b'\0'+data)
         build = 'source-'+digest.hexdigest()[:16]
     return {'version':version, 'build':build}
 

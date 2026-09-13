@@ -7,16 +7,8 @@ from .platform_support import portable_root
 
 REPOSITORY = 'https://github.com/Mrbruceybruce/argonaut-c64u'
 
-def show_about(app):
-    existing = getattr(app, 'about_window', None)
-    if existing is not None:
-        existing.present()
-        return existing
-    window = Gtk.Window(title='About Argonaut', transient_for=app.window, modal=True)
-    app.about_window = window
-    window.set_default_size(720, 620)
-    scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
-    window.set_child(scroll)
+def about_page():
+    scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     scroll.set_child(box)
     picture = Gtk.Picture.new_for_filename(str(ASSETS / 'about-background.png'))
@@ -43,12 +35,8 @@ def show_about(app):
                       ('GPL-3.0-or-later', 'https://www.gnu.org/licenses/gpl-3.0.html')]:
         links.insert(Gtk.LinkButton(uri=uri, label=text), -1)
     details.append(links)
-    close = Gtk.Button(label='Close', halign=Gtk.Align.END)
-    close.connect('clicked', lambda *_: window.close())
-    details.append(close)
-    def closed(*_):
-        app.about_window = None
-        return False
-    window.connect('close-request', closed)
-    window.present()
-    return window
+    return scroll
+
+def show_about(app):
+    from .app_preferences import show_preferences
+    return show_preferences(app, page=2)

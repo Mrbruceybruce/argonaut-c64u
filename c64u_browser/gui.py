@@ -118,10 +118,8 @@ class Browser(Gtk.Application):
         self.controls.append(connection)
         self.connection_label = Gtk.Label(xalign=0, hexpand=True, wrap=True)
         connection.append(self.connection_label)
-        from .about import show_about
         from .app_preferences import show_preferences
         self.button(connection, 'Preferences…', lambda: show_preferences(self))
-        self.button(connection, 'About', lambda: show_about(self))
         self.button(connection, 'Disconnect', self.disconnect_device)
         self.tabs = Gtk.Notebook(vexpand=True)
         self.controls.append(self.tabs)
@@ -151,7 +149,7 @@ class Browser(Gtk.Application):
         self.streams_tab=StreamsTab(self)
         self.tabs.append_page(self.streams_tab.box,Gtk.Label(label='Streams'))
         self.tabs.connect('switch-page', lambda _, page, index: self.settings_tab.load_if_needed() if index == 1 else self.drives_tab.load_if_needed() if index == 2 else None)
-        self.status = Gtk.Label(label='Open Preferences → Connections to select or discover a C64 Ultimate.', xalign=0, wrap=True, selectable=True)
+        self.status = Gtk.Label(label='Open Preferences → Device details to select or discover a C64 Ultimate.', xalign=0, wrap=True, selectable=True)
         outer.append(self.status)
         self.cancel_button = self.button(actions, 'Cancel transfer', self.cancel_transfer)
         self.cancel_button.set_sensitive(False)
@@ -560,7 +558,7 @@ class Browser(Gtk.Application):
         payload = self.drag_payload
         if self.busy or not payload or value != payload[0] or local == payload[1]: return False
         if not self.client:
-            self.status.set_text('Open Preferences → Connections and connect to a C64U first.'); return False
+            self.status.set_text('Open Preferences → Device details and connect to a C64U first.'); return False
         row = listing.get_row_at_y(int(y))
         destination = self.local if local else self.remote
         if row and row.item[1]:

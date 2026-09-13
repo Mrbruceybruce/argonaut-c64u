@@ -51,6 +51,7 @@ class StreamsTab:
         self.text_return=Gtk.CheckButton(label='Append Return',active=True);keyboard.append(self.text_return)
         self.text_send=Gtk.Button(label='Send text',sensitive=False);keyboard.append(self.text_send)
         self.text_send.connect('clicked',self.send_text)
+        self.text_input.connect('activate',self.send_text)
         self.text_status=Gtk.Label(xalign=0,wrap=True)
         self.box.append(self.text_status)
         self.bind(None)
@@ -224,5 +225,5 @@ class StreamsTab:
         self.picture.set_size_request(round(384*factor),round(self.preview_height*factor))
 
     def apply_scale(self,*_):
-        self.preview_percent=int(self.zoom.get_text())
+        self.preview_percent=int(self.zoom.get_text().rstrip('%'))
         self.scale_preview()

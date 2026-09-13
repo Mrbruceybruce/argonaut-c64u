@@ -31,7 +31,7 @@ if '--self-test' in sys.argv:
   from c64u_browser.about import show_about
   from c64u_browser.version import ASSETS,build_info
   assert (ASSETS/'about-background.png').is_file() and (ASSETS/'argonaut.png').is_file()
-  expected_version='0.1.4-dev' if package_metadata.get('development') else package_metadata.get('version','0.1.4')
+  expected_version=package_metadata.get('version','0.1.4')
   assert build_info()['version']==expected_version and 'unpackaged' not in build_info()['build']
   if package_metadata.get('development'):
    assert Preferences().path.parent.name=='argonaut-development'
@@ -42,7 +42,7 @@ if '--self-test' in sys.argv:
    assert not preferences_dialog.connections.model.get_editable()
    assert preferences_dialog.connections.fields['case_edition'].get_editable()
    assert app.streams_tab.text_return.get_active()
-   assert not app.streams_tab.zoom.get_editable()
+   assert isinstance(app.streams_tab.zoom,Gtk.Label)
    saved_scale=app.preferences.app_options['preview_scale']
    app.streams_tab.set_zoom(300);app.streams_tab.apply_scale()
    assert app.preferences.app_options['preview_scale']==saved_scale
@@ -50,7 +50,7 @@ if '--self-test' in sys.argv:
    assert isinstance(local_networks(),list)
    preferences_dialog.response(Gtk.ResponseType.CANCEL)
    assert app.lookup_action('quit').get_enabled()
-  about=show_about(app);assert about is show_about(app);about.close();assert app.about_window is None
+  about=show_about(app);assert about is show_about(app);about.close();assert app.preferences_dialog is None
   app.activate_action('quit',None)
   assert app.window not in app.get_windows()
   src=Path(d)/'a';dst=Path(d)/'b';src.write_bytes(b'test');publish_new(src,dst);assert dst.read_bytes()==b'test'
