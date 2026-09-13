@@ -98,7 +98,10 @@ Other firmware versions may expose different capabilities.
 
 See the [feature roadmap](docs/ROADMAP.md) and the
 [focused OBS integration proposal](docs/OBS-INTEGRATION-PROPOSAL.md).
-These are plans; existing WebM recording remains supported.
+Existing WebM recording remains supported. This development branch also includes
+an [OBS capture window and setup guide](docs/OBS-GUIDE.md); see
+[development results and remaining hardware checks](docs/OBS-DEVELOPMENT-RESULTS.md).
+This feature is not yet in the stable downloads above.
 
 ## Feedback
 

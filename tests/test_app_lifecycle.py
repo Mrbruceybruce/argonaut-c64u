@@ -41,6 +41,19 @@ class Lifecycle(unittest.TestCase):
         app.pool.shutdown.assert_called_once_with(wait=False)
         app.quit.assert_called_once_with()
 
+    def test_quit_waits_for_media_without_blocking_or_duplicate_timers(self):
+        app=SimpleNamespace(busy=False,status=Mock(),recovery=None,streams_tab=Mock(),pool=Mock(),quit=Mock())
+        app.streams_tab.close.side_effect=[True,True,True,False]
+        with patch('c64u_browser.gui.GLib.timeout_add') as timer:
+            self.assertTrue(Browser.close(app))
+            self.assertTrue(Browser.close(app))
+            timer.assert_called_once()
+            finish=timer.call_args.args[1]
+            self.assertTrue(finish())
+            app.quit.assert_not_called();app.pool.shutdown.assert_not_called()
+            self.assertFalse(finish())
+        app.quit.assert_called_once_with();app.pool.shutdown.assert_called_once_with(wait=False)
+
     def test_busy_close_preserves_active_worker(self):
         app=SimpleNamespace(busy=True,status=Mock(),pool=Mock(),quit=Mock())
         self.assertTrue(Browser.close(app))

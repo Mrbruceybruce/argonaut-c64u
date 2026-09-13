@@ -1,6 +1,9 @@
 # Argonaut feature roadmap
 
-Status: proposed; documentation only. Reviewed 2026-09-13 against stable **1.5**,
+Status: proposed roadmap; the OBS development increment is now implemented locally.
+See [implementation results](OBS-DEVELOPMENT-RESULTS.md) for its measured scope and
+remaining qualification. The inventory below describes the original stable baseline.
+Reviewed 2026-09-13 against stable **1.5**,
 application release commit `857c8bac63a07fb9fab6ba81366065af1141f341`, and current
 `main` at `5d1b270` (the subsequent screenshot update). No feature in this roadmap
 is promised for a particular release. No device or system configuration was changed.

@@ -53,3 +53,33 @@ class Recording(unittest.TestCase):
    path=str(Path(folder)/'clip.webm');r=Recorder(path,240,False);self.feed(r)
    with self.assertRaisesRegex(RuntimeError,'mode changed'):r.feed((272,bytes(384*272*3)),[])
    self.finish(r);self.decode(path,False)
+
+@unittest.skipUnless(AVAILABLE,'GStreamer runtime unavailable')
+class RecordingTiming(unittest.TestCase):
+ def test_thirty_minutes_of_nominal_audio_and_video_have_monotonic_pts(self):
+  from unittest.mock import Mock,patch
+  r=Recorder.__new__(Recorder)
+  r.finishing=False;r.started=0;r.audio_pts=None;r.last_video=-1;r.height=240;r.frames=0
+  r.pipeline=Mock();r.pipeline.get_bus.return_value.pop_filtered.return_value=None
+  r.video=object();r.sound=object();last={'audio':-1,'video':-1};max_offset=0
+  def push(source,data,pts,duration):
+   key='video' if source is r.video else 'audio'
+   self.assertGreater(pts,last[key]);last[key]=pts
+  r.push=push
+  # Accelerated 30-minute test of the current nominal clock policy, not hardware sync.
+  with patch('c64u_browser.recording.time.monotonic') as clock:
+   for n in range(1,56251):
+    clock.return_value=n*.032
+    r.feed((240,b''),[bytes(768)]*8)
+    max_offset=max(max_offset,abs(r.audio_pts-r.last_video))
+  self.assertLessEqual(max_offset,1)
+ def test_gap_reanchors_audio_and_encoder_failure_is_explicit(self):
+  from unittest.mock import Mock,patch
+  r=Recorder.__new__(Recorder)
+  r.finishing=False;r.started=0;r.audio_pts=0;r.last_video=-1;r.height=240;r.frames=0
+  r.pipeline=Mock();r.pipeline.get_bus.return_value.pop_filtered.return_value=None
+  r.video=object();r.sound=object();r.push=Mock()
+  with patch('c64u_browser.recording.time.monotonic',return_value=2):r.feed((240,b''),[bytes(768)])
+  self.assertEqual(r.audio_pts,2*Gst.SECOND)
+  source=Mock();source.get_property.side_effect=[100,10]
+  with self.assertRaisesRegex(RuntimeError,'keep up'):Recorder.push(r,source,b'',0,1)

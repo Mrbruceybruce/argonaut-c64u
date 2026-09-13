@@ -822,7 +822,15 @@ class Browser(Gtk.Application):
             self.status.set_text('Wait for the current operation to finish before closing.')
             return True
         if self.recovery:self.recovery.close()
-        self.streams_tab.close()
+        if self.streams_tab.close() is True:
+            self.status.set_text('Finishing recording and stopping streams…')
+            if not getattr(self,'closing_media',False):
+                self.closing_media=True
+                def finish_close():
+                    if self.streams_tab.close() is True:return True
+                    self.pool.shutdown(wait=False);self.quit();return False
+                GLib.timeout_add(100,finish_close)
+            return True
         self.pool.shutdown(wait=False)
         # Child windows must not keep an application with a stopped worker alive.
         self.quit()

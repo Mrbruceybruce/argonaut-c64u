@@ -40,7 +40,7 @@ Priority: optional
 Architecture: all
 Maintainer: Bruce Marcus <argonaut@localhost>
 Installed-Size: {size}
-Depends: python3 (>= 3.11), python3-gi, gir1.2-gtk-4.0 (>= 4.8), gir1.2-secret-1, gir1.2-gstreamer-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, iproute2, adwaita-icon-theme
+Depends: python3 (>= 3.11), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.8), gir1.2-secret-1, gir1.2-gstreamer-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, iproute2, adwaita-icon-theme
 Recommends: gnome-keyring
 Description: GTK desktop controller and file manager for C64 Ultimate
  Manage connection profiles, USB and SD files, settings, ROMs,

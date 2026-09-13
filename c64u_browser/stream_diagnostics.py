@@ -20,6 +20,8 @@ COUNTERS = {
 }
 
 def advice(stats):
+    if stats.get('running') is False:
+        return 'Preview is stopped. Counters are from the last session; start preview explicitly for live measurements.'
     if not stats:
         return 'Start preview explicitly to measure incoming media. Opening diagnostics does not start streams.'
     if not stats.get('video_packets', 0):
@@ -36,6 +38,8 @@ def advice(stats):
 
 def report(stats, include_addresses=False):
     lines = ['Argonaut stream diagnostics', 'Passwords, keys, device identifiers and file paths are excluded.']
+    lines.append('Connection in Argonaut: '+('Connected' if stats.get('connected') is True else 'Disconnected'))
+    lines.append('Preview: '+('Running' if stats.get('running') is True else 'Stopped'))
     for key in ('peer', 'address'):
         value = 'Hidden'
         if include_addresses:

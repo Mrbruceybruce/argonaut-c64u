@@ -1,6 +1,9 @@
 # Proposal: clean C64 capture for OBS
 
-Status: proposed, not implemented. Companion to the [roadmap](ROADMAP.md).
+Status: initial proposal retained as the design record. The first development
+implementation now exists on `feature/obs-capture`; see [OBS guide](OBS-GUIDE.md)
+and [implementation results](OBS-DEVELOPMENT-RESULTS.md). Hardware qualification
+and physical display-aspect correction remain pending. Companion to the [roadmap](ROADMAP.md).
 Reviewed baseline: Argonaut 1.5 / `main` at `5d1b270`, 2026-09-13.
 
 ## Outcome and scope
