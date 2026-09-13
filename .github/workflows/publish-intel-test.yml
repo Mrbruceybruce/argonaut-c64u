@@ -1,0 +1,26 @@
+name: Publish Intel Mac test package
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify and publish experimental Intel downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run view 34733713538 --json conclusion,headSha > /tmp/intel-run.json
+          python3 - <<'PYTHON'
+          import json
+          r=json.load(open('/tmp/intel-run.json'))
+          assert r['conclusion']=='success'
+          assert r['headSha']=='ae33a975aea11eec755734104e52ab35eed8141b'
+          PYTHON
+          gh run download 34733713538 --name Argonaut-macOS-Intel-0.1.4-test --dir artifacts
+          sha256sum --check artifacts/SHA256SUMS
+          gh release create v0.1.4-intel-test.1 artifacts/* --target ae33a975aea11eec755734104e52ab35eed8141b --prerelease --latest=false --title "Argonaut 0.1.4 — Intel Mac test" --notes-file packaging/macos/INTEL-TEST.md
