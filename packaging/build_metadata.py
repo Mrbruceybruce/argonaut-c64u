@@ -27,7 +27,10 @@ def metadata(source, version):
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--version',required=True)
+    parser.add_argument('--development',action='store_true')
     parser.add_argument('--source',type=Path,default=Path(__file__).resolve().parents[1])
     args=parser.parse_args()
     destination=args.source/'c64u_browser/_build.json'
-    destination.write_text(json.dumps(metadata(args.source,args.version),indent=2)+'\n')
+    data=metadata(args.source,args.version)
+    if args.development:data['development']=True
+    destination.write_text(json.dumps(data,indent=2)+'\n')

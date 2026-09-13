@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os,sys,tempfile,json
 from pathlib import Path
+import c64u_browser
+metadata_path=Path(c64u_browser.__file__).parent/'_build.json'
+package_metadata=json.loads(metadata_path.read_text()) if metadata_path.is_file() else {}
+if package_metadata.get('development') is True:
+ os.environ['ARGONAUT_DEVELOPMENT']='1'
+ os.environ['ARGONAUT_DEV_BUILD']=package_metadata['build']
 if '--self-test' in sys.argv:
  import gi
  gi.require_version('Gtk','4.0');gi.require_version('Gst','1.0')
@@ -11,7 +17,8 @@ if '--self-test' in sys.argv:
  from c64u_browser.credentials import Credentials
  root=portable_root()
  if root:
-  assert Preferences().path == root/"Data"/"argonaut"/"config.json"
+  config_name='argonaut-development' if package_metadata.get('development') else 'argonaut'
+  assert Preferences().path == root/"Data"/config_name/"config.json"
   assert getattr(Credentials(),"session_only",False)
   prefs=Preferences();prefs.save();assert prefs.path.is_file()
  Gst.init(None)
@@ -24,9 +31,18 @@ if '--self-test' in sys.argv:
   from c64u_browser.about import show_about
   from c64u_browser.version import ASSETS,build_info
   assert (ASSETS/'about-background.png').is_file() and (ASSETS/'argonaut.png').is_file()
-  assert build_info()['version']=='0.1.4' and 'unpackaged' not in build_info()['build']
+  expected_version='0.1.4-dev' if package_metadata.get('development') else package_metadata.get('version','0.1.4')
+  assert build_info()['version']==expected_version and 'unpackaged' not in build_info()['build']
+  if package_metadata.get('development'):
+   assert Preferences().path.parent.name=='argonaut-development'
+   assert getattr(Credentials(),'session_only',False)
+   from c64u_browser.app_preferences import show_preferences
+   preferences_dialog=show_preferences(app);assert preferences_dialog
+   preferences_dialog.response(Gtk.ResponseType.CANCEL)
+   assert app.lookup_action('quit').get_enabled()
   about=show_about(app);assert about is show_about(app);about.close();assert app.about_window is None
-  app.recovery.close();app.window.close();app.quit()
+  app.activate_action('quit',None)
+  assert app.window not in app.get_windows()
   src=Path(d)/'a';dst=Path(d)/'b';src.write_bytes(b'test');publish_new(src,dst);assert dst.read_bytes()==b'test'
  Path(sys.argv[sys.argv.index('--self-test')+1]).write_text(json.dumps({'result':'passed','platform':sys.platform}))
 else:
