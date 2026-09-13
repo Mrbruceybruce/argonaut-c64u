@@ -38,6 +38,16 @@ if '--self-test' in sys.argv:
    assert getattr(Credentials(),'session_only',False)
    from c64u_browser.app_preferences import show_preferences
    preferences_dialog=show_preferences(app);assert preferences_dialog
+   assert preferences_dialog.pages.get_n_pages()==3
+   assert not preferences_dialog.connections.model.get_editable()
+   assert preferences_dialog.connections.fields['case_edition'].get_editable()
+   assert app.streams_tab.text_return.get_active()
+   assert not app.streams_tab.zoom.get_editable()
+   saved_scale=app.preferences.app_options['preview_scale']
+   app.streams_tab.set_zoom(300);app.streams_tab.apply_scale()
+   assert app.preferences.app_options['preview_scale']==saved_scale
+   from c64u_browser.local_networks import local_networks
+   assert isinstance(local_networks(),list)
    preferences_dialog.response(Gtk.ResponseType.CANCEL)
    assert app.lookup_action('quit').get_enabled()
   about=show_about(app);assert about is show_about(app);about.close();assert app.about_window is None

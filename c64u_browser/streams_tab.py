@@ -31,16 +31,15 @@ class StreamsTab:
         zoomrow=Gtk.Box(spacing=8);self.box.append(zoomrow)
         zoomrow.append(Gtk.Label(label='Preview scale'))
         self.preview_percent=app.preferences.app_options['preview_scale']
-        self.zoom=Gtk.Entry(text=str(self.preview_percent),width_chars=4,max_width_chars=4,max_length=3,input_purpose=Gtk.InputPurpose.DIGITS)
-        self.zoom.set_tooltip_text('Preview size: enter a whole number from 50 to 200 percent.')
-        zoomrow.append(self.zoom);zoomrow.append(Gtk.Label(label='%'))
-        self.zoom_error=Gtk.Label(xalign=0);zoomrow.append(self.zoom_error)
-        self.zoom.connect('activate',self.apply_scale)
-        focus=Gtk.EventControllerFocus();focus.connect('leave',self.apply_scale);self.zoom.add_controller(focus)
+        from .app_preferences import scale_control
+        control,self.zoom,self.set_zoom=scale_control(self.preview_percent,self.apply_scale)
+        zoomrow.append(control)
         self.preview_height=240
         self.picture=Gtk.Picture(can_shrink=True,halign=Gtk.Align.CENTER,valign=Gtk.Align.CENTER)
         self.preview_scroll=Gtk.ScrolledWindow(hexpand=True,vexpand=True,min_content_height=200)
         self.preview_scroll.set_policy(Gtk.PolicyType.AUTOMATIC,Gtk.PolicyType.AUTOMATIC)
+        self.preview_scroll.set_propagate_natural_width(False);self.preview_scroll.set_propagate_natural_height(False)
+        self.preview_scroll.set_overlay_scrolling(False)
         self.preview_scroll.set_child(self.picture);self.box.append(self.preview_scroll)
         self.scale_preview()
         self.capture_status=Gtk.Label(xalign=0,wrap=True,selectable=True);self.box.append(self.capture_status)
@@ -49,7 +48,7 @@ class StreamsTab:
         keyboard=Gtk.Box(spacing=8);self.box.append(keyboard)
         self.text_input=Gtk.Entry(placeholder_text='Text for the C64 BASIC READY prompt',hexpand=True,max_length=160)
         keyboard.append(self.text_input)
-        self.text_return=Gtk.CheckButton(label='Append Return');keyboard.append(self.text_return)
+        self.text_return=Gtk.CheckButton(label='Append Return',active=True);keyboard.append(self.text_return)
         self.text_send=Gtk.Button(label='Send text',sensitive=False);keyboard.append(self.text_send)
         self.text_send.connect('clicked',self.send_text)
         self.text_status=Gtk.Label(xalign=0,wrap=True)
@@ -225,13 +224,5 @@ class StreamsTab:
         self.picture.set_size_request(round(384*factor),round(self.preview_height*factor))
 
     def apply_scale(self,*_):
-        value=self.zoom.get_text().strip()
-        if not value.isascii() or not value.isdecimal() or not 50<=int(value)<=200:
-            self.zoom_error.set_text('Enter a whole number from 50 to 200.')
-            self.zoom.set_text(str(self.preview_percent))
-            return
-        self.preview_percent=int(value)
-        self.app.preferences.app_options['preview_scale']=self.preview_percent
-        self.app.save_app_preferences()
-        self.zoom.set_text(str(self.preview_percent));self.zoom_error.set_text('')
+        self.preview_percent=int(self.zoom.get_text())
         self.scale_preview()

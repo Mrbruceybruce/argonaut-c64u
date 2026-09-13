@@ -76,6 +76,7 @@ def ident_scan(seconds=2):
             raise BrowserError('Discovery reply port 64640 is busy. Close another scan and retry, or use Scan subnet.') from exc
         sock.settimeout(.2)
         networks = [ipaddress.ip_network(n) for n in local_networks()]
+        if not networks:raise BrowserError('No connected private IPv4 network found. Check the network connection or connect by IP address.')
         for network in networks:
             sock.sendto(('json'+nonce).encode(), (str(network.broadcast_address), 64))
         sock.sendto(('json'+nonce).encode(), ('255.255.255.255', 64))
@@ -209,14 +210,7 @@ def verify(candidate):
     return candidate
 
 
-def local_networks():
-    try:
-        rows = json.loads(subprocess.check_output(['ip','-j','-4','address','show','up'], timeout=3))
-        return sorted({str(ipaddress.ip_interface(f"{a['local']}/{a['prefixlen']}").network)
-                       for row in rows if row['ifname'] != 'lo'
-                       for a in row.get('addr_info',[]) if a.get('scope') == 'global'
-                       and ipaddress.ip_address(a['local']).is_private})
-    except (OSError, ValueError, subprocess.SubprocessError): return []
+from .local_networks import local_networks
 
 
 def preferred_subnet(networks, hosts=()):

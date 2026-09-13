@@ -14,5 +14,5 @@ when ready. The argonaut-windows directory is legacy staging, not the active
 checkout. GitHub Actions still builds Windows and Mac packages.
 
 This separates app settings, not the connected C64U hardware or files: operations
-in either app still affect the selected real device. Mount & Run remains queued
-in NEXT-PASS.md.
+in either app still affect the selected real device. Mount & Run and Send Text have passed initial hardware testing; the
+current prerelease checklist is in DEVELOPMENT-TEST.md.
