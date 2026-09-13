@@ -72,7 +72,9 @@ Argonaut running on Windows and connected to a C64 Ultimate.
 
 ## Run from source
 
-Install Python 3.11+, PyGObject, GTK 4.8+, libsecret introspection,
+For Mac source setup and Intel builds, see [macOS build instructions](docs/MACOS-BUILD.md).
+
+On Debian, install Python 3.11+, PyGObject, GTK 4.8+, libsecret introspection,
 GStreamer introspection and base/good plugins, iproute2 and Adwaita icons.
 The complete Debian dependency list is in `packaging/build_deb.py`.
 Run `python3 -m c64u_browser.gui` in a graphical desktop session.
