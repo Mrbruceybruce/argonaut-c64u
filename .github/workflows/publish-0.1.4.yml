@@ -1,0 +1,49 @@
+name: Prepare tested unified 0.1.4 release
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Verify tested runs and download packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run view 34727332085 --json conclusion,headSha > /tmp/windows-run.json
+          gh run view 34727336219 --json conclusion,headSha > /tmp/mac-run.json
+          python3 - <<'PY'
+          import json
+          for name in ('windows','mac'):
+              r=json.load(open('/tmp/'+name+'-run.json'))
+              assert r['conclusion']=='success'
+              assert r['headSha']=='739d6bdac4435205fedd3f3423a2d5585435c8e7'
+          PY
+          gh run download 34727332085 --name Argonaut-Windows-0.1.4 --dir windows
+          gh run download 34727336219 --name Argonaut-macOS-AppleSilicon-0.1.4-test --dir mac
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,shutil
+          for folder in ('windows','mac'):
+              root=Path(folder)
+              for line in (root/'SHA256SUMS').read_text().splitlines():
+                  digest,name=line.split(None,1)
+                  path=root/Path(name.strip()).name
+                  assert hashlib.sha256(path.read_bytes()).hexdigest()==digest,path
+          out=Path('release-assets');out.mkdir()
+          for root in (Path('windows'),Path('mac')):
+              for p in root.iterdir():
+                  if p.suffix in ('.exe','.dmg') or ('Windows' in p.name or 'AppleSilicon' in p.name) and p.suffix=='.zip':
+                      shutil.copyfile(p,out/p.name.replace('-Test.','.'))
+          PY
+          git archive --format=tar.gz --prefix=argonaut-0.1.4/ -o release-assets/argonaut-0.1.4.tar.gz 739d6bdac4435205fedd3f3423a2d5585435c8e7
+      - name: Create draft for adding tested Debian package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create v0.1.4 release-assets/* --draft --target 739d6bdac4435205fedd3f3423a2d5585435c8e7 --title "Argonaut 0.1.4 — Debian, Windows and macOS" --notes-file packaging/RELEASE-0.1.4.md
