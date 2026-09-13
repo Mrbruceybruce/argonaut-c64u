@@ -49,6 +49,9 @@ class Browser(Gtk.Application):
         self.preferences_error = None
         try: self.preferences.load()
         except (BrowserError, OSError) as exc: self.preferences_error = str(exc)
+        remembered=self.preferences.app_options['local_folder']
+        self.local=Path(remembered) if self.preferences.app_options['remember_folders'] and remembered and Path(remembered).is_dir() else Path.home()
+        self.histories[True]=History(self.local)
         self.credentials = Credentials()
         self.session_passwords = {}
         self.active_profile = None
@@ -79,7 +82,9 @@ class Browser(Gtk.Application):
         from .version import ASSETS
         Gtk.IconTheme.get_for_display(self.window.get_display()).add_search_path(str(ASSETS))
         self.window.set_icon_name('argonaut')
-        self.window.set_default_size(1200, 850)
+        options=self.preferences.app_options
+        self.window.set_default_size(options['width'] if options['remember_window'] else 1200, options['height'] if options['remember_window'] else 850)
+        self.window.connect('close-request',self.remember_window)
         self.window.connect('close-request', self.close)
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         for side in ('top', 'bottom', 'start', 'end'): getattr(outer, 'set_margin_' + side)(12)
@@ -91,6 +96,8 @@ class Browser(Gtk.Application):
         self.connection_label = Gtk.Label(xalign=0, hexpand=True, wrap=True)
         connection.append(self.connection_label)
         from .about import show_about
+        from .app_preferences import show_preferences
+        self.button(connection, 'Preferences…', lambda: show_preferences(self))
         self.button(connection, 'About', lambda: show_about(self))
         self.button(connection, 'Connections…', self.open_connections)
         self.button(connection, 'Disconnect', self.disconnect_device)
@@ -331,12 +338,14 @@ class Browser(Gtk.Application):
             client = profile.client(self.credentials.get(profile.id))
             info=client.test_connection()
             profile.verify_identity(info,require_bound=True)
-            return profile, client, info, initial_directory(client)
+            return profile, client, info, initial_directory(client,self.preferences.app_options['remote_folders'].get(profile.id,'/USB2') if self.preferences.app_options['remember_folders'] else '/USB2')
         self.run(task, lambda result: self.activate_connection(*result))
         return False
 
     def show_remote(self, result):
         self.remote, entries = result
+        if self.active_profile and self.preferences.app_options['remember_folders']:
+            self.preferences.app_options['remote_folders'][self.active_profile.id]=self.remote;self.save_app_preferences()
         self.remote_root=storage_root(self.remote) or '/'
         self.drive_bars[False].refresh()
         self.rpath.set_text(self.remote)
@@ -384,6 +393,8 @@ class Browser(Gtk.Application):
                 self.status.set_text('Choose an existing local folder.'); return
             self.local = candidate
             if self.refresh_local():
+                if self.preferences.app_options['remember_folders']:
+                    self.preferences.app_options['local_folder']=str(candidate);self.save_app_preferences()
                 history.visit(candidate, offset)
                 self.update_history_buttons()
             else:
@@ -773,6 +784,17 @@ class Browser(Gtk.Application):
         dialog.present()
         entry.grab_focus()
         return dialog, entry, confirm
+
+    def save_app_preferences(self):
+        if self.preferences_error:return
+        try:self.preferences.save()
+        except OSError as exc:self.status.set_text('Could not save Argonaut preferences: '+str(exc))
+
+    def remember_window(self,*_):
+        if not self.busy and self.preferences.app_options['remember_window'] and not self.window.is_maximized():
+            self.preferences.app_options.update(width=max(600,self.window.get_width()),height=max(400,self.window.get_height()))
+            self.save_app_preferences()
+        return False
 
     def close(self, *_):
         if self.busy:

@@ -17,5 +17,9 @@ def discover(client):
 
 def initial_directory(client,preferred='/USB2'):
  roots=discover(client)
+ if storage_root(preferred) in roots and preferred not in roots:
+  from .api import BrowserError
+  try:return client.list_directory(preferred)
+  except BrowserError:preferred=storage_root(preferred)
  target=preferred if preferred in roots else next(iter(roots),None)
  return client.list_directory(target) if target else ('/',[])

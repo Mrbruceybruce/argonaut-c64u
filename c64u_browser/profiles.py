@@ -57,6 +57,7 @@ class Profile:
     def client(self, password=''):
         return UltimateClient(self.host, password, port=self.ftp_port, http_port=self.http_port)
 
+from .app_preferences import defaults, validate
 from .platform_support import config_base
 from . import development
 
@@ -64,6 +65,7 @@ class Preferences:
     def __init__(self, path=None):
         base = config_base()
         self.path = Path(path) if path else base/('argonaut-development' if development.enabled() else 'argonaut')/'config.json'
+        self.app_options = defaults()
         self.profiles = []
         self.selected_id = None
         self.screenshot_folder = ''
@@ -77,6 +79,7 @@ class Preferences:
             self.profiles = [Profile(**p).validate() for p in data['profiles']]
             ids = [p.id for p in self.profiles]
             if len(ids) != len(set(ids)): raise ValueError('Duplicate profile IDs')
+            self.app_options = validate(data.get('app_options',{}))
             self.recording_folder = data.get('recording_folder', '')
             if not isinstance(self.recording_folder,str):raise ValueError('Invalid recording folder')
             self.screenshot_folder = data.get('screenshot_folder', '')
@@ -96,9 +99,10 @@ class Preferences:
         return self
 
     def save(self):
+        self.app_options=validate(self.app_options)
         for p in self.profiles: p.validate()
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        data = {'schema_version': 1, 'selected_id': self.selected_id,
+        data = {'app_options': self.app_options, 'schema_version': 1, 'selected_id': self.selected_id,
                 'profiles': [asdict(p) for p in self.profiles], 'screenshot_folder': self.screenshot_folder, 'recording_folder': self.recording_folder,
                 'setting_favorites': [list(key) for key in sorted(self.setting_favorites)]}
         fd, temp = tempfile.mkstemp(dir=self.path.parent, prefix='.config-')

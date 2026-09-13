@@ -27,11 +27,11 @@ class StreamsTab:
         self.capture_chooser=None
         self.record_button=Gtk.Button(label='Start recording…',sensitive=False);row.append(self.record_button)
         self.record_button.connect('clicked',self.record)
-        self.audio=Gtk.CheckButton(label='Play audio on this computer',active=True);row.append(self.audio)
+        self.audio=Gtk.CheckButton(label='Play audio on this computer',active=app.preferences.app_options['preview_audio']);row.append(self.audio)
         zoomrow=Gtk.Box(spacing=8);self.box.append(zoomrow)
         zoomrow.append(Gtk.Label(label='Preview scale'))
-        self.preview_percent=150
-        self.zoom=Gtk.Entry(text='150',width_chars=4,max_width_chars=4,max_length=3,input_purpose=Gtk.InputPurpose.DIGITS)
+        self.preview_percent=app.preferences.app_options['preview_scale']
+        self.zoom=Gtk.Entry(text=str(self.preview_percent),width_chars=4,max_width_chars=4,max_length=3,input_purpose=Gtk.InputPurpose.DIGITS)
         self.zoom.set_tooltip_text('Preview size: enter a whole number from 50 to 200 percent.')
         zoomrow.append(self.zoom);zoomrow.append(Gtk.Label(label='%'))
         self.zoom_error=Gtk.Label(xalign=0);zoomrow.append(self.zoom_error)
@@ -71,6 +71,7 @@ class StreamsTab:
 
     def start(self,*_):
         if not self.client or (self.session and self.session.thread.is_alive()):return
+        self.app.preferences.app_options['preview_audio']=self.audio.get_active();self.app.save_app_preferences()
         self.picture.set_paintable(None);self.capture_button.set_sensitive(False)
         try:self.output=AudioOutput() if self.audio.get_active() else None
         except Exception as exc:
@@ -230,5 +231,7 @@ class StreamsTab:
             self.zoom.set_text(str(self.preview_percent))
             return
         self.preview_percent=int(value)
+        self.app.preferences.app_options['preview_scale']=self.preview_percent
+        self.app.save_app_preferences()
         self.zoom.set_text(str(self.preview_percent));self.zoom_error.set_text('')
         self.scale_preview()

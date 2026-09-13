@@ -177,7 +177,7 @@ class ConnectionDialog:
                     current=client.test_connection()
                     candidate=replace(p,device_id=reported or p.device_id,device_mac=info.get('network_mac','') or p.device_mac)
                     candidate.verify_identity(current)
-                    listing=initial_directory(client)
+                    listing=initial_directory(client,self.app.preferences.app_options['remote_folders'].get(p.id,'/USB2') if self.app.preferences.app_options['remember_folders'] else '/USB2')
                     saved=self.persist(candidate,entered,remember)
                     return saved,client,current,listing
                 def connected(result):
