@@ -4,23 +4,22 @@ Argonaut controls and manages a C64 Ultimate from your computer. It provides
 file transfers, settings and favorites, ROM selection, configuration backups,
 and live screen preview with audio.
 
-This guide covers the Debian 0.1.3, Windows 0.1.1, and Apple Silicon Mac 0.1.2
-releases. Available settings and actions depend on the connected C64U firmware.
+This guide covers Argonaut 0.1.4 on Debian, Windows, and Apple Silicon Mac. Available settings and actions depend on the connected C64U firmware.
 
 ## 1. Install Argonaut
 
-Choose the package for your computer; the release numbers differ by platform.
+Choose the package for your computer from the unified 0.1.4 release.
 
 | Computer | Download | Install |
 | --- | --- | --- |
-| Debian 13 | [Debian 0.1.3](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.3) | Download the `.deb` and run the command below. |
-| Windows 10/11, 64-bit | [Windows 0.1.1](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.1) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
-| Apple Silicon Mac, macOS 15 or newer | [Mac 0.1.2](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.2) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
+| Debian 13 | [Debian 0.1.4](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4) | Download the `.deb` and run the command below. |
+| Windows 10/11, 64-bit | [Windows 0.1.4](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
+| Apple Silicon Mac, macOS 15 or newer | [Mac 0.1.4](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
 
 On Debian, open a terminal in the folder containing the downloaded package:
 
 ```sh
-sudo apt install ./argonaut-c64u_0.1.3_all.deb
+sudo apt install ./argonaut-c64u_0.1.4_all.deb
 ```
 
 Windows and Mac packages include Python, GTK, and the media libraries.
@@ -36,6 +35,8 @@ Profiles and preferences travel in the adjacent `Data` folder. Passwords last
 only for the current session. Keep `Data` when updating, and exit Argonaut
 before ejecting the thumb drive. Reselect screenshot or recording destinations
 if its drive letter changes.
+
+Choose **About** beside Connections to see the running version and build identifier.
 
 ## 2. Prepare and connect your C64U
 
