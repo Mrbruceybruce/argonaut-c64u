@@ -1,0 +1,187 @@
+name: Build and publish stable 1.5
+'on':
+  workflow_dispatch: null
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ github.sha }}
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ github.sha }}
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-python-gobject mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-pyinstaller
+          mingw-w64-ucrt-x86_64-gst-plugins-base mingw-w64-ucrt-x86_64-gst-plugins-good mingw-w64-ucrt-x86_64-gst-plugins-bad mingw-w64-ucrt-x86_64-adwaita-icon-theme
+    - name: Unit tests
+      shell: msys2 {0}
+      run: python -m unittest discover -s tests -p 'test_*.py'
+    - name: Build portable application
+      shell: msys2 {0}
+      run: |
+        python packaging/build_metadata.py --version 1.5
+        python -m PyInstaller --noconfirm --clean packaging/windows/argonaut.spec
+        pacman -Q > dist/Argonaut/MSYS2-PACKAGES.txt
+        cp LICENSE COPYRIGHT packaging/windows/README.txt dist/Argonaut/
+    - name: Test packaged executable
+      shell: pwsh
+      run: |
+        $report = Join-Path $env:RUNNER_TEMP 'argonaut-self-test.json'
+        $exe = Join-Path $env:GITHUB_WORKSPACE 'dist\Argonaut\Argonaut.exe'
+        $env:PATH = "$env:SystemRoot\system32;$env:SystemRoot"
+        $process = Start-Process -FilePath $exe -ArgumentList @('--self-test', $report) -PassThru
+        if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Startup test timed out' }
+        if ($process.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Packaged startup failed' }
+        Get-Content $report
+    - name: Build installer and portable ZIP; test install and uninstall
+      shell: pwsh
+      run: ./packaging/windows/package.ps1
+    - uses: actions/upload-artifact@v4
+      with:
+        name: stable-Windows
+        path: release-assets/
+        if-no-files-found: error
+  macos:
+    runs-on: ${{ matrix.runner }}
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ github.sha }}
+    timeout-minutes: 90
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ github.sha }}
+    - name: Install Mac runtime
+      run: |
+        test "$(uname -m)" = "${{ matrix.arch }}"
+        # The hosted Intel image includes python.org symlinks that conflict
+        # with Homebrew. Preserve these links outside PATH on this disposable VM.
+        mkdir -p "$RUNNER_TEMP/python-links"
+        for name in idle3.13 pip3.13 pydoc3.13 python3.13 python3.13-config; do
+          link="/usr/local/bin/$name"
+          if [ -L "$link" ]; then
+            mv "$link" "$RUNNER_TEMP/python-links/$name"
+          fi
+        done
+        brew install python@3.13 pygobject3 gtk4 gstreamer adwaita-icon-theme
+        "$(brew --prefix python@3.13)/bin/python3.13" -m venv --system-site-packages .venv
+        .venv/bin/python -m pip install pyinstaller keyring
+        .venv/bin/python -c "import gi; gi.require_version('Gtk','4.0'); from gi.repository import Gtk"
+    - name: Unit tests
+      run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+    - name: Build app
+      run: |
+        .venv/bin/python packaging/build_metadata.py --version 1.5
+        .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
+    - name: Check relocated app with minimal environment
+      run: |
+        mkdir -p "$RUNNER_TEMP/Argonaut App Test"
+        ditto "dist/Argonaut.app" "$RUNNER_TEMP/Argonaut App Test/Argonaut.app"
+        codesign --verify --deep --strict "$RUNNER_TEMP/Argonaut App Test/Argonaut.app"
+        .venv/bin/python - <<'PYTHON'
+        import os, subprocess
+        from pathlib import Path
+        folder=Path(os.environ['RUNNER_TEMP'])/'Argonaut App Test'
+        report=folder/'self-test.json'
+        env=dict(os.environ,PATH='/usr/bin:/bin:/usr/sbin:/sbin')
+        for key in ('PYTHONPATH','GI_TYPELIB_PATH','DYLD_LIBRARY_PATH','GST_PLUGIN_PATH'):
+            env.pop(key,None)
+        subprocess.run([str(folder/'Argonaut.app/Contents/MacOS/Argonaut'),'--self-test',str(report)],env=env,check=True,timeout=90)
+        assert report.is_file()
+        print(report.read_text())
+        PYTHON
+    - name: Create stable DMG and ZIP
+      run: |
+        mkdir -p mac-package artifacts
+        ditto "dist/Argonaut.app" "mac-package/Argonaut.app"
+        cp packaging/RELEASE-1.5.md LICENSE COPYRIGHT mac-package/
+        brew info --json=v2 --installed > mac-package/Homebrew-packages.json
+        ln -s /Applications mac-package/Applications
+        hdiutil create -volname 'Argonaut' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-macOS-${{ matrix.label }}.dmg
+        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-macOS-${{ matrix.label }}.zip
+    - uses: actions/upload-artifact@v4
+      with:
+        name: stable-macOS-${{ matrix.label }}
+        path: artifacts/
+        if-no-files-found: error
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - runner: macos-15
+          arch: arm64
+          label: AppleSilicon
+        - runner: macos-15-intel
+          arch: x86_64
+          label: Intel
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ github.sha }}
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: stable-*
+        path: release-assets
+        merge-multiple: true
+    - name: Publish verified stable packages
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        git archive --format=zip --prefix=argonaut-1.5/ -o /tmp/argonaut-1.5-source.zip HEAD
+        cp /tmp/argonaut-1.5-source.zip release-assets/
+        cd release-assets
+        python3 - <<'VERIFY'
+        from pathlib import Path
+        import hashlib
+        expected={'Argonaut-1.5-Windows-x64-Setup.exe','Argonaut-1.5-Windows-x64-Portable.zip','Argonaut-1.5-macOS-AppleSilicon.dmg','Argonaut-1.5-macOS-AppleSilicon.zip','Argonaut-1.5-macOS-Intel.dmg','Argonaut-1.5-macOS-Intel.zip','argonaut-c64u_1.5_all.deb','argonaut-1.5-source.zip'}
+        assert {p.name for p in Path('.').iterdir() if p.name!='SHA256SUMS'}==expected
+        Path('SHA256SUMS').write_text(''.join(hashlib.sha256(Path(n).read_bytes()).hexdigest()+'  '+n+'\n' for n in sorted(expected)))
+        VERIFY
+        gh release create v1.5 --target "${{ github.sha }}" --latest --title 'Argonaut 1.5 — Debian, Windows and macOS' --notes-file ../packaging/RELEASE-1.5.md *.deb *.exe *.zip *.dmg SHA256SUMS
+    needs:
+    - windows
+    - macos
+    - debian
+  debian:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ github.sha }}
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ github.sha }}
+    - name: Install GTK test runtime
+      run: |-
+        sudo apt-get update
+        sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good iproute2 adwaita-icon-theme xvfb dbus-x11
+    - name: Unit and GTK tests
+      run: |-
+        python3 -m unittest discover -s tests -p 'test_*.py'
+        xvfb-run -a env ARGONAUT_UI_TESTS=1 python3 -m unittest tests.test_preferences_ui
+    - name: Build and test installed package
+      run: |-
+        python3 packaging/build_deb.py --version 1.5 --output release-assets
+        sudo apt-get install -y ./release-assets/argonaut-c64u_1.5_all.deb
+        cp packaging/windows/launch.py /tmp/argonaut-package-test.py
+        cd /tmp
+        xvfb-run -a env PYTHONPATH=/usr/lib/argonaut python3 /tmp/argonaut-package-test.py --self-test /tmp/debian-test.json
+        cat /tmp/debian-test.json
+    - uses: actions/upload-artifact@v4
+      with:
+        name: stable-Debian
+        path: release-assets/*.deb
+        if-no-files-found: error
