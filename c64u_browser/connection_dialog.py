@@ -10,16 +10,17 @@ from .profiles import Profile
 from .discovery import standard_scan, subnet_scan, local_networks, preferred_subnet
 
 class ConnectionDialog:
-    def __init__(self, app):
+    def __init__(self, app, window=None):
         self.app = app
         self.current_id = None
-        self.window = Gtk.Window(title='Argonaut — Connections', transient_for=app.window, modal=True)
-        self.window.set_default_size(680, 650)
+        self.window = window or Gtk.Window(title='Argonaut — Connections', transient_for=app.window, modal=True)
+        if window is None:self.window.set_default_size(680,650)
         self.window.connect('close-request', lambda *_: app.busy)
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         for side in ('top','bottom','start','end'): getattr(outer,'set_margin_'+side)(16)
-        page_scroll=Gtk.ScrolledWindow();page_scroll.set_child(outer)
-        self.window.set_child(page_scroll)
+        page_scroll=Gtk.ScrolledWindow();page_scroll.set_overlay_scrolling(False);page_scroll.set_child(outer)
+        self.page=page_scroll
+        if window is None:self.window.set_child(page_scroll)
         self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8); outer.append(self.controls)
         self.saved = Gtk.ComboBoxText()
         self.saved.connect('changed', self.selected)
@@ -39,21 +40,35 @@ class ConnectionDialog:
             row = Gtk.Box(spacing=8); self.controls.append(row)
             row.append(Gtk.Label(label=label,width_chars=15,xalign=0))
             entry = Gtk.Entry(text=default,hexpand=True); row.append(entry); self.fields[key]=entry
-        details=Gtk.Expander(label='Optional device details · saved on this computer')
-        details_box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=8);details.set_child(details_box)
-        self.controls.append(details)
-        for key,label in [('serial_number','Serial number'),('case_edition','Case edition'),('notes','Notes')]:
+        details_box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
+        self.details_page=details_box
+        self.details_profile=Gtk.Label(xalign=0,wrap=True);details_box.append(self.details_profile)
+        for key,label in [('serial_number','Serial number'),('case_edition','Box model'),('notes','Notes')]:
             row=Gtk.Box(spacing=8);details_box.append(row)
             row.append(Gtk.Label(label=label,width_chars=15,xalign=0))
             entry=Gtk.Entry(hexpand=True);row.append(entry);self.fields[key]=entry
+        self.fields['case_edition'].set_placeholder_text('Model checked on the shipping box')
+        self.fields['case_edition'].set_tooltip_text('Enter the model checked on the shipping box. Saved with this profile; does not change the C64U hardware model.')
+        details_box.append(Gtk.Label(label='Box model is your shipping-box label. C64U Model is read-only firmware information and may differ from the box label.',xalign=0,wrap=True))
+        self.model=Gtk.Entry(editable=False,hexpand=True)
+        modelrow=Gtk.Box(spacing=8);modelrow.append(Gtk.Label(label='C64U Model',width_chars=15,xalign=0));modelrow.append(self.model);details_box.append(modelrow)
+        modelrow=Gtk.Box(spacing=8);details_box.append(modelrow)
+        app.button(modelrow,'Read model from C64U',self.read_model)
+        app.button(modelrow,'Save profile details',self.save)
+        self.details_status=Gtk.Label(xalign=0,wrap=True);details_box.append(self.details_status)
+        self.fields['name'].connect('changed',lambda *_:self.details_profile.set_text('Profile: '+(self.fields['name'].get_text() or 'New profile')))
+        self.fields['host'].connect('changed',lambda *_:self.model.set_text('Not read'))
+        self.controls.append(details_box)
         self.password = Gtk.PasswordEntry(show_peek_icon=True,placeholder_text='Network password (blank: use saved password)')
         self.controls.append(self.password)
         self.remember = Gtk.CheckButton(label='Store entered password in '+('Windows Credential Manager' if sys.platform=='win32' else 'macOS Keychain' if sys.platform=='darwin' else 'GNOME keyring'))
         if getattr(app.credentials,"session_only",False) is True:
             self.remember.set_label("Portable mode: passwords stay in this session only")
             self.remember.set_sensitive(False)
+        self.remember.set_halign(Gtk.Align.START)
         self.controls.append(self.remember)
         self.auto = Gtk.CheckButton(label='Connect automatically at startup when this profile is selected')
+        self.auto.set_halign(Gtk.Align.START)
         self.controls.append(self.auto)
         row = Gtk.Box(spacing=8); self.controls.append(row)
         app.button(row,'Test connection',self.test)
@@ -63,7 +78,18 @@ class ConnectionDialog:
         self.status = Gtk.Label(label='Scan for devices or enter a hostname and ports manually.',wrap=True,xalign=0,selectable=True)
         outer.append(self.status)
         self.reload()
-        self.window.present()
+        if window is None:self.window.present()
+
+    def read_model(self):
+        try:p=self.profile()
+        except BrowserError as exc:self.status.set_text(str(exc));return
+        entered=self.password.get_text()
+        def task():
+            client=p.client(self.credential(p,entered));p.verify_identity(client.test_connection())
+            from .configuration import Configuration
+            return next((row.current for row in Configuration(client).settings('U64 Specific Settings') if row.name=='C64U Model'),'Not reported')
+        def done(value):self.model.set_text(value);self.status.set_text('Model is read-only and reported by this C64U.')
+        self.submit(task,done)
 
     def reload(self):
         self.saved.remove_all()
@@ -77,14 +103,28 @@ class ConnectionDialog:
         self.current_id = profile.id
         for key,value in [('name',profile.name),('host',profile.host),('http',profile.http_port),('ftp',profile.ftp_port)]: self.fields[key].set_text(str(value))
         for key in ('serial_number','case_edition','notes'):self.fields[key].set_text(getattr(profile,key))
+        self.model.set_text('Not read')
         self.auto.set_active(profile.auto_connect); self.password.set_text(''); self.remember.set_active(False)
+        self.mark_clean()
 
     def new(self):
         self.current_id = None
         self.saved.set_active(-1)
         for key,value in [('name',''),('host',''),('http','80'),('ftp','21')]: self.fields[key].set_text(value)
         for key in ('serial_number','case_edition','notes'):self.fields[key].set_text('')
+        self.model.set_text('Not read')
         self.auto.set_active(False); self.password.set_text(''); self.remember.set_active(False)
+        self.mark_clean()
+
+    def snapshot(self):
+        return (tuple((key,field.get_text()) for key,field in self.fields.items()),
+                self.auto.get_active(),self.password.get_text(),self.remember.get_active())
+
+    def mark_clean(self):
+        self._saved_fields=self.snapshot()
+
+    def dirty(self):
+        return self.snapshot()!=self._saved_fields
 
     def profile(self):
         try:
@@ -102,8 +142,10 @@ class ConnectionDialog:
     def submit(self, task, done):
         if self.app.busy: return
         self.controls.set_sensitive(False); self.status.set_text('Working…')
+        if hasattr(self,'window') and hasattr(self.window,'pages'):self.window.pages.set_sensitive(False)
         def finish(result):
             self.controls.set_sensitive(True)
+            if hasattr(self,'window') and hasattr(self.window,'pages'):self.window.pages.set_sensitive(True)
             if isinstance(result,Exception): self.status.set_text(str(result))
             else: done(result)
         def caught():
@@ -150,7 +192,7 @@ class ConnectionDialog:
         if entered: self.app.session_passwords[p.id] = entered
         return p
 
-    def save(self):
+    def save(self, after=None):
         try: p = self.profile()
         except BrowserError as exc: self.status.set_text(str(exc)); return
         entered, remember = self.password.get_text(), self.remember.get_active()
@@ -158,6 +200,7 @@ class ConnectionDialog:
             self.current_id=p.id; self.reload(); self.app.update_connection_header()
             password_note=('Password saved in the system credential store.' if remember else 'Entered password is available for this session only.') if entered else 'Saved password unchanged.'
             self.status.set_text('Profile saved. '+password_note)
+            if after:after()
         self.submit(lambda:self.persist(p,entered,remember),done)
 
     def connect(self):
@@ -177,11 +220,14 @@ class ConnectionDialog:
                     current=client.test_connection()
                     candidate=replace(p,device_id=reported or p.device_id,device_mac=info.get('network_mac','') or p.device_mac)
                     candidate.verify_identity(current)
-                    listing=initial_directory(client)
+                    listing=initial_directory(client,self.app.preferences.app_options['remote_folders'].get(p.id,'/USB2') if self.app.preferences.app_options['remember_folders'] else '/USB2')
                     saved=self.persist(candidate,entered,remember)
                     return saved,client,current,listing
                 def connected(result):
-                    self.app.activate_connection(*result);self.window.destroy()
+                    self.app.activate_connection(*result)
+                    self.current_id=result[0].id;self.reload()
+                    if hasattr(self.window,'pages'):self.status.set_text('Connected · Profile saved.')
+                    else:self.window.destroy()
                 self.submit(finish_task,connected)
             if p.device_id or p.device_mac:finish_connection();return
             dialog=Gtk.Dialog(title='Confirm profile device',transient_for=self.window,modal=True)
@@ -202,7 +248,8 @@ class ConnectionDialog:
             self.status.set_text('Enter one connected local subnet. At most 1024 addresses, eight probes at a time.'); return
         def task():
             if fallback: return subnet_scan(subnet), ['Controlled LAN scan complete.'], []
-            candidates, notes = standard_scan()
+            known=[(p.host,p.http_port) for p in self.app.preferences.profiles]
+            candidates, notes = standard_scan(known_hosts=known)
             return candidates, notes, local_networks()
         def done(result):
             candidates,notes,networks=result

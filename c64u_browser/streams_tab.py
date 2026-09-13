@@ -12,7 +12,11 @@ class StreamsTab:
     def __init__(self,app):
         self.app=app;self.client=None;self.session=None;self.output=None;self.timer=None
         self.box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
-        self.device=Gtk.Label(xalign=0,wrap=True);self.box.append(self.device)
+        header=Gtk.Box(spacing=12);self.box.append(header)
+        self.device=Gtk.Label(xalign=0,wrap=True,hexpand=True);header.append(self.device)
+        self.status=Gtk.Label(xalign=1,wrap=True,max_width_chars=55);header.append(self.status)
+        self.status.set_tooltip_text('FPS counts complete video frames received; seconds are elapsed preview time.')
+        self.fps_time=0;self.fps_frames=0;self.fps=0.0
         row=Gtk.Box(spacing=8);self.box.append(row)
         self.start_button=Gtk.Button(label='Start preview');row.append(self.start_button)
         self.start_button.connect('clicked',self.start)
@@ -21,23 +25,42 @@ class StreamsTab:
         self.capture_button=Gtk.Button(label='Save screenshot…',sensitive=False);row.append(self.capture_button)
         self.capture_button.connect('clicked',self.capture)
         self.capture_chooser=None
-        self.audio=Gtk.CheckButton(label='Play audio on this computer',active=True);row.append(self.audio)
-        self.picture=Gtk.Picture(hexpand=True,vexpand=True,can_shrink=True)
-        self.picture.set_size_request(384,240);self.box.append(self.picture)
-        self.status=Gtk.Label(xalign=0,wrap=True);self.box.append(self.status)
-        self.capture_status=Gtk.Label(xalign=0,wrap=True,selectable=True);self.box.append(self.capture_status)
-        self.box.append(Gtk.Label(label='Requires wired Ethernet on the C64U. Preview includes the Ultimate menu on tested Spiffy 1.1.0s2 firmware. Colors use a standard preview palette. Starting video replaces any existing video/debug stream; audio replaces any existing audio stream.',xalign=0,wrap=True))
-        recordrow=Gtk.Box(spacing=8);self.box.append(recordrow)
-        self.record_button=Gtk.Button(label='Start recording…',sensitive=False);recordrow.append(self.record_button)
+        self.record_button=Gtk.Button(label='Start recording…',sensitive=False);row.append(self.record_button)
         self.record_button.connect('clicked',self.record)
-        self.record_status=Gtk.Label(xalign=0,wrap=True);recordrow.append(self.record_status)
+        self.audio=Gtk.CheckButton(label='Play audio on this computer',active=app.preferences.app_options['preview_audio']);row.append(self.audio)
+        zoomrow=Gtk.Box(spacing=8);self.box.append(zoomrow)
+        zoomrow.append(Gtk.Label(label='Preview scale'))
+        self.preview_percent=app.preferences.app_options['preview_scale']
+        from .app_preferences import scale_control
+        control,self.zoom,self.set_zoom=scale_control(self.preview_percent,self.apply_scale)
+        zoomrow.append(control)
+        self.preview_height=240
+        self.picture=Gtk.Picture(can_shrink=True,halign=Gtk.Align.CENTER,valign=Gtk.Align.CENTER)
+        self.preview_scroll=Gtk.ScrolledWindow(hexpand=True,vexpand=True,min_content_height=200)
+        self.preview_scroll.set_policy(Gtk.PolicyType.AUTOMATIC,Gtk.PolicyType.AUTOMATIC)
+        self.preview_scroll.set_propagate_natural_width(False);self.preview_scroll.set_propagate_natural_height(False)
+        self.preview_scroll.set_overlay_scrolling(False)
+        self.preview_scroll.set_child(self.picture);self.box.append(self.preview_scroll)
+        self.scale_preview()
+        self.capture_status=Gtk.Label(xalign=0,wrap=True,selectable=True);self.box.append(self.capture_status)
+        self.record_status=Gtk.Label(xalign=0,wrap=True);self.box.append(self.record_status)
         self.recorder=None;self.record_chooser=None
-        self.box.append(Gtk.Label(label='Recordings save as WebM. Enable computer audio before starting preview to include sound.' ,xalign=0,wrap=True))
+        keyboard=Gtk.Box(spacing=8);self.box.append(keyboard)
+        self.text_input=Gtk.Entry(placeholder_text='Text for the C64 BASIC READY prompt',hexpand=True,max_length=160)
+        keyboard.append(self.text_input)
+        self.text_return=Gtk.CheckButton(label='Append Return',active=True);keyboard.append(self.text_return)
+        self.text_send=Gtk.Button(label='Send text',sensitive=False);keyboard.append(self.text_send)
+        self.text_send.connect('clicked',self.send_text)
+        self.text_input.connect('activate',self.send_text)
+        self.text_status=Gtk.Label(xalign=0,wrap=True)
+        self.box.append(self.text_status)
         self.bind(None)
 
     def bind(self,client):
         self.stop();self.client=client;self.picture.set_paintable(None);self.capture_button.set_sensitive(False)
         self.device.set_text('Active C64U · '+client.host if client else 'Connect to a C64 Ultimate to preview video and audio.')
+        self.text_send.set_sensitive(client is not None)
+        self.text_input.set_text('')
         self.update_buttons()
 
     def update_buttons(self):
@@ -48,10 +71,12 @@ class StreamsTab:
 
     def start(self,*_):
         if not self.client or (self.session and self.session.thread.is_alive()):return
+        self.app.preferences.app_options['preview_audio']=self.audio.get_active();self.app.save_app_preferences()
         self.picture.set_paintable(None);self.capture_button.set_sensitive(False)
         try:self.output=AudioOutput() if self.audio.get_active() else None
         except Exception as exc:
             self.status.set_text('Audio could not start: '+str(exc)+'. Turn off audio to preview video only.');return
+        self.fps_time=time.monotonic();self.fps_frames=0;self.fps=0.0
         self.session=StreamSession(self.client,self.audio.get_active())
         self.status.set_text('Starting preview…');self.update_buttons()
         if self.timer is None:self.timer=GLib.timeout_add(33,self.tick)
@@ -75,6 +100,8 @@ class StreamsTab:
                 rgb=rgb_frame(packed)
                 texture=Gdk.MemoryTexture.new(384,height,Gdk.MemoryFormat.R8G8B8,GLib.Bytes.new(rgb),384*3)
                 self.picture.set_paintable(texture)
+                if height!=self.preview_height:
+                    self.preview_height=height;self.scale_preview()
                 self.capture_button.set_sensitive(self.capture_chooser is None)
             if self.recorder and not self.recorder.finishing:
                 try:self.recorder.feed((height,rgb) if frame else None,samples)
@@ -88,7 +115,13 @@ class StreamsTab:
             if receiver.frames:
                 audio=' · Audio receiving' if receiver.last_audio and time.monotonic()-receiver.last_audio<2 else (' · Waiting for audio' if session.with_audio else '')
                 stale=' · Waiting for video' if time.monotonic()-receiver.last_video>2 else ''
-                self.status.set_text(f'Live preview · {receiver.frames} frames'+audio+stale)
+                now=time.monotonic()
+                interval=now-self.fps_time
+                if interval>=1:
+                    self.fps=max(0,receiver.frames-self.fps_frames)/interval
+                    self.fps_time=now;self.fps_frames=receiver.frames
+                seconds=max(0,int(now-receiver.started))
+                self.status.set_text(f'Live preview · {self.fps:.1f} FPS · {seconds} s'+audio+stale)
             else:self.status.set_text(session.message)
         if not session.thread.is_alive():
             if self.recorder:self.recorder.stop()
@@ -170,3 +203,27 @@ class StreamsTab:
         if self.capture_chooser:self.capture_chooser.destroy();self.capture_chooser=None
         self.stop()
         if self.timer is not None:GLib.source_remove(self.timer);self.timer=None
+
+    def send_text(self,*_):
+        if not self.client or self.app.busy:return
+        from .keyboard_input import send_text,encode_text
+        client=self.client;text=self.text_input.get_text();enter=self.text_return.get_active()
+        try:encode_text(text,enter)
+        except Exception as exc:
+            self.text_status.set_text(str(exc));return
+        self.text_status.set_text('Sending text… Keep the C64U at BASIC READY; do not type on its keyboard during sending.')
+        def task():
+            try:return send_text(client,text,enter)
+            except Exception as exc:return exc
+        def done(result):
+            if self.client is not client:return
+            self.text_status.set_text(str(result) if isinstance(result,Exception) else f'Sent {result} bytes. Check the C64U screen.')
+        self.app.run(task,done)
+
+    def scale_preview(self,*_):
+        factor=self.preview_percent/100
+        self.picture.set_size_request(round(384*factor),round(self.preview_height*factor))
+
+    def apply_scale(self,*_):
+        self.preview_percent=int(self.zoom.get_text().rstrip('%'))
+        self.scale_preview()

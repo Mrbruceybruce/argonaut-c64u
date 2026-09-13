@@ -4,22 +4,22 @@ Argonaut controls and manages a C64 Ultimate from your computer. It provides
 file transfers, settings and favorites, ROM selection, configuration backups,
 and live screen preview with audio.
 
-This guide covers Argonaut 0.1.4 on Debian, Windows, and Apple Silicon Mac. Available settings and actions depend on the connected C64U firmware.
+This guide covers Argonaut 1.5 on Debian, Windows, and Apple Silicon or Intel Mac. Available settings and actions depend on the connected C64U firmware.
 
 ## 1. Install Argonaut
 
-Choose the package for your computer from the unified 0.1.4 release.
+Choose the package for your computer from the unified 1.5 release.
 
 | Computer | Download | Install |
 | --- | --- | --- |
-| Debian 13 | [Debian 0.1.4](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4) | Download the `.deb` and run the command below. |
-| Windows 10/11, 64-bit | [Windows 0.1.4](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
-| Apple Silicon Mac, macOS 15 or newer | [Mac 0.1.4](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
+| Debian 13 | [Debian 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Download the `.deb` and run the command below. |
+| Windows 10/11, 64-bit | [Windows 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
+| Apple Silicon or Intel Mac, macOS 15 or newer | [Mac 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
 
 On Debian, open a terminal in the folder containing the downloaded package:
 
 ```sh
-sudo apt install ./argonaut-c64u_0.1.4_all.deb
+sudo apt install ./argonaut-c64u_1.5_all.deb
 ```
 
 Windows and Mac packages include Python, GTK, and the media libraries.
@@ -36,14 +36,14 @@ only for the current session. Keep `Data` when updating, and exit Argonaut
 before ejecting the thumb drive. Reselect screenshot or recording destinations
 if its drive letter changes.
 
-Choose **About** beside Connections to see the running version and build identifier.
+Choose **Preferences → About** to see the running version and build identifier.
 
 ## 2. Prepare and connect your C64U
 
 1. Connect your computer and C64U to the same reachable local network.
 2. Enable the C64U's **REST** and **FTP** services in its network/service settings.
 3. Note the C64U's current IP address. Use wired Ethernet on the C64U for preview.
-4. Launch Argonaut and open **Connections…**.
+4. Launch Argonaut and open **Preferences → Device details**.
 5. Choose **New profile**, enter a descriptive name and the IP address, and check
    the REST and FTP ports. Defaults are **80** and **21**; use your device's values
    if you changed them.
@@ -55,7 +55,7 @@ Choose **About** beside Connections to see the running version and build identif
 and network interface an identifiable profile name, such as “Desk C64U Ethernet.”
 
 You can also try **Scan again** or **Scan subnet**. Manual IP entry is available
-on every platform. Automatic subnet suggestions and MAC-address fallback are
+on every platform. Subnet discovery works on Debian, Windows, and Mac. MAC-address fallback is
 currently Linux-only.
 
 ### Keep profiles pointing to the right machine

@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """GTK4 presentation; all remote work runs on a single worker thread."""
+from . import development
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import posixpath
+import sys
 import time
 import uuid
 from threading import Event
@@ -30,7 +32,7 @@ from .streams_tab import StreamsTab
 
 class Browser(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id='org.local.Argonaut')
+        super().__init__(application_id='org.local.Argonaut.Development' if development.enabled() else 'org.local.Argonaut')
         self.pool = ThreadPoolExecutor(max_workers=1)
         self.local = Path.cwd()
         self.remote = '/USB2'
@@ -48,6 +50,9 @@ class Browser(Gtk.Application):
         self.preferences_error = None
         try: self.preferences.load()
         except (BrowserError, OSError) as exc: self.preferences_error = str(exc)
+        remembered=self.preferences.app_options['local_folder']
+        self.local=Path(remembered) if self.preferences.app_options['remember_folders'] and remembered and Path(remembered).is_dir() else Path.home()
+        self.histories[True]=History(self.local)
         self.credentials = Credentials()
         self.session_passwords = {}
         self.active_profile = None
@@ -68,17 +73,41 @@ class Browser(Gtk.Application):
         button.update_property([Gtk.AccessibleProperty.LABEL], [label])
         return button
 
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        # GTK's macOS/Quartz backend only enables the app-menu "Quit" item and
+        # the Cmd+Q accelerator if an "app.quit" action actually exists; without
+        # this, both stay permanently disabled on macOS (Linux/Windows menus are
+        # unaffected, since this app doesn't build its own menubar there).
+        quit_action = Gio.SimpleAction.new('quit', None)
+        quit_action.connect('activate', self.request_quit)
+        self.add_action(quit_action)
+        accel = '<Meta>q' if sys.platform == 'darwin' else '<Primary>q'
+        self.set_accels_for_action('app.quit', [accel])
+
+
+    def request_quit(self,*_):
+        window=getattr(self,'window',None)
+        if window is not None:
+            # Preserve close-request handlers: saved geometry and busy guard.
+            window.close()
+        else:
+            self.pool.shutdown(wait=False)
+            self.quit()
+
     def do_activate(self):
         # A second launcher activation must present the existing app, not create
         # another main window sharing the same worker and shutdown handler.
         if getattr(self, 'window', None) in self.get_windows():
             self.window.present()
             return
-        self.window = Gtk.ApplicationWindow(application=self, title='Argonaut — C64 Ultimate Control & Management')
+        self.window = Gtk.ApplicationWindow(application=self, title='Argonaut Development — C64 Ultimate Control & Management' if development.enabled() else 'Argonaut — C64 Ultimate Control & Management')
         from .version import ASSETS
         Gtk.IconTheme.get_for_display(self.window.get_display()).add_search_path(str(ASSETS))
         self.window.set_icon_name('argonaut')
-        self.window.set_default_size(1050, 650)
+        options=self.preferences.app_options
+        self.window.set_default_size(options['width'] if options['remember_window'] else 1200, options['height'] if options['remember_window'] else 850)
+        self.window.connect('close-request',self.remember_window)
         self.window.connect('close-request', self.close)
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         for side in ('top', 'bottom', 'start', 'end'): getattr(outer, 'set_margin_' + side)(12)
@@ -89,9 +118,8 @@ class Browser(Gtk.Application):
         self.controls.append(connection)
         self.connection_label = Gtk.Label(xalign=0, hexpand=True, wrap=True)
         connection.append(self.connection_label)
-        from .about import show_about
-        self.button(connection, 'About', lambda: show_about(self))
-        self.button(connection, 'Connections…', self.open_connections)
+        from .app_preferences import show_preferences
+        self.button(connection, 'Preferences…', lambda: show_preferences(self))
         self.button(connection, 'Disconnect', self.disconnect_device)
         self.tabs = Gtk.Notebook(vexpand=True)
         self.controls.append(self.tabs)
@@ -121,7 +149,7 @@ class Browser(Gtk.Application):
         self.streams_tab=StreamsTab(self)
         self.tabs.append_page(self.streams_tab.box,Gtk.Label(label='Streams'))
         self.tabs.connect('switch-page', lambda _, page, index: self.settings_tab.load_if_needed() if index == 1 else self.drives_tab.load_if_needed() if index == 2 else None)
-        self.status = Gtk.Label(label='Open Connections to select or discover a C64 Ultimate.', xalign=0, wrap=True, selectable=True)
+        self.status = Gtk.Label(label='Open Preferences → Device details to select or discover a C64 Ultimate.', xalign=0, wrap=True, selectable=True)
         outer.append(self.status)
         self.cancel_button = self.button(actions, 'Cancel transfer', self.cancel_transfer)
         self.cancel_button.set_sensitive(False)
@@ -243,7 +271,8 @@ class Browser(Gtk.Application):
         if self.busy: return
         if self.preferences_error:
             self.status.set_text(self.preferences_error); return
-        self.connection_dialog = ConnectionDialog(self)
+        from .app_preferences import show_preferences
+        show_preferences(self,page=1)
 
     def update_connection_header(self):
         selected = self.preferences.selected()
@@ -330,12 +359,14 @@ class Browser(Gtk.Application):
             client = profile.client(self.credentials.get(profile.id))
             info=client.test_connection()
             profile.verify_identity(info,require_bound=True)
-            return profile, client, info, initial_directory(client)
+            return profile, client, info, initial_directory(client,self.preferences.app_options['remote_folders'].get(profile.id,'/USB2') if self.preferences.app_options['remember_folders'] else '/USB2')
         self.run(task, lambda result: self.activate_connection(*result))
         return False
 
     def show_remote(self, result):
         self.remote, entries = result
+        if self.active_profile and self.preferences.app_options['remember_folders']:
+            self.preferences.app_options['remote_folders'][self.active_profile.id]=self.remote;self.save_app_preferences()
         self.remote_root=storage_root(self.remote) or '/'
         self.drive_bars[False].refresh()
         self.rpath.set_text(self.remote)
@@ -383,6 +414,8 @@ class Browser(Gtk.Application):
                 self.status.set_text('Choose an existing local folder.'); return
             self.local = candidate
             if self.refresh_local():
+                if self.preferences.app_options['remember_folders']:
+                    self.preferences.app_options['local_folder']=str(candidate);self.save_app_preferences()
                 history.visit(candidate, offset)
                 self.update_history_buttons()
             else:
@@ -525,7 +558,7 @@ class Browser(Gtk.Application):
         payload = self.drag_payload
         if self.busy or not payload or value != payload[0] or local == payload[1]: return False
         if not self.client:
-            self.status.set_text('Open Connections and connect to a C64U first.'); return False
+            self.status.set_text('Open Preferences → Device details and connect to a C64U first.'); return False
         row = listing.get_row_at_y(int(y))
         destination = self.local if local else self.remote
         if row and row.item[1]:
@@ -772,6 +805,17 @@ class Browser(Gtk.Application):
         dialog.present()
         entry.grab_focus()
         return dialog, entry, confirm
+
+    def save_app_preferences(self):
+        if self.preferences_error:return
+        try:self.preferences.save()
+        except OSError as exc:self.status.set_text('Could not save Argonaut preferences: '+str(exc))
+
+    def remember_window(self,*_):
+        if not self.busy and self.preferences.app_options['remember_window'] and not self.window.is_maximized():
+            self.preferences.app_options.update(width=max(600,self.window.get_width()),height=max(400,self.window.get_height()))
+            self.save_app_preferences()
+        return False
 
     def close(self, *_):
         if self.busy:

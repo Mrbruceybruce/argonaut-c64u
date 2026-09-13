@@ -54,7 +54,9 @@ class Connections(unittest.TestCase):
     def test_password_candidate_not_verified(self):
         with patch.object(UltimateClient,'test_connection',side_effect=ConnectionFailure('authentication','Denied')):
             c=verify(Candidate('192.168.68.60'))
-            self.assertIn('identity unverified',c.status);self.assertEqual(c.info,{})
+            self.assertIsNone(c)
+            c=verify(Candidate('192.168.68.60',info={'ident':{'product':'C64 Ultimate'}}))
+            self.assertIn('identity unverified',c.status)
 
     def test_profile_roundtrip_and_permissions(self):
         with tempfile.TemporaryDirectory() as d:
@@ -114,10 +116,10 @@ class IdentTests(unittest.TestCase):
             self.assertLessEqual(len(nonce),24)
             return json.dumps({'product':'C64 Ultimate (V1.49) 1.1.0s2','firmware_version':'1.1.0s2','hostname':'C64','your_string':nonce}).encode(),('192.168.68.60',64)
         sock.recvfrom.side_effect=receive
-        with patch('c64u_browser.discovery.socket.socket',return_value=sock), patch('c64u_browser.discovery.local_networks',return_value=['192.168.68.0/22']), patch('c64u_browser.discovery.time.monotonic',side_effect=[0,0,3]):
+        with patch('c64u_browser.discovery.socket.socket',return_value=sock), patch('c64u_browser.discovery.local_networks',return_value=['192.168.68.0/22']), patch('c64u_browser.discovery.time.monotonic',side_effect=[0,0,0,0,1,1,1,2,2,2,3]):
             results=ident_scan()
         self.assertIn(('192.168.68.60',80),results)
-        self.assertEqual(sock.sendto.call_args_list[0].args[1],('192.168.71.255',64))
-        self.assertEqual(sock.sendto.call_args_list[1].args[1],('255.255.255.255',64))
+        self.assertEqual(sock.sendto.call_count,6)
+        self.assertEqual({c.args[1] for c in sock.sendto.call_args_list},{('192.168.71.255',64),('255.255.255.255',64)})
 
 if __name__=='__main__':unittest.main()

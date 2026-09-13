@@ -2,12 +2,13 @@
 # Copyright (C) 2026 Bruce Marcus
 """Native credential stores only; no plaintext fallback."""
 import sys
+from . import development
 from .api import BrowserError
 from .platform_support import portable_root
 
 class Credentials:
     def __new__(cls):
-        if portable_root() is not None:return SessionCredentials()
+        if development.enabled() or portable_root() is not None:return SessionCredentials()
         if sys.platform == "darwin":
             from .macos_credentials import MacOSCredentials
             return MacOSCredentials()
@@ -54,5 +55,5 @@ class SessionCredentials:
     error=None
     session_only=True
     def get(self,profile_id):return ''
-    def set(self,profile_id,password):raise BrowserError('Portable mode keeps passwords for this session only.')
+    def set(self,profile_id,password):raise BrowserError('This mode keeps passwords for this session only.')
     def delete(self,profile_id):pass
