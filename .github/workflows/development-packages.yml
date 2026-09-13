@@ -14,7 +14,7 @@ jobs:
         fetch-depth: 0
     - id: source
       run: |
-        echo '22a5c2d17153c8c7ee1f04356ec1b63273676d9d7d96f08619f862fc6b795181  .github/workflows/development-source.bundle' | sha256sum -c -
+        echo '81652849fd7fe16e1956999ee647f6269ecf61da8eba1e0a671921233ec11a64  .github/workflows/development-source.bundle' | sha256sum -c -
         git bundle verify .github/workflows/development-source.bundle
         echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   windows:
@@ -30,7 +30,7 @@ jobs:
       shell: bash
       run: |
         git fetch .github/workflows/development-source.bundle development:refs/remotes/import/development
-        test "$(git rev-parse refs/remotes/import/development)" = a518d36b36a877da0bad2484b7fc3d9797241690
+        test "$(git rev-parse refs/remotes/import/development)" = 563bf636c0ab542cc656aa46f5aa91cfa5ca548a
         git checkout --detach refs/remotes/import/development
     - uses: msys2/setup-msys2@v2
       with:
@@ -44,7 +44,7 @@ jobs:
     - name: Build portable application
       shell: msys2 {0}
       run: |
-        python packaging/build_metadata.py --version 0.1.4-dev.1 --development
+        python packaging/build_metadata.py --version 0.1.4-dev.2 --development
         python -m PyInstaller --noconfirm --clean packaging/windows/argonaut.spec
         pacman -Q > dist/Argonaut/MSYS2-PACKAGES.txt
         cp LICENSE COPYRIGHT packaging/windows/README.txt dist/Argonaut/
@@ -72,7 +72,7 @@ jobs:
         if ($p.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Portable test failed' }
         if (-not (Test-Path "$bundle/Data/argonaut-development/config.json")) { throw 'Development preferences missing' }
         Remove-Item "$bundle/Data" -Recurse -Force
-        Compress-Archive -Path "$bundle/*" -DestinationPath artifacts/Argonaut-0.1.4-dev.1-Windows-x64-Portable.zip
+        Compress-Archive -Path "$bundle/*" -DestinationPath artifacts/Argonaut-0.1.4-dev.2-Windows-x64-Portable.zip
     - uses: actions/upload-artifact@v4
       with:
         name: dev-Windows
@@ -108,7 +108,7 @@ jobs:
       run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
     - name: Build app
       run: |
-        .venv/bin/python packaging/build_metadata.py --version 0.1.4-dev.1 --development
+        .venv/bin/python packaging/build_metadata.py --version 0.1.4-dev.2 --development
         .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
     - name: Check relocated app with minimal environment
       run: |
@@ -134,8 +134,8 @@ jobs:
         cp docs/DEVELOPMENT-TEST.md LICENSE COPYRIGHT mac-package/
         brew info --json=v2 --installed > mac-package/Homebrew-packages.json
         ln -s /Applications mac-package/Applications
-        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-0.1.4-dev.1-macOS-${{ matrix.label }}.dmg
-        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-0.1.4-dev.1-macOS-${{ matrix.label }}.zip
+        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-0.1.4-dev.2-macOS-${{ matrix.label }}.dmg
+        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-0.1.4-dev.2-macOS-${{ matrix.label }}.zip
     - uses: actions/upload-artifact@v4
       with:
         name: dev-macOS-${{ matrix.label }}
@@ -175,8 +175,8 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        git archive --format=zip --prefix=argonaut-development/ -o release-assets/argonaut-0.1.4-dev.1-source.zip HEAD
-        printf '\nPackages and the attached source ZIP use reviewed development commit a518d36b36a877da0bad2484b7fc3d9797241690. GitHub automatic source archives refer to the build-workflow tag; use argonaut-0.1.4-dev.1-source.zip for the application source.\n' >> docs/DEVELOPMENT-TEST.md
+        git archive --format=zip --prefix=argonaut-development/ -o release-assets/argonaut-0.1.4-dev.2-source.zip HEAD
+        printf '\nPackages and the attached source ZIP use reviewed development commit 563bf636c0ab542cc656aa46f5aa91cfa5ca548a. GitHub automatic source archives refer to the build-workflow tag; use argonaut-0.1.4-dev.2-source.zip for the application source.\n' >> docs/DEVELOPMENT-TEST.md
         cd release-assets
         sha256sum *.zip *.dmg > SHA256SUMS
-        gh release create v0.1.4-dev.1 --target "${{ needs.source.outputs.sha }}" --prerelease --latest=false --title 'Argonaut 0.1.4-dev.1 — Development test packages' --notes-file ../docs/DEVELOPMENT-TEST.md *.zip *.dmg SHA256SUMS
+        gh release create v0.1.4-dev.2 --target "${{ needs.source.outputs.sha }}" --prerelease --latest=false --title 'Argonaut 0.1.4-dev.2 — Development test packages' --notes-file ../docs/DEVELOPMENT-TEST.md *.zip *.dmg SHA256SUMS
