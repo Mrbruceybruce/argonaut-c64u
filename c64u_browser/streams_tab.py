@@ -12,7 +12,11 @@ class StreamsTab:
     def __init__(self,app):
         self.app=app;self.client=None;self.session=None;self.output=None;self.timer=None
         self.box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
-        self.device=Gtk.Label(xalign=0,wrap=True);self.box.append(self.device)
+        header=Gtk.Box(spacing=12);self.box.append(header)
+        self.device=Gtk.Label(xalign=0,wrap=True,hexpand=True);header.append(self.device)
+        self.status=Gtk.Label(xalign=1,wrap=True,max_width_chars=55);header.append(self.status)
+        self.status.set_tooltip_text('FPS counts complete video frames received; seconds are elapsed preview time.')
+        self.fps_time=0;self.fps_frames=0;self.fps=0.0
         row=Gtk.Box(spacing=8);self.box.append(row)
         self.start_button=Gtk.Button(label='Start preview');row.append(self.start_button)
         self.start_button.connect('clicked',self.start)
@@ -21,6 +25,8 @@ class StreamsTab:
         self.capture_button=Gtk.Button(label='Save screenshot…',sensitive=False);row.append(self.capture_button)
         self.capture_button.connect('clicked',self.capture)
         self.capture_chooser=None
+        self.record_button=Gtk.Button(label='Start recording…',sensitive=False);row.append(self.record_button)
+        self.record_button.connect('clicked',self.record)
         self.audio=Gtk.CheckButton(label='Play audio on this computer',active=True);row.append(self.audio)
         zoomrow=Gtk.Box(spacing=8);self.box.append(zoomrow)
         zoomrow.append(Gtk.Label(label='Preview scale'))
@@ -36,15 +42,9 @@ class StreamsTab:
         self.preview_scroll.set_child(self.picture);self.box.append(self.preview_scroll)
         self.zoom.connect('value-changed',self.scale_preview)
         self.scale_preview()
-        self.status=Gtk.Label(xalign=0,wrap=True);self.box.append(self.status)
         self.capture_status=Gtk.Label(xalign=0,wrap=True,selectable=True);self.box.append(self.capture_status)
-        self.box.append(Gtk.Label(label='Requires wired Ethernet on the C64U. Preview includes the Ultimate menu on tested Spiffy 1.1.0s2 firmware. Colors use a standard preview palette. Starting video replaces any existing video/debug stream; audio replaces any existing audio stream.',xalign=0,wrap=True))
-        recordrow=Gtk.Box(spacing=8);self.box.append(recordrow)
-        self.record_button=Gtk.Button(label='Start recording…',sensitive=False);recordrow.append(self.record_button)
-        self.record_button.connect('clicked',self.record)
-        self.record_status=Gtk.Label(xalign=0,wrap=True);recordrow.append(self.record_status)
+        self.record_status=Gtk.Label(xalign=0,wrap=True);self.box.append(self.record_status)
         self.recorder=None;self.record_chooser=None
-        self.box.append(Gtk.Label(label='Recordings save as WebM. Enable computer audio before starting preview to include sound.' ,xalign=0,wrap=True))
         keyboard=Gtk.Box(spacing=8);self.box.append(keyboard)
         self.text_input=Gtk.Entry(placeholder_text='Text for the C64 BASIC READY prompt',hexpand=True,max_length=160)
         keyboard.append(self.text_input)
@@ -74,6 +74,7 @@ class StreamsTab:
         try:self.output=AudioOutput() if self.audio.get_active() else None
         except Exception as exc:
             self.status.set_text('Audio could not start: '+str(exc)+'. Turn off audio to preview video only.');return
+        self.fps_time=time.monotonic();self.fps_frames=0;self.fps=0.0
         self.session=StreamSession(self.client,self.audio.get_active())
         self.status.set_text('Starting preview…');self.update_buttons()
         if self.timer is None:self.timer=GLib.timeout_add(33,self.tick)
@@ -112,7 +113,13 @@ class StreamsTab:
             if receiver.frames:
                 audio=' · Audio receiving' if receiver.last_audio and time.monotonic()-receiver.last_audio<2 else (' · Waiting for audio' if session.with_audio else '')
                 stale=' · Waiting for video' if time.monotonic()-receiver.last_video>2 else ''
-                self.status.set_text(f'Live preview · {receiver.frames} frames'+audio+stale)
+                now=time.monotonic()
+                interval=now-self.fps_time
+                if interval>=1:
+                    self.fps=max(0,receiver.frames-self.fps_frames)/interval
+                    self.fps_time=now;self.fps_frames=receiver.frames
+                seconds=max(0,int(now-receiver.started))
+                self.status.set_text(f'Live preview · {self.fps:.1f} FPS · {seconds} s'+audio+stale)
             else:self.status.set_text(session.message)
         if not session.thread.is_alive():
             if self.recorder:self.recorder.stop()
