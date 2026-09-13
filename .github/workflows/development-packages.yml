@@ -16,12 +16,7 @@ jobs:
       run: |
         echo '22a5c2d17153c8c7ee1f04356ec1b63273676d9d7d96f08619f862fc6b795181  .github/workflows/development-source.bundle' | sha256sum -c -
         git bundle verify .github/workflows/development-source.bundle
-        git fetch .github/workflows/development-source.bundle development:refs/remotes/import/development
-        test "$(git rev-parse refs/remotes/import/development)" = a518d36b36a877da0bad2484b7fc3d9797241690
-        git push origin refs/remotes/import/development:refs/heads/development
-        echo 'sha=a518d36b36a877da0bad2484b7fc3d9797241690' >> "$GITHUB_OUTPUT"
-    permissions:
-      contents: write
+        echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   windows:
     runs-on: windows-2022
     timeout-minutes: 40
@@ -29,6 +24,14 @@ jobs:
     - uses: actions/checkout@v5
       with:
         ref: ${{ needs.source.outputs.sha }}
+        fetch-depth: 0
+    - &id001
+      name: Restore reviewed development source
+      shell: bash
+      run: |
+        git fetch .github/workflows/development-source.bundle development:refs/remotes/import/development
+        test "$(git rev-parse refs/remotes/import/development)" = a518d36b36a877da0bad2484b7fc3d9797241690
+        git checkout --detach refs/remotes/import/development
     - uses: msys2/setup-msys2@v2
       with:
         msystem: UCRT64
@@ -83,6 +86,8 @@ jobs:
     - uses: actions/checkout@v5
       with:
         ref: ${{ needs.source.outputs.sha }}
+        fetch-depth: 0
+    - *id001
     - name: Install Mac runtime
       run: |
         test "$(uname -m)" = "${{ matrix.arch }}"
@@ -159,6 +164,8 @@ jobs:
     - uses: actions/checkout@v5
       with:
         ref: ${{ needs.source.outputs.sha }}
+        fetch-depth: 0
+    - *id001
     - uses: actions/download-artifact@v4
       with:
         pattern: dev-*
@@ -169,6 +176,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         git archive --format=zip --prefix=argonaut-development/ -o release-assets/argonaut-0.1.4-dev.1-source.zip HEAD
+        printf '\nPackages and the attached source ZIP use reviewed development commit a518d36b36a877da0bad2484b7fc3d9797241690. GitHub automatic source archives refer to the build-workflow tag; use argonaut-0.1.4-dev.1-source.zip for the application source.\n' >> docs/DEVELOPMENT-TEST.md
         cd release-assets
         sha256sum *.zip *.dmg > SHA256SUMS
         gh release create v0.1.4-dev.1 --target "${{ needs.source.outputs.sha }}" --prerelease --latest=false --title 'Argonaut 0.1.4-dev.1 — Development test packages' --notes-file ../docs/DEVELOPMENT-TEST.md *.zip *.dmg SHA256SUMS
