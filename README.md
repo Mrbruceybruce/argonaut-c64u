@@ -56,19 +56,23 @@ Use **Preferences → About** to check the running version and build identifier.
 
 ## Screenshots
 
-Argonaut running on Windows and connected to a C64 Ultimate.
+Argonaut 1.5 running on macOS (Apple Silicon), connected to a C64 Ultimate.
 
 **Files — local and C64U storage side by side.**
 
-![Windows Files tab showing local folders and C64U USB2 storage](docs/images/windows-files.png)
+![Mac Files tab showing local folders and a selected C64U disk image](docs/images/macos-files.png)
 
-**Settings — search, favorites, ROM selection, and backup controls.**
+**Drives — mount disk images or use Mount & Run.**
 
-![Windows Settings tab showing Memory and ROMs](docs/images/windows-settings.png)
+![Mac Drives tab showing Drive A controls and Mount & Run](docs/images/macos-drives.png)
 
 **Streams — live C64U screen preview with audio receiving.**
 
-![Windows Streams tab displaying a live C64 Christmas-tree animation](docs/images/windows-streams.png)
+![Mac Streams tab displaying a live C64U game screen at 200 percent scale](docs/images/macos-streams.png)
+
+**About — version, build, platform, and project links.**
+
+![Mac About tab showing Argonaut version 1.5 and its build identifier](docs/images/macos-about.png)
 
 ## Run from source
 
