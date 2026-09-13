@@ -75,6 +75,9 @@ class Browser(Gtk.Application):
             self.window.present()
             return
         self.window = Gtk.ApplicationWindow(application=self, title='Argonaut — C64 Ultimate Control & Management')
+        from .version import ASSETS
+        Gtk.IconTheme.get_for_display(self.window.get_display()).add_search_path(str(ASSETS))
+        self.window.set_icon_name('argonaut')
         self.window.set_default_size(1050, 650)
         self.window.connect('close-request', self.close)
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -86,6 +89,8 @@ class Browser(Gtk.Application):
         self.controls.append(connection)
         self.connection_label = Gtk.Label(xalign=0, hexpand=True, wrap=True)
         connection.append(self.connection_label)
+        from .about import show_about
+        self.button(connection, 'About', lambda: show_about(self))
         self.button(connection, 'Connections…', self.open_connections)
         self.button(connection, 'Disconnect', self.disconnect_device)
         self.tabs = Gtk.Notebook(vexpand=True)
