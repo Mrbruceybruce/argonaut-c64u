@@ -9,11 +9,11 @@ live screen preview, screenshots, and WebM recordings.
 Start with the [quick-start guide](docs/QUICK-START.md) for connection setup,
 file transfers, settings, backups, and preview.
 
-## macOS (Apple Silicon)
+## macOS (Apple Silicon and Intel)
 
-Download the [Mac release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4)
+Download the [Mac release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5)
 for **macOS 15 or newer**. Open the DMG and drag Argonaut into Applications.
-The ZIP contains the same app. Python, GTK, and media libraries are included.
+Choose the Apple Silicon or Intel download for your Mac. The ZIP contains the same app. Python, GTK, and media libraries are included.
 Profiles use `~/Library/Application Support/argonaut`; passwords use macOS Keychain.
 
 This build is ad-hoc signed and has not been Apple-notarized. macOS may require
@@ -21,7 +21,7 @@ This build is ad-hoc signed and has not been Apple-notarized. macOS may require
 
 ## Windows 10/11 (64-bit)
 
-Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4):
+Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5):
 
 - **Setup.exe** installs Argonaut for your Windows user, adds a Start menu shortcut,
   and provides an uninstaller. Profiles use AppData; saved passwords use Windows
@@ -32,18 +32,18 @@ Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/re
   Exit Argonaut before ejecting the drive.
 
 Both include the required runtime and are unsigned. Add the C64U address manually
-in Connections. See [Windows instructions](packaging/windows/README.txt) for details.
+in Preferences → Device details. See [Windows instructions](packaging/windows/README.txt) for details.
 
 ## Debian 13 installation
 
-Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v0.1.4) and install it with:
+Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) and install it with:
 
 ```sh
-sudo apt install ./argonaut-c64u_0.1.4_all.deb
+sudo apt install ./argonaut-c64u_1.5_all.deb
 ```
 
 Launch **Argonaut** from the application menu, or run `argonaut`.
-Enable the C64U REST and FTP services, then add its address in **Connections**.
+Enable the C64U REST and FTP services, then add its address in **Preferences → Device details**.
 Preview requires Ethernet and inbound UDP ports 11000–11001 from the C64U;
 configure any firewall to allow only the intended device or trusted LAN.
 Installation does not change firewall rules or device settings.
@@ -52,7 +52,7 @@ Profiles and preferences use `$XDG_CONFIG_HOME/argonaut` (normally
 `~/.config/argonaut`). Saved passwords use the desktop Secret Service.
 Removing or upgrading the package preserves user preferences.
 
-Use **About** beside Connections to check the running version and build identifier.
+Use **Preferences → About** to check the running version and build identifier.
 
 ## Screenshots
 
