@@ -33,11 +33,21 @@ class StreamsTab:
         self.record_status=Gtk.Label(xalign=0,wrap=True);recordrow.append(self.record_status)
         self.recorder=None;self.record_chooser=None
         self.box.append(Gtk.Label(label='Recordings save as WebM. Enable computer audio before starting preview to include sound.' ,xalign=0,wrap=True))
+        keyboard=Gtk.Box(spacing=8);self.box.append(keyboard)
+        self.text_input=Gtk.Entry(placeholder_text='Text for the C64 BASIC READY prompt',hexpand=True,max_length=160)
+        keyboard.append(self.text_input)
+        self.text_return=Gtk.CheckButton(label='Append Return');keyboard.append(self.text_return)
+        self.text_send=Gtk.Button(label='Send text',sensitive=False);keyboard.append(self.text_send)
+        self.text_send.connect('clicked',self.send_text)
+        self.text_status=Gtk.Label(label='DMA text input: standard keyboard buffer only; not game controls. Text is sent as uppercase. Return executes commands.',xalign=0,wrap=True)
+        self.box.append(self.text_status)
         self.bind(None)
 
     def bind(self,client):
         self.stop();self.client=client;self.picture.set_paintable(None);self.capture_button.set_sensitive(False)
         self.device.set_text('Active C64U · '+client.host if client else 'Connect to a C64 Ultimate to preview video and audio.')
+        self.text_send.set_sensitive(client is not None)
+        self.text_input.set_text('')
         self.update_buttons()
 
     def update_buttons(self):
@@ -170,3 +180,19 @@ class StreamsTab:
         if self.capture_chooser:self.capture_chooser.destroy();self.capture_chooser=None
         self.stop()
         if self.timer is not None:GLib.source_remove(self.timer);self.timer=None
+
+    def send_text(self,*_):
+        if not self.client or self.app.busy:return
+        from .keyboard_input import send_text,encode_text
+        client=self.client;text=self.text_input.get_text();enter=self.text_return.get_active()
+        try:encode_text(text,enter)
+        except Exception as exc:
+            self.text_status.set_text(str(exc));return
+        self.text_status.set_text('Sending text… Keep the C64U at BASIC READY; do not type on its keyboard during sending.')
+        def task():
+            try:return send_text(client,text,enter)
+            except Exception as exc:return exc
+        def done(result):
+            if self.client is not client:return
+            self.text_status.set_text(str(result) if isinstance(result,Exception) else f'Sent {result} bytes. Check the C64U screen.')
+        self.app.run(task,done)
