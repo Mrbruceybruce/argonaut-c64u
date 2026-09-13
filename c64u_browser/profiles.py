@@ -58,11 +58,12 @@ class Profile:
         return UltimateClient(self.host, password, port=self.ftp_port, http_port=self.http_port)
 
 from .platform_support import config_base
+from . import development
 
 class Preferences:
     def __init__(self, path=None):
         base = config_base()
-        self.path = Path(path) if path else base/'argonaut'/'config.json'
+        self.path = Path(path) if path else base/('argonaut-development' if development.enabled() else 'argonaut')/'config.json'
         self.profiles = []
         self.selected_id = None
         self.screenshot_folder = ''

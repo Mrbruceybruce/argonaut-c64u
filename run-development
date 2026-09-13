@@ -1,0 +1,8 @@
+#!/bin/bash
+set -euo pipefail
+cd -- "$(dirname -- "$(readlink -f -- "$0")")"
+export ARGONAUT_DEVELOPMENT=1
+ARGONAUT_DEV_BUILD="$(git rev-parse --short=12 HEAD)"
+if [ -n "$(git status --porcelain)" ]; then ARGONAUT_DEV_BUILD+="-modified"; fi
+export ARGONAUT_DEV_BUILD
+exec /usr/bin/python3 -m c64u_browser.gui "$@"

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """GTK4 presentation; all remote work runs on a single worker thread."""
+from . import development
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import posixpath
@@ -30,7 +31,7 @@ from .streams_tab import StreamsTab
 
 class Browser(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id='org.local.Argonaut')
+        super().__init__(application_id='org.local.Argonaut.Development' if development.enabled() else 'org.local.Argonaut')
         self.pool = ThreadPoolExecutor(max_workers=1)
         self.local = Path.cwd()
         self.remote = '/USB2'
@@ -74,7 +75,7 @@ class Browser(Gtk.Application):
         if getattr(self, 'window', None) in self.get_windows():
             self.window.present()
             return
-        self.window = Gtk.ApplicationWindow(application=self, title='Argonaut — C64 Ultimate Control & Management')
+        self.window = Gtk.ApplicationWindow(application=self, title='Argonaut Development — C64 Ultimate Control & Management' if development.enabled() else 'Argonaut — C64 Ultimate Control & Management')
         from .version import ASSETS
         Gtk.IconTheme.get_for_display(self.window.get_display()).add_search_path(str(ASSETS))
         self.window.set_icon_name('argonaut')
