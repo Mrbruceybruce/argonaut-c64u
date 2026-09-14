@@ -13,9 +13,14 @@ PALETTE = ('000000','ffffff','68372b','70a4b2','6f3d86','588d43','352879','b8c76
            '6f4f25','433900','9a6759','444444','6c6c6c','9ad284','6c5eb5','959595')
 RGB=tuple(bytes.fromhex(c) for c in PALETTE)
 PIXELS=tuple(RGB[n&15]+RGB[n>>4] for n in range(256))
+RGB_PLANES=tuple(bytes(pixel[i] for pixel in PIXELS) for i in range(6))
 
 def rgb_frame(packed):
-    return b''.join(PIXELS[n] for n in packed)
+    # Translate each byte lane in C instead of allocating thousands of Python
+    # join entries per frame. Low nibble remains the left pixel.
+    result=bytearray(len(packed)*6)
+    for lane,table in enumerate(RGB_PLANES):result[lane::6]=packed.translate(table)
+    return bytes(result)
 
 class VideoDecoder:
     def __init__(self):
@@ -104,9 +109,10 @@ class Receiver:
         except (OSError,ValueError) as exc:
             if not self.stopping.is_set():self.error=str(exc)
 
-    def take(self):
+    def take(self, video=True):
         with self.lock:
-            frame=self.latest;self.latest=None
+            frame=self.latest if video else None
+            if video:self.latest=None
             samples=list(self.samples);self.samples.clear()
         return frame,samples
 

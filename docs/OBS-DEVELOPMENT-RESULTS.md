@@ -85,3 +85,26 @@ the proposed millisecond sync targets have not been instrumentally verified.
 Windows and macOS OBS hardware tests remain pending. The Apple Silicon package
 is being built from the same application commit on the `obs-test-build` GitHub
 branch, workflow run `34791772436`.
+
+## Mac choppiness investigation
+
+Bruce reported choppy live preview and both recordings on Apple Silicon, persisting
+with OBS closed. His cumulative report showed 15,933 receiver audio queue drops,
+127 estimated sequence gaps, 298 monitor input drops, and 12 display supersessions.
+This establishes receiver queue overflow, not its exclusive cause: scheduling
+stalls and bursty packet arrival remain possible contributors.
+
+The revised worker services audio before video conversion, uses an 8 ms audio
+service deadline, and retains the 30 fps video target without adding processing
+time to each sleep. Audio-only drains retain the latest video frame. Palette
+conversion uses byte translation rather than a Python per-byte generator; a local
+PAL-sized benchmark measured 0.327 ms versus 2.045 ms per frame. No queue capacity,
+network setting or firmware endpoint was changed. Longest worker service interval
+and processing-cycle times are now included in safe diagnostics.
+
+Regression result: 190 tests discovered, 181 passed, 9 opt-in display tests skipped.
+New tests cover exact pixel equivalence, video retention during audio drains,
+audio delivery before a blocked conversion and audio service between video frames.
+This is a candidate fix. Mac hardware improvement is not yet verified. Restart
+preview to reset counters, test without recording for one minute, then compare
+fresh diagnostics before trying simultaneous recording again.

@@ -17,6 +17,8 @@ COUNTERS = {
     'displayed': 'Frames presented to the main preview',
     'recorded': 'Frames submitted to recording',
     'monitor_drops': 'Audio monitor input drops',
+    'max_cycle_gap_ms': 'Longest media service interval (ms)',
+    'max_processing_ms': 'Longest media processing cycle (ms)',
 }
 
 def advice(stats):
@@ -34,6 +36,8 @@ def advice(stats):
         return 'Video has stopped arriving. Check the Ethernet cable and whether another client changed the stream destination.'
     if stats.get('with_audio') and not stats.get('audio_packets', 0):
         return 'Video is arriving, but audio is not. Check incoming UDP 11001. Stop and restart preview with audio enabled.'
+    if stats.get('audio_evictions',0):
+        return 'Media is arriving, but the receiver audio queue has overflowed during this session. This can cause audible gaps; compare fresh reports with recording stopped. Drops may reflect local processing stalls or bursty arrival, not just network loss.'
     return 'Media is arriving. Received FPS is not necessarily displayed or recorded FPS; sequence gaps are estimates, not confirmed network loss.'
 
 def report(stats, include_addresses=False):

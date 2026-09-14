@@ -16,6 +16,7 @@ class MediaDelivery:
         self.recorded=0;self.monitor_drops=0;self.error=''
         self.state='idle';self.record_message='';self.record_started=0
         self.done=False;self.recorder=None;self.output=None
+        self.max_cycle_gap_ms=0;self.max_processing_ms=0
         self.thread=threading.Thread(target=self.run,name='Argonaut media')
         self.thread.start()
 
@@ -45,12 +46,22 @@ class MediaDelivery:
             return dict(recording_state=self.state,record_message=self.record_message,
                         record_started=self.record_started,recorded=self.recorded,
                         display_superseded=self.display_superseded,displayed=self.displayed,
-                        monitor_drops=self.monitor_drops,error=self.error,done=self.done)
+                        monitor_drops=self.monitor_drops,error=self.error,done=self.done,
+                        max_cycle_gap_ms=self.max_cycle_gap_ms,max_processing_ms=self.max_processing_ms)
 
     def run(self):
         try:
             if self.session.with_audio:self.output=self.output_factory()
-            while not self.stopping.wait(.033):
+            # Audio has its own shorter service cadence. Video still targets
+            # the existing 30 fps policy. Subtract processing time from the
+            # wait so work does not accumulate on top of every interval.
+            next_cycle=time.monotonic();last_cycle=None;next_video=next_cycle
+            while not self.stopping.wait(max(0,next_cycle-time.monotonic())):
+                cycle_started=time.monotonic()
+                with self.lock:
+                    if last_cycle is not None:self.max_cycle_gap_ms=max(self.max_cycle_gap_ms,round((cycle_started-last_cycle)*1000))
+                last_cycle=cycle_started
+                next_cycle=cycle_started+.008
                 if not self.session.thread.is_alive():break
                 try:command=self.commands.get_nowait()
                 except queue.Empty:command=None
@@ -75,7 +86,13 @@ class MediaDelivery:
                 if self.recorder and finish:self.recorder.stop()
                 receiver=self.session.receiver
                 if receiver and not self.session.stopping.is_set():
-                    frame,samples=receiver.take()
+                    video_due=cycle_started>=next_video
+                    frame,samples=receiver.take(video=video_due)
+                    # Deliver already-received sound before converting a frame.
+                    if self.output:
+                        self.output.push(samples)
+                        with self.lock:self.monitor_drops=self.output.dropped
+                    if frame:next_video=cycle_started+1/30
                     converted=(frame[0],rgb_frame(frame[1])) if frame else None
                     if converted:
                         surface=None
@@ -91,10 +108,9 @@ class MediaDelivery:
                     if self.recorder and not self.recorder.finishing:
                         try:self.recorder.feed(converted,samples)
                         except Exception as exc:self.recorder.stop(str(exc))
-                    if self.output:
-                        self.output.push(samples)
-                        with self.lock:self.monitor_drops=self.output.dropped
                 self.update_recording()
+                if next_video>cycle_started:next_cycle=min(next_cycle,next_video)
+                with self.lock:self.max_processing_ms=max(self.max_processing_ms,round((time.monotonic()-cycle_started)*1000))
         except Exception as exc:
             with self.lock:self.error='Media output failed: '+str(exc)
             self.session.stop_reason=self.error;self.session.stop()
