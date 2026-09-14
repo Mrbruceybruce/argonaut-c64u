@@ -1,0 +1,92 @@
+name: OBS Apple Silicon test package
+'on':
+  push:
+    branches:
+    - obs-test-build
+    paths:
+    - .github/workflows/obs-macos.yml
+    - .github/workflows/obs-source.bundle
+  workflow_dispatch: null
+permissions:
+  contents: write
+jobs:
+  macos:
+    runs-on: macos-15
+    env:
+      ARGONAUT_SOURCE_COMMIT: c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d
+    timeout-minutes: 90
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+    - name: Restore verified OBS source
+      run: |
+        echo '0a61618fcbfff283007d3899d75d158e57f26f76f3fc856b5b7290d49e37cf17  .github/workflows/obs-source.bundle' | shasum -a 256 -c -
+        git bundle verify .github/workflows/obs-source.bundle
+        git fetch .github/workflows/obs-source.bundle feature/obs-capture:refs/remotes/import/obs
+        test "$(git rev-parse refs/remotes/import/obs)" = c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d
+        git checkout --detach refs/remotes/import/obs
+    - name: Install Mac runtime
+      run: |
+        brew install python@3.13 pygobject3 gtk4 gstreamer adwaita-icon-theme
+        "$(brew --prefix python@3.13)/bin/python3.13" -m venv --system-site-packages .venv
+        .venv/bin/python -m pip install pyinstaller keyring
+        .venv/bin/python -c "import gi; gi.require_version('Gtk','4.0'); from gi.repository import Gtk"
+    - name: Unit tests
+      run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+    - name: Build app
+      run: |
+        .venv/bin/python packaging/build_metadata.py --version 1.5-obs.1 --development
+        .venv/bin/python -c "import json; m=json.load(open('c64u_browser/_build.json')); assert m['build']=='c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d' and m['version']=='1.5-obs.1' and m['development']"
+        .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
+    - name: Check relocated app with minimal environment
+      run: |
+        mkdir -p "$RUNNER_TEMP/Argonaut App Test"
+        ditto "dist/Argonaut Development.app" "$RUNNER_TEMP/Argonaut App Test/Argonaut Development.app"
+        codesign --verify --deep --strict "$RUNNER_TEMP/Argonaut App Test/Argonaut Development.app"
+        .venv/bin/python - <<'PYTHON'
+        import os, subprocess
+        from pathlib import Path
+        folder=Path(os.environ['RUNNER_TEMP'])/'Argonaut App Test'
+        report=folder/'self-test.json'
+        env=dict(os.environ,PATH='/usr/bin:/bin:/usr/sbin:/sbin')
+        for key in ('PYTHONPATH','GI_TYPELIB_PATH','DYLD_LIBRARY_PATH','GST_PLUGIN_PATH'):
+            env.pop(key,None)
+        subprocess.run([str(folder/'Argonaut Development.app/Contents/MacOS/Argonaut'),'--self-test',str(report)],env=env,check=True,timeout=90)
+        assert report.is_file()
+        print(report.read_text())
+        PYTHON
+    - name: Create development DMG and ZIP
+      run: |
+        mkdir -p mac-package artifacts
+        ditto "dist/Argonaut Development.app" "mac-package/Argonaut Development.app"
+        cp docs/OBS-GUIDE.md LICENSE COPYRIGHT mac-package/
+        cp output/pdf/Argonaut-OBS-Testing-Checklist.pdf artifacts/
+        brew info --json=v2 --installed > mac-package/Homebrew-packages.json
+        ln -s /Applications mac-package/Applications
+        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-obs.1-macOS-AppleSilicon.dmg
+        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-obs.1-macOS-AppleSilicon.zip
+    - uses: actions/upload-artifact@v4
+      with:
+        name: obs-macOS-AppleSilicon
+        path: artifacts/
+        if-no-files-found: error
+    - name: Publish Mac OBS test download
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        git archive --format=zip --prefix=argonaut-obs/ -o artifacts/argonaut-1.5-obs.1-source.zip HEAD
+        cat > "$RUNNER_TEMP/obs-notes.md" <<'NOTES'
+        Apple Silicon Mac test build with the clean OBS capture window and stream diagnostics.
+
+        Version: 1.5-obs.1. About Build: c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d.
+
+        Open the DMG and drag Argonaut Development into Applications, replacing the previous development app. Stable Argonaut remains separate. macOS 15 or newer. Ad-hoc signed, not notarized.
+
+        Bruce reported successful Debian capture, audio, simultaneous Argonaut/OBS recording, capture-window reopening and a 30-minute test with no noticeable drift. These are user observations, not instrumented sync measurements. Mac OBS hardware testing remains pending.
+
+        Use Streams > Open capture window. Follow the included OBS guide and fillable checklist. Source ZIP contains the exact application source; automatic GitHub source archives describe the build workflow instead.
+        NOTES
+        cd artifacts
+        shasum -a 256 *.zip *.dmg *.pdf > SHA256SUMS
+        gh release create v1.5-obs.1 --target "$GITHUB_SHA" --prerelease --latest=false --title 'Argonaut 1.5-obs.1 - Apple Silicon OBS test' --notes-file "$RUNNER_TEMP/obs-notes.md" *.zip *.dmg *.pdf SHA256SUMS
