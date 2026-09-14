@@ -231,7 +231,17 @@ class Browser(Gtk.Application):
 
     def refresh_local(self):
         try:
-            entries = [(p.name, p.is_dir(), p.stat().st_size) for p in self.local.iterdir()]
+            entries = []
+            for p in self.local.iterdir():
+                # Some files never resolve via stat(), most notably dangling
+                # symlinks such as Emacs' ".#name" lock files, which point at
+                # a "user@host.pid:boot-time" string that was never a real
+                # path. One such entry shouldn't take down the whole listing;
+                # show it with a placeholder size instead of aborting.
+                try:
+                    entries.append((p.name, p.is_dir(), p.stat().st_size))
+                except OSError:
+                    entries.append((p.name, False, 0))
             self.populate(self.llist, sorted(entries, key=lambda e: (not e[1], e[0].casefold())))
             self.lpath.set_text(str(self.local))
             self.drive_bars[True].refresh()
