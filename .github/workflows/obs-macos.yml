@@ -13,7 +13,7 @@ jobs:
   macos:
     runs-on: macos-15
     env:
-      ARGONAUT_SOURCE_COMMIT: d1ad7781a639453d06ddd7222a3fcde9c5bc0da9
+      ARGONAUT_SOURCE_COMMIT: a0b4fcdd8245f5418d15eeb4fecb94b58cdba851
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v5
@@ -21,10 +21,10 @@ jobs:
         fetch-depth: 0
     - name: Restore verified OBS source
       run: |
-        echo '2358fd41b4a3ae7bf18d3409f2b40f77435be5961145eda543cbd38065cf551a  .github/workflows/obs-source.bundle' | shasum -a 256 -c -
+        echo '2840da77ebee3c5539ddb2c11e6ec26e6e9e040b2dec231667926541dc4683eb  .github/workflows/obs-source.bundle' | shasum -a 256 -c -
         git bundle verify .github/workflows/obs-source.bundle
         git fetch .github/workflows/obs-source.bundle feature/obs-capture:refs/remotes/import/obs
-        test "$(git rev-parse refs/remotes/import/obs)" = d1ad7781a639453d06ddd7222a3fcde9c5bc0da9
+        test "$(git rev-parse refs/remotes/import/obs)" = a0b4fcdd8245f5418d15eeb4fecb94b58cdba851
         git checkout --detach refs/remotes/import/obs
     - name: Install Mac runtime
       run: |
@@ -36,8 +36,8 @@ jobs:
       run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
     - name: Build app
       run: |
-        .venv/bin/python packaging/build_metadata.py --version 1.5-obs.2 --development
-        .venv/bin/python -c "import json; m=json.load(open('c64u_browser/_build.json')); assert m['build']=='d1ad7781a639453d06ddd7222a3fcde9c5bc0da9' and m['version']=='1.5-obs.2' and m['development']"
+        .venv/bin/python packaging/build_metadata.py --version 1.5-obs.3 --development
+        .venv/bin/python -c "import json; m=json.load(open('c64u_browser/_build.json')); assert m['build']=='a0b4fcdd8245f5418d15eeb4fecb94b58cdba851' and m['version']=='1.5-obs.3' and m['development']"
         .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
     - name: Check relocated app with minimal environment
       run: |
@@ -64,8 +64,8 @@ jobs:
         cp output/pdf/Argonaut-OBS-Testing-Checklist.pdf artifacts/
         brew info --json=v2 --installed > mac-package/Homebrew-packages.json
         ln -s /Applications mac-package/Applications
-        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-obs.2-macOS-AppleSilicon.dmg
-        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-obs.2-macOS-AppleSilicon.zip
+        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-obs.3-macOS-AppleSilicon.dmg
+        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-obs.3-macOS-AppleSilicon.zip
     - uses: actions/upload-artifact@v4
       with:
         name: obs-macOS-AppleSilicon
@@ -75,11 +75,11 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        git archive --format=zip --prefix=argonaut-obs/ -o artifacts/argonaut-1.5-obs.2-source.zip HEAD
+        git archive --format=zip --prefix=argonaut-obs/ -o artifacts/argonaut-1.5-obs.3-source.zip HEAD
         cat > "$RUNNER_TEMP/obs-notes.md" <<'NOTES'
-        Apple Silicon candidate fix for choppy preview/audio: quicker audio service, faster frame conversion, and worker timing diagnostics. Mac hardware retest is pending.
+        Includes OldMan2525's merged PR #7: one broken symbolic link no longer prevents a local folder from being listed. Also retains the OBS audio-timing candidate fix and worker diagnostics. Mac hardware retest is pending.
 
-        Version: 1.5-obs.2. About Build: d1ad7781a639453d06ddd7222a3fcde9c5bc0da9.
+        Version: 1.5-obs.3. About Build: a0b4fcdd8245f5418d15eeb4fecb94b58cdba851.
 
         Open the DMG and drag Argonaut Development into Applications, replacing the previous development app. Stable Argonaut remains separate. macOS 15 or newer. Ad-hoc signed, not notarized.
 
@@ -89,4 +89,4 @@ jobs:
         NOTES
         cd artifacts
         shasum -a 256 *.zip *.dmg *.pdf > SHA256SUMS
-        gh release create v1.5-obs.2 --target "$GITHUB_SHA" --prerelease --latest=false --title 'Argonaut 1.5-obs.2 - Apple Silicon OBS test' --notes-file "$RUNNER_TEMP/obs-notes.md" *.zip *.dmg *.pdf SHA256SUMS
+        gh release create v1.5-obs.3 --target "$GITHUB_SHA" --prerelease --latest=false --title 'Argonaut 1.5-obs.3 - Apple Silicon OBS test' --notes-file "$RUNNER_TEMP/obs-notes.md" *.zip *.dmg *.pdf SHA256SUMS
