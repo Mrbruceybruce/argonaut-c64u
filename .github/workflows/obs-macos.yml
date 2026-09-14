@@ -13,7 +13,7 @@ jobs:
   macos:
     runs-on: macos-15
     env:
-      ARGONAUT_SOURCE_COMMIT: c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d
+      ARGONAUT_SOURCE_COMMIT: d1ad7781a639453d06ddd7222a3fcde9c5bc0da9
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v5
@@ -21,10 +21,10 @@ jobs:
         fetch-depth: 0
     - name: Restore verified OBS source
       run: |
-        echo '0a61618fcbfff283007d3899d75d158e57f26f76f3fc856b5b7290d49e37cf17  .github/workflows/obs-source.bundle' | shasum -a 256 -c -
+        echo '2358fd41b4a3ae7bf18d3409f2b40f77435be5961145eda543cbd38065cf551a  .github/workflows/obs-source.bundle' | shasum -a 256 -c -
         git bundle verify .github/workflows/obs-source.bundle
         git fetch .github/workflows/obs-source.bundle feature/obs-capture:refs/remotes/import/obs
-        test "$(git rev-parse refs/remotes/import/obs)" = c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d
+        test "$(git rev-parse refs/remotes/import/obs)" = d1ad7781a639453d06ddd7222a3fcde9c5bc0da9
         git checkout --detach refs/remotes/import/obs
     - name: Install Mac runtime
       run: |
@@ -36,8 +36,8 @@ jobs:
       run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
     - name: Build app
       run: |
-        .venv/bin/python packaging/build_metadata.py --version 1.5-obs.1 --development
-        .venv/bin/python -c "import json; m=json.load(open('c64u_browser/_build.json')); assert m['build']=='c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d' and m['version']=='1.5-obs.1' and m['development']"
+        .venv/bin/python packaging/build_metadata.py --version 1.5-obs.2 --development
+        .venv/bin/python -c "import json; m=json.load(open('c64u_browser/_build.json')); assert m['build']=='d1ad7781a639453d06ddd7222a3fcde9c5bc0da9' and m['version']=='1.5-obs.2' and m['development']"
         .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
     - name: Check relocated app with minimal environment
       run: |
@@ -64,8 +64,8 @@ jobs:
         cp output/pdf/Argonaut-OBS-Testing-Checklist.pdf artifacts/
         brew info --json=v2 --installed > mac-package/Homebrew-packages.json
         ln -s /Applications mac-package/Applications
-        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-obs.1-macOS-AppleSilicon.dmg
-        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-obs.1-macOS-AppleSilicon.zip
+        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-obs.2-macOS-AppleSilicon.dmg
+        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-obs.2-macOS-AppleSilicon.zip
     - uses: actions/upload-artifact@v4
       with:
         name: obs-macOS-AppleSilicon
@@ -75,18 +75,18 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        git archive --format=zip --prefix=argonaut-obs/ -o artifacts/argonaut-1.5-obs.1-source.zip HEAD
+        git archive --format=zip --prefix=argonaut-obs/ -o artifacts/argonaut-1.5-obs.2-source.zip HEAD
         cat > "$RUNNER_TEMP/obs-notes.md" <<'NOTES'
-        Apple Silicon Mac test build with the clean OBS capture window and stream diagnostics.
+        Apple Silicon candidate fix for choppy preview/audio: quicker audio service, faster frame conversion, and worker timing diagnostics. Mac hardware retest is pending.
 
-        Version: 1.5-obs.1. About Build: c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d.
+        Version: 1.5-obs.2. About Build: d1ad7781a639453d06ddd7222a3fcde9c5bc0da9.
 
         Open the DMG and drag Argonaut Development into Applications, replacing the previous development app. Stable Argonaut remains separate. macOS 15 or newer. Ad-hoc signed, not notarized.
 
         Bruce reported successful Debian capture, audio, simultaneous Argonaut/OBS recording, capture-window reopening and a 30-minute test with no noticeable drift. These are user observations, not instrumented sync measurements. Mac OBS hardware testing remains pending.
 
-        Use Streams > Open capture window. Follow the included OBS guide and fillable checklist. Source ZIP contains the exact application source; automatic GitHub source archives describe the build workflow instead.
+        After updating, restart preview and test for one minute without recording. Copy fresh diagnostics if choppiness remains. Then test simultaneous recording. Use Streams > Open capture window. Follow the included OBS guide and fillable checklist. Source ZIP contains the exact application source; automatic GitHub source archives describe the build workflow instead.
         NOTES
         cd artifacts
         shasum -a 256 *.zip *.dmg *.pdf > SHA256SUMS
-        gh release create v1.5-obs.1 --target "$GITHUB_SHA" --prerelease --latest=false --title 'Argonaut 1.5-obs.1 - Apple Silicon OBS test' --notes-file "$RUNNER_TEMP/obs-notes.md" *.zip *.dmg *.pdf SHA256SUMS
+        gh release create v1.5-obs.2 --target "$GITHUB_SHA" --prerelease --latest=false --title 'Argonaut 1.5-obs.2 - Apple Silicon OBS test' --notes-file "$RUNNER_TEMP/obs-notes.md" *.zip *.dmg *.pdf SHA256SUMS
