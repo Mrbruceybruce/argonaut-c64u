@@ -70,3 +70,18 @@ or a flash/click test program should be agreed separately before changing the
 running C64 session. Do not promote this increment before those checks pass.
 
 The other roadmap features remain planned, not implemented by this increment.
+
+## Bruce's Debian test report (2026-09-13)
+
+Installed development build `1.5-obs.1`, application commit
+`c42d7e0cf2272a8436e11ed0e1ab63d78cf9c40d`. OBS Studio 30.2.3 on Debian Wayland.
+Bruce reported successful clean-window capture, working desktop audio, a short
+recording with apparently correct synchronization, simultaneous OBS/Argonaut
+recording, and capture-window close/reopen without disrupting Argonaut recording.
+He subsequently reported success for the 30-minute game recording test.
+
+These are user-observed passes. Numerical start/end offsets were not supplied;
+the proposed millisecond sync targets have not been instrumentally verified.
+Windows and macOS OBS hardware tests remain pending. The Apple Silicon package
+is being built from the same application commit on the `obs-test-build` GitHub
+branch, workflow run `34791772436`.
