@@ -9,11 +9,16 @@ from .c64_ai_chat import MAX_PROMPT_BYTES, MAX_REPLY_BYTES, decode_prompt
 from .ai_gateway import GatewayError
 
 
-def make_handler(gateway, token, allowed_client=None):
+def make_handler(gateway, token, allowed_clients=None):
     if not isinstance(token, str) or len(token) < 32 or not token.isascii():
         raise ValueError('A strong bridge token is required.')
-    if allowed_client is not None:
-        allowed_client = str(ipaddress.IPv4Address(allowed_client))
+    if allowed_clients is not None:
+        if isinstance(allowed_clients, str):
+            allowed_clients = (allowed_clients,)
+        allowed_clients = frozenset(
+            str(ipaddress.IPv4Address(value)) for value in allowed_clients)
+        if not allowed_clients:
+            raise ValueError('At least one paired client is required.')
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, _format, *_args):
@@ -29,8 +34,8 @@ def make_handler(gateway, token, allowed_client=None):
             self.wfile.write(body)
 
         def do_POST(self):
-            if (allowed_client is not None
-                    and self.client_address[0] != allowed_client):
+            if (allowed_clients is not None
+                    and self.client_address[0] not in allowed_clients):
                 self._send(403, b'Client is not paired.')
                 return
             if self.path != '/v1/chat':
@@ -80,15 +85,19 @@ def loopback_server(gateway, token, port=0):
     return HTTPServer(('127.0.0.1', port), make_handler(gateway, token))
 
 
-def paired_lan_server(gateway, token, host, allowed_client, port=6464):
-    """Bind one LAN address and accept chat only from one paired IPv4 client."""
+def paired_lan_server(gateway, token, host, allowed_clients, port=6464):
+    """Bind one LAN address and accept chat only from paired IPv4 addresses."""
     host = str(ipaddress.IPv4Address(host))
-    client = str(ipaddress.IPv4Address(allowed_client))
+    if isinstance(allowed_clients, str):
+        allowed_clients = (allowed_clients,)
+    clients = tuple(str(ipaddress.IPv4Address(value))
+                    for value in allowed_clients)
     if (ipaddress.IPv4Address(host).is_unspecified
             or ipaddress.IPv4Address(host).is_multicast
-            or ipaddress.IPv4Address(client).is_unspecified
-            or ipaddress.IPv4Address(client).is_multicast):
+            or not clients or any(ipaddress.IPv4Address(client).is_unspecified
+                                  or ipaddress.IPv4Address(client).is_multicast
+                                  for client in clients)):
         raise ValueError('Use unicast LAN addresses for the bridge.')
     if type(port) is not int or (port != 0 and not 1024 <= port <= 65535):
         raise ValueError('Use a bridge port from 1024 to 65535.')
-    return HTTPServer((host, port), make_handler(gateway, token, client))
+    return HTTPServer((host, port), make_handler(gateway, token, clients))

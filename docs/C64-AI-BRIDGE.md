@@ -6,18 +6,19 @@ different use of a model: it accepts a short user question and returns short
 screen text. It does not receive a Test Lab report, credentials, or a C64U
 control object.
 
-The first bridge is a loopback-only HTTP prototype in `c64_ai_chat.py` and
-`c64_ai_service.py`. It accepts `POST /v1/chat` with `Content-Type: text/plain`,
+The first bridge starts as loopback-only in `c64_ai_chat.py` and can use a
+paired LAN listener from `c64_ai_service.py`. It accepts `POST /v1/chat` with `Content-Type: text/plain`,
 an authorization bearer token, and one printable ASCII question of at most
 240 bytes. The answer is at most 512 printable ASCII bytes, with a fixed
 `Content-Length` and `Cache-Control: no-store`. The C64 client will translate
 the text to PETSCII and wrap it to 40 columns. The model is local Ollama only;
 the current bridge has no cloud selection or device actions.
 
-The prototype deliberately binds to `127.0.0.1`, so a C64U cannot reach it
-yet. Before enabling a listener on the home LAN, add private token pairing,
-identity or address restriction to the intended C64U, and a simple way to
-start and stop the bridge. The listener should never expose Ollama itself.
+The LAN listener binds one explicit address, requires a private token, and
+accepts only the known addresses of the selected C64U. Supporting both its
+Ethernet and Wi-Fi addresses does not pair another device. A simple way to
+start and stop the bridge is still required. The listener never exposes Ollama
+itself.
 
 For the C64 program, use the Ultimate Command Interface (UCI) Network target
 `$03` to open a TCP socket, send a small HTTP request, and read the bounded
@@ -53,3 +54,12 @@ enabling its runtime `Command Interface` setting. It returned `UCI NETWORK
 READY` and `ULTIMATE-II NETWORK INTERFACE V1.0`. The setting was not saved to
 flash, and the second C64U was not changed. This verifies target `$03` on the
 current C64U 1.1.0 firmware without relying on the later HTTP target.
+
+`c64/uci-network-info.prg` reads the UCI interface count and addresses without
+changing them. The same C64U reported Ethernet `192.168.68.69` and Wi-Fi
+`192.168.68.66`, both with a `/22` mask and gateway `192.168.68.1`. Its UCI
+socket could connect to an existing service on the Argonaut computer, proving
+the TCP route works, while the new bridge port remained blocked when the
+firewall allowed only `.69`. The paired listener therefore supports both known
+addresses; the firewall should do the same until firmware offers explicit
+per-socket interface selection or Wi-Fi is disabled by a supported setting.
