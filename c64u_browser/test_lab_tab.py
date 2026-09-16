@@ -21,7 +21,8 @@ from .test_lab_presentation import (
 )
 from .test_lab_schedule import HardwareSchedule
 from .test_lab_saved import (
-    preferred_record, saved_comparison, saved_hardware_results, saved_status,
+    preferred_record, saved_comparison, saved_hardware_results, saved_run_label,
+    saved_status,
 )
 from .test_lab_auto_analysis import (
     CACHE_NAME, CONFIG_NAME, load_local_config, save_local_config,
@@ -65,6 +66,15 @@ class TestLabTab:
                                           self.show_verified_history)
         self.saved_button.set_sensitive(False)
         self.verified_button.set_sensitive(False)
+        archive_row = Gtk.Box(spacing=8)
+        self.box.append(archive_row)
+        archive_row.append(Gtk.Label(label='Earlier saved run:', xalign=0))
+        self.saved_run_choice = Gtk.DropDown.new_from_strings(['No saved runs'])
+        self.saved_run_choice.set_hexpand(True)
+        archive_row.append(self.saved_run_choice)
+        self.saved_run_button = app.button(archive_row, 'View selected run',
+                                           self.show_selected_history)
+        self.saved_run_button.set_sensitive(False)
         toolbar = Gtk.Box(spacing=8)
         self.box.append(toolbar)
         self.run_button = app.button(toolbar, 'Run offline checks', self.run)
@@ -162,6 +172,8 @@ class TestLabTab:
             self.saved_choice.set_model(Gtk.StringList.new(['No bound C64Us']))
             self.saved_button.set_sensitive(False)
             self.verified_button.set_sensitive(False)
+            self.saved_run_choice.set_model(Gtk.StringList.new(['No saved runs']))
+            self.saved_run_button.set_sensitive(False)
             return
         labels = [f"{record['profile'].name} — {saved_status(record)}"
                   for record in self.saved_records]
@@ -181,6 +193,24 @@ class TestLabTab:
                   if selected < len(self.saved_records) else None)
         self.saved_button.set_sensitive(bool(record and record['recent']))
         self.verified_button.set_sensitive(bool(record and record['verified']))
+        runs = record['runs'] if record else []
+        labels = ([saved_run_label(item, index) for index, item in enumerate(runs)]
+                  if runs else ['No saved runs'])
+        self.saved_run_choice.set_model(Gtk.StringList.new(labels))
+        self.saved_run_choice.set_selected(0)
+        self.saved_run_button.set_sensitive(bool(runs))
+
+    def show_selected_history(self):
+        selected = self.saved_choice.get_selected()
+        if selected >= len(self.saved_records):
+            return
+        record = self.saved_records[selected]
+        run_index = self.saved_run_choice.get_selected()
+        if run_index < len(record['runs']):
+            report = record['runs'][run_index]['report']
+            self.show_saved(report, record['profile'].name,
+                            'Selected saved C64U result', record['profile'].id,
+                            record)
 
     def show_history(self):
         selected = self.saved_choice.get_selected()

@@ -90,21 +90,34 @@ class TestLabHistory:
     def latest(self, suite=None):
         return self.most_recent(suite, include_skips=False)
 
-    def verified_pair(self, suite=None):
-        """Return the newest two non-skipped reports from this history scope."""
-        found = []
+    def recent_runs(self, suite=None):
+        """List the bounded, valid saved runs in reverse chronological order."""
+        runs = []
         if self.path.exists():
             for path in sorted(self.path.glob('*.json'), reverse=True):
                 try:
                     report = json.loads(path.read_text(encoding='utf-8'))
                     validate_report(report)
-                    if (report['status'] != 'skip' and
-                            (suite is None or report.get('suite', 'offline') == suite)):
-                        found.append(report)
-                        if len(found) == 2:
-                            break
+                    if suite is not None and report.get('suite', 'offline') != suite:
+                        continue
+                    try:
+                        saved_at = datetime.strptime(path.name.split('-', 1)[0],
+                                                     '%Y%m%dT%H%M%S.%fZ').replace(
+                                                         tzinfo=timezone.utc)
+                    except ValueError:
+                        saved_at = None
+                    runs.append({'report': report, 'saved_at': saved_at})
+                    if len(runs) == MAX_RUNS:
+                        break
                 except (OSError, ValueError, AttributeError):
                     continue
+        return runs
+
+    def verified_pair(self, suite=None, runs=None):
+        """Return the newest two non-skipped reports from this history scope."""
+        found = [item['report'] for item in
+                 (runs if runs is not None else self.recent_runs(suite))
+                 if item['report']['status'] != 'skip'][:2]
         return tuple((found + [None, None])[:2])
 
     def save(self, report):

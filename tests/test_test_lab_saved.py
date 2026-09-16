@@ -5,7 +5,8 @@ import unittest
 from c64u_browser.profiles import Preferences, Profile
 from c64u_browser.test_lab_history import TestLabHistory
 from c64u_browser.test_lab_saved import (
-    preferred_record, saved_comparison, saved_hardware_results, saved_status,
+    preferred_record, saved_comparison, saved_hardware_results, saved_run_label,
+    saved_status,
 )
 
 
@@ -60,6 +61,25 @@ class SavedHardwareTests(unittest.TestCase):
                              ['new_failures'], ['hardware.identity'])
             self.assertIsNone(saved_comparison(records[0], records[0]['recent']))
             self.assertIsNone(records[1]['previous_verified'])
+
+    def test_older_saved_run_uses_its_own_prior_verified_baseline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            preferences = Preferences(Path(directory) / 'config.json')
+            profile = Profile.new('First', 'first.invalid', device_id='FIRST')
+            preferences.profiles = [profile]
+            history = TestLabHistory(preferences.path, profile.id)
+            history.save(report('pass'))
+            history.save(report('fail'))
+            history.save(report('pass'))
+            record = saved_hardware_results(preferences)[0]
+            self.assertEqual(len(record['runs']), 3)
+            newest, middle, oldest = (item['report'] for item in record['runs'])
+            self.assertEqual(saved_comparison(record, newest)['resolved'],
+                             ['hardware.identity'])
+            self.assertEqual(saved_comparison(record, middle)['new_failures'],
+                             ['hardware.identity'])
+            self.assertIsNone(saved_comparison(record, oldest))
+            self.assertIn('— Pass', saved_run_label(record['runs'][0], 0))
 
 
 if __name__ == '__main__':

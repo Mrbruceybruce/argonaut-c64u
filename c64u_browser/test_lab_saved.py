@@ -10,11 +10,13 @@ def saved_hardware_results(preferences):
         if not (profile.device_id or profile.device_mac):
             continue
         history = TestLabHistory(preferences.path, profile.id)
-        verified, previous_verified = history.verified_pair('hardware')
+        runs = history.recent_runs('hardware')
+        verified, previous_verified = history.verified_pair('hardware', runs=runs)
         records.append({'profile': profile,
-                        'recent': history.most_recent('hardware'),
+                        'recent': runs[0]['report'] if runs else None,
                         'verified': verified,
-                        'previous_verified': previous_verified})
+                        'previous_verified': previous_verified,
+                        'runs': runs})
     return records
 
 
@@ -22,7 +24,19 @@ def saved_comparison(record, report):
     """A skipped saved run cannot prove any check recovered."""
     if report['status'] == 'skip':
         return None
-    return compare_reports(record['previous_verified'], report)
+    for index, item in enumerate(record['runs']):
+        if item['report'] is report:
+            previous = next((older['report'] for older in record['runs'][index + 1:]
+                             if older['report']['status'] != 'skip'), None)
+            return compare_reports(previous, report)
+    return None
+
+
+def saved_run_label(item, index):
+    saved_at = item['saved_at']
+    date = (saved_at.astimezone().strftime('%Y-%m-%d %I:%M %p')
+            if saved_at is not None else f'Saved run {index + 1}')
+    return f"{date} — {item['report']['status'].capitalize()}"
 
 
 def saved_status(record):

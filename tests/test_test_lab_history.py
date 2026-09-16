@@ -46,6 +46,11 @@ class HistoryTests(unittest.TestCase):
             second = run_with_history(Path(directory) / 'argonaut-development' / 'config.json',
                                       run_default_checks)
             self.assertEqual(second['comparison']['new_failures'], [])
+            runs = history.recent_runs('offline')
+            self.assertEqual(len(runs), 2)
+            self.assertTrue(all(item['saved_at'] is not None for item in runs))
+            self.assertEqual([item['report']['status'] for item in runs],
+                             ['pass', 'pass'])
 
     def test_duplicate_or_inconsistent_report_cannot_mask_a_failure(self):
         valid = report(('one', 'fail'))
@@ -66,6 +71,7 @@ class HistoryTests(unittest.TestCase):
                 history.save(report(('one', 'pass')))
             files = list(history.path.glob('*.json'))
             self.assertEqual(len(files), MAX_RUNS)
+            self.assertEqual(len(history.recent_runs()), MAX_RUNS)
             self.assertFalse(list(history.path.glob('.run-*')))
             self.assertEqual(json.loads(files[0].read_text())['schema'], 1)
             if os.name != 'nt':

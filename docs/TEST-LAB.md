@@ -189,7 +189,10 @@ last verified result** let you inspect the deterministic check details for a
 chosen C64U, including reports written by the unattended Linux service. A
 verified saved result also shows new and resolved check failures relative to
 that C64U's prior verified run. A skipped run cannot confirm recovery and does
-not get a regression comparison.
+not get a regression comparison. **Earlier saved run** lists up to 20 retained
+results for the selected C64U by save time. **View selected run** opens any of
+them with the comparison against its own prior verified run and its matching
+saved local AI diagnosis, if one exists.
 
 The AI analysis boundary extracts only failed checks and a small whitelist of
 sanitized operation fields. It rechecks route, operation, target, outcome, and
