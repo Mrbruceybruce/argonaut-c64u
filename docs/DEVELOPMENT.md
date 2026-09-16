@@ -3,7 +3,7 @@
 Use `./run-development` from this checkout on Debian. The launcher uses system
 Python and the GTK/media dependencies already installed with stable Argonaut.
 
-Development has its own application ID and window title. About shows 0.1.4-dev
+Development has its own application ID and window title. About shows 1.5-dev
 and the checkout commit (with -modified when changes exist). It stores preferences
 in ~/.config/argonaut-development/config.json (or XDG_CONFIG_HOME), with separate
 configuration history. Passwords are session-only; stable keyring entries are not

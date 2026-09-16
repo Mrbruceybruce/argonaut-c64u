@@ -1,4 +1,4 @@
-#define AppVersion "0.1.4"
+#define AppVersion "1.5"
 [Setup]
 SetupIconFile=..\icons\argonaut.ico
 AppId=Argonaut-C64U

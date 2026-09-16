@@ -31,7 +31,7 @@ if '--self-test' in sys.argv:
   from c64u_browser.about import show_about
   from c64u_browser.version import ASSETS,build_info
   assert (ASSETS/'about-background.png').is_file() and (ASSETS/'argonaut.png').is_file()
-  expected_version=package_metadata.get('version','0.1.4')
+  expected_version=package_metadata.get('version','1.5')
   assert build_info()['version']==expected_version and 'unpackaged' not in build_info()['build']
   if package_metadata.get('development'):
    assert Preferences().path.parent.name=='argonaut-development'

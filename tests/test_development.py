@@ -23,4 +23,4 @@ class DevelopmentTests(unittest.TestCase):
 
     def test_about_identifies_development(self):
         with patch.dict(os.environ, {'ARGONAUT_DEVELOPMENT':'1','ARGONAUT_DEV_BUILD':'test-modified'}):
-            self.assertEqual(build_info(),{'version':'0.1.4-dev','build':'test-modified'})
+            self.assertEqual(build_info(),{'version':'1.5-dev','build':'test-modified'})

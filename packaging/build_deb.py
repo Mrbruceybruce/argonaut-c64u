@@ -3,7 +3,7 @@
 import argparse,os,shutil,subprocess,tempfile,json
 from build_metadata import metadata
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path(__file__).resolve().parents[1]);p.add_argument('--output',type=Path,default=Path('dist'));p.add_argument('--version',default='0.1.4');p.add_argument('--development',action='store_true');args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path(__file__).resolve().parents[1]);p.add_argument('--output',type=Path,default=Path('dist'));p.add_argument('--version',default='1.5');p.add_argument('--development',action='store_true');args=p.parse_args()
 source=args.source.resolve();assets=Path(__file__).resolve().parent;out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 version=args.version
 app_name='argonaut-development' if args.development else 'argonaut'

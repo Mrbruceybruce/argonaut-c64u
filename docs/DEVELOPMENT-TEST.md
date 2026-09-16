@@ -1,40 +1,52 @@
-# Argonaut 0.1.4-dev.2 — Development testing
+# Argonaut 1.5-ai.1 — AI and Test Lab development testing
 
-This pass fixes Windows/macOS local network enumeration for discovery and adds:
+This build starts from stable Argonaut 1.5 and keeps Development profiles,
+preferences, reports, and build identity separate from the installed stable app.
 
-- Preferences tabs: General, Connections, and Device details.
-- Editable Serial number and Box model (the model checked on the shipping box), saved per connection profile. Existing Case edition text is preserved as Box model.
-- C64U Model is read-only. Select the profile, then use Read model from C64U.
-- Preview scale: 100–300% in 25% steps, with minus/plus buttons and a read-only value.
-- General preferences save the default scale; Streams scale changes are session-only.
-- Preview scrollbars appear when needed, without resizing the application window.
-- Append Return is checked by default. Sending text with it checked executes the line.
-- Preference checkboxes no longer toggle when clicking far beyond their labels.
+The Development Test Lab now includes:
 
-Windows: extract the portable ZIP to a writable folder and run Argonaut.exe.
+- deterministic offline, simulated, and read-only C64U checks with structured
+  operation evidence and retained regression history;
+- optional failure-only AI explanations through local Ollama or OpenAI, kept
+  separate from code-determined verdicts;
+- opt-in unattended read-only checks for every identity-bound Development C64U,
+  changed-failure and recovery notifications, and bounded local AI diagnoses;
+- a paired local C64 AI bridge and interactive USB2 PETSCII client;
+- deterministic bridge, network, Ollama, and downloaded-model health checks;
+- separate controls for five-minute AI health alerts, persistent 30-minute fleet
+  checks, and the temporary schedule that runs only while the window is open.
+
+The Debian Development package includes the local bridge, health monitor, and
+fleet-check user services. Ollama, a downloaded model, and the narrow TCP 6464
+firewall rules for paired C64U addresses remain explicit prerequisites. The
+pairing token and saved diagnostic material stay private and are not committed.
+
+Windows: extract the portable ZIP to a writable folder and run `Argonaut.exe`.
 Mac: open the DMG and copy Argonaut Development.app to Applications, or extract
 the ZIP. Apple Silicon and Intel packages require macOS 15 or newer. The Mac app
 is ad-hoc signed, not notarized. If blocked, use System Settings → Privacy &
-Security → Open Anyway.
-
-Profiles and preferences remain separate from stable Argonaut. To retain Windows
-development profiles, copy the existing Data folder into the newly extracted
-portable folder. Mac uses the existing development preferences. Passwords remain
-session-only. About displays 0.1.4-dev and the source build identifier.
+Security → Open Anyway. Linux background-service controls require systemd and
+will report unavailable on other platforms.
 
 ## Test checklist
 
-1. Open Preferences → Connections. Test Scan again and Scan subnet on your LAN;
-   select a device, test the connection, and connect. Manual IP entry remains available.
-2. Switch profiles and check Serial number and Box model. Save profile details,
-   close/reopen, and confirm each machine retains its own values. Read C64U Model.
-3. In General, click to the right of checkbox labels; they should not toggle.
-4. Save a preview default such as 175%. Restart and confirm it persists.
-5. On Streams, test minus/plus from 100% to 300%. The window should stay the same
-   size and display scrollbars as needed. Restart; scale should return to the saved default.
-6. Confirm Append Return starts checked. At BASIC READY, send PRINT "HELLO".
-7. Check capture folders, screenshot/recording, Mount & Run, and Quit as a regression check.
+1. Confirm About shows 1.5-ai.1 and the expected source build identifier.
+2. Connect each C64U and run **Run C64U checks**. Confirm all four read-only
+   checks pass and saved runs remain selectable after restarting Argonaut.
+3. Run **Test local AI (simulation)**. Confirm the expected FTP failure appears
+   and the diagnosis explicitly identifies it as a fixture, not a device fault.
+4. On Debian, confirm the C64 AI bridge, automatic health alerts, and background
+   C64U checks all show **On**. The temporary checkbox must say it applies only
+   while the window is open.
+5. Launch the paired C64 AI client on each C64U and ask one short question. Check
+   that the reply appears on the C64 and the prompt returns.
+6. Stop and restore Ollama once. Confirm Test Lab reports the model outage and
+   later recovery without changing any saved C64U verdict.
+7. Check file copy, Settings, Drives, Send Text, screenshot/recording, Mount &
+   Run, and Quit as stable 1.5 regression checks.
 
-Mount & Run requires DMA network service and runs a temporary D64 copy in Drive A.
-Operations affect the connected real C64U and its files. Report platform and About
-build with any failure. This prerelease does not replace the stable release.
+Operations still affect the connected real C64U and its files. The hardware
+suite itself is read-only. Mount & Run requires the DMA network service. The
+C64 AI launcher can enable Command Interface for the current runtime but does
+not save the C64U configuration to flash. This prerelease does not replace the
+stable 1.5 installation.

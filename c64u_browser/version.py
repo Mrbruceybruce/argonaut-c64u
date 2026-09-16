@@ -4,7 +4,7 @@ import json
 import os
 from . import development
 from pathlib import Path
-VERSION = '0.1.4'
+VERSION = '1.5'
 ASSETS = Path(__file__).resolve().parent / 'assets'
 
 def build_info():
