@@ -10,7 +10,7 @@ from c64u_browser.c64_ai_bridge_config import (
 )
 from c64u_browser.c64_ai_bridge_control import (
     SERVICE, activate_bridge, bridge_status, local_bridge_host,
-    pair_bridge_address, setup_bridge,
+    local_model_status, pair_bridge_address, setup_bridge,
 )
 
 
@@ -53,6 +53,45 @@ class C64AIBridgeControlTests(unittest.TestCase):
         self.assertEqual(status.allowed_clients, ('192.0.2.10',))
         self.assertNotIn(TOKEN, status.message)
         self.assertIn('1 paired address', status.message)
+
+    def test_model_health_distinguishes_service_and_missing_model(self):
+        self.assertEqual(
+            local_model_status('gemma3:4b', lambda: {'gemma3:4b'}),
+            ('ready', 'Local AI ready'))
+        state, message = local_model_status('gemma3:4b', lambda: {'other:1b'})
+        self.assertEqual(state, 'model_missing')
+        self.assertIn('gemma3:4b', message)
+        state, message = local_model_status(
+            'gemma3:4b', lambda: (_ for _ in ()).throw(OSError()))
+        self.assertEqual(state, 'model_unavailable')
+        self.assertIn('unavailable', message)
+        self.assertIn('Start Ollama', message)
+
+    def test_bridge_status_reports_model_outage_separately(self):
+        save_bridge_config(self.path, self.config)
+        def runner(args, **_kwargs):
+            return result(args, output=('active\n' if args[2] == 'is-active'
+                                        else 'enabled\n'))
+        status = bridge_status(
+            self.path, runner, check_model=True,
+            model_checker=lambda _model: (
+                'model_unavailable', 'Local AI service unavailable'))
+        self.assertEqual(status.state, 'model_unavailable')
+        self.assertEqual(status.model_status, 'model_unavailable')
+        self.assertIn('Bridge running', status.message)
+        self.assertNotIn(TOKEN, status.message)
+
+    def test_stopped_bridge_distinguishes_changed_network(self):
+        save_bridge_config(self.path, self.config)
+        def runner(args, **_kwargs):
+            return result(args, code=3, output='inactive\n')
+        status = bridge_status(
+            self.path, runner, network_checker=lambda _host: False)
+        self.assertEqual(status.state, 'network_changed')
+        self.assertIn('Reconnect', status.message)
+        status = bridge_status(
+            self.path, runner, network_checker=lambda _host: True)
+        self.assertEqual(status.state, 'stopped')
 
     def test_pair_preserves_token_adds_address_and_restarts(self):
         save_bridge_config(self.path, self.config)

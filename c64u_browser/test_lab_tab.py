@@ -210,16 +210,19 @@ class TestLabTab:
             else 'Install & pair C64U')
         self.connection_changed()
         self.activate_bridge_button.set_label(
-            'Start bridge' if status.state == 'stopped' else 'Restart bridge')
+            'Start bridge' if status.state == 'stopped' else
+            'Retry bridge' if status.state == 'network_changed' else
+            'Restart bridge')
         self.activate_bridge_button.set_sensitive(
-            status.state in ('ready', 'stopped'))
+            status.state in ('ready', 'stopped', 'network_changed'))
 
     def connection_changed(self):
         connected = (self.app.client is not None
                      and not getattr(self.app, 'offline_message', None)
                      and self.app.active_profile is not None)
         self.pair_bridge_button.set_sensitive(
-            connected and self.bridge_state in ('ready', 'stopped', 'setup'))
+            connected and self.bridge_state in (
+                'ready', 'stopped', 'setup', 'model_unavailable', 'model_missing'))
 
     def refresh_bridge_status(self):
         if self.app.busy:
@@ -229,14 +232,19 @@ class TestLabTab:
             self.show_bridge_status(status)
             self.app.status.set_text('C64 AI bridge status refreshed.')
 
-        self.app.run(lambda: bridge_status(self.bridge_path), done)
+        self.app.run(
+            lambda: bridge_status(self.bridge_path, check_model=True), done)
 
     def activate_bridge(self):
         def done(status):
             self.show_bridge_status(status)
             self.app.status.set_text('The local C64 AI bridge is ready.')
 
-        self.app.run(lambda: activate_bridge(self.bridge_path), done)
+        def task():
+            activate_bridge(self.bridge_path)
+            return bridge_status(self.bridge_path, check_model=True)
+
+        self.app.run(task, done)
 
     def pair_connected_c64(self):
         client = None if getattr(self.app, 'offline_message', None) else self.app.client

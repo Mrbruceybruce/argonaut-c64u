@@ -230,6 +230,13 @@ failed runs automatically** switch applies only to this app session; turning it
 on with OpenAI cloud selected sends future failed-run evidence to OpenAI.
 Passing reports do not call a model.
 
+The C64 AI bridge status is also determined without a model. Test Lab checks
+the managed bridge process, verifies that its saved listener address still
+belongs to this computer when the process is stopped, reads Ollama's bounded
+local model list, and distinguishes an unavailable service from a missing
+configured model. These operational health states remain separate from C64U
+test verdicts and from AI-generated failure explanations.
+
 API contracts: [Ollama chat](https://docs.ollama.com/api/chat),
 [Ollama nonstreaming](https://docs.ollama.com/api/streaming), and
 [OpenAI Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).

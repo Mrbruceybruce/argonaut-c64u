@@ -7,6 +7,9 @@ from pathlib import Path
 import secrets
 import socket
 import subprocess
+import json
+import urllib.error
+import urllib.request
 
 from .api import BrowserError
 from .c64_ai_bridge_config import (
@@ -26,6 +29,7 @@ class BridgeStatus:
     port: int = 0
     allowed_clients: tuple = ()
     enabled: bool = False
+    model_status: str = 'unchecked'
 
 
 def _systemctl(command, runner=subprocess.run):
@@ -46,7 +50,55 @@ def _reload_user_services(runner=subprocess.run):
         raise BrowserError('The background service list could not be refreshed.') from exc
 
 
-def bridge_status(path, runner=subprocess.run):
+def _local_model_names():
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    request = urllib.request.Request(
+        'http://127.0.0.1:11434/api/tags', headers={'Accept': 'application/json'})
+    with opener.open(request, timeout=3) as response:
+        raw = response.read(65537)
+    if len(raw) > 65536:
+        raise ValueError('Local model list is too large.')
+    data = json.loads(raw)
+    models = data.get('models') if isinstance(data, dict) else None
+    if not isinstance(models, list):
+        raise ValueError('Local model list is invalid.')
+    names = set()
+    for item in models:
+        if not isinstance(item, dict):
+            raise ValueError('Local model entry is invalid.')
+        for key in ('name', 'model'):
+            value = item.get(key)
+            if isinstance(value, str) and value:
+                names.add(value.casefold())
+    return names
+
+
+def local_model_status(model, fetcher=None):
+    try:
+        names = (fetcher or _local_model_names)()
+    except (OSError, TimeoutError, ValueError, urllib.error.URLError,
+            urllib.error.HTTPError):
+        return ('model_unavailable',
+                'Local AI service unavailable · Start Ollama, then refresh')
+    if model.casefold() not in names:
+        return ('model_missing',
+                f'Local model {model} is not downloaded · Download it in Ollama, then refresh')
+    return 'ready', 'Local AI ready'
+
+
+def local_address_available(address, socket_factory=socket.socket):
+    probe = socket_factory(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.bind((address, 0))
+        return True
+    except OSError:
+        return False
+    finally:
+        probe.close()
+
+
+def bridge_status(path, runner=subprocess.run, check_model=False,
+                  model_checker=None, network_checker=None):
     path = Path(path)
     if not path.exists():
         return BridgeStatus('setup', 'Setup needed · no private bridge setting found')
@@ -66,15 +118,26 @@ def bridge_status(path, runner=subprocess.run):
               f'{len(config.allowed_clients)} paired address'
               f'{"es" if len(config.allowed_clients) != 1 else ""}')
     if running:
-        message = 'Ready · ' + detail
+        model_state, model_message = (
+            (model_checker or local_model_status)(config.model)
+            if check_model else ('unchecked', ''))
+        state = 'ready' if model_state in ('ready', 'unchecked') else model_state
+        message = (('Ready · ' if state == 'ready' else model_message + ' · Bridge running · ')
+                   + detail)
         if not enabled:
             message += ' · automatic start is off'
-        state = 'ready'
     else:
-        message = 'Stopped · ' + detail
-        state = 'stopped'
+        if not (network_checker or local_address_available)(config.host):
+            message = ('Network changed · bridge address is unavailable · '
+                       'Reconnect this computer to the C64U network, then retry · '
+                       + detail)
+            state = 'network_changed'
+        else:
+            message = 'Stopped · ' + detail
+            state = 'stopped'
+        model_state = 'unchecked'
     return BridgeStatus(state, message, config.model, config.host, config.port,
-                        config.allowed_clients, enabled)
+                        config.allowed_clients, enabled, model_state)
 
 
 def activate_bridge(path, runner=subprocess.run):

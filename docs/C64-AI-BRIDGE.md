@@ -93,10 +93,13 @@ the paired client. It deliberately does not invoke `save_to_flash`, avoiding an
 unrelated permanent save of the C64U's complete current configuration.
 
 The Test Lab also presents the managed bridge as a normal application feature.
-It reports whether the bridge is ready, stopped, unavailable, or needs setup,
-along with the local model, listener address, and paired-address count. The
-private token is never returned to the interface. **Start bridge** and **Restart
-bridge** provide recovery without a terminal. **Install & pair C64U** first
+It separately reports a ready bridge, a stopped bridge, a changed local network
+address, an unavailable Ollama service, a missing downloaded model, an
+unavailable service manager, or setup that has not been completed. The status
+includes the local model, listener address, and paired-address count. The
+private token is never returned to the interface. **Start bridge**, **Retry
+bridge**, and **Restart bridge** provide recovery without a terminal. **Install
+& pair C64U** first
 re-verifies the active profile against the live device, then adds only that
 fixed IPv4 address while preserving the existing token. A failed restart
 restores the prior private pairing file and restarts the previous bridge.
@@ -126,3 +129,12 @@ narrow TCP 6464 firewall rule in place, Argonaut sent `WHAT IS A VIC II CHIP?`,
 observed the second C64U connect to the paired bridge, and read back the screen
 reply: `IT'S THE COMMODORE 64'S GRAPHICS CHIP. DISPLAYS COLORS AND SHAPES.` The
 interactive client returned to its question prompt.
+
+The recovery states were hardware-validated on 2026-09-16. Stopping the bridge
+produced the deterministic `stopped` state and **Start bridge** restored it to
+ready. Stopping Ollama left the bridge running but produced the separate
+`model_unavailable` state with the instruction to start Ollama and refresh;
+after the local model service restarted, status returned to ready. A configured
+model absent from Ollama and a listener address absent from the computer's
+current interfaces are covered by deterministic fixtures and do not depend on
+model output.
