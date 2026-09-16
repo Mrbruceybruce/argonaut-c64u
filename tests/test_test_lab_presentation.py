@@ -8,7 +8,7 @@ from c64u_browser.test_lab_presentation import check_details, comparison_summary
 class PresentationTests(unittest.TestCase):
     def test_summary_and_operation_details(self):
         report = run_default_checks()
-        self.assertEqual(summary(report), '10 passed · 0 failed · 0 skipped · 10 total')
+        self.assertEqual(summary(report), '14 passed · 0 failed · 0 skipped · 14 total')
         check = next(c for c in report['checks'] if c['id'] == 'sim.rest.authentication')
         text = check_details(check)
         self.assertIn('REST GET /v1/info · error', text)

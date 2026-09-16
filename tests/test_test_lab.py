@@ -12,13 +12,13 @@ class TestLabTests(unittest.TestCase):
     def test_offline_checks_pass_and_serialize(self):
         report = run_default_checks()
         self.assertEqual(report['status'], 'pass')
-        self.assertEqual(len(report['checks']), 10)
+        self.assertEqual(len(report['checks']), 14)
         self.assertEqual(json.loads(json.dumps(report))['schema'], 1)
 
     def test_simulated_checks_exercise_real_transports_without_leaking_fixtures(self):
         report = run_default_checks()
         simulated = [check for check in report['checks'] if check['id'].startswith('sim.')]
-        self.assertEqual(len(simulated), 8)
+        self.assertEqual(len(simulated), 12)
         self.assertTrue(all(check['status'] == 'pass' for check in simulated))
         self.assertTrue(all(len(check['operations']) == 1 for check in simulated[:6]))
         self.assertEqual(len(simulated[6]['operations']), 2)
@@ -27,6 +27,14 @@ class TestLabTests(unittest.TestCase):
         self.assertEqual(simulated[5]['operations'][0]['error_kind'], 'authentication')
         self.assertEqual(simulated[6]['id'], 'sim.identity.wrong_device')
         self.assertEqual(simulated[7]['id'], 'sim.hardware.complete')
+        self.assertEqual([check['id'] for check in simulated[8:]], [
+            'sim.transfer.download', 'sim.transfer.interrupted',
+            'sim.transfer.upload', 'sim.transfer.collision'])
+        self.assertTrue(all(len(check['operations']) == 1 for check in simulated[8:]))
+        self.assertEqual([check['operations'][0]['outcome'] for check in simulated[8:]],
+                         ['ok', 'error', 'ok', 'error'])
+        self.assertTrue(all(event['origin'] == 'simulation' for check in simulated
+                            for event in check['operations']))
         self.assertNotIn('private', json.dumps(report))
         self.assertNotIn('fixture.invalid', json.dumps(report))
 

@@ -166,7 +166,7 @@ class HeadlessCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(report['status'], 'pass')
         self.assertEqual(report['suite'], 'offline')
-        self.assertEqual(len(report['checks']), 10)
+        self.assertEqual(len(report['checks']), 14)
 
     def test_hardware_uses_development_profile_and_stdin_secret(self):
         with tempfile.TemporaryDirectory() as directory:

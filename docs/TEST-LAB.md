@@ -89,6 +89,11 @@ The complete hardware fixture runs the same four read-only checks against
 simulated REST and FTP responses, including bound identity, both drive states,
 the FTP root listing, and a stable API version. It records the expected five
 transport operations without opening a network connection.
+Four transfer fixtures exercise the real FTP download and upload code against
+an in-process server object. They prove a complete download and verified upload,
+cleanup after an interrupted download, and refusal to connect when an upload
+destination already exists. Their result events remain sanitized and marked as
+simulations; none writes to a C64U.
 
 The development tab also offers **Run C64U checks**. This opt-in suite uses the
 current connected profile and performs only read-only identity/firmware, drive

@@ -2,16 +2,20 @@
 # Copyright (C) 2026 Bruce Marcus
 """Offline REST/FTP fixtures for the Test Lab; no device or network access."""
 import ftplib
+import hashlib
 import io
 import json
+from pathlib import Path
+import tempfile
 import urllib.error
 from urllib.parse import urlsplit
 from unittest.mock import patch
 
-from .api import ConnectionFailure, UltimateClient
+from .api import BrowserError, ConnectionFailure, UltimateClient
 from .hardware_checks import run_hardware_checks
 from .profiles import Profile
 from .test_lab import Check, require
+from .transfers import download, upload, UploadFailure
 
 
 class _Response:
@@ -84,6 +88,50 @@ class _FTP:
         self.commands.append(('retrlines', command))
         for line in self.listing:
             callback(line)
+
+    def close(self):
+        self.commands.append(('close',))
+
+
+class _TransferFTP:
+    def __init__(self, files=None, fail_download=False):
+        self.files = dict(files or {})
+        self.fail_download = fail_download
+        self.commands = []
+
+    def connect(self, host, port):
+        self.commands.append(('connect', host, port))
+
+    def login(self, user, password):
+        self.commands.append(('login', user, password))
+
+    def set_pasv(self, enabled):
+        self.commands.append(('set_pasv', enabled))
+
+    def voidcmd(self, command):
+        self.commands.append(('voidcmd', command))
+
+    def size(self, path):
+        self.commands.append(('size', path))
+        return len(self.files[path]) if path in self.files else None
+
+    def retrbinary(self, command, callback):
+        self.commands.append(('retrbinary', command))
+        if self.fail_download:
+            callback(b'a')
+            raise OSError('simulated connection loss')
+        callback(self.files[command[5:]])
+
+    def storbinary(self, command, stream, callback=None):
+        self.commands.append(('storbinary', command))
+        data = stream.read()
+        self.files[command[5:]] = data
+        if callback:
+            callback(data)
+
+    def rename(self, source, destination):
+        self.commands.append(('rename',))
+        self.files[destination] = self.files.pop(source)
 
     def close(self):
         self.commands.append(('close',))
@@ -213,6 +261,73 @@ def _complete_read_only_hardware_suite():
             'Complete hardware FTP listing differed')
 
 
+def _transfer_download_complete():
+    data = b'verified fixture payload'
+    ftp = _TransferFTP({'/USB2/private-game.d64': data})
+    with tempfile.TemporaryDirectory() as directory, patch('ftplib.FTP', return_value=ftp):
+        destination = Path(directory) / 'private-download.d64'
+        result = download(UltimateClient('fixture.invalid', password='private'),
+                          '/USB2/private-game.d64', destination)
+        require(destination.read_bytes() == data and result['bytes'] == len(data),
+                'FTP download bytes differed')
+        require(result['sha256'] == hashlib.sha256(data).hexdigest(),
+                'FTP download digest differed')
+        require(len(list(Path(directory).iterdir())) == 1,
+                'FTP download left a staged file')
+    require(('voidcmd', 'TYPE I') in ftp.commands and
+            ('retrbinary', 'RETR /USB2/private-game.d64') in ftp.commands and
+            ftp.commands[-1] == ('close',),
+            'FTP download did not use and close the binary connection')
+
+
+def _transfer_download_interrupt():
+    ftp = _TransferFTP({'/USB2/private-game.d64': b'abc'}, fail_download=True)
+    with tempfile.TemporaryDirectory() as directory, patch('ftplib.FTP', return_value=ftp):
+        destination = Path(directory) / 'private-download.d64'
+        try:
+            download(UltimateClient('fixture.invalid'),
+                     '/USB2/private-game.d64', destination)
+        except BrowserError:
+            pass
+        else:
+            raise AssertionError('Interrupted FTP download was accepted')
+        require(not destination.exists() and not list(Path(directory).iterdir()),
+                'Interrupted FTP download published or left a staged file')
+    require(ftp.commands[-1] == ('close',),
+            'Interrupted FTP download did not close the connection')
+
+
+def _transfer_upload_verified():
+    data = b'verified upload payload'
+    ftp = _TransferFTP()
+    with tempfile.TemporaryDirectory() as directory, patch(
+            'ftplib.FTP', return_value=ftp), patch(
+            'c64u_browser.files.inspect', return_value=None):
+        source = Path(directory) / 'private-upload.bin'
+        source.write_bytes(data)
+        result = upload(UltimateClient('fixture.invalid', password='private'),
+                        source, '/USB2/Private')
+    require(result['verified'] and result['bytes'] == len(data),
+            'FTP upload verification differed')
+    require(ftp.files == {'/USB2/Private/private-upload.bin': data},
+            'FTP upload did not publish only the verified file')
+    require(any(command[0] == 'rename' for command in ftp.commands) and
+            ftp.commands[-1] == ('close',),
+            'FTP upload did not publish and close the connection')
+
+
+def _transfer_upload_collision():
+    with patch('c64u_browser.files.inspect', return_value=object()), patch(
+            'ftplib.FTP') as create_ftp:
+        try:
+            upload(UltimateClient('fixture.invalid'), 'private-upload.bin', '/USB2')
+        except UploadFailure:
+            pass
+        else:
+            raise AssertionError('Colliding FTP upload was accepted')
+    create_ftp.assert_not_called()
+
+
 SIMULATED_CHECKS = (
     Check('sim.rest.success', 'REST valid response', _rest_success),
     Check('sim.rest.malformed', 'REST malformed response', _rest_malformed_response),
@@ -224,4 +339,12 @@ SIMULATED_CHECKS = (
           _rest_wrong_device_identity),
     Check('sim.hardware.complete', 'Complete read-only C64U check simulation',
           _complete_read_only_hardware_suite),
+    Check('sim.transfer.download', 'Verified FTP download simulation',
+          _transfer_download_complete),
+    Check('sim.transfer.interrupted', 'Interrupted FTP download cleanup simulation',
+          _transfer_download_interrupt),
+    Check('sim.transfer.upload', 'Verified FTP upload simulation',
+          _transfer_upload_verified),
+    Check('sim.transfer.collision', 'FTP upload collision refusal simulation',
+          _transfer_upload_collision),
 )
