@@ -31,3 +31,12 @@ class Tests(unittest.TestCase):
             with self.assertRaises(BrowserError): UltimateClient('device').list_directory()
             ftp.retrlines.assert_not_called()
             ftp.close.assert_called_once()
+    def test_run_prg_validates_and_encodes_path(self):
+        client=UltimateClient('device')
+        with patch.object(client,'_request_json',return_value={'errors':[]}) as request:
+            client.run_prg('/USB2/Argonaut AI.prg')
+        request.assert_called_once_with(
+            'PUT','/v1/runners:run_prg?file=%2FUSB2%2FArgonaut+AI.prg')
+        for path in ('relative.prg','/USB2/../bad.prg','/USB2/readme.txt'):
+            with self.subTest(path=path),self.assertRaises(BrowserError):
+                client.run_prg(path)

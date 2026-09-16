@@ -205,6 +205,15 @@ class UltimateClient:
         if action not in ('reset','reboot'):raise BrowserError('Unsupported machine action.')
         return self._request_json('PUT','/v1/machine:'+action)
 
+    def run_prg(self, path):
+        safe_argument(path)
+        if (not isinstance(path, str) or not path.startswith('/')
+                or any(part in ('.', '..') for part in path.split('/'))
+                or not path.lower().endswith('.prg')):
+            raise BrowserError('Use an absolute C64U path to a PRG file.')
+        return self._request_json(
+            'PUT', '/v1/runners:run_prg?' + urlencode({'file': path}))
+
     @staticmethod
     def sid_parameters(path, song=None):
         if not isinstance(path,str):raise BrowserError('Choose a SID file on the C64U.')

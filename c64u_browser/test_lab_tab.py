@@ -17,6 +17,7 @@ from .hardware_checks import run_hardware_checks
 from .ai_analysis import analyze_failures
 from .ai_presentation import readable_diagnosis
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
+from .c64_ai_launch import launch_c64_ai
 from .test_lab_history import run_with_history
 from .test_lab_presentation import (
     check_details, comparison_changes, comparison_summary, summary,
@@ -90,6 +91,9 @@ class TestLabTab:
                                        self.run_probe)
         self.probe_button.set_tooltip_text(
             'Simulate a failed FTP login and ask only the local model to explain it.')
+        self.c64_ai_button = app.button(toolbar, 'Launch C64 AI', self.launch_c64_ai)
+        self.c64_ai_button.set_tooltip_text(
+            'Enable the Command Interface for this session and start the paired USB2 client.')
         self.schedule_check = Gtk.CheckButton(label='Run C64U checks every 30 minutes while connected')
         self.schedule_check.connect('toggled', self.schedule_toggled)
         self.box.append(self.schedule_check)
@@ -283,6 +287,19 @@ class TestLabTab:
         profile = self.app.active_profile if client is not None else None
         self._run_checks(lambda: run_hardware_checks(client, profile),
                          profile_id=profile.id if profile else None)
+
+    def launch_c64_ai(self):
+        client = None if getattr(self.app, 'offline_message', None) else self.app.client
+        profile = self.app.active_profile if client is not None else None
+        self.app.status.set_text('Starting the paired C64 AI client…')
+
+        def done(result):
+            message = 'C64 AI client started from USB2.'
+            if result['command_interface_changed']:
+                message += ' Command Interface enabled for this session.'
+            self.app.status.set_text(message)
+
+        self.app.run(lambda: launch_c64_ai(client, profile), done)
 
     def schedule_toggled(self, button):
         if button.get_active():

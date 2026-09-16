@@ -85,3 +85,9 @@ service. It answered `WHAT IS PETSCII?` and `WHAT IS A SID CHIP?`, returned to
 the prompt after each answer, and kept all model access separate from Test Lab
 verdicts and device-control APIs. The selected C64U's Command Interface is
 enabled for the current runtime but has not been saved to flash.
+
+The Development Test Lab includes **Launch C64 AI**. The launch helper verifies
+the bound device identity and the client file on USB2 before changing anything,
+enables Command Interface only for the current runtime when necessary, and runs
+the paired client. It deliberately does not invoke `save_to_flash`, avoiding an
+unrelated permanent save of the C64U's complete current configuration.
