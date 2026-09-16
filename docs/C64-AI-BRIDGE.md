@@ -6,13 +6,13 @@ different use of a model: it accepts a short user question and returns short
 screen text. It does not receive a Test Lab report, credentials, or a C64U
 control object.
 
-The first bridge starts as loopback-only in `c64_ai_chat.py` and can use a
-paired LAN listener from `c64_ai_service.py`. It accepts `POST /v1/chat` with `Content-Type: text/plain`,
-an authorization bearer token, and one printable ASCII question of at most
-240 bytes. The answer is at most 512 printable ASCII bytes, with a fixed
-`Content-Length` and `Cache-Control: no-store`. The C64 client will translate
-the text to PETSCII and wrap it to 40 columns. The model is local Ollama only;
-the current bridge has no cloud selection or device actions.
+The first bridge starts as loopback-only HTTP in `c64_ai_chat.py` and can use a
+paired compact TCP listener from `c64_ai_service.py`. The C64 sends
+`ARGONAUT/1 <token> <length>\n<question>`, with one printable ASCII question of
+at most 240 bytes. The bridge returns `OK <length>\n<answer>` or a short `ERR`
+line. The answer is at most 512 printable ASCII bytes. C64 protocol replies are
+uppercase so they display in the default PETSCII screen mode. The model is
+local Ollama only; the current bridge has no cloud selection or device actions.
 
 The LAN listener binds one explicit address, requires a private token, and
 accepts only the known addresses of the selected C64U. Supporting both its
@@ -21,7 +21,7 @@ start and stop the bridge is still required. The listener never exposes Ollama
 itself.
 
 For the C64 program, use the Ultimate Command Interface (UCI) Network target
-`$03` to open a TCP socket, send a small HTTP request, and read the bounded
+`$03` to open a TCP socket, send a compact authenticated frame, and read the bounded
 reply. Probe `$03 $01` first, so a missing or disabled Command Interface is
 shown as a clear error. The official [Network Target documentation](https://1541u-documentation.readthedocs.io/en/latest/uci/network_target.html)
 defines `OPEN_TCP`, `WRITE_SOCKET`, `READ_SOCKET`, and `CLOSE_SOCKET` for
@@ -36,9 +36,9 @@ describes it as a 3.15-era feature. Bruce's two C64Us currently report
 `1.1.0` and `1.1.0s2`; the C64 program must probe target `$06 $01` before
 selecting that path. No firmware change is required for this first step.
 
-The next implementation step is a minimal PETSCII client and a temporary,
-paired LAN listener. The listener must accept requests only from the selected
-C64U and must still require its private bearer token.
+The next implementation step is an interactive PETSCII question prompt and a
+managed start/stop lifecycle for the paired bridge. The listener must continue
+to accept requests only from the selected C64U and require its private token.
 
 The first capability probe is now in `c64/uci-network-probe.bas`; its tokenized
 `c64/uci-network-probe.prg` is a small C64 BASIC program. It checks the UCI
@@ -63,3 +63,11 @@ the TCP route works, while the new bridge port remained blocked when the
 firewall allowed only `.69`. The paired listener therefore supports both known
 addresses; the firewall should do the same until firmware offers explicit
 per-socket interface selection or Wi-Fi is disabled by a supported setting.
+
+The generated private link probe uses lowercase letters in its BASIC source
+for bytes that must become unshifted ASCII-range PETSCII after tokenization.
+The saved pairing token is uppercase for the same reason. On 2026-09-15 the
+hardware probe completed the full C64U → paired bridge → local Gemma path and
+displayed `HELLO BRUCE, A FRIENDLY GREETING.` on the C64 screen. This proves
+the compact framing, source-address restriction, token check, local model call,
+and PETSCII-safe reply together. The token remains private and is not committed.

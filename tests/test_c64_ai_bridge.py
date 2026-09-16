@@ -1,4 +1,5 @@
 import http.client
+import socket
 import threading
 import unittest
 from unittest.mock import Mock, patch
@@ -7,18 +8,20 @@ from c64u_browser.c64_ai_chat import (
     C64ChatGateway, decode_prompt, encode_reply,
 )
 from c64u_browser.c64_ai_client import render_link_probe
-from c64u_browser.c64_ai_service import loopback_server, paired_lan_server
+from c64u_browser.c64_ai_service import (
+    loopback_server, paired_c64_server, paired_lan_server,
+)
 
 
-TOKEN = 'a' * 40
+TOKEN = 'A' * 40
 
 
 class C64AIBridgeTests(unittest.TestCase):
     def test_private_link_probe_source_is_bounded_and_tokenized(self):
-        token = 'b' * 64
+        token = 'B' * 64
         source = render_link_probe('192.0.2.1', 6464, token)
         self.assertIn('h$="192.0.2.1":p=6464', source)
-        self.assertIn('Authorization: Bearer ' + token, source)
+        self.assertIn('argonaut/1 ' + token.lower() + ' 33', source)
         self.assertIn('chr$(3)+chr$(7)', source)
         self.assertIn('chr$(3)+chr$(17)', source)
         self.assertIn('chr$(3)+chr$(16)', source)
@@ -107,6 +110,29 @@ class C64AIBridgeTests(unittest.TestCase):
                              (403, b'Client is not paired.'))
             conn.close()
             gateway.assert_not_called()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_compact_c64_protocol_authenticates_and_returns_plain_text(self):
+        gateway = Mock(return_value=b'A SID makes sound.')
+        server = paired_c64_server(gateway, TOKEN, '127.0.0.1',
+                                   '127.0.0.1', 0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            address = server.server_address
+            with socket.create_connection(address, timeout=2) as client:
+                client.sendall(b'ARGONAUT/1 wrong 9\nQuestion?')
+                self.assertEqual(client.recv(100), b'ERR AUTH\n')
+            gateway.assert_not_called()
+            with socket.create_connection(address, timeout=2) as client:
+                client.sendall(('ARGONAUT/1 ' + TOKEN + ' 12\n').encode()
+                               + b'What is SID?')
+                self.assertEqual(client.recv(100),
+                                 b'OK 18\nA SID MAKES SOUND.')
+            gateway.assert_called_once_with('What is SID?')
         finally:
             server.shutdown()
             server.server_close()
