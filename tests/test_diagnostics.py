@@ -1,17 +1,21 @@
 import io
 import json
 import logging
+import os
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch, Mock
 
 from c64u_browser.api import ConnectionFailure, Entry, UltimateClient, BrowserError
-from c64u_browser.diagnostics import LOGGER, JsonEventFormatter
+from c64u_browser.diagnostics import (LOGGER, JsonEventFormatter,
+                                      enable_private_log, disable_private_log,
+                                      operation_event)
 from c64u_browser.transfers import download, upload
 from c64u_browser.files import operate
 from c64u_browser.native_files import read_remote
 from c64u_browser.disk_run import mount_and_run
+from c64u_browser.test_lab import run_default_checks
 
 
 class DiagnosticEventsTest(unittest.TestCase):
@@ -131,6 +135,53 @@ class DiagnosticEventsTest(unittest.TestCase):
                          ('dma', 'mount_and_run', 'disk', 'error'))
         self.assertNotIn('private-image.d81', self.stream.getvalue())
         self.assertNotIn('private-password', self.stream.getvalue())
+
+    def test_development_log_is_private_bounded_jsonl(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / 'argonaut-development'
+            handler = enable_private_log(base / 'config.json', max_bytes=400,
+                                         backups=2)
+            try:
+                for _ in range(20):
+                    with operation_event('ftp', 'download', 'file'):
+                        pass
+            finally:
+                disable_private_log(handler)
+            folder = base / 'diagnostics'
+            files = sorted(folder.glob('operations.jsonl*'))
+            self.assertLessEqual(len(files), 3)
+            self.assertGreater(len(files), 1)
+            rows = [json.loads(line) for path in files
+                    for line in path.read_text().splitlines()]
+            self.assertTrue(rows)
+            self.assertTrue(all(row['operation'] == 'download' and
+                                row['target'] == 'file' and
+                                row['origin'] == 'device' for row in rows))
+            if os.name != 'nt':
+                self.assertEqual(folder.stat().st_mode & 0o777, 0o700)
+                self.assertTrue(all(path.stat().st_mode & 0o777 == 0o600
+                                    for path in files))
+
+    def test_offline_fixture_events_stay_in_report_not_activity_log(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / 'argonaut-development'
+            handler = enable_private_log(base / 'config.json')
+            try:
+                report = run_default_checks()
+                self.assertEqual(report['status'], 'pass')
+                events = [event for check in report['checks']
+                          for event in check['operations']]
+                self.assertTrue(events)
+                self.assertTrue(all(event['origin'] == 'simulation'
+                                    for event in events))
+                self.assertEqual((base / 'diagnostics/operations.jsonl').read_text(), '')
+                with operation_event('ftp', 'download', 'file'):
+                    pass
+            finally:
+                disable_private_log(handler)
+            rows = (base / 'diagnostics/operations.jsonl').read_text().splitlines()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(json.loads(rows[0])['origin'], 'device')
 
 
 if __name__ == '__main__':

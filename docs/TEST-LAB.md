@@ -107,12 +107,18 @@ by default and is cleared when Argonaut closes.
 Each check has a stable ID, a title, a pass/fail/skip result, an error category,
 timing, and structured C64U operation events captured while it ran. REST calls,
 FTP directory browsing, uploads, downloads, Flash reads and writes, file
-actions, replacement, and DMA actions emit the same
-event format. REST targets use recognized route labels; dynamic configuration
-segments and URL query values are redacted. FTP file and entry targets are
-generic labels. Assertions
+actions, replacement, and DMA actions emit the same event format. REST targets
+use recognized route labels; dynamic configuration segments and URL query
+values are redacted. FTP file and entry targets are generic labels. Assertions
 and exceptions determine the result. Exception messages, credentials, request
 bodies, URL query values, and device file paths are excluded from reports.
+Development also keeps ordinary C64U operation events in a private, rotating
+JSONL activity log under its settings folder while the app is open. The log is
+limited to 1 MB plus two rotated backups and does not include credentials,
+request bodies, dynamic route segments, query values, or file paths. Test Lab
+reports and headless fleet runs keep their own private histories separately.
+Offline fixture events are marked as simulations and remain in their Test Lab
+reports without appearing in the ordinary activity log.
 The runner rejects missing, invalid, or duplicate check IDs before running any
 check. History comparison ignores damaged saved reports and rejects inconsistent
 overall verdicts, so a duplicate ID cannot overwrite a failure in the baseline.

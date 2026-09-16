@@ -37,6 +37,10 @@ class TestLabTab:
         self.box.append(Gtk.Label(
             label='Offline checks use simulations. C64U checks read the connected device without changing settings, drives, or files.',
             xalign=0, wrap=True))
+        self.box.append(Gtk.Label(
+            label=(getattr(app, 'operation_log_error', None) or
+                   'Detailed C64U activity is saved privately while Development is open.'),
+            xalign=0, wrap=True))
         self.saved_overview = Gtk.Label(label='No saved C64U results loaded.',
                                         xalign=0, wrap=True)
         self.box.append(self.saved_overview)

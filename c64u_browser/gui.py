@@ -28,6 +28,7 @@ from .machine_tab import MachineTab
 from .recovery import Recovery
 from .media_tab import MediaTab
 from .streams_tab import StreamsTab
+from .diagnostics import enable_private_log, disable_private_log
 
 
 class Browser(Gtk.Application):
@@ -50,6 +51,13 @@ class Browser(Gtk.Application):
         self.preferences_error = None
         try: self.preferences.load()
         except (BrowserError, OSError) as exc: self.preferences_error = str(exc)
+        self.operation_log = None
+        self.operation_log_error = None
+        if development.enabled():
+            try:
+                self.operation_log = enable_private_log(self.preferences.path)
+            except OSError:
+                self.operation_log_error = 'Private activity log is unavailable.'
         remembered=self.preferences.app_options['local_folder']
         self.local=Path(remembered) if self.preferences.app_options['remember_folders'] and remembered and Path(remembered).is_dir() else Path.home()
         self.histories[True]=History(self.local)
@@ -829,6 +837,8 @@ class Browser(Gtk.Application):
             return True
         if self.recovery:self.recovery.close()
         if getattr(self, 'test_lab_tab', None): self.test_lab_tab.stop_schedule()
+        disable_private_log(getattr(self, 'operation_log', None))
+        self.operation_log = None
         self.streams_tab.close()
         self.pool.shutdown(wait=False)
         # Child windows must not keep an application with a stopped worker alive.

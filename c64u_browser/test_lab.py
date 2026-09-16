@@ -8,7 +8,7 @@ import threading
 import time
 
 from .api import BrowserError, UltimateClient, parse_list
-from .diagnostics import LOGGER
+from .diagnostics import LOGGER, operation_origin
 
 
 @dataclass(frozen=True)
@@ -112,7 +112,8 @@ DEFAULT_CHECKS = (
 def run_default_checks():
     """Offline and simulated checks; safe without a connected C64U."""
     from .simulated_c64u import SIMULATED_CHECKS
-    report = run_checks(DEFAULT_CHECKS + SIMULATED_CHECKS)
+    with operation_origin('simulation'):
+        report = run_checks(DEFAULT_CHECKS + SIMULATED_CHECKS)
     report['suite'] = 'offline'
     return report
 
