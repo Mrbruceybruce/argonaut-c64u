@@ -91,3 +91,12 @@ the bound device identity and the client file on USB2 before changing anything,
 enables Command Interface only for the current runtime when necessary, and runs
 the paired client. It deliberately does not invoke `save_to_flash`, avoiding an
 unrelated permanent save of the C64U's complete current configuration.
+
+The Test Lab also presents the managed bridge as a normal application feature.
+It reports whether the bridge is ready, stopped, unavailable, or needs setup,
+along with the local model, listener address, and paired-address count. The
+private token is never returned to the interface. **Start bridge** and **Restart
+bridge** provide recovery without a terminal. **Pair connected C64U** first
+re-verifies the active profile against the live device, then adds only that
+fixed IPv4 address while preserving the existing token. A failed restart
+restores the prior private pairing file and restarts the previous bridge.

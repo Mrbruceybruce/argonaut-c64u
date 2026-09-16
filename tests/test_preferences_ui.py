@@ -114,3 +114,11 @@ class PreferencesUI(unittest.TestCase):
             send.assert_called_once_with(tab.client,'PRINT "HELLO"',True)
             self.app.busy=True;tab.text_input.emit('activate');self.assertEqual(send.call_count,1)
         self.app.busy=False
+
+    def test_test_lab_bridge_setup_state_is_non_secret_and_actionable(self):
+        tab=self.app.test_lab_tab
+        self.app.tabs.set_current_page(6);self.pump()
+        self.assertIn('Setup needed',tab.bridge_status.get_text())
+        self.assertNotIn('token',tab.bridge_status.get_text().casefold())
+        self.assertFalse(tab.activate_bridge_button.get_sensitive())
+        self.assertFalse(tab.pair_bridge_button.get_sensitive())
