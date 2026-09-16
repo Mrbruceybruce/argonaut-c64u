@@ -17,7 +17,7 @@ class AnalysisBoundaryTests(unittest.TestCase):
                              'error_kind': 'network', 'password': 'private'}]},
         ]}
         evidence = failure_evidence(report)
-        self.assertEqual([item['id'] for item in evidence['failures']], ['bad'])
+        self.assertEqual([item['id'] for item in evidence['failures']], ['check-1'])
         self.assertEqual(evidence['failures'][0]['operations'][0]['target'], '/v1/info')
         self.assertNotIn('private', json.dumps(evidence))
         self.assertNotIn('secret', json.dumps(evidence))
@@ -55,8 +55,32 @@ class AnalysisBoundaryTests(unittest.TestCase):
 
     def test_passing_report_does_not_call_adapter(self):
         adapter = Mock()
-        result = analyze_failures({'schema': 1, 'status': 'pass', 'checks': []}, adapter)
+        result = analyze_failures({'schema': 1, 'status': 'pass', 'checks': [
+            {'id': 'hardware.identity', 'status': 'pass'}]}, adapter)
         self.assertEqual(result['status'], 'no_failures')
+        adapter.assert_not_called()
+
+    def test_untrusted_check_title_and_identifier_stay_out_of_model_evidence(self):
+        report = {'schema': 1, 'status': 'fail', 'checks': [
+            {'id': 'private_password', 'title': 'password=secret',
+             'status': 'fail', 'error_kind': 'BrowserError',
+             'operations': []}]}
+        adapter = Mock(return_value='Inspect the failed check.')
+        analysis = analyze_failures(report, adapter)
+        evidence = adapter.call_args.args[0]
+        self.assertEqual(evidence['failures'][0]['id'], 'check-1')
+        self.assertNotIn('private_password', json.dumps(evidence))
+        self.assertNotIn('secret', json.dumps(evidence))
+        self.assertEqual(analysis['check_ids'], ['private_password'])
+        self.assertEqual(report['status'], 'fail')
+
+    def test_excessive_failures_are_rejected_before_model_call(self):
+        report = {'schema': 1, 'status': 'fail', 'checks': [
+            {'id': f'custom.{index}', 'status': 'fail', 'operations': []}
+            for index in range(33)]}
+        adapter = Mock()
+        with self.assertRaises(ValueError):
+            analyze_failures(report, adapter)
         adapter.assert_not_called()
 
 

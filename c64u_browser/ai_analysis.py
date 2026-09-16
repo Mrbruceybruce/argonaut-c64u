@@ -2,6 +2,7 @@
 # Copyright (C) 2026 Bruce Marcus
 """Failure-only evidence boundary for future local and cloud AI adapters."""
 from .diagnostics import rest_target
+from .test_lab_history import validate_report
 
 
 SAFE_OPERATIONS = {
@@ -22,6 +23,17 @@ SAFE_ERROR_KINDS = frozenset((
     'authentication', 'network', 'host', 'api', 'ftp', 'identity',
     'BrowserError', 'UploadFailure', 'AssertionError', 'ValueError',
     'OSError', 'EOFError', 'TimeoutError', 'UnicodeError',
+))
+MAX_FAILURES = 32
+SAFE_CHECK_IDS = frozenset((
+    'ftp.listing_parser', 'rest.sid_path_validation',
+    'hardware.identity', 'hardware.drives', 'hardware.storage',
+    'hardware.version_stability',
+    'sim.rest.success', 'sim.rest.malformed', 'sim.rest.authentication',
+    'sim.ftp.mlsd', 'sim.ftp.list_fallback', 'sim.ftp.authentication',
+    'sim.identity.wrong_device', 'sim.hardware.complete',
+    'sim.transfer.download', 'sim.transfer.interrupted',
+    'sim.transfer.upload', 'sim.transfer.collision',
 ))
 
 
@@ -51,15 +63,16 @@ def safe_operation(event):
 
 
 def failure_evidence(report):
-    """Whitelisted, bounded evidence; no credentials or exception messages."""
-    if report.get('schema') != 1 or not isinstance(report.get('checks'), list):
-        raise ValueError('Unsupported Test Lab report')
+    """Whitelisted, bounded evidence; no titles, credentials, or exception text."""
+    validate_report(report)
     failures = []
     for check in report['checks']:
         if not isinstance(check, dict):
             continue
         if check.get('status') != 'fail':
             continue
+        if len(failures) >= MAX_FAILURES:
+            raise ValueError('Too many failures for AI analysis')
         operations = []
         events = check.get('operations', [])
         if isinstance(events, list):
@@ -70,9 +83,11 @@ def failure_evidence(report):
         if error_kind is not None and (not isinstance(error_kind, str) or
                                        error_kind not in SAFE_ERROR_KINDS):
             error_kind = 'other'
+        check_id = check.get('id')
+        if not isinstance(check_id, str) or check_id not in SAFE_CHECK_IDS:
+            check_id = f'check-{len(failures) + 1}'
         failures.append({
-            'id': check.get('id'),
-            'title': check.get('title'),
+            'id': check_id,
             'error_kind': error_kind,
             'operations': operations,
         })
@@ -89,4 +104,5 @@ def analyze_failures(report, adapter):
     if not isinstance(diagnosis, str):
         raise TypeError('AI adapter must return text')
     return {'schema': 1, 'status': 'analyzed', 'diagnosis': diagnosis[:8000],
-            'check_ids': [failure['id'] for failure in evidence['failures']]}
+            'check_ids': [check.get('id') for check in report['checks']
+                          if isinstance(check, dict) and check.get('status') == 'fail']}

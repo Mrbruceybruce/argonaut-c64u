@@ -44,6 +44,16 @@ does not contact either model. On a failed run, the command adds a separate
 unchanged even if the model is unavailable. Neither the key nor model text is
 stored in the private run history.
 
+A saved or exported report can also be analyzed later, without reconnecting to
+the C64U or rerunning checks:
+`python3 -m c64u_browser.test_lab_replay --report REPORT.json --ai-provider
+ollama --ai-model MODEL`. The same command accepts `--ai-provider openai` for
+explicit cloud analysis. It validates the saved verdict before use and prints
+only the report status and a separate analysis object. Its exit code remains 0
+for a saved pass, 1 for a saved failure, 2 for an all-skipped report, and 3 for
+an unreadable or damaged report. A passing or skipped report never contacts a
+model. The input report is never changed.
+
 For a monitor that runs independently of the Argonaut window, use
 `python3 -m c64u_browser.test_lab_watch --interval-minutes 30`.
 It immediately runs the same read-only hardware suite for the selected
@@ -155,7 +165,11 @@ chosen C64U, including reports written by the unattended Linux service.
 
 The AI analysis boundary extracts only failed checks and a small whitelist of
 sanitized operation fields. It rechecks route, operation, target, outcome, and
-error labels before sending evidence to a model. The AI Gateway supports local
+error labels before sending evidence to a model. Built-in check IDs are known
+safe labels; an unknown check ID is replaced with an opaque failure number in
+model evidence. Check titles, exception messages, and extra report fields are
+excluded, and analysis refuses more than 32 failures rather than sending a
+partial or oversized explanation. The AI Gateway supports local
 Ollama chat and the OpenAI Responses API; each returns a diagnosis as a separate
 object. This object
 cannot change the saved report, its code-determined verdicts, or the run
