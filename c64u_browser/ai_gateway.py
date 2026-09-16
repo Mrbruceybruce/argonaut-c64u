@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 import json
 import os
+from types import MappingProxyType
 import urllib.error
 import urllib.request
 
@@ -26,6 +27,7 @@ INSTRUCTIONS = (
     'State uncertainty when the evidence is insufficient. '
     'Keep the diagnosis concise, under 150 words. Use plain text without Markdown formatting.'
 )
+SUPPORTED_PROVIDERS = frozenset(('ollama', 'openai'))
 
 
 class GatewayError(Exception):
@@ -40,7 +42,7 @@ class GatewayConfig:
     model: str
 
     def __post_init__(self):
-        if self.provider not in ('ollama', 'openai'):
+        if self.provider not in SUPPORTED_PROVIDERS:
             raise GatewayError('configuration', 'Choose a supported AI provider.')
         if (not isinstance(self.model, str) or not self.model.strip()
                 or len(self.model) > 120
@@ -84,11 +86,17 @@ def _openai_text(response):
     direct = response.get('output_text')
     if isinstance(direct, str) and direct.strip():
         return direct
+    output = response.get('output')
+    if not isinstance(output, list):
+        raise GatewayError('response', 'AI returned an unsupported response.')
     parts = []
-    for item in response.get('output', []):
+    for item in output:
         if not isinstance(item, dict) or item.get('type') != 'message':
             continue
-        for content in item.get('content', []):
+        content_items = item.get('content')
+        if not isinstance(content_items, list):
+            continue
+        for content in content_items:
             if isinstance(content, dict) and content.get('type') == 'output_text':
                 value = content.get('text')
                 if isinstance(value, str):
@@ -99,6 +107,42 @@ def _openai_text(response):
     return text
 
 
+def _ollama_diagnosis(model, content, _api_key):
+    response = _post_json('http://127.0.0.1:11434/api/chat', {
+        'model': model,
+        'messages': [{'role': 'system', 'content': INSTRUCTIONS},
+                     {'role': 'user', 'content': content}],
+        'stream': False,
+        'options': {'num_predict': LOCAL_OUTPUT_TOKENS},
+    }, {}, timeout=LOCAL_TIMEOUT_SECONDS)
+    if response.get('done') is not True:
+        raise GatewayError('response', 'Local AI response did not complete.')
+    if response.get('done_reason') == 'length':
+        raise GatewayError('response', 'Local AI diagnosis was cut short.')
+    message = response.get('message')
+    return message.get('content') if isinstance(message, dict) else None
+
+
+def _openai_diagnosis(model, content, api_key):
+    key = api_key or os.environ.get('OPENAI_API_KEY')
+    if not key:
+        raise GatewayError('configuration', 'OpenAI API key is unavailable.')
+    response = _post_json('https://api.openai.com/v1/responses', {
+        'model': model,
+        'instructions': INSTRUCTIONS,
+        'input': content,
+        'store': False,
+        'max_output_tokens': 512,
+    }, {'Authorization': 'Bearer ' + key})
+    return _openai_text(response)
+
+
+PROVIDER_ADAPTERS = MappingProxyType({
+    'ollama': _ollama_diagnosis,
+    'openai': _openai_diagnosis,
+})
+
+
 class AIGateway:
     def __init__(self, config, api_key=None):
         self.config = config
@@ -106,32 +150,8 @@ class AIGateway:
 
     def __call__(self, evidence):
         content = json.dumps(evidence, sort_keys=True, separators=(',', ':'))
-        if self.config.provider == 'ollama':
-            response = _post_json('http://127.0.0.1:11434/api/chat', {
-                'model': self.config.model,
-                'messages': [{'role': 'system', 'content': INSTRUCTIONS},
-                             {'role': 'user', 'content': content}],
-                'stream': False,
-                'options': {'num_predict': LOCAL_OUTPUT_TOKENS},
-            }, {}, timeout=LOCAL_TIMEOUT_SECONDS)
-            if response.get('done') is not True:
-                raise GatewayError('response', 'Local AI response did not complete.')
-            if response.get('done_reason') == 'length':
-                raise GatewayError('response', 'Local AI diagnosis was cut short.')
-            message = response.get('message')
-            text = message.get('content') if isinstance(message, dict) else None
-        else:
-            key = self.api_key or os.environ.get('OPENAI_API_KEY')
-            if not key:
-                raise GatewayError('configuration', 'OpenAI API key is unavailable.')
-            response = _post_json('https://api.openai.com/v1/responses', {
-                'model': self.config.model,
-                'instructions': INSTRUCTIONS,
-                'input': content,
-                'store': False,
-                'max_output_tokens': 512,
-            }, {'Authorization': 'Bearer ' + key})
-            text = _openai_text(response)
+        adapter = PROVIDER_ADAPTERS[self.config.provider]
+        text = adapter(self.config.model, content, self.api_key)
         if not isinstance(text, str) or not text.strip():
             raise GatewayError('response', 'AI returned no diagnosis text.')
         return text

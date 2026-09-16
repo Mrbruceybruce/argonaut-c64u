@@ -218,6 +218,10 @@ Ollama chat and the OpenAI Responses API; each returns a diagnosis as a separate
 object. This object
 cannot change the saved report, its code-determined verdicts, or the run
 comparison. Model responses are bounded and treated as suggestions.
+Both providers implement the same gateway adapter contract: bounded sanitized
+evidence in, diagnosis text or a stable categorized error out. Provider response
+shapes are validated inside their adapters, so a malformed local or cloud reply
+cannot escape into the deterministic test runner as an unrelated exception.
 
 In the development Test Lab tab, choose **Local Ollama** or **OpenAI cloud** and
 enter a model name. Ollama must be running locally with a downloaded model.

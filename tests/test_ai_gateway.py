@@ -3,7 +3,10 @@ import unittest
 from unittest.mock import Mock, patch
 import urllib.error
 
-from c64u_browser.ai_gateway import AIGateway, GatewayConfig, GatewayError
+from c64u_browser.ai_gateway import (
+    AIGateway, GatewayConfig, GatewayError, PROVIDER_ADAPTERS,
+    SUPPORTED_PROVIDERS,
+)
 from c64u_browser.ai_analysis import analyze_failures
 
 
@@ -20,6 +23,9 @@ def response(body):
 
 
 class GatewayTests(unittest.TestCase):
+    def test_each_supported_provider_has_one_adapter(self):
+        self.assertEqual(frozenset(PROVIDER_ADAPTERS), SUPPORTED_PROVIDERS)
+
     def test_local_ollama_nonstreaming_request(self):
         with patch('urllib.request.build_opener') as build:
             build.return_value.open.return_value = response({
@@ -92,6 +98,22 @@ class GatewayTests(unittest.TestCase):
             with self.assertRaises(GatewayError) as caught:
                 AIGateway(GatewayConfig('ollama', 'local-model'))(EVIDENCE)
         self.assertEqual(caught.exception.kind, 'response')
+
+    def test_malformed_openai_output_is_a_stable_response_error(self):
+        malformed = (
+            {'status': 'completed'},
+            {'status': 'completed', 'output': None},
+            {'status': 'completed', 'output': [
+                {'type': 'message', 'content': None}]},
+        )
+        for body in malformed:
+            with self.subTest(body=body), patch(
+                    'urllib.request.build_opener') as build:
+                build.return_value.open.return_value = response(body)
+                with self.assertRaises(GatewayError) as caught:
+                    AIGateway(GatewayConfig('openai', 'cloud-model'),
+                              api_key='test-private-key')(EVIDENCE)
+            self.assertEqual(caught.exception.kind, 'response')
 
     def test_failed_model_call_cannot_change_code_verdict(self):
         report = {'schema': 1, 'status': 'fail', 'checks': [{
