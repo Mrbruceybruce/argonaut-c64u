@@ -1,5 +1,7 @@
 import http.client
+from pathlib import Path
 import socket
+import tempfile
 import threading
 import unittest
 from unittest.mock import Mock, patch
@@ -7,7 +9,10 @@ from unittest.mock import Mock, patch
 from c64u_browser.c64_ai_chat import (
     C64ChatGateway, decode_prompt, encode_reply,
 )
-from c64u_browser.c64_ai_client import render_link_probe
+from c64u_browser.c64_ai_client import render_chat_client, render_link_probe
+from c64u_browser.c64_ai_bridge_config import (
+    C64BridgeConfig, load_bridge_config, save_bridge_config,
+)
 from c64u_browser.c64_ai_service import (
     loopback_server, paired_c64_server, paired_lan_server,
 )
@@ -17,6 +22,18 @@ TOKEN = 'A' * 40
 
 
 class C64AIBridgeTests(unittest.TestCase):
+    def test_private_bridge_config_round_trip_and_validation(self):
+        config = C64BridgeConfig('gemma3:4b', '192.0.2.1', 6464,
+                                 ('192.0.2.10', '192.0.2.11'), 'C' * 64)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'bridge.json'
+            save_bridge_config(path, config)
+            self.assertEqual(load_bridge_config(path), config)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        with self.assertRaises(ValueError):
+            save_bridge_config('/unused', C64BridgeConfig(
+                'gemma3:4b', '0.0.0.0', 6464, ('192.0.2.10',), 'C' * 64))
+
     def test_private_link_probe_source_is_bounded_and_tokenized(self):
         token = 'B' * 64
         source = render_link_probe('192.0.2.1', 6464, token)
@@ -31,6 +48,14 @@ class C64AIBridgeTests(unittest.TestCase):
             render_link_probe('0.0.0.0', 80, token)
         with self.assertRaises(ValueError):
             render_link_probe('192.0.2.1', 6464, 'short')
+
+    def test_interactive_client_prompts_and_reconnects(self):
+        source = render_chat_client('192.0.2.1', 6464, 'B' * 64)
+        self.assertIn('40 input "ask argonaut (blank exits)";q$', source)
+        self.assertIn('45 if len(q$)>80', source)
+        self.assertIn('+mid$(str$(len(q$)),2)+chr$(10)+q$', source)
+        self.assertIn('900 goto 40', source)
+        self.assertLess(max(map(len, source.splitlines())), 255)
 
     def test_text_contract_rejects_controls_and_bounds_reply(self):
         self.assertEqual(decode_prompt(b'  What is a SID?  '), 'What is a SID?')

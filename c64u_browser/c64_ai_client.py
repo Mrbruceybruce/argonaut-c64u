@@ -11,8 +11,7 @@ def _quoted(value):
     return '"' + value + '"'
 
 
-def render_link_probe(host, port, token):
-    """Return BASIC V2 source for one bounded end-to-end local AI question."""
+def _render_client(host, port, token, interactive):
     host = str(ipaddress.IPv4Address(host))
     if type(port) is not int or not 1024 <= port <= 65535:
         raise ValueError('Use a bridge port from 1024 to 65535.')
@@ -23,13 +22,23 @@ def render_link_probe(host, port, token):
     # PETCAT converts lowercase source letters to unshifted ASCII-range PETSCII.
     # Uppercase source letters use shifted codes above 127, unsuitable on TCP.
     question = 'say hello to bruce in five words.'
-    request = (_quoted('argonaut/1 ' + token.lower() + ' ' + str(len(question)))
-               + '+chr$(10)+' + _quoted(question))
+    if interactive:
+        request = (_quoted('argonaut/1 ' + token.lower() + ' ')
+                   + '+mid$(str$(len(q$)),2)+chr$(10)+q$')
+        title = 'argonaut local ai'
+        question_line = '40 input "ask argonaut (blank exits)";q$:if q$="" then end'
+        request_line = '45 if len(q$)>80 then print "question is too long":goto 40'
+    else:
+        request = (_quoted('argonaut/1 ' + token.lower() + ' ' + str(len(question)))
+                   + '+chr$(10)+' + _quoted(question))
+        title = 'argonaut local ai link probe'
+        question_line = f'40 q$={_quoted(question)}'
+        request_line = None
     lines = [
-        '10 print chr$(147);"argonaut local ai link probe"',
+        f'10 print chr$(147);{_quoted(title)}',
         f'20 c=57116:d=57117:r=57118:s=57119:h$={_quoted(host)}:p={port}',
         '30 i=peek(d):if i<>201 and i<>73 then print "command interface not found":end',
-        f'40 q$={_quoted(question)}',
+        question_line,
         '50 x$=' + request,
         '60 m$=chr$(3)+chr$(7)+chr$(p and 255)+chr$(int(p/256))+h$+chr$(0):gosub 5000',
         '70 if left$(s$,2)<>"00" or len(a$)<1 then print "could not open bridge":print s$:goto 900',
@@ -52,7 +61,7 @@ def render_link_probe(host, port, token):
         '140 gosub 7000',
         '145 next:print "bridge reply timed out":goto 800',
         '800 m$=chr$(3)+chr$(9)+chr$(k):gosub 5000',
-        '900 end',
+        '900 ' + ('goto 40' if interactive else 'end'),
         '5000 a$="":s$="":if (peek(c) and 48)<>0 then poke c,4',
         '5010 for j=1 to len(m$):poke d,asc(mid$(m$,j,1)):next:poke c,1:t=ti',
         '5020 v=peek(c):if (v and 48)>=32 then 5040',
@@ -66,4 +75,16 @@ def render_link_probe(host, port, token):
         '7010 if ti-t<15 then 7010',
         '7020 return',
     ]
+    if request_line is not None:
+        lines.insert(4, request_line)
     return '\n'.join(lines) + '\n'
+
+
+def render_link_probe(host, port, token):
+    """Return BASIC V2 source for one bounded end-to-end local AI question."""
+    return _render_client(host, port, token, False)
+
+
+def render_chat_client(host, port, token):
+    """Return BASIC V2 source for an interactive paired local AI prompt."""
+    return _render_client(host, port, token, True)
