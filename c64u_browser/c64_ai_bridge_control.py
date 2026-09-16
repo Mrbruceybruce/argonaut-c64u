@@ -18,6 +18,7 @@ from .c64_ai_bridge_config import (
 
 
 SERVICE = 'argonaut-c64-ai-bridge.service'
+HEALTH_TIMER = 'argonaut-c64-ai-health.timer'
 
 
 @dataclass(frozen=True)
@@ -32,10 +33,10 @@ class BridgeStatus:
     model_status: str = 'unchecked'
 
 
-def _systemctl(command, runner=subprocess.run):
+def _systemctl(command, runner=subprocess.run, unit=SERVICE, options=()):
     try:
         return runner(
-            ['systemctl', '--user', command, SERVICE], capture_output=True,
+            ['systemctl', '--user', command, *options, unit], capture_output=True,
             text=True, timeout=8, check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         raise BrowserError('The C64 AI bridge service could not be checked.') from exc
@@ -183,6 +184,7 @@ def setup_bridge(path, model, address, runner=subprocess.run,
         raise BrowserError('The private C64 AI bridge is already set up.')
     saved = False
     was_enabled = True
+    health_was_enabled = True
     try:
         address = str(ipaddress.IPv4Address(address))
         config = C64BridgeConfig(
@@ -194,7 +196,12 @@ def setup_bridge(path, model, address, runner=subprocess.run,
         was_enabled = _systemctl('is-enabled', runner).returncode == 0
         if _systemctl('enable', runner).returncode != 0:
             raise BrowserError('Automatic start could not be enabled for the C64 AI bridge.')
-        return activate_bridge(path, runner)
+        status = activate_bridge(path, runner)
+        health_was_enabled = (
+            _systemctl('is-enabled', runner, HEALTH_TIMER).returncode == 0)
+        if _systemctl('enable', runner, HEALTH_TIMER, ('--now',)).returncode != 0:
+            raise BrowserError('Automatic C64 AI health alerts could not be enabled.')
+        return status
     except Exception:
         if saved:
             try:
@@ -204,6 +211,11 @@ def setup_bridge(path, model, address, runner=subprocess.run,
             if not was_enabled:
                 try:
                     _systemctl('disable', runner)
+                except Exception:
+                    pass
+            if not health_was_enabled:
+                try:
+                    _systemctl('disable', runner, HEALTH_TIMER, ('--now',))
                 except Exception:
                     pass
             try:

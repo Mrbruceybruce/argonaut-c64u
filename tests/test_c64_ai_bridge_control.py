@@ -9,7 +9,7 @@ from c64u_browser.c64_ai_bridge_config import (
     C64BridgeConfig, load_bridge_config, save_bridge_config,
 )
 from c64u_browser.c64_ai_bridge_control import (
-    SERVICE, activate_bridge, bridge_status, local_bridge_host,
+    HEALTH_TIMER, SERVICE, activate_bridge, bridge_status, local_bridge_host,
     local_model_status, pair_bridge_address, setup_bridge,
 )
 
@@ -185,8 +185,10 @@ class C64AIBridgeControlTests(unittest.TestCase):
         commands = []
         def runner(args, **_kwargs):
             command = args[2]
-            commands.append(command)
-            if command == 'is-enabled' and commands.count('is-enabled') == 1:
+            commands.append((command, args[-1], tuple(args[3:-1])))
+            if command == 'is-enabled' and args[-1] == SERVICE:
+                return result(args, code=1, output='disabled\n')
+            if command == 'is-enabled' and args[-1] == HEALTH_TIMER:
                 return result(args, code=1, output='disabled\n')
             return result(args, output=('active\n' if command == 'is-active'
                                         else 'enabled\n'))
@@ -199,8 +201,14 @@ class C64AIBridgeControlTests(unittest.TestCase):
         self.assertEqual(stored.host, '192.0.2.1')
         self.assertEqual(stored.allowed_clients, ('192.0.2.10',))
         self.assertEqual(stored.token, ('AB' * 32))
-        self.assertEqual(commands[:4],
-                         ['daemon-reload', 'is-enabled', 'enable', 'restart'])
+        self.assertEqual(commands[:4], [
+            ('daemon-reload', 'daemon-reload', ()),
+            ('is-enabled', SERVICE, ()),
+            ('enable', SERVICE, ()),
+            ('restart', SERVICE, ()),
+        ])
+        self.assertIn(('is-enabled', HEALTH_TIMER, ()), commands)
+        self.assertIn(('enable', HEALTH_TIMER, ('--now',)), commands)
 
     def test_failed_setup_removes_new_private_setting(self):
         route = Mock()
@@ -212,6 +220,32 @@ class C64AIBridgeControlTests(unittest.TestCase):
                 self.path, 'gemma3:4b', '192.0.2.10', runner,
                 socket_factory, lambda _size: 'A' * 64)
         self.assertFalse(self.path.exists())
+
+    def test_failed_health_timer_enable_rolls_back_new_setup(self):
+        route = Mock()
+        route.getsockname.return_value = ('192.0.2.1', 40000)
+        commands = []
+
+        def runner(args, **_kwargs):
+            command, unit = args[2], args[-1]
+            commands.append((command, unit, tuple(args[3:-1])))
+            if command == 'is-active':
+                return result(args, output='active\n')
+            if command == 'is-enabled':
+                return result(args, code=1, output='disabled\n')
+            if command == 'enable' and unit == HEALTH_TIMER:
+                return result(args, code=1)
+            return result(args)
+
+        with self.assertRaisesRegex(
+                BrowserError, 'health alerts could not be enabled'):
+            setup_bridge(
+                self.path, 'gemma3:4b', '192.0.2.10', runner,
+                Mock(return_value=route), lambda _size: 'A' * 64)
+        self.assertFalse(self.path.exists())
+        self.assertIn(('stop', SERVICE, ()), commands)
+        self.assertIn(('disable', SERVICE, ()), commands)
+        self.assertIn(('disable', HEALTH_TIMER, ('--now',)), commands)
 
 
 if __name__ == '__main__':

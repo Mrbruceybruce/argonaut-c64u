@@ -138,3 +138,16 @@ after the local model service restarted, status returned to ready. A configured
 model absent from Ollama and a listener address absent from the computer's
 current interfaces are covered by deterministic fixtures and do not depend on
 model output.
+
+The Development package also includes a separate five-minute health monitor.
+Completing **Set up & install C64 AI** enables its per-user timer. The monitor
+uses ordinary code to check the bridge process, saved listener address, Ollama,
+and the exact downloaded model. It sends one desktop notification when the
+state changes to a problem and one when service recovers; an unchanged problem
+does not repeat alerts. If the desktop notification service is unavailable,
+the new state is not accepted and the alert is retried on the next check. Its
+mode-0600 private state file stores only the last deterministic state. Console
+output contains only that state, model readiness, and the number of paired
+addresses; it does not include the pairing token, C64U addresses or identities,
+or model-generated text. This monitor is independent of Test Lab verdicts and
+of the separate unattended failure-diagnosis setting.
