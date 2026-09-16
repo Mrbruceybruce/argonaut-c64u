@@ -1,4 +1,5 @@
 import http.client
+import os
 from pathlib import Path
 import socket
 import tempfile
@@ -29,7 +30,8 @@ class C64AIBridgeTests(unittest.TestCase):
             path = Path(folder) / 'bridge.json'
             save_bridge_config(path, config)
             self.assertEqual(load_bridge_config(path), config)
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
         with self.assertRaises(ValueError):
             save_bridge_config('/unused', C64BridgeConfig(
                 'gemma3:4b', '0.0.0.0', 6464, ('192.0.2.10',), 'C' * 64))

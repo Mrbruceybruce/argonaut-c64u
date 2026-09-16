@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -29,7 +30,8 @@ class C64AIHealthAlertTests(unittest.TestCase):
             self.assertIn('Ollama', notices[0][1])
             self.assertIn('recovered', notices[1][0])
             self.assertEqual(health.read_state(state), 'ready')
-            self.assertEqual(state.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':
+                self.assertEqual(state.stat().st_mode & 0o777, 0o600)
 
     def test_failed_notification_is_retried_without_advancing_state(self):
         with tempfile.TemporaryDirectory() as folder:

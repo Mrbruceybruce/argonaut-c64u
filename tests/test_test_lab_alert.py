@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -58,7 +59,8 @@ class TestLabAlertTests(unittest.TestCase):
             self.assertEqual(len(notices), 3)
             self.assertIn('recovered', notices[-1][0])
             self.assertEqual(json.loads(state.read_text())['failures'], [])
-            self.assertEqual(state.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':
+                self.assertEqual(state.stat().st_mode & 0o777, 0o600)
 
     def test_skipped_check_does_not_claim_recovery(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -115,7 +117,8 @@ class TestLabAlertTests(unittest.TestCase):
             adapter.assert_called_once()
             cache = state.parent / CACHE_NAME
             self.assertTrue(json.loads(cache.read_text())['notified'])
-            self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':
+                self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
             self.assertEqual(json.loads(state.read_text())['failures'],
                              [KEY + ':hardware.identity'])
 

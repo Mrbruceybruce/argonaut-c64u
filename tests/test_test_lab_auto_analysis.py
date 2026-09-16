@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -20,7 +21,8 @@ class LocalAISettingTests(unittest.TestCase):
             save_local_config(path, 'downloaded-model')
             self.assertEqual(load_local_config(path).provider, 'ollama')
             self.assertEqual(load_local_config(path).model, 'downloaded-model')
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             save_local_config(path)
             self.assertIsNone(load_local_config(path))
 
@@ -99,8 +101,9 @@ class LocalAISettingTests(unittest.TestCase):
             self.assertEqual(adapter.call_count, 2)
             archive = base / ARCHIVE_NAME
             self.assertEqual(len(list(archive.glob('*.json'))), 2)
-            self.assertTrue(all(item.stat().st_mode & 0o777 == 0o600
-                                for item in archive.glob('*.json')))
+            if os.name != 'nt':
+                self.assertTrue(all(item.stat().st_mode & 0o777 == 0o600
+                                    for item in archive.glob('*.json')))
 
     def test_private_diagnosis_history_is_bounded(self):
         with tempfile.TemporaryDirectory() as directory:

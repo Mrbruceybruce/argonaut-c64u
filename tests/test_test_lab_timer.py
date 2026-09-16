@@ -13,7 +13,7 @@ SPEC.loader.exec_module(timer_module)
 class TestLabTimerTests(unittest.TestCase):
     def test_render_runs_read_only_fleet_and_separates_failed_verdict(self):
         with tempfile.TemporaryDirectory(prefix='Argonaut Test Lab ') as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             service, timer = timer_module.render(root, '/usr/bin/python3',
                                                  root / 'config.json')
         self.assertIn(f'WorkingDirectory={root}', service)
