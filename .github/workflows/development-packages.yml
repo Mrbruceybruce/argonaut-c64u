@@ -1,6 +1,12 @@
 name: Development Windows and Mac packages
 'on':
-  workflow_dispatch: null
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified packages as the v1.5-ai.1 prerelease
+        required: true
+        default: false
+        type: boolean
 permissions:
   contents: read
 jobs:
@@ -140,6 +146,7 @@ jobs:
           arch: x86_64
           label: Intel
   publish:
+    if: ${{ inputs.publish }}
     needs:
     - source
     - windows
