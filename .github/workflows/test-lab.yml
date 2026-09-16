@@ -25,7 +25,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Keep the Test Lab report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-lab-report
           path: test-lab-report.json
