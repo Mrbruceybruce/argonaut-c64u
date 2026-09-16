@@ -11,6 +11,7 @@ import tempfile
 import uuid
 from .api import BrowserError, safe_argument
 from .storage import storage_root
+from .diagnostics import operation_event
 
 
 class UploadFailure(BrowserError):
@@ -39,6 +40,11 @@ def connect(client):
 
 
 def download(client, source, destination, progress=lambda n: None):
+    with operation_event('ftp', 'download', 'file'):
+        return _download(client, source, destination, progress)
+
+
+def _download(client, source, destination, progress):
     check = getattr(progress, 'check', lambda:None)
     check()
     remote_file(source)
@@ -83,6 +89,11 @@ def download(client, source, destination, progress=lambda n: None):
 
 def upload_new_folder(client, source, parent='/USB2', progress=lambda n: None):
     """Never upload into an existing folder; leave uncertain results for inspection."""
+    with operation_event('ftp', 'upload_new_folder', 'file'):
+        return _upload_new_folder(client, source, parent, progress)
+
+
+def _upload_new_folder(client, source, parent, progress):
     remote_file(parent + '/placeholder')
     source = Path(source)
     safe_argument(source.name)
@@ -121,6 +132,11 @@ def upload_new_folder(client, source, parent='/USB2', progress=lambda n: None):
 
 def upload(client, source, parent='/USB2', progress=lambda n: None):
     """Stage and verify a file, then rename into the requested directory."""
+    with operation_event('ftp', 'upload', 'file'):
+        return _upload(client, source, parent, progress)
+
+
+def _upload(client, source, parent, progress):
     check = getattr(progress, 'check', lambda:None)
     from .files import child, inspect
     source = Path(source)

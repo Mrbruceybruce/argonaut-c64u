@@ -10,7 +10,7 @@ import urllib.error
 from urllib.parse import quote, urlencode
 import socket
 import ipaddress
-from .diagnostics import operation_event
+from .diagnostics import operation_event, rest_target
 
 class BrowserError(Exception):
     pass
@@ -150,8 +150,8 @@ class UltimateClient:
         return self._request_json('GET', path)
 
     def _request_json(self, method, path, payload=None):
-        # Query strings can contain filenames and other private values.
-        with operation_event('rest', method, path.split('?', 1)[0]):
+        # Query values and dynamic route segments can contain private names.
+        with operation_event('rest', method, rest_target(path)):
             return self._request_json_impl(method, path, payload)
 
     def _request_json_impl(self, method, path, payload=None):

@@ -6,6 +6,7 @@ import time
 import urllib.request
 from .api import BrowserError, NoRedirect
 from .disk_run import receive_exact
+from .diagnostics import operation_event
 
 
 def encode_text(text, enter=False):
@@ -22,6 +23,11 @@ def encode_text(text, enter=False):
 
 
 def buffer_count(client):
+    with operation_event('rest', 'GET', '/v1/machine:readmem'):
+        return _buffer_count(client)
+
+
+def _buffer_count(client):
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
     request=urllib.request.Request(f'http://{client.host}:{client.http_port}/v1/machine:readmem?address=00C6&length=1',
         headers={'X-Password':client.password,'Accept':'application/octet-stream'})
@@ -41,6 +47,11 @@ def wait_empty(client):
 
 
 def send_text(client, text, enter=False):
+    with operation_event('dma', 'send_text', 'keyboard'):
+        return _send_text(client, text, enter)
+
+
+def _send_text(client, text, enter=False):
     data=encode_text(text,enter)
     queued=0
     try:

@@ -105,7 +105,12 @@ history, comparisons, and optional AI failure explanations. The switch is off
 by default and is cleared when Argonaut closes.
 
 Each check has a stable ID, a title, a pass/fail/skip result, an error category,
-timing, and structured C64U operation events captured while it ran. Assertions
+timing, and structured C64U operation events captured while it ran. REST calls,
+FTP directory browsing, uploads, downloads, Flash reads and writes, file
+actions, replacement, and DMA actions emit the same
+event format. REST targets use recognized route labels; dynamic configuration
+segments and URL query values are redacted. FTP file and entry targets are
+generic labels. Assertions
 and exceptions determine the result. Exception messages, credentials, request
 bodies, URL query values, and device file paths are excluded from reports.
 The runner rejects missing, invalid, or duplicate check IDs before running any
@@ -138,8 +143,10 @@ last verified result** let you inspect the deterministic check details for a
 chosen C64U, including reports written by the unattended Linux service.
 
 The AI analysis boundary extracts only failed checks and a small whitelist of
-sanitized operation fields. The AI Gateway supports local Ollama chat and the
-OpenAI Responses API; each returns a diagnosis as a separate object. This object
+sanitized operation fields. It rechecks route, operation, target, outcome, and
+error labels before sending evidence to a model. The AI Gateway supports local
+Ollama chat and the OpenAI Responses API; each returns a diagnosis as a separate
+object. This object
 cannot change the saved report, its code-determined verdicts, or the run
 comparison. Model responses are bounded and treated as suggestions.
 

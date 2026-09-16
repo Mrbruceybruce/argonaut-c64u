@@ -10,6 +10,7 @@ from .api import BrowserError,safe_argument
 from .transfers import connect
 from .backups import allowed
 from .storage import storage_root
+from .diagnostics import operation_event
 
 FLASH_FOLDERS={'ROMs':'/Flash/roms','Cartridges':'/Flash/carts','Configurations':'/Flash/configs'}
 MAX_BYTES=16*1024*1024
@@ -22,6 +23,10 @@ def flash_path(folder,name):
  return folder+'/'+name
 
 def read_remote(client,path):
+ with operation_event('ftp','read_remote','file'):
+  return _read_remote(client,path)
+
+def _read_remote(client,path):
  safe_argument(path)
  if not ((storage_root(path) and storage_root(path)!=path) or any(path.startswith(folder+'/') for folder in FLASH_FOLDERS.values())) or any(p in ('','.','..') for p in path.split('/')[1:]):raise BrowserError('Choose a USB/SD or supported Flash file.')
  ftp=connect(client)
@@ -95,6 +100,10 @@ def validate_upload(folder,name,data):
  if not folder.endswith('/configs') and len(name.encode('utf-8'))>30:raise BrowserError('Use a ROM or cartridge filename of at most 30 bytes.')
 
 def upload_flash(client,folder,name,data):
+ with operation_event('ftp','upload_flash','file'):
+  return _upload_flash(client,folder,name,data)
+
+def _upload_flash(client,folder,name,data):
  validate_upload(folder,name,data)
  destination=flash_path(folder,name)
  temporary=flash_path(folder,'argonaut-part-'+uuid.uuid4().hex)

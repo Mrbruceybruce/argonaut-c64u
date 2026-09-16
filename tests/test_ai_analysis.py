@@ -34,6 +34,25 @@ class AnalysisBoundaryTests(unittest.TestCase):
         self.assertEqual(report['checks'][0]['status'], 'fail')
         adapter.assert_called_once()
 
+    def test_unexpected_operation_labels_cannot_reach_ai_evidence(self):
+        report = {'schema': 1, 'status': 'fail', 'checks': [
+            {'id': 'bad', 'title': 'Bad', 'status': 'fail', 'error_kind': 'network',
+             'operations': [
+                 {'transport': 'rest', 'operation': 'GET',
+                  'target': '/v1/configs/private-category/*?password=secret',
+                  'outcome': 'error', 'error_kind': 'network'},
+                 {'transport': 'ftp', 'operation': 'RETR /USB2/private-file',
+                  'target': '/USB2/private-file', 'outcome': 'error',
+                  'error_kind': 'ftp'},
+             ]}]}
+        evidence = failure_evidence(report)
+        operations = evidence['failures'][0]['operations']
+        self.assertEqual(operations[0]['target'], '/v1/configs/category')
+        self.assertEqual((operations[1]['operation'], operations[1]['target']),
+                         ('other', 'other'))
+        self.assertNotIn('private', json.dumps(evidence))
+        self.assertNotIn('secret', json.dumps(evidence))
+
     def test_passing_report_does_not_call_adapter(self):
         adapter = Mock()
         result = analyze_failures({'schema': 1, 'status': 'pass', 'checks': []}, adapter)

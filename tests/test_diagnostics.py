@@ -1,11 +1,17 @@
 import io
 import json
 import logging
+from pathlib import Path
+import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
-from c64u_browser.api import ConnectionFailure, UltimateClient
+from c64u_browser.api import ConnectionFailure, Entry, UltimateClient, BrowserError
 from c64u_browser.diagnostics import LOGGER, JsonEventFormatter
+from c64u_browser.transfers import download, upload
+from c64u_browser.files import operate
+from c64u_browser.native_files import read_remote
+from c64u_browser.disk_run import mount_and_run
 
 
 class DiagnosticEventsTest(unittest.TestCase):
@@ -45,12 +51,86 @@ class DiagnosticEventsTest(unittest.TestCase):
         self.assertEqual((self.event()['outcome'], self.event()['error_kind']),
                          ('error', 'network'))
 
+    def test_rest_dynamic_route_segment_is_redacted(self):
+        client = UltimateClient('c64u.local')
+        with patch.object(client, '_request_json_impl', return_value={'errors': []}):
+            client.read_configuration('private-category')
+        self.assertEqual(self.event()['target'], '/v1/configs/category')
+        self.assertNotIn('private-category', self.stream.getvalue())
+
     def test_ftp_listing_does_not_record_private_path(self):
         client = UltimateClient('c64u.local')
         with patch.object(client, '_list_directory', return_value=('/', [])):
             client.list_directory('/private/files')
         self.assertEqual(self.event()['target'], 'directory')
         self.assertNotIn('/private/files', self.stream.getvalue())
+
+    def test_ftp_download_event_redacts_file_paths_and_preserves_failure(self):
+        with tempfile.TemporaryDirectory() as directory, patch(
+                'c64u_browser.transfers.connect') as connect:
+            destination = Path(directory) / 'private-download.bin'
+            ftp = connect.return_value
+            ftp.size.return_value = 3
+            ftp.retrbinary.side_effect = lambda _command, callback: callback(b'abc')
+            download(Mock(), '/USB2/private-device.bin', destination)
+            event = self.event()
+            self.assertEqual((event['operation'], event['target'], event['outcome']),
+                             ('download', 'file', 'ok'))
+            self.assertNotIn('private-device.bin', self.stream.getvalue())
+            self.assertNotIn('private-download.bin', self.stream.getvalue())
+            self.stream.seek(0)
+            self.stream.truncate()
+            ftp.retrbinary.side_effect = OSError('private connection detail')
+            with self.assertRaises(BrowserError):
+                download(Mock(), '/USB2/private-device.bin', destination.with_name('retry.bin'))
+            self.assertEqual((self.event()['outcome'], self.event()['error_kind']),
+                             ('error', 'BrowserError'))
+            self.assertNotIn('private connection detail', self.stream.getvalue())
+
+    def test_ftp_upload_and_file_action_events_use_generic_targets(self):
+        with tempfile.TemporaryDirectory() as directory, patch(
+                'c64u_browser.transfers.connect') as connect, patch(
+                'c64u_browser.files.inspect', return_value=None):
+            source = Path(directory) / 'private-upload.bin'
+            source.write_bytes(b'abc')
+            ftp = connect.return_value
+            ftp.storbinary.side_effect = lambda _command, stream, callback: callback(stream.read())
+            ftp.retrbinary.side_effect = lambda _command, callback: callback(b'abc')
+            ftp.size.return_value = 3
+            upload(Mock(), source, '/USB2/Private')
+        self.assertEqual((self.event()['operation'], self.event()['target']),
+                         ('upload', 'file'))
+        self.assertNotIn('private-upload.bin', self.stream.getvalue())
+        self.stream.seek(0)
+        self.stream.truncate()
+        with patch('c64u_browser.files.inspect', return_value=Entry('private.bin', 'file', 3)), patch(
+                'c64u_browser.files.connect') as connect:
+            operate(Mock(), 'delete', '/USB2/private.bin',
+                    confirmation='/USB2/private.bin')
+            connect.return_value.delete.assert_called_once()
+        self.assertEqual((self.event()['operation'], self.event()['target']),
+                         ('file_delete', 'entry'))
+        self.assertNotIn('private.bin', self.stream.getvalue())
+
+    def test_flash_or_storage_read_and_dma_run_do_not_log_paths_or_password(self):
+        client = UltimateClient('c64u.local', password='private-password')
+        with patch('c64u_browser.native_files.connect') as connect:
+            ftp = connect.return_value
+            ftp.size.return_value = 3
+            ftp.retrbinary.side_effect = lambda _command, callback: callback(b'abc')
+            self.assertEqual(read_remote(client, '/Flash/roms/private.rom'), b'abc')
+        self.assertEqual((self.event()['transport'], self.event()['target']),
+                         ('ftp', 'file'))
+        self.assertNotIn('private.rom', self.stream.getvalue())
+        self.stream.seek(0)
+        self.stream.truncate()
+        with self.assertRaises(BrowserError):
+            mount_and_run(client, '/USB2/private-image.d81')
+        self.assertEqual((self.event()['transport'], self.event()['operation'],
+                          self.event()['target'], self.event()['outcome']),
+                         ('dma', 'mount_and_run', 'disk', 'error'))
+        self.assertNotIn('private-image.d81', self.stream.getvalue())
+        self.assertNotIn('private-password', self.stream.getvalue())
 
 
 if __name__ == '__main__':

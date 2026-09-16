@@ -11,6 +11,7 @@ from .api import BrowserError
 from .files import inspect, operate, child
 from .transfers import connect
 from .file_copy import copy_files
+from .diagnostics import operation_event
 
 def signature(client,local,path):
  if local:
@@ -22,6 +23,10 @@ def signature(client,local,path):
  return (e.name,e.size)
 
 def replace_file(client,step,source_local,local,progress):
+ with operation_event('local' if local else 'ftp','replace_file','file'):
+  return _replace_file(client,step,source_local,local,progress)
+
+def _replace_file(client,step,source_local,local,progress):
  check=getattr(progress,'check',lambda:None)
  check()
  if signature(client,local,step.destination)!=step.signature:raise BrowserError('Replacement target changed since review.')
