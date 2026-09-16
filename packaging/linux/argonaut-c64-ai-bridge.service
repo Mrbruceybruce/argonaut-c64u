@@ -1,0 +1,13 @@
+[Unit]
+Description=Argonaut paired C64 local AI bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@BRIDGE_EXECUTABLE@
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

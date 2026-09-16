@@ -298,6 +298,8 @@ class Browser(Gtk.Application):
         else:
             text = 'Disconnected' + (f' · Selected: {selected.name}' if selected else ' · No device selected')
         self.connection_label.set_text(text)
+        if hasattr(self, 'test_lab_tab'):
+            self.test_lab_tab.connection_changed()
 
     def activate_connection(self, profile, client, info, listing):
         self.offline_message=None

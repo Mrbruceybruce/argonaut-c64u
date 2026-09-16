@@ -20,8 +20,9 @@ from .ai_presentation import readable_diagnosis
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .c64_ai_launch import launch_c64_ai
 from .c64_ai_bridge_control import (
-    activate_bridge, bridge_status, pair_bridge_address,
+    activate_bridge, bridge_status, setup_bridge,
 )
+from .c64_ai_install import install_and_pair_c64_ai
 from .test_lab_history import run_with_history
 from .test_lab_presentation import (
     check_details, comparison_changes, comparison_summary, summary,
@@ -108,11 +109,12 @@ class TestLabTab:
         self.activate_bridge_button = app.button(
             bridge_row, 'Restart bridge', self.activate_bridge)
         self.pair_bridge_button = app.button(
-            bridge_row, 'Pair connected C64U', self.pair_connected_c64)
+            bridge_row, 'Install & pair C64U', self.pair_connected_c64)
         self.pair_bridge_button.set_tooltip_text(
-            'Add the connected identity-bound C64U address without changing the private token.')
+            'Verify the connected C64U, install its matching USB2 client, and pair its fixed address.')
         self.bridge_path = self.app.preferences.path.parent / 'test-lab' / 'c64-ai-bridge.json'
         self.bridge_loaded = False
+        self.bridge_state = 'unknown'
         self.schedule_check = Gtk.CheckButton(label='Run C64U checks every 30 minutes while connected')
         self.schedule_check.connect('toggled', self.schedule_toggled)
         self.box.append(self.schedule_check)
@@ -199,15 +201,25 @@ class TestLabTab:
 
     def show_bridge_status(self, status):
         self.bridge_loaded = True
+        self.bridge_state = status.state
         self.bridge_status.set_text(status.message)
         addresses = ', '.join(status.allowed_clients) or 'No paired addresses'
         self.bridge_status.set_tooltip_text('Paired addresses: ' + addresses)
-        self.pair_bridge_button.set_sensitive(
-            status.state in ('ready', 'stopped'))
+        self.pair_bridge_button.set_label(
+            'Set up & install C64 AI' if status.state == 'setup'
+            else 'Install & pair C64U')
+        self.connection_changed()
         self.activate_bridge_button.set_label(
             'Start bridge' if status.state == 'stopped' else 'Restart bridge')
         self.activate_bridge_button.set_sensitive(
             status.state in ('ready', 'stopped'))
+
+    def connection_changed(self):
+        connected = (self.app.client is not None
+                     and not getattr(self.app, 'offline_message', None)
+                     and self.app.active_profile is not None)
+        self.pair_bridge_button.set_sensitive(
+            connected and self.bridge_state in ('ready', 'stopped', 'setup'))
 
     def refresh_bridge_status(self):
         if self.app.busy:
@@ -229,16 +241,24 @@ class TestLabTab:
     def pair_connected_c64(self):
         client = None if getattr(self.app, 'offline_message', None) else self.app.client
         profile = self.app.active_profile if client is not None else None
+        model = (self.unattended_model.get_text().strip()
+                 or self.model.get_text().strip() or 'gemma3:4b')
 
         def task():
             if client is None or profile is None:
                 raise BrowserError('Connect an identity-bound C64U before pairing it.')
             profile.verify_identity(client.test_connection(), require_bound=True)
-            return pair_bridge_address(self.bridge_path, profile.host)
+            if not self.bridge_path.exists():
+                setup_bridge(self.bridge_path, model, profile.host)
+            return install_and_pair_c64_ai(
+                client, self.bridge_path, profile.host)
 
-        def done(status):
-            self.show_bridge_status(status)
-            self.app.status.set_text('The connected C64U address is paired with the local AI bridge.')
+        def done(result):
+            self.show_bridge_status(result.bridge)
+            action = ('installed and paired' if result.client.installed
+                      else 'verified and paired')
+            self.app.status.set_text(
+                f'The C64 AI client was {action}; the local bridge is ready.')
 
         self.app.run(task, done)
 

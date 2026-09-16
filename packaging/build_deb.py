@@ -21,6 +21,13 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
  write(f'usr/lib/{app_name}/c64u_browser/_build.json',json.dumps(build))
  write(f'usr/bin/{app_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/launch.py "$@"\n',0o755)
  write(f'usr/lib/{app_name}/launch.py', ('import os\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\n' if args.development else '')+f'import sys\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.gui import main\nmain()\n')
+ if args.development:
+  bridge_name=app_name+'-ai-bridge'
+  write(f'usr/bin/{bridge_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/bridge.py "$@"\n',0o755)
+  write(f'usr/lib/{app_name}/bridge.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.c64_ai_bridge_cli import main\nraise SystemExit(main())\n')
+  unit=(source/'packaging/linux/argonaut-c64-ai-bridge.service').read_text()
+  unit=unit.replace('@BRIDGE_EXECUTABLE@','/usr/bin/'+bridge_name)
+  write('usr/lib/systemd/user/argonaut-c64-ai-bridge.service',unit)
  desktop=(assets/'desktop/argonaut.desktop').read_text().replace('Exec=argonaut','Exec='+app_name).replace('Icon=argonaut','Icon='+app_name)
  if args.development:desktop=desktop.replace('Name=Argonaut','Name=Argonaut Development '+version.replace('~','-'))
  write(f'usr/share/applications/{app_name}.desktop',desktop)
@@ -42,6 +49,7 @@ Maintainer: Bruce Marcus <argonaut@localhost>
 Installed-Size: {size}
 Depends: python3 (>= 3.11), python3-gi, gir1.2-gtk-4.0 (>= 4.8), gir1.2-secret-1, gir1.2-gstreamer-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, iproute2, adwaita-icon-theme
 Recommends: gnome-keyring
+Suggests: ollama
 Description: GTK desktop controller and file manager for C64 Ultimate
  Manage connection profiles, USB and SD files, settings, ROMs,
  configuration backups, screen preview, screenshots and recordings.

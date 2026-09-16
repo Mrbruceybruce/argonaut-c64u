@@ -4,10 +4,14 @@
 from dataclasses import dataclass, replace
 import ipaddress
 from pathlib import Path
+import secrets
+import socket
 import subprocess
 
 from .api import BrowserError
-from .c64_ai_bridge_config import load_bridge_config, save_bridge_config
+from .c64_ai_bridge_config import (
+    C64BridgeConfig, load_bridge_config, save_bridge_config,
+)
 
 
 SERVICE = 'argonaut-c64-ai-bridge.service'
@@ -31,6 +35,15 @@ def _systemctl(command, runner=subprocess.run):
             text=True, timeout=8, check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         raise BrowserError('The C64 AI bridge service could not be checked.') from exc
+
+
+def _reload_user_services(runner=subprocess.run):
+    try:
+        return runner(
+            ['systemctl', '--user', 'daemon-reload'], capture_output=True,
+            text=True, timeout=8, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise BrowserError('The background service list could not be refreshed.') from exc
 
 
 def bridge_status(path, runner=subprocess.run):
@@ -73,11 +86,68 @@ def activate_bridge(path, runner=subprocess.run):
         raise BrowserError('The private C64 AI bridge setting could not be read.') from exc
     restarted = _systemctl('restart', runner)
     if restarted.returncode != 0:
-        raise BrowserError('The C64 AI bridge could not be started.')
+        _reload_user_services(runner)
+        restarted = _systemctl('restart', runner)
+        if restarted.returncode != 0:
+            raise BrowserError('The C64 AI bridge could not be started.')
     status = bridge_status(path, runner)
     if status.state != 'ready':
         raise BrowserError('The C64 AI bridge did not become ready.')
     return status
+
+
+def local_bridge_host(address, socket_factory=socket.socket):
+    try:
+        address = str(ipaddress.IPv4Address(address))
+        probe = socket_factory(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            probe.connect((address, 9))
+            host = str(ipaddress.IPv4Address(probe.getsockname()[0]))
+        finally:
+            probe.close()
+    except (OSError, ValueError) as exc:
+        raise BrowserError(
+            'Argonaut could not determine this computer’s address for the C64U.') from exc
+    if ipaddress.IPv4Address(host).is_loopback:
+        raise BrowserError('The C64U cannot reach the local AI bridge address.')
+    return host
+
+
+def setup_bridge(path, model, address, runner=subprocess.run,
+                 socket_factory=socket.socket, token_factory=secrets.token_hex):
+    path = Path(path)
+    if path.exists():
+        raise BrowserError('The private C64 AI bridge is already set up.')
+    saved = False
+    was_enabled = True
+    try:
+        address = str(ipaddress.IPv4Address(address))
+        config = C64BridgeConfig(
+            model, local_bridge_host(address, socket_factory), 6464,
+            (address,), token_factory(32).upper())
+        save_bridge_config(path, config)
+        saved = True
+        _reload_user_services(runner)
+        was_enabled = _systemctl('is-enabled', runner).returncode == 0
+        if _systemctl('enable', runner).returncode != 0:
+            raise BrowserError('Automatic start could not be enabled for the C64 AI bridge.')
+        return activate_bridge(path, runner)
+    except Exception:
+        if saved:
+            try:
+                _systemctl('stop', runner)
+            except Exception:
+                pass
+            if not was_enabled:
+                try:
+                    _systemctl('disable', runner)
+                except Exception:
+                    pass
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
 
 
 def pair_bridge_address(path, address, runner=subprocess.run):

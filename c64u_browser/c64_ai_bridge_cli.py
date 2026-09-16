@@ -6,11 +6,18 @@ import argparse
 from .c64_ai_bridge_config import load_bridge_config
 from .c64_ai_chat import C64ChatGateway
 from .c64_ai_service import paired_c64_server
+from .platform_support import config_base
+from . import development
+
+
+def default_config_path():
+    app = 'argonaut-development' if development.enabled() else 'argonaut'
+    return config_base() / app / 'test-lab' / 'c64-ai-bridge.json'
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Argonaut paired C64 AI bridge')
-    parser.add_argument('--config', required=True)
+    parser.add_argument('--config', default=default_config_path())
     args = parser.parse_args(argv)
     config = load_bridge_config(args.config)
     server = paired_c64_server(

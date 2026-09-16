@@ -120,5 +120,7 @@ class PreferencesUI(unittest.TestCase):
         self.app.tabs.set_current_page(6);self.pump()
         self.assertIn('Setup needed',tab.bridge_status.get_text())
         self.assertNotIn('token',tab.bridge_status.get_text().casefold())
+        self.assertEqual(tab.pair_bridge_button.get_label(),
+                         'Set up & install C64 AI')
         self.assertFalse(tab.activate_bridge_button.get_sensitive())
         self.assertFalse(tab.pair_bridge_button.get_sensitive())

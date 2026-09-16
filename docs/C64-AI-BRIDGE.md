@@ -16,8 +16,8 @@ local Ollama only; the current bridge has no cloud selection or device actions.
 
 The LAN listener binds one explicit address, requires a private token, and
 accepts only the known addresses of the selected C64U. Supporting both its
-Ethernet and Wi-Fi addresses does not pair another device. A simple way to
-start and stop the bridge is still required. The listener never exposes Ollama
+Ethernet and Wi-Fi addresses does not pair another device. Test Lab reports,
+starts, and restarts the managed bridge. The listener never exposes Ollama
 itself.
 
 For the C64 program, use the Ultimate Command Interface (UCI) Network target
@@ -100,3 +100,18 @@ bridge** provide recovery without a terminal. **Pair connected C64U** first
 re-verifies the active profile against the live device, then adds only that
 fixed IPv4 address while preserving the existing token. A failed restart
 restores the prior private pairing file and restarts the previous bridge.
+
+**Install & pair C64U** generates the private interactive client with
+Argonaut's built-in Commodore BASIC V2 tokenizer. Its output is byte-identical
+to the hardware-tested `petcat` build, so no emulator or external tokenizer is
+required. If `/USB2/argonaut-ai.prg` exists, Argonaut downloads it and requires
+an exact match; it never overwrites a different file. An absent client is
+uploaded through the existing staged, checksum-verified transfer path.
+
+On a fresh Debian Development installation, **Set up & install C64 AI** derives
+the computer address used to reach the connected identity-bound C64U, creates a
+private random token, starts the packaged per-user bridge service, installs the
+matching C64 program, and leaves the bridge ready. The development Debian
+package supplies the bridge launcher and systemd user unit. Ollama, the chosen
+downloaded model, and a narrow TCP 6464 firewall allowance remain explicit
+computer prerequisites; installation does not silently alter them.
