@@ -97,6 +97,13 @@ the user's systemd manager is active; it does not enable login lingering.
 Stopping and disabling `argonaut-test-lab-fleet.timer` ends unattended runs
 without deleting saved reports.
 
+The Development Debian package includes this fleet service and timer with a
+package-local launcher. Test Lab shows its state separately as **Background
+C64U checks**. **Enable checks** starts the persistent 30-minute schedule, and
+**Stop checks** disables it without deleting reports or AI diagnoses. The
+nearby **Run C64U checks every 30 minutes while this window is open** switch is
+the temporary in-app schedule; its label deliberately distinguishes the two.
+
 In the Development Test Lab tab, **Explain unattended C64U failures with local
 AI** can be enabled with the name of a downloaded Ollama model. **Save local AI
 setting** writes a private local-only setting; the existing user timer reads it

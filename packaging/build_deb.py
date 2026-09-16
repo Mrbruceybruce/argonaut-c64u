@@ -36,6 +36,14 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
   write('usr/lib/systemd/user/argonaut-c64-ai-health.service',health)
   write('usr/lib/systemd/user/argonaut-c64-ai-health.timer',
         (source/'packaging/linux/argonaut-c64-ai-health.timer').read_text())
+  alert_name=app_name+'-test-lab-alert'
+  write(f'usr/bin/{alert_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/alert.py "$@"\n',0o755)
+  write(f'usr/lib/{app_name}/alert.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.test_lab_alert import main\nraise SystemExit(main())\n')
+  fleet=(source/'packaging/linux/argonaut-test-lab-fleet.service').read_text()
+  fleet=fleet.replace('@ALERT_EXECUTABLE@','/usr/bin/'+alert_name)
+  write('usr/lib/systemd/user/argonaut-test-lab-fleet.service',fleet)
+  write('usr/lib/systemd/user/argonaut-test-lab-fleet.timer',
+        (source/'packaging/linux/argonaut-test-lab-fleet.timer').read_text())
  desktop=(assets/'desktop/argonaut.desktop').read_text().replace('Exec=argonaut','Exec='+app_name).replace('Icon=argonaut','Icon='+app_name)
  if args.development:desktop=desktop.replace('Name=Argonaut','Name=Argonaut Development '+version.replace('~','-'))
  write(f'usr/share/applications/{app_name}.desktop',desktop)

@@ -37,6 +37,8 @@ from .test_lab_auto_analysis import (
     CACHE_NAME, CONFIG_NAME, load_local_config, save_local_config,
     saved_diagnosis,
 )
+from .test_lab_background import set_enabled as set_background_enabled
+from .test_lab_background import status as background_status
 
 
 class TestLabTab:
@@ -124,7 +126,17 @@ class TestLabTab:
         health_row.append(self.health_status)
         self.health_button = app.button(
             health_row, 'Enable alerts', self.enable_health_alerts)
-        self.schedule_check = Gtk.CheckButton(label='Run C64U checks every 30 minutes while connected')
+        background_row = Gtk.Box(spacing=8)
+        self.box.append(background_row)
+        background_row.append(Gtk.Label(label='Background C64U checks:', xalign=0))
+        self.background_status = Gtk.Label(
+            label='Checking…', xalign=0, hexpand=True, wrap=True)
+        background_row.append(self.background_status)
+        self.background_button = app.button(
+            background_row, 'Enable checks', self.toggle_background_checks)
+        self.background_state = 'unknown'
+        self.schedule_check = Gtk.CheckButton(
+            label='Run C64U checks every 30 minutes while this window is open')
         self.schedule_check.connect('toggled', self.schedule_toggled)
         self.box.append(self.schedule_check)
         self.summary = Gtk.Label(label='No run yet.', xalign=0, wrap=True)
@@ -229,6 +241,13 @@ class TestLabTab:
         self.health_status.set_text(status.message)
         self.health_button.set_sensitive(status.state != 'ready')
 
+    def show_background_status(self, status):
+        self.background_state = status.state
+        self.background_status.set_text(status.message)
+        self.background_button.set_label(
+            'Stop checks' if status.state == 'ready' else 'Enable checks')
+        self.background_button.set_sensitive(status.state != 'unavailable')
+
     def connection_changed(self):
         connected = (self.app.client is not None
                      and not getattr(self.app, 'offline_message', None)
@@ -242,14 +261,16 @@ class TestLabTab:
             return
         self.bridge_status.set_text('Checking local bridge…')
         self.health_status.set_text('Checking…')
+        self.background_status.set_text('Checking…')
         def done(statuses):
             self.show_bridge_status(statuses[0])
             self.show_health_status(statuses[1])
-            self.app.status.set_text('C64 AI bridge and health alerts refreshed.')
+            self.show_background_status(statuses[2])
+            self.app.status.set_text('Test Lab automation status refreshed.')
 
         self.app.run(
             lambda: (bridge_status(self.bridge_path, check_model=True),
-                     health_monitor_status()), done)
+                     health_monitor_status(), background_status()), done)
 
     def enable_health_alerts(self):
         self.health_status.set_text('Enabling automatic health alerts…')
@@ -257,6 +278,18 @@ class TestLabTab:
             self.show_health_status(status)
             self.app.status.set_text('Automatic C64 AI health alerts are on.')
         self.app.run(enable_health_monitor, done)
+
+    def toggle_background_checks(self):
+        enable = self.background_state != 'ready'
+        self.background_status.set_text(
+            'Enabling background checks…' if enable else
+            'Stopping background checks…')
+        def done(status):
+            self.show_background_status(status)
+            self.app.status.set_text(
+                'Background C64U checks are on.' if enable else
+                'Background C64U checks are off.')
+        self.app.run(lambda: set_background_enabled(enable), done)
 
     def activate_bridge(self):
         def done(status):
