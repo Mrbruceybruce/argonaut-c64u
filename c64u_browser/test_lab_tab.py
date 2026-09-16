@@ -103,6 +103,8 @@ class TestLabTab:
             placeholder_text='Downloaded Ollama model', hexpand=True)
         if local_config is not None:
             self.unattended_model.set_text(local_config.model)
+            if not self.model.get_text():
+                self.model.set_text(local_config.model)
         local_row.append(self.unattended_model)
         app.button(local_row, 'Save local AI setting', self.save_unattended_ai)
         self.unattended_status = Gtk.Label(label=local_config_error,

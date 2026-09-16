@@ -97,9 +97,12 @@ runs never call a model.
 A new or changed saved failure can add a short local diagnosis preview to its
 desktop alert. The bounded full diagnosis is kept separately in a private
 `latest-local-ai.json` file under Development's Test Lab settings. Opening the
-matching saved result in the Development Test Lab shows the full diagnosis; it
-never changes the saved test report or fleet exit code. Identical sanitized failure
-evidence reuses that diagnosis instead of calling the model repeatedly. If
+matching saved result in the Development Test Lab shows the full diagnosis. Up
+to 20 private diagnoses are also retained in `local-ai-diagnoses`, so an
+older saved failure can still show its explanation and a recurring failure can
+reuse it without another model call. The diagnosis never changes the saved test
+report or fleet exit code. Identical sanitized failure evidence reuses that
+diagnosis instead of calling the model repeatedly. If
 Ollama is unavailable, Argonaut shows the ordinary failure alert and retries
 diagnosis on the next failed run. When a retry succeeds, it sends one local
 diagnosis-ready alert. Saving the switch off in the Development Test Lab tab

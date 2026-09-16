@@ -6,8 +6,8 @@ from unittest.mock import Mock
 
 from c64u_browser.ai_gateway import GatewayError
 from c64u_browser.test_lab_auto_analysis import (
-    Diagnosis, alert_excerpt, diagnose_saved_fleet, load_local_config,
-    save_local_config, saved_diagnosis,
+    ARCHIVE_NAME, Diagnosis, _save_cache, alert_excerpt, diagnose_saved_fleet,
+    load_local_config, mark_notified, save_local_config, saved_diagnosis,
 )
 from c64u_browser.test_lab_history import profile_scope_key
 
@@ -62,6 +62,58 @@ class LocalAISettingTests(unittest.TestCase):
             diagnose_saved_fleet(json.dumps(fleet), config, cache,
                                  gateway_factory=lambda _: adapter)
             self.assertEqual(adapter.call_count, 2)
+
+    def test_older_failure_diagnosis_survives_change_and_is_reused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            config, cache = base / 'local-ai.json', base / 'latest-local-ai.json'
+            save_local_config(config, 'downloaded-model')
+            profile_id = 'fixture-profile'
+            key = profile_scope_key(profile_id)[:16]
+            first = {'schema': 1, 'suite': 'hardware', 'status': 'fail',
+                     'history_saved': True, 'checks': [
+                         {'id': 'hardware.storage', 'status': 'fail',
+                          'error_kind': 'network', 'operations': []}]}
+            second = json.loads(json.dumps(first))
+            second['checks'][0]['error_kind'] = 'authentication'
+
+            def fleet(report):
+                return json.dumps({'schema': 1, 'profiles': [
+                    {'key': key, 'exit_code': 1, 'result': report}]})
+
+            adapter = Mock(side_effect=('Check the network link.',
+                                        'Check the FTP password.'))
+            factory = lambda _: adapter
+            earlier = diagnose_saved_fleet(fleet(first), config, cache,
+                                           gateway_factory=factory)
+            mark_notified(cache, earlier)
+            diagnose_saved_fleet(fleet(second), config, cache,
+                                 gateway_factory=factory)
+            self.assertEqual(saved_diagnosis(cache, profile_id, first),
+                             'Check the network link.')
+            self.assertEqual(saved_diagnosis(cache, profile_id, second),
+                             'Check the FTP password.')
+            reused = diagnose_saved_fleet(fleet(first), config, cache,
+                                           gateway_factory=factory)
+            self.assertTrue(reused.notified)
+            self.assertEqual(adapter.call_count, 2)
+            archive = base / ARCHIVE_NAME
+            self.assertEqual(len(list(archive.glob('*.json'))), 2)
+            self.assertTrue(all(item.stat().st_mode & 0o777 == 0o600
+                                for item in archive.glob('*.json')))
+
+    def test_private_diagnosis_history_is_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            cache = base / 'latest-local-ai.json'
+            for number in range(21):
+                fingerprint = f'{number:064x}'
+                _save_cache(cache, Diagnosis(fingerprint, ({
+                    'key': 'a' * 16, 'evidence_sha': 'b' * 64,
+                    'diagnosis': 'Inspect the failed check.'},), False))
+            self.assertEqual(len(list((base / ARCHIVE_NAME).glob('*.json'))), 20)
+            self.assertEqual(json.loads(cache.read_text())['fingerprint'],
+                             f'{20:064x}')
 
     def test_untrusted_model_markup_is_plain_notification_text(self):
         diagnosis = Diagnosis('a' * 64, (

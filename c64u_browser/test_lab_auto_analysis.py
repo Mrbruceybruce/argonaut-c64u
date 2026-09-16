@@ -17,9 +17,11 @@ from .test_lab_history import profile_scope_key, validate_report
 
 CONFIG_NAME = 'local-ai.json'
 CACHE_NAME = 'latest-local-ai.json'
+ARCHIVE_NAME = 'local-ai-diagnoses'
 PROFILE_KEY = re.compile(r'[0-9a-f]{16}\Z')
 FINGERPRINT = re.compile(r'[0-9a-f]{64}\Z')
 MAX_PROFILES = 4
+MAX_ARCHIVED_DIAGNOSES = 20
 
 
 @dataclass(frozen=True)
@@ -130,9 +132,25 @@ def read_cache(path, fingerprint):
 
 
 def _save_cache(path, diagnosis):
-    _write_private(path, {'schema': 1, 'fingerprint': diagnosis.fingerprint,
-                          'records': list(diagnosis.records),
-                          'notified': diagnosis.notified})
+    value = {'schema': 1, 'fingerprint': diagnosis.fingerprint,
+             'records': list(diagnosis.records),
+             'notified': diagnosis.notified}
+    archive = Path(path).parent / ARCHIVE_NAME
+    _write_private(archive / (diagnosis.fingerprint + '.json'), value)
+    for old in _archive_paths(path)[MAX_ARCHIVED_DIAGNOSES:]:
+        old.unlink()
+    _write_private(path, value)
+
+
+def _archive_paths(path):
+    archive = Path(path).parent / ARCHIVE_NAME
+    try:
+        candidates = [item for item in archive.glob('*.json')
+                      if FINGERPRINT.fullmatch(item.stem)]
+        return sorted(candidates, key=lambda item: item.stat().st_mtime_ns,
+                      reverse=True)
+    except OSError:
+        return []
 
 
 def mark_notified(path, diagnosis):
@@ -146,19 +164,18 @@ def saved_diagnosis(path, profile_id, report):
     validate_report(report)
     if report['status'] != 'fail':
         return None
-    try:
-        value = json.loads(Path(path).read_text(encoding='utf-8'))
-        fingerprint = value['fingerprint']
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-    cached = read_cache(path, fingerprint)
-    if cached is None:
-        return None
     key = profile_scope_key(profile_id)[:16]
     evidence_sha = _report_fingerprint(report)
-    for record in cached.records:
-        if record['key'] == key and record['evidence_sha'] == evidence_sha:
-            return record['diagnosis']
+    for candidate in (Path(path), *_archive_paths(path)[:MAX_ARCHIVED_DIAGNOSES]):
+        try:
+            fingerprint = json.loads(candidate.read_text(encoding='utf-8'))['fingerprint']
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        cached = read_cache(candidate, fingerprint)
+        if cached is not None:
+            for record in cached.records:
+                if record['key'] == key and record['evidence_sha'] == evidence_sha:
+                    return record['diagnosis']
     return None
 
 
@@ -175,6 +192,11 @@ def diagnose_saved_fleet(output, config_path, cache_path,
     cached = read_cache(cache_path, fingerprint)
     if cached is not None:
         return cached
+    archived = read_cache(Path(cache_path).parent / ARCHIVE_NAME /
+                          (fingerprint + '.json'), fingerprint)
+    if archived is not None:
+        _save_cache(cache_path, archived)
+        return archived
     gateway = (gateway_factory or AIGateway)(config)
     records = []
     for key, report in selected:
