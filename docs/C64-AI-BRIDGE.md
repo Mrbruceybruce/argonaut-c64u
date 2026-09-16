@@ -35,6 +35,16 @@ describes it as a 3.15-era feature. Bruce's two C64Us currently report
 `1.1.0` and `1.1.0s2`; the C64 program must probe target `$06 $01` before
 selecting that path. No firmware change is required for this first step.
 
-The next implementation step is a C64U-side capability probe and minimal
-PETSCII client, tested first in a simulation or emulator. LAN pairing and a
-private listener can follow once the program's transport is working.
+The next implementation step is to run the capability probe on a C64U, then
+build a minimal PETSCII client. LAN pairing and a private listener can follow
+once the program's transport is working.
+
+The first capability probe is now in `c64/uci-network-probe.bas`; its tokenized
+`c64/uci-network-probe.prg` is a 560-byte C64 BASIC program. It checks the UCI
+identification register, sends only the Network target's `IDENTIFY` command,
+checks the status bytes, and reports either `UCI NETWORK READY`, a missing
+Command Interface, or a network target error. It does not change settings or
+open a network connection. Rebuild with `petcat -w2 -o
+c64/uci-network-probe.prg c64/uci-network-probe.bas`. It has been compiled and
+round-tripped through VICE's `petcat`, but still needs a real C64U run to
+confirm that the Command Interface is enabled on Bruce's firmware.
