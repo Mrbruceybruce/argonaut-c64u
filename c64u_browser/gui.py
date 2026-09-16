@@ -148,6 +148,10 @@ class Browser(Gtk.Application):
         self.tabs.append_page(self.media_tab.box,Gtk.Label(label='SID/Media'))
         self.streams_tab=StreamsTab(self)
         self.tabs.append_page(self.streams_tab.box,Gtk.Label(label='Streams'))
+        if development.enabled():
+            from .test_lab_tab import TestLabTab
+            self.test_lab_tab = TestLabTab(self)
+            self.tabs.append_page(self.test_lab_tab.box, Gtk.Label(label='Test Lab'))
         self.tabs.connect('switch-page', lambda _, page, index: self.settings_tab.load_if_needed() if index == 1 else self.drives_tab.load_if_needed() if index == 2 else None)
         self.status = Gtk.Label(label='Open Preferences → Device details to select or discover a C64 Ultimate.', xalign=0, wrap=True, selectable=True)
         outer.append(self.status)
@@ -158,6 +162,8 @@ class Browser(Gtk.Application):
         self.busy_controls = [connection, panes, self.partial_button,
             self.settings_tab.box, self.drives_tab.box, self.machine_tab.box,
             self.media_tab.box, self.streams_tab.box]
+        if development.enabled():
+            self.busy_controls.append(self.test_lab_tab.box)
         self.refresh_local()
         self.window.present()
         self.update_connection_header()
@@ -822,6 +828,7 @@ class Browser(Gtk.Application):
             self.status.set_text('Wait for the current operation to finish before closing.')
             return True
         if self.recovery:self.recovery.close()
+        if getattr(self, 'test_lab_tab', None): self.test_lab_tab.stop_schedule()
         self.streams_tab.close()
         self.pool.shutdown(wait=False)
         # Child windows must not keep an application with a stopped worker alive.

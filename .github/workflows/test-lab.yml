@@ -1,0 +1,32 @@
+name: Argonaut Test Lab
+
+'on':
+  push:
+    branches: [development]
+  pull_request:
+    branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Run deterministic Test Lab checks
+        run: python -m c64u_browser.test_lab --suite offline > test-lab-report.json
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Keep the Test Lab report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-lab-report
+          path: test-lab-report.json
+          if-no-files-found: warn

@@ -1,0 +1,167 @@
+# Argonaut Test Lab foundation
+
+Run the offline and simulated protocol checks with `python3 -m c64u_browser.test_lab`.
+The command prints a versioned JSON report and exits nonzero when any check fails.
+It does not connect to a C64U or modify device settings.
+
+The `Argonaut Test Lab` GitHub workflow runs this offline suite and the unit
+tests for pushes and pull requests targeting `development`. It keeps the JSON
+report as a workflow artifact and requires no C64U, credentials, GUI, or AI
+service. Hardware checks remain local and opt-in.
+
+The same command can run headlessly against hardware with
+`python3 -m c64u_browser.test_lab --suite hardware`. This flag uses only the
+selected **Argonaut Development** profile. It runs the read-only hardware suite,
+saves a private report, and prints sanitized JSON with the comparison result.
+If the device password is needed, `--password-stdin` reads one line from
+standard input; no password is accepted as a command-line argument or stored
+in preferences. `--timeout N` sets a 1–30 second hardware timeout. Exit codes
+are 0 for pass, 1 for fail, 2 for skip, and 3 for startup or history errors.
+An all-skipped run is kept for audit but is ignored as a comparison baseline.
+`--device-id ID` can target a specific C64U through its already saved,
+identity-bound Argonaut Development profile instead of the currently selected
+profile. A missing or ambiguous match stops before any device read. The device
+ID and host are excluded from JSON output; each profile keeps its own hardware
+history. The same option works with the headless monitor.
+
+`python3 -m c64u_browser.test_lab_fleet` runs one read-only pass across every
+identity-bound **Argonaut Development** connection. Unbound connections are
+ignored. Its JSON output contains a separate result and exit code for each
+profile under a stable, opaque key; no profile name, device ID, or host is
+included. Overall failure wins over passing or skipped profiles. A startup or
+history error stops the pass. The monitor can repeat this fleet pass with
+`--all-profiles`, still waiting after each completed pass and never running
+two passes concurrently. The same password line, if supplied with
+`--password-stdin`, is used for every profile during that process session.
+
+For unattended failure explanations, add `--explain-failures --ai-provider
+ollama --ai-model MODEL` to either suite. A downloaded local Ollama model must be
+running on this computer. `--ai-provider openai` explicitly selects the cloud
+adapter and requires `OPENAI_API_KEY` in the process environment. A passing run
+does not contact either model. On a failed run, the command adds a separate
+`analysis` object to its JSON output; AI service errors appear there as
+`status: error`. The saved report, deterministic verdict, and exit code are
+unchanged even if the model is unavailable. Neither the key nor model text is
+stored in the private run history.
+
+For a monitor that runs independently of the Argonaut window, use
+`python3 -m c64u_browser.test_lab_watch --interval-minutes 30`.
+It immediately runs the same read-only hardware suite for the selected
+Argonaut Development profile, then waits 30 minutes **after each completed
+run** before starting the next. It never catches up missed intervals or runs
+checks concurrently. `--runs N` limits the session for testing; without it,
+the process continues until interrupted. Output is one JSON object per line,
+with a run number, the ordinary test exit code, and the sanitized report.
+Setup or history errors stop the monitor. A failed check is recorded and the
+next scheduled run still occurs. If needed, `--password-stdin` reads one
+password line once and keeps it only in this process's memory for the session.
+AI options match the one-shot command and remain opt-in; passing runs do not
+contact a model. The monitor is not started automatically by installing
+Argonaut.
+
+On Linux, `packaging/linux/test_lab_timer.py` renders a user-level systemd
+service and timer for unattended Development fleet checks. The service calls
+the same ordinary read-only fleet command through a separate desktop-alert
+layer and saves reports under the private Development history. It treats an
+all-skipped run as a nonfailure and a failed check as a service failure; AI
+analysis is disabled. The alert layer keeps a private state containing only
+opaque profile keys and stable check IDs. It shows a local desktop notification
+for a new or changed failure and when confirmed passing checks recover.
+Unchanged failures do not repeat the notification, and skipped checks do not
+claim recovery. An unavailable desktop notification leaves the verdict and
+saved reports intact and will be retried on the next run. The timer waits five
+minutes after it is enabled, then starts a new run 30 minutes after the last
+start. It does not try to catch up missed runs. The user service runs while
+the user's systemd manager is active; it does not enable login lingering.
+Stopping and disabling `argonaut-test-lab-fleet.timer` ends unattended runs
+without deleting saved reports.
+
+The simulated checks exercise the real REST and FTP transport code against
+in-process fixtures. They cover valid and malformed REST responses, REST and
+FTP authentication failures, FTP MLSD listings, and the LIST fallback. Each
+fixture is isolated to its check; transport fixtures record exactly one
+operation.
+The identity regression fixture simulates an address that answers as a different
+C64U. It checks that Argonaut reports an identity failure and skips all later
+drive, storage, and version reads; that fixture records only the two initial
+identity reads.
+The complete hardware fixture runs the same four read-only checks against
+simulated REST and FTP responses, including bound identity, both drive states,
+the FTP root listing, and a stable API version. It records the expected five
+transport operations without opening a network connection.
+
+The development tab also offers **Run C64U checks**. This opt-in suite uses the
+current connected profile and performs only read-only identity/firmware, drive
+status, FTP root listing, and API version checks. It does not change settings,
+drives, machine state, or files. A disconnected app or a profile without a bound
+device identity produces skipped checks without opening a network connection.
+If the bound identity fails, dependent checks skip instead of probing that
+device further. A connection that fails during an opted-in run is a test failure.
+The **Run C64U checks every 30 minutes while connected** switch schedules the
+same suite for this app session only. It waits for a bound, connected device
+and an idle app; after an offline period it runs once on reconnection rather
+than trying to catch up missed intervals. Scheduled runs use the same private
+history, comparisons, and optional AI failure explanations. The switch is off
+by default and is cleared when Argonaut closes.
+
+Each check has a stable ID, a title, a pass/fail/skip result, an error category,
+timing, and structured C64U operation events captured while it ran. Assertions
+and exceptions determine the result. Exception messages, credentials, request
+bodies, URL query values, and device file paths are excluded from reports.
+The runner rejects missing, invalid, or duplicate check IDs before running any
+check. History comparison ignores damaged saved reports and rejects inconsistent
+overall verdicts, so a duplicate ID cannot overwrite a failure in the baseline.
+The runner also records `skip` separately when a check cannot run. Offline and
+hardware runs use separate comparison baselines. Hardware history is also
+partitioned by the saved connection profile, so two C64Us cannot become each
+other's regression baseline. The private folder name is a hash of the profile
+ID; the ID and host are absent from the report. Existing unscoped hardware
+reports are preserved, but each profile starts a new baseline on its first
+scoped run.
+The built-in checks use explicit assertions that remain active when Python runs
+in optimized mode. Operation events from unrelated threads are excluded from
+each check's report.
+
+The Developer Mode UI displays these reports. Any future hardware checks that
+change device state will need explicit setup and cleanup. An AI analysis
+service can read the same
+report to explain failures, but must never decide whether a check passed. That
+service should sit behind a separate gateway for local or cloud models; a C64
+PETSCII client can use the gateway later without entering the test runner.
+
+Opening the Development Test Lab tab loads the latest saved hardware result
+for the first profile needing attention, or the selected profile when all are
+passing. The saved C64U row shows each bound profile's most recent result.
+When the most recent run skipped, it also shows the last verified verdict so
+an earlier failure is still visible. **View latest saved result** and **View
+last verified result** let you inspect the deterministic check details for a
+chosen C64U, including reports written by the unattended Linux service.
+
+The AI analysis boundary extracts only failed checks and a small whitelist of
+sanitized operation fields. The AI Gateway supports local Ollama chat and the
+OpenAI Responses API; each returns a diagnosis as a separate object. This object
+cannot change the saved report, its code-determined verdicts, or the run
+comparison. Model responses are bounded and treated as suggestions.
+
+In the development Test Lab tab, choose **Local Ollama** or **OpenAI cloud** and
+enter a model name. Ollama must be running locally with a downloaded model.
+The local option rejects Ollama's `:cloud` model names.
+OpenAI cloud requires `OPENAI_API_KEY` in Argonaut's environment; the key is
+never written to the report or preferences. Cloud analysis sends only the
+failed-check evidence, not the full report. OpenAI requests set `store: false`.
+**Explain failures** analyzes the current failed run. The optional **Explain
+failed runs automatically** switch applies only to this app session; turning it
+on with OpenAI cloud selected sends future failed-run evidence to OpenAI.
+Passing reports do not call a model.
+
+API contracts: [Ollama chat](https://docs.ollama.com/api/chat),
+[Ollama nonstreaming](https://docs.ollama.com/api/streaming), and
+[OpenAI Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).
+
+Development builds now include a Test Lab tab. It runs the offline and simulated
+checks on the application's worker thread, shows each result and its operation
+events, and exports the sanitized JSON report to a local file chosen by the user.
+Each run is also saved privately under the development settings directory.
+Argonaut keeps the newest 20 reports and compares check verdicts by stable ID
+to show new failures, resolved failures, and added or removed checks. A failed
+history write does not change the check verdict or prevent JSON export.

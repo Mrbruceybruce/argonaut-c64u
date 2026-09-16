@@ -10,6 +10,7 @@ import urllib.error
 from urllib.parse import quote, urlencode
 import socket
 import ipaddress
+from .diagnostics import operation_event
 
 class BrowserError(Exception):
     pass
@@ -55,6 +56,10 @@ class UltimateClient:
         self.http_port = http_port
 
     def list_directory(self, path='/'):
+        with operation_event('ftp', 'list_directory', 'directory'):
+            return self._list_directory(path)
+
+    def _list_directory(self, path):
         safe_argument(path)
         if not path.startswith('/'):
             raise BrowserError('Directory path must be absolute, beginning with /.')
@@ -145,6 +150,11 @@ class UltimateClient:
         return self._request_json('GET', path)
 
     def _request_json(self, method, path, payload=None):
+        # Query strings can contain filenames and other private values.
+        with operation_event('rest', method, path.split('?', 1)[0]):
+            return self._request_json_impl(method, path, payload)
+
+    def _request_json_impl(self, method, path, payload=None):
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         body = None if payload is None else json.dumps(payload).encode('utf-8')
         headers = {'X-Password': self.password, 'Accept': 'application/json'}

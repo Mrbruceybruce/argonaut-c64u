@@ -1,0 +1,45 @@
+import json
+import unittest
+from unittest.mock import Mock
+
+from c64u_browser.ai_analysis import analyze_failures, failure_evidence
+
+
+class AnalysisBoundaryTests(unittest.TestCase):
+    def test_only_failed_checks_and_whitelisted_operation_fields(self):
+        report = {'schema': 1, 'status': 'fail', 'checks': [
+            {'id': 'ok', 'title': 'Good', 'status': 'pass', 'error_kind': None,
+             'operations': [{'secret': 'never include'}]},
+            {'id': 'bad', 'title': 'Bad', 'status': 'fail',
+             'error_kind': 'network', 'exception_message': 'password=private',
+             'operations': [{'transport': 'rest', 'operation': 'GET',
+                             'target': '/v1/info?token=secret', 'outcome': 'error',
+                             'error_kind': 'network', 'password': 'private'}]},
+        ]}
+        evidence = failure_evidence(report)
+        self.assertEqual([item['id'] for item in evidence['failures']], ['bad'])
+        self.assertEqual(evidence['failures'][0]['operations'][0]['target'], '/v1/info')
+        self.assertNotIn('private', json.dumps(evidence))
+        self.assertNotIn('secret', json.dumps(evidence))
+
+    def test_adapter_diagnosis_is_separate_from_verdict(self):
+        report = {'schema': 1, 'status': 'fail', 'checks': [
+            {'id': 'bad', 'title': 'Bad', 'status': 'fail',
+             'error_kind': 'AssertionError', 'operations': []}]}
+        adapter = Mock(return_value='Check the response shape.')
+        analysis = analyze_failures(report, adapter)
+        self.assertEqual(analysis['status'], 'analyzed')
+        self.assertEqual(analysis['check_ids'], ['bad'])
+        self.assertEqual(analysis['diagnosis'], 'Check the response shape.')
+        self.assertEqual(report['checks'][0]['status'], 'fail')
+        adapter.assert_called_once()
+
+    def test_passing_report_does_not_call_adapter(self):
+        adapter = Mock()
+        result = analyze_failures({'schema': 1, 'status': 'pass', 'checks': []}, adapter)
+        self.assertEqual(result['status'], 'no_failures')
+        adapter.assert_not_called()
+
+
+if __name__ == '__main__':
+    unittest.main()
