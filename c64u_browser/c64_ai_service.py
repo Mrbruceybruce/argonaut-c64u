@@ -3,14 +3,17 @@
 """Loopback-only HTTP prototype for a later UCI TCP C64 client."""
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import hmac
+import ipaddress
 
 from .c64_ai_chat import MAX_PROMPT_BYTES, MAX_REPLY_BYTES, decode_prompt
 from .ai_gateway import GatewayError
 
 
-def make_handler(gateway, token):
+def make_handler(gateway, token, allowed_client=None):
     if not isinstance(token, str) or len(token) < 32 or not token.isascii():
         raise ValueError('A strong bridge token is required.')
+    if allowed_client is not None:
+        allowed_client = str(ipaddress.IPv4Address(allowed_client))
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, _format, *_args):
@@ -26,6 +29,10 @@ def make_handler(gateway, token):
             self.wfile.write(body)
 
         def do_POST(self):
+            if (allowed_client is not None
+                    and self.client_address[0] != allowed_client):
+                self._send(403, b'Client is not paired.')
+                return
             if self.path != '/v1/chat':
                 self._send(404, b'Not found.')
                 return
@@ -71,3 +78,17 @@ def make_handler(gateway, token):
 def loopback_server(gateway, token, port=0):
     """Bind only this computer; LAN exposure requires a separate deployment step."""
     return HTTPServer(('127.0.0.1', port), make_handler(gateway, token))
+
+
+def paired_lan_server(gateway, token, host, allowed_client, port=6464):
+    """Bind one LAN address and accept chat only from one paired IPv4 client."""
+    host = str(ipaddress.IPv4Address(host))
+    client = str(ipaddress.IPv4Address(allowed_client))
+    if (ipaddress.IPv4Address(host).is_unspecified
+            or ipaddress.IPv4Address(host).is_multicast
+            or ipaddress.IPv4Address(client).is_unspecified
+            or ipaddress.IPv4Address(client).is_multicast):
+        raise ValueError('Use unicast LAN addresses for the bridge.')
+    if type(port) is not int or (port != 0 and not 1024 <= port <= 65535):
+        raise ValueError('Use a bridge port from 1024 to 65535.')
+    return HTTPServer((host, port), make_handler(gateway, token, client))

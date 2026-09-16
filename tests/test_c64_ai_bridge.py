@@ -6,13 +6,29 @@ from unittest.mock import Mock, patch
 from c64u_browser.c64_ai_chat import (
     C64ChatGateway, decode_prompt, encode_reply,
 )
-from c64u_browser.c64_ai_service import loopback_server
+from c64u_browser.c64_ai_client import render_link_probe
+from c64u_browser.c64_ai_service import loopback_server, paired_lan_server
 
 
 TOKEN = 'a' * 40
 
 
 class C64AIBridgeTests(unittest.TestCase):
+    def test_private_link_probe_source_is_bounded_and_tokenized(self):
+        token = 'b' * 64
+        source = render_link_probe('192.0.2.1', 6464, token)
+        self.assertIn('h$="192.0.2.1":p=6464', source)
+        self.assertIn('Authorization: Bearer ' + token, source)
+        self.assertIn('chr$(3)+chr$(7)', source)
+        self.assertIn('chr$(3)+chr$(17)', source)
+        self.assertIn('chr$(3)+chr$(16)', source)
+        self.assertIn('chr$(3)+chr$(9)', source)
+        self.assertLess(max(map(len, source.splitlines())), 255)
+        with self.assertRaises(ValueError):
+            render_link_probe('0.0.0.0', 80, token)
+        with self.assertRaises(ValueError):
+            render_link_probe('192.0.2.1', 6464, 'short')
+
     def test_text_contract_rejects_controls_and_bounds_reply(self):
         self.assertEqual(decode_prompt(b'  What is a SID?  '), 'What is a SID?')
         for body in (b'', b'Hello\nworld', b'\x00cmd', b'\xff', b'x' * 241):
@@ -63,6 +79,34 @@ class C64AIBridgeTests(unittest.TestCase):
             self.assertEqual(ask(b'What is SID?', headers),
                              (200, b'Use the SID chip.'))
             gateway.assert_called_once_with('What is SID?')
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_paired_server_validates_binding_and_client(self):
+        with self.assertRaises(ValueError):
+            paired_lan_server(Mock(), TOKEN, '0.0.0.0', '192.0.2.10')
+        with self.assertRaises(ValueError):
+            paired_lan_server(Mock(), TOKEN, '127.0.0.1', '192.0.2.10', 80)
+
+        gateway = Mock(return_value=b'answer')
+        server = paired_lan_server(gateway, TOKEN, '127.0.0.1',
+                                   '192.0.2.10', 0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = http.client.HTTPConnection(
+                '127.0.0.1', server.server_address[1], timeout=2)
+            conn.request('POST', '/v1/chat', body=b'Question?', headers={
+                'Authorization': 'Bearer ' + TOKEN,
+                'Content-Type': 'text/plain',
+            })
+            result = conn.getresponse()
+            self.assertEqual((result.status, result.read()),
+                             (403, b'Client is not paired.'))
+            conn.close()
+            gateway.assert_not_called()
         finally:
             server.shutdown()
             server.server_close()
