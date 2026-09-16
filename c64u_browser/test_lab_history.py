@@ -90,6 +90,23 @@ class TestLabHistory:
     def latest(self, suite=None):
         return self.most_recent(suite, include_skips=False)
 
+    def verified_pair(self, suite=None):
+        """Return the newest two non-skipped reports from this history scope."""
+        found = []
+        if self.path.exists():
+            for path in sorted(self.path.glob('*.json'), reverse=True):
+                try:
+                    report = json.loads(path.read_text(encoding='utf-8'))
+                    validate_report(report)
+                    if (report['status'] != 'skip' and
+                            (suite is None or report.get('suite', 'offline') == suite)):
+                        found.append(report)
+                        if len(found) == 2:
+                            break
+                except (OSError, ValueError, AttributeError):
+                    continue
+        return tuple((found + [None, None])[:2])
+
     def save(self, report):
         validate_report(report)
         self.path.mkdir(parents=True, exist_ok=True, mode=0o700)

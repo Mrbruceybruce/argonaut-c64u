@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Map private per-profile Test Lab history to local Development UI choices."""
-from .test_lab_history import TestLabHistory
+from .test_lab_history import TestLabHistory, compare_reports
 
 
 def saved_hardware_results(preferences):
@@ -10,10 +10,19 @@ def saved_hardware_results(preferences):
         if not (profile.device_id or profile.device_mac):
             continue
         history = TestLabHistory(preferences.path, profile.id)
+        verified, previous_verified = history.verified_pair('hardware')
         records.append({'profile': profile,
                         'recent': history.most_recent('hardware'),
-                        'verified': history.latest('hardware')})
+                        'verified': verified,
+                        'previous_verified': previous_verified})
     return records
+
+
+def saved_comparison(record, report):
+    """A skipped saved run cannot prove any check recovered."""
+    if report['status'] == 'skip':
+        return None
+    return compare_reports(record['previous_verified'], report)
 
 
 def saved_status(record):

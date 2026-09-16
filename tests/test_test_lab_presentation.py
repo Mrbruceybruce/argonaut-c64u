@@ -2,7 +2,9 @@ import json
 import unittest
 
 from c64u_browser.test_lab import run_default_checks
-from c64u_browser.test_lab_presentation import check_details, comparison_summary, summary
+from c64u_browser.test_lab_presentation import (
+    check_details, comparison_changes, comparison_summary, summary,
+)
 
 
 class PresentationTests(unittest.TestCase):
@@ -24,6 +26,19 @@ class PresentationTests(unittest.TestCase):
         self.assertIn('No C64U operations', text)
         self.assertEqual(comparison_summary(None),
                          'First saved run; no previous run to compare.')
+
+    def test_saved_regression_names_changed_checks(self):
+        current = {'checks': [
+            {'id': 'hardware.identity', 'title': 'Bound C64U identity and firmware'},
+            {'id': 'hardware.storage', 'title': 'Read-only FTP root listing'}]}
+        comparison = {'new_failures': ['hardware.storage'],
+                      'resolved': ['hardware.identity'], 'added': [], 'removed': []}
+        self.assertEqual(comparison_changes(comparison, current),
+                         'New failures: Read-only FTP root listing · '
+                         'Resolved: Bound C64U identity and firmware')
+        current['checks'][1]['title'] = 42
+        self.assertIn('New failures: hardware.storage',
+                      comparison_changes(comparison, current))
 
 
 if __name__ == '__main__':

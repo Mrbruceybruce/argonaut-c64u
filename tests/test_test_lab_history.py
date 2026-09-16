@@ -109,16 +109,23 @@ class HistoryTests(unittest.TestCase):
     def test_most_recent_includes_skip_without_replacing_verified_baseline(self):
         with tempfile.TemporaryDirectory() as directory:
             history = TestLabHistory(Path(directory) / 'config.json', 'profile-a')
+            passed = report(('hardware.identity', 'pass'))
+            passed['suite'] = 'hardware'
             failed = report(('hardware.identity', 'fail'))
             failed['suite'] = 'hardware'
             skipped = report(('hardware.identity', 'skip'))
             skipped['suite'] = 'hardware'
+            history.save(passed)
             history.save(failed)
             history.save(skipped)
             self.assertEqual(history.most_recent('hardware')['status'], 'skip')
             self.assertEqual(history.latest('hardware')['status'], 'fail')
+            pair = history.verified_pair('hardware')
+            self.assertEqual([item['status'] for item in pair], ['fail', 'pass'])
             (history.path / 'zzzz-broken.json').write_text('{broken')
             self.assertEqual(history.most_recent('hardware')['status'], 'skip')
+            self.assertEqual([item['status'] for item in history.verified_pair('hardware')],
+                             ['fail', 'pass'])
 
 
 if __name__ == '__main__':

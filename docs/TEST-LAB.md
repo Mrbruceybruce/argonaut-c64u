@@ -186,7 +186,10 @@ passing. The saved C64U row shows each bound profile's most recent result.
 When the most recent run skipped, it also shows the last verified verdict so
 an earlier failure is still visible. **View latest saved result** and **View
 last verified result** let you inspect the deterministic check details for a
-chosen C64U, including reports written by the unattended Linux service.
+chosen C64U, including reports written by the unattended Linux service. A
+verified saved result also shows new and resolved check failures relative to
+that C64U's prior verified run. A skipped run cannot confirm recovery and does
+not get a regression comparison.
 
 The AI analysis boundary extracts only failed checks and a small whitelist of
 sanitized operation fields. It rechecks route, operation, target, outcome, and

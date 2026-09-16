@@ -16,9 +16,13 @@ from .hardware_checks import run_hardware_checks
 from .ai_analysis import analyze_failures
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .test_lab_history import run_with_history
-from .test_lab_presentation import check_details, comparison_summary, summary
+from .test_lab_presentation import (
+    check_details, comparison_changes, comparison_summary, summary,
+)
 from .test_lab_schedule import HardwareSchedule
-from .test_lab_saved import preferred_record, saved_hardware_results, saved_status
+from .test_lab_saved import (
+    preferred_record, saved_comparison, saved_hardware_results, saved_status,
+)
 from .test_lab_auto_analysis import (
     CACHE_NAME, CONFIG_NAME, load_local_config, save_local_config,
     saved_diagnosis,
@@ -184,7 +188,8 @@ class TestLabTab:
             record = self.saved_records[selected]
             if record['recent']:
                 self.show_saved(record['recent'], record['profile'].name,
-                                'Latest saved C64U result', record['profile'].id)
+                                'Latest saved C64U result', record['profile'].id,
+                                record)
 
     def show_verified_history(self):
         selected = self.saved_choice.get_selected()
@@ -192,13 +197,21 @@ class TestLabTab:
             record = self.saved_records[selected]
             if record['verified']:
                 self.show_saved(record['verified'], record['profile'].name,
-                                'Last verified C64U result', record['profile'].id)
+                                'Last verified C64U result', record['profile'].id,
+                                record)
 
-    def show_saved(self, report, name, source, profile_id):
+    def show_saved(self, report, name, source, profile_id, record):
         self.report = report
-        self.comparison = None
+        self.comparison = saved_comparison(record, report)
         self.loaded_from_history = True
         self.saved_context = f'{source} for {name}. Verdicts come from saved checks.'
+        if report['status'] == 'skip':
+            self.saved_context += ' This skipped run cannot confirm recovery.'
+        else:
+            self.saved_context += ' ' + comparison_summary(self.comparison)
+            changes = comparison_changes(self.comparison, report)
+            if changes:
+                self.saved_context += ' ' + changes
         self.analysis = None
         self.ai_status.set_text('')
         self.ai_details.get_buffer().set_text('')

@@ -4,8 +4,9 @@ import unittest
 
 from c64u_browser.profiles import Preferences, Profile
 from c64u_browser.test_lab_history import TestLabHistory
-from c64u_browser.test_lab_saved import (preferred_record, saved_hardware_results,
-                                         saved_status)
+from c64u_browser.test_lab_saved import (
+    preferred_record, saved_comparison, saved_hardware_results, saved_status,
+)
 
 
 def report(status):
@@ -42,6 +43,23 @@ class SavedHardwareTests(unittest.TestCase):
             records = saved_hardware_results(preferences)
             self.assertEqual(preferred_record(records, second.id), 1)
             self.assertEqual(saved_status(records[0]), 'No saved run')
+
+    def test_saved_view_compares_verified_runs_but_not_a_later_skip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            preferences = Preferences(Path(directory) / 'config.json')
+            first = Profile.new('First', 'first.invalid', device_id='FIRST')
+            second = Profile.new('Second', 'second.invalid', device_id='SECOND')
+            preferences.profiles = [first, second]
+            history = TestLabHistory(preferences.path, first.id)
+            history.save(report('pass'))
+            history.save(report('fail'))
+            history.save(report('skip'))
+            records = saved_hardware_results(preferences)
+            self.assertEqual(records[0]['previous_verified']['status'], 'pass')
+            self.assertEqual(saved_comparison(records[0], records[0]['verified'])
+                             ['new_failures'], ['hardware.identity'])
+            self.assertIsNone(saved_comparison(records[0], records[0]['recent']))
+            self.assertIsNone(records[1]['previous_verified'])
 
 
 if __name__ == '__main__':

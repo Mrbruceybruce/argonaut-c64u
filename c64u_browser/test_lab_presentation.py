@@ -20,6 +20,22 @@ def comparison_summary(comparison):
             f"{len(comparison['removed'])} removed")
 
 
+def comparison_changes(comparison, report):
+    """Name saved verdict changes using the check titles in the current report."""
+    if comparison is None:
+        return ''
+    titles = {check['id']: (check['title'] if isinstance(check.get('title'), str)
+                            and check['title'] else check['id'])
+              for check in report['checks']}
+    parts = []
+    for label, key in (('New failures', 'new_failures'),
+                       ('Resolved', 'resolved')):
+        if comparison[key]:
+            parts.append(label + ': ' + ', '.join(
+                titles.get(check_id, check_id) for check_id in comparison[key]))
+    return ' · '.join(parts)
+
+
 def check_details(check):
     lines = [check['title'], f"Result: {check['status'].upper()}",
              f"Check ID: {check['id']}",
