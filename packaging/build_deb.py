@@ -20,7 +20,11 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
  shutil.copytree(source/'c64u_browser/assets',root/f'usr/lib/{app_name}/c64u_browser/assets')
  write(f'usr/lib/{app_name}/c64u_browser/_build.json',json.dumps(build))
  write(f'usr/bin/{app_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/launch.py "$@"\n',0o755)
- write(f'usr/lib/{app_name}/launch.py', ('import os\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\n' if args.development else '')+f'import sys\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.gui import main\nmain()\n')
+ launch=('import json,os,sys\nfrom pathlib import Path\n'+
+         ('os.environ["ARGONAUT_DEVELOPMENT"]="1"\n' if args.development else '')+
+         f'sys.path.insert(0, "/usr/lib/{app_name}")\nimport c64u_browser\nmetadata_path=Path(c64u_browser.__file__).parent/"_build.json"\npackage_metadata=json.loads(metadata_path.read_text())\n'+
+         'if "--self-test" in sys.argv:\n from c64u_browser.package_self_test import run\n run(package_metadata,sys.argv[sys.argv.index("--self-test")+1])\nelse:\n from c64u_browser.gui import main\n main()\n')
+ write(f'usr/lib/{app_name}/launch.py',launch)
  if args.development:
   bridge_name=app_name+'-ai-bridge'
   write(f'usr/bin/{bridge_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/bridge.py "$@"\n',0o755)
