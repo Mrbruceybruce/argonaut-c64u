@@ -33,6 +33,12 @@ class BridgeStatus:
     model_status: str = 'unchecked'
 
 
+@dataclass(frozen=True)
+class HealthMonitorStatus:
+    state: str
+    message: str
+
+
 def _systemctl(command, runner=subprocess.run, unit=SERVICE, options=()):
     try:
         return runner(
@@ -49,6 +55,34 @@ def _reload_user_services(runner=subprocess.run):
             text=True, timeout=8, check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         raise BrowserError('The background service list could not be refreshed.') from exc
+
+
+def health_monitor_status(runner=subprocess.run):
+    try:
+        enabled = _systemctl(
+            'is-enabled', runner, HEALTH_TIMER).returncode == 0
+        if not enabled:
+            return HealthMonitorStatus(
+                'disabled', 'Off · enable alerts to monitor bridge and model health')
+        active = _systemctl('is-active', runner, HEALTH_TIMER)
+    except BrowserError:
+        return HealthMonitorStatus(
+            'unavailable', 'Status unavailable · background services could not be checked')
+    if active.returncode == 0 and active.stdout.strip() == 'active':
+        return HealthMonitorStatus('ready', 'On · checks every 5 minutes')
+    return HealthMonitorStatus(
+        'stopped', 'Scheduled but stopped · enable alerts to restart monitoring')
+
+
+def enable_health_monitor(runner=subprocess.run):
+    _reload_user_services(runner)
+    enabled = _systemctl('enable', runner, HEALTH_TIMER, ('--now',))
+    if enabled.returncode != 0:
+        raise BrowserError('Automatic C64 AI health alerts could not be enabled.')
+    status = health_monitor_status(runner)
+    if status.state != 'ready':
+        raise BrowserError('Automatic C64 AI health alerts did not start.')
+    return status
 
 
 def _local_model_names():
@@ -199,8 +233,7 @@ def setup_bridge(path, model, address, runner=subprocess.run,
         status = activate_bridge(path, runner)
         health_was_enabled = (
             _systemctl('is-enabled', runner, HEALTH_TIMER).returncode == 0)
-        if _systemctl('enable', runner, HEALTH_TIMER, ('--now',)).returncode != 0:
-            raise BrowserError('Automatic C64 AI health alerts could not be enabled.')
+        enable_health_monitor(runner)
         return status
     except Exception:
         if saved:

@@ -20,7 +20,8 @@ from .ai_presentation import readable_diagnosis
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .c64_ai_launch import launch_c64_ai
 from .c64_ai_bridge_control import (
-    activate_bridge, bridge_status, setup_bridge,
+    activate_bridge, bridge_status, enable_health_monitor,
+    health_monitor_status, setup_bridge,
 )
 from .c64_ai_install import install_and_pair_c64_ai
 from .test_lab_history import run_with_history
@@ -115,6 +116,14 @@ class TestLabTab:
         self.bridge_path = self.app.preferences.path.parent / 'test-lab' / 'c64-ai-bridge.json'
         self.bridge_loaded = False
         self.bridge_state = 'unknown'
+        health_row = Gtk.Box(spacing=8)
+        self.box.append(health_row)
+        health_row.append(Gtk.Label(label='Automatic health alerts:', xalign=0))
+        self.health_status = Gtk.Label(
+            label='Checking…', xalign=0, hexpand=True, wrap=True)
+        health_row.append(self.health_status)
+        self.health_button = app.button(
+            health_row, 'Enable alerts', self.enable_health_alerts)
         self.schedule_check = Gtk.CheckButton(label='Run C64U checks every 30 minutes while connected')
         self.schedule_check.connect('toggled', self.schedule_toggled)
         self.box.append(self.schedule_check)
@@ -216,6 +225,10 @@ class TestLabTab:
         self.activate_bridge_button.set_sensitive(
             status.state in ('ready', 'stopped', 'network_changed'))
 
+    def show_health_status(self, status):
+        self.health_status.set_text(status.message)
+        self.health_button.set_sensitive(status.state != 'ready')
+
     def connection_changed(self):
         connected = (self.app.client is not None
                      and not getattr(self.app, 'offline_message', None)
@@ -228,12 +241,22 @@ class TestLabTab:
         if self.app.busy:
             return
         self.bridge_status.set_text('Checking local bridge…')
-        def done(status):
-            self.show_bridge_status(status)
-            self.app.status.set_text('C64 AI bridge status refreshed.')
+        self.health_status.set_text('Checking…')
+        def done(statuses):
+            self.show_bridge_status(statuses[0])
+            self.show_health_status(statuses[1])
+            self.app.status.set_text('C64 AI bridge and health alerts refreshed.')
 
         self.app.run(
-            lambda: bridge_status(self.bridge_path, check_model=True), done)
+            lambda: (bridge_status(self.bridge_path, check_model=True),
+                     health_monitor_status()), done)
+
+    def enable_health_alerts(self):
+        self.health_status.set_text('Enabling automatic health alerts…')
+        def done(status):
+            self.show_health_status(status)
+            self.app.status.set_text('Automatic C64 AI health alerts are on.')
+        self.app.run(enable_health_monitor, done)
 
     def activate_bridge(self):
         def done(status):

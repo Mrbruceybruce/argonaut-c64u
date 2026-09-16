@@ -151,3 +151,9 @@ output contains only that state, model readiness, and the number of paired
 addresses; it does not include the pairing token, C64U addresses or identities,
 or model-generated text. This monitor is independent of Test Lab verdicts and
 of the separate unattended failure-diagnosis setting.
+
+Test Lab shows this timer separately as **Automatic health alerts**. It reports
+whether the five-minute monitor is on, off, stopped, or unavailable. **Enable
+alerts** reloads the installed per-user unit, enables its timer, starts it, and
+verifies that it is active. This lets an upgraded Development installation turn
+on monitoring without a terminal; it does not run a model or contact a C64U.

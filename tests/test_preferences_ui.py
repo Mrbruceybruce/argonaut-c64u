@@ -124,3 +124,6 @@ class PreferencesUI(unittest.TestCase):
                          'Set up & install C64 AI')
         self.assertFalse(tab.activate_bridge_button.get_sensitive())
         self.assertFalse(tab.pair_bridge_button.get_sensitive())
+        self.assertTrue(tab.health_status.get_text())
+        self.assertNotIn('token', tab.health_status.get_text().casefold())
+        self.assertEqual(tab.health_button.get_label(), 'Enable alerts')

@@ -9,8 +9,9 @@ from c64u_browser.c64_ai_bridge_config import (
     C64BridgeConfig, load_bridge_config, save_bridge_config,
 )
 from c64u_browser.c64_ai_bridge_control import (
-    HEALTH_TIMER, SERVICE, activate_bridge, bridge_status, local_bridge_host,
-    local_model_status, pair_bridge_address, setup_bridge,
+    HEALTH_TIMER, SERVICE, activate_bridge, bridge_status, enable_health_monitor,
+    health_monitor_status, local_bridge_host, local_model_status,
+    pair_bridge_address, setup_bridge,
 )
 
 
@@ -66,6 +67,39 @@ class C64AIBridgeControlTests(unittest.TestCase):
         self.assertEqual(state, 'model_unavailable')
         self.assertIn('unavailable', message)
         self.assertIn('Start Ollama', message)
+
+    def test_health_monitor_status_distinguishes_off_stopped_and_ready(self):
+        def runner(state):
+            def run(args, **_kwargs):
+                command = args[2]
+                if command == 'is-enabled':
+                    return result(args, code=0 if state != 'disabled' else 1,
+                                  output='enabled\n' if state != 'disabled' else '')
+                return result(args, code=0 if state == 'ready' else 3,
+                              output='active\n' if state == 'ready' else 'inactive\n')
+            return run
+
+        self.assertEqual(health_monitor_status(runner('disabled')).state,
+                         'disabled')
+        self.assertEqual(health_monitor_status(runner('stopped')).state,
+                         'stopped')
+        self.assertEqual(health_monitor_status(runner('ready')).state, 'ready')
+
+    def test_enable_health_monitor_reloads_enables_and_verifies(self):
+        commands = []
+
+        def runner(args, **_kwargs):
+            commands.append((args[2], args[-1], tuple(args[3:-1])))
+            return result(args, output=(
+                'active\n' if args[2] == 'is-active' else 'enabled\n'))
+
+        self.assertEqual(enable_health_monitor(runner).state, 'ready')
+        self.assertEqual(commands, [
+            ('daemon-reload', 'daemon-reload', ()),
+            ('enable', HEALTH_TIMER, ('--now',)),
+            ('is-enabled', HEALTH_TIMER, ()),
+            ('is-active', HEALTH_TIMER, ()),
+        ])
 
     def test_bridge_status_reports_model_outage_separately(self):
         save_bridge_config(self.path, self.config)
@@ -183,13 +217,18 @@ class C64AIBridgeControlTests(unittest.TestCase):
             return RouteSocket()
 
         commands = []
+        health_enabled = False
         def runner(args, **_kwargs):
+            nonlocal health_enabled
             command = args[2]
             commands.append((command, args[-1], tuple(args[3:-1])))
             if command == 'is-enabled' and args[-1] == SERVICE:
                 return result(args, code=1, output='disabled\n')
             if command == 'is-enabled' and args[-1] == HEALTH_TIMER:
-                return result(args, code=1, output='disabled\n')
+                return result(args, code=0 if health_enabled else 1,
+                              output='enabled\n' if health_enabled else 'disabled\n')
+            if command == 'enable' and args[-1] == HEALTH_TIMER:
+                health_enabled = True
             return result(args, output=('active\n' if command == 'is-active'
                                         else 'enabled\n'))
 
