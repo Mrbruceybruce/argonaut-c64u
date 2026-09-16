@@ -3,9 +3,11 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from c64u_browser import test_lab_alert
+from c64u_browser.ai_gateway import GatewayError
+from c64u_browser.test_lab_auto_analysis import CACHE_NAME, CONFIG_NAME, save_local_config
 
 
 KEY = 'a' * 16
@@ -92,6 +94,72 @@ class TestLabAlertTests(unittest.TestCase):
         result['profiles'][0]['key'] = KEY
         result['profiles'][0]['result']['checks'][0]['id'] = 'password=private'
         self.assertEqual(test_lab_alert.failure_set(json.dumps(result), code), ())
+
+    def test_opted_in_local_diagnosis_is_cached_and_attached_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'test-lab/alert-state.json'
+            save_local_config(state.parent / CONFIG_NAME, 'local-test')
+            code, result = fleet('fail')
+            result['profiles'][0]['result']['history_saved'] = True
+            result['profiles'][0]['result']['checks'][0]['error_kind'] = 'network'
+            notices = []
+            notify = lambda title, body: notices.append((title, body)) or True
+            adapter = Mock(return_value='Check the cable.\nThen retry.')
+            with patch('c64u_browser.test_lab_auto_analysis.AIGateway',
+                       return_value=adapter) as gateway:
+                self.invoke(code, result, state, notify)
+                self.invoke(code, result, state, notify)
+            self.assertEqual(len(notices), 1)
+            self.assertIn('Local AI: Check the cable. Then retry.', notices[0][1])
+            gateway.assert_called_once()
+            adapter.assert_called_once()
+            cache = state.parent / CACHE_NAME
+            self.assertTrue(json.loads(cache.read_text())['notified'])
+            self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads(state.read_text())['failures'],
+                             [KEY + ':hardware.identity'])
+
+    def test_model_outage_keeps_generic_alert_then_retries_diagnosis(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'test-lab/alert-state.json'
+            save_local_config(state.parent / CONFIG_NAME, 'local-test')
+            code, result = fleet('fail')
+            result['profiles'][0]['result']['history_saved'] = True
+            notices = []
+            notify = lambda title, body: notices.append((title, body)) or True
+            adapter = Mock(side_effect=[GatewayError('network', 'Unavailable'),
+                                        'Check the connection.'])
+            with patch('c64u_browser.test_lab_auto_analysis.AIGateway',
+                       return_value=adapter):
+                self.invoke(code, result, state, notify)
+                self.assertFalse((state.parent / CACHE_NAME).exists())
+                self.invoke(code, result, state, notify)
+            self.assertEqual(len(notices), 2)
+            self.assertIn('needs attention', notices[0][0])
+            self.assertIn('local diagnosis ready', notices[1][0])
+            self.assertIn('Local AI: Check the connection.', notices[1][1])
+            self.assertEqual(json.loads(state.read_text())['failures'],
+                             [KEY + ':hardware.identity'])
+
+    def test_passing_fleet_never_contacts_opted_in_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'test-lab/alert-state.json'
+            save_local_config(state.parent / CONFIG_NAME, 'local-test')
+            with patch('c64u_browser.test_lab_auto_analysis.AIGateway') as gateway:
+                self.invoke(*fleet('pass'), state, lambda *_: True)
+            gateway.assert_not_called()
+
+    def test_unsaved_failure_still_alerts_without_contacting_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'test-lab/alert-state.json'
+            save_local_config(state.parent / CONFIG_NAME, 'local-test')
+            notices = []
+            with patch('c64u_browser.test_lab_auto_analysis.AIGateway') as gateway:
+                self.invoke(*fleet('fail'), state,
+                            lambda title, body: notices.append((title, body)) or True)
+            self.assertEqual(len(notices), 1)
+            self.assertNotIn('Local AI:', notices[0][1])
+            gateway.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -74,7 +74,7 @@ service and timer for unattended Development fleet checks. The service calls
 the same ordinary read-only fleet command through a separate desktop-alert
 layer and saves reports under the private Development history. It treats an
 all-skipped run as a nonfailure and a failed check as a service failure; AI
-analysis is disabled. The alert layer keeps a private state containing only
+analysis is off by default. The alert layer keeps a private state containing only
 opaque profile keys and stable check IDs. It shows a local desktop notification
 for a new or changed failure and when confirmed passing checks recover.
 Unchanged failures do not repeat the notification, and skipped checks do not
@@ -85,6 +85,26 @@ start. It does not try to catch up missed runs. The user service runs while
 the user's systemd manager is active; it does not enable login lingering.
 Stopping and disabling `argonaut-test-lab-fleet.timer` ends unattended runs
 without deleting saved reports.
+
+In the Development Test Lab tab, **Explain unattended C64U failures with local
+AI** can be enabled with the name of a downloaded Ollama model. **Save local AI
+setting** writes a private local-only setting; the existing user timer reads it
+on its next fleet run without a restart. Cloud models and Ollama `:cloud` models
+are refused for unattended analysis. A failed report is analyzed only after
+the ordinary tests have determined and saved its verdict. Passing and skipped
+runs never call a model.
+
+A new or changed saved failure can add a short local diagnosis preview to its
+desktop alert. The bounded full diagnosis is kept separately in a private
+`latest-local-ai.json` file under Development's Test Lab settings. Opening the
+matching saved result in the Development Test Lab shows the full diagnosis; it
+never changes the saved test report or fleet exit code. Identical sanitized failure
+evidence reuses that diagnosis instead of calling the model repeatedly. If
+Ollama is unavailable, Argonaut shows the ordinary failure alert and retries
+diagnosis on the next failed run. When a retry succeeds, it sends one local
+diagnosis-ready alert. Saving the switch off in the Development Test Lab tab
+disables unattended AI analysis. The unattended layer analyzes at most four
+failed C64Us per run; larger fleets keep the ordinary saved results and alerts.
 
 The simulated checks exercise the real REST and FTP transport code against
 in-process fixtures. They cover valid and malformed REST responses, REST and

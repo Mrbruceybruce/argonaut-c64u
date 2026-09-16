@@ -19,6 +19,10 @@ from .test_lab_history import run_with_history
 from .test_lab_presentation import check_details, comparison_summary, summary
 from .test_lab_schedule import HardwareSchedule
 from .test_lab_saved import preferred_record, saved_hardware_results, saved_status
+from .test_lab_auto_analysis import (
+    CACHE_NAME, CONFIG_NAME, load_local_config, save_local_config,
+    saved_diagnosis,
+)
 
 
 class TestLabTab:
@@ -82,6 +86,28 @@ class TestLabTab:
         ai_options.append(self.model)
         self.auto_analyze = Gtk.CheckButton(label='Explain failed runs automatically')
         self.box.append(self.auto_analyze)
+        self.unattended_ai_path = self.app.preferences.path.parent / 'test-lab' / CONFIG_NAME
+        local_config_error = ''
+        try:
+            local_config = load_local_config(self.unattended_ai_path)
+        except (GatewayError, OSError, ValueError):
+            local_config = None
+            local_config_error = 'Saved unattended local AI setting could not be read.'
+        local_row = Gtk.Box(spacing=8)
+        self.box.append(local_row)
+        self.unattended_ai = Gtk.CheckButton(
+            label='Explain unattended C64U failures with local AI')
+        self.unattended_ai.set_active(local_config is not None)
+        local_row.append(self.unattended_ai)
+        self.unattended_model = Gtk.Entry(
+            placeholder_text='Downloaded Ollama model', hexpand=True)
+        if local_config is not None:
+            self.unattended_model.set_text(local_config.model)
+        local_row.append(self.unattended_model)
+        app.button(local_row, 'Save local AI setting', self.save_unattended_ai)
+        self.unattended_status = Gtk.Label(label=local_config_error,
+                                           xalign=0, wrap=True)
+        self.box.append(self.unattended_status)
         self.box.append(Gtk.Label(
             label='Only failed check details are sent for AI analysis. OpenAI cloud uses the OPENAI_API_KEY environment variable; the key is never saved in reports.',
             xalign=0, wrap=True))
@@ -106,6 +132,18 @@ class TestLabTab:
         ai_scroll.set_child(self.ai_details)
         self.box.append(ai_scroll)
         self.app.tabs.connect('switch-page', self.shown)
+
+    def save_unattended_ai(self):
+        model = (self.unattended_model.get_text().strip()
+                 if self.unattended_ai.get_active() else None)
+        try:
+            save_local_config(self.unattended_ai_path, model)
+        except (GatewayError, OSError) as exc:
+            self.unattended_status.set_text(str(exc))
+            return
+        self.unattended_status.set_text(
+            'Unattended local explanations enabled for the next fleet run.'
+            if model is not None else 'Unattended local explanations disabled.')
 
     def shown(self, _, page, _index):
         if page == self.box:
@@ -144,7 +182,7 @@ class TestLabTab:
             record = self.saved_records[selected]
             if record['recent']:
                 self.show_saved(record['recent'], record['profile'].name,
-                                'Latest saved C64U result')
+                                'Latest saved C64U result', record['profile'].id)
 
     def show_verified_history(self):
         selected = self.saved_choice.get_selected()
@@ -152,9 +190,9 @@ class TestLabTab:
             record = self.saved_records[selected]
             if record['verified']:
                 self.show_saved(record['verified'], record['profile'].name,
-                                'Last verified C64U result')
+                                'Last verified C64U result', record['profile'].id)
 
-    def show_saved(self, report, name, source):
+    def show_saved(self, report, name, source, profile_id):
         self.report = report
         self.comparison = None
         self.loaded_from_history = True
@@ -164,6 +202,11 @@ class TestLabTab:
         self.ai_details.get_buffer().set_text('')
         try:
             self.render()
+            diagnosis = saved_diagnosis(
+                self.unattended_ai_path.parent / CACHE_NAME, profile_id, report)
+            if diagnosis:
+                self.ai_status.set_text('Saved unattended local AI diagnosis:')
+                self.ai_details.get_buffer().set_text(diagnosis)
         except (KeyError, TypeError, ValueError, IndexError):
             self.report = None
             while self.checks.get_first_child():

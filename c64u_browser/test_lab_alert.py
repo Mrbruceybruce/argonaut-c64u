@@ -12,6 +12,10 @@ import sys
 import tempfile
 
 from .platform_support import config_base
+from .ai_gateway import GatewayError
+from .test_lab_auto_analysis import (
+    CACHE_NAME, CONFIG_NAME, alert_excerpt, diagnose_saved_fleet, mark_notified,
+)
 from .test_lab_fleet import main as run_fleet
 
 
@@ -159,12 +163,34 @@ def main(argv=None, stdin=None, stdout=None, stderr=None, *,
             config_base() / 'argonaut-development/test-lab' / STATE_NAME)
     previous = read_state(path)
     current = merge_unconfirmed(previous, failure_set(output, code), output, code)
-    if current != previous:
+    diagnosis = None
+    if code == 1:
+        try:
+            diagnosis = diagnose_saved_fleet(
+                output, path.parent / CONFIG_NAME, path.parent / CACHE_NAME)
+        except (GatewayError, OSError, ValueError, TypeError):
+            print('Local AI diagnosis unavailable; saved test verdict is unchanged.',
+                  file=stderr)
+    changed = current != previous
+    diagnosis_notice = bool(diagnosis and current and not diagnosis.notified)
+    if changed or diagnosis_notice:
         if current or previous:
-            if not notify(*alert_text(previous, current)):
+            title, body = alert_text(previous, current)
+            if diagnosis is not None and current:
+                body += ' Local AI: ' + alert_excerpt(diagnosis)
+            if diagnosis_notice and not changed:
+                title = 'Argonaut Test Lab local diagnosis ready'
+            if not notify(title, body):
                 print('Test Lab desktop alert unavailable; verdict and report are saved.',
                       file=stderr)
                 return code
+        if diagnosis_notice:
+            try:
+                mark_notified(path.parent / CACHE_NAME, diagnosis)
+            except OSError:
+                print('Local AI alert state could not be saved; verdict is unchanged.',
+                      file=stderr)
+    if changed:
         try:
             save_state(path, current)
         except OSError:
