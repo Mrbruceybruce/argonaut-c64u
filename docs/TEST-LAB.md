@@ -4,6 +4,17 @@ Run the offline and simulated protocol checks with `python3 -m c64u_browser.test
 The command prints a versioned JSON report and exits nonzero when any check fails.
 It does not connect to a C64U or modify device settings.
 
+To exercise the failure and AI diagnosis path without waiting for real hardware
+to fail, run `python3 -m c64u_browser.test_lab --suite diagnosis_probe
+--explain-failures --ai-provider ollama --ai-model MODEL`. This intentionally
+simulates an FTP login refusal through the ordinary transport code. Its report
+is marked as a simulation; code determines `fail` and the expected exit code is
+1. The report is not added to hardware or offline regression history, and the
+model receives only sanitized failure evidence. The Development Test Lab's
+**Test local AI (simulation)** button runs the same probe and asks only the
+configured local Ollama model for an explanation. It never contacts a C64U or
+sends probe evidence to the cloud.
+
 The `Argonaut Test Lab` GitHub workflow runs this offline suite and the unit
 tests for pushes and pull requests targeting `development`. It keeps the JSON
 report as a workflow artifact and requires no C64U, credentials, GUI, or AI

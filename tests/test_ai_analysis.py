@@ -17,6 +17,7 @@ class AnalysisBoundaryTests(unittest.TestCase):
                              'error_kind': 'network', 'password': 'private'}]},
         ]}
         evidence = failure_evidence(report)
+        self.assertFalse(evidence['simulation'])
         self.assertEqual([item['id'] for item in evidence['failures']], ['check-1'])
         self.assertEqual(evidence['failures'][0]['operations'][0]['target'], '/v1/info')
         self.assertNotIn('private', json.dumps(evidence))

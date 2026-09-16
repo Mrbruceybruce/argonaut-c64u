@@ -34,6 +34,7 @@ SAFE_CHECK_IDS = frozenset((
     'sim.identity.wrong_device', 'sim.hardware.complete',
     'sim.transfer.download', 'sim.transfer.interrupted',
     'sim.transfer.upload', 'sim.transfer.collision',
+    'probe.ftp_authentication',
 ))
 
 
@@ -91,7 +92,9 @@ def failure_evidence(report):
             'error_kind': error_kind,
             'operations': operations,
         })
-    return {'schema': 1, 'failures': failures}
+    return {'schema': 1,
+            'simulation': report.get('suite') in ('offline', 'diagnosis_probe'),
+            'failures': failures}
 
 
 def analyze_failures(report, adapter):

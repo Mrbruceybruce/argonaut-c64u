@@ -12,6 +12,7 @@ gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib
 
 from .test_lab import run_default_checks
+from .test_lab_probe import run_diagnosis_probe
 from .hardware_checks import run_hardware_checks
 from .ai_analysis import analyze_failures
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
@@ -84,6 +85,10 @@ class TestLabTab:
         self.export_button.set_sensitive(False)
         self.analyze_button = app.button(toolbar, 'Explain failures', self.analyze)
         self.analyze_button.set_sensitive(False)
+        self.probe_button = app.button(toolbar, 'Test local AI (simulation)',
+                                       self.run_probe)
+        self.probe_button.set_tooltip_text(
+            'Simulate a failed FTP login and ask only the local model to explain it.')
         self.schedule_check = Gtk.CheckButton(label='Run C64U checks every 30 minutes while connected')
         self.schedule_check.connect('toggled', self.schedule_toggled)
         self.box.append(self.schedule_check)
@@ -269,6 +274,9 @@ class TestLabTab:
     def run(self):
         self._run_checks(run_default_checks)
 
+    def run_probe(self):
+        self._run_checks(run_diagnosis_probe, probe=True)
+
     def run_hardware(self):
         client = None if getattr(self.app, 'offline_message', None) else self.app.client
         profile = self.app.active_profile if client is not None else None
@@ -304,37 +312,51 @@ class TestLabTab:
             GLib.source_remove(self.schedule_source)
             self.schedule_source = None
 
-    def _run_checks(self, runner, profile_id=None):
+    def _run_checks(self, runner, profile_id=None, probe=False):
         if self.app.busy:
             return
-        self.summary.set_text('Running checks…')
+        self.summary.set_text('Simulating an FTP login failure…' if probe
+                              else 'Running checks…')
         self.run_button.set_sensitive(False)
         self.hardware_button.set_sensitive(False)
+        self.probe_button.set_sensitive(False)
 
         def done(result):
             self.run_button.set_sensitive(True)
             self.hardware_button.set_sensitive(True)
+            self.probe_button.set_sensitive(True)
             if not isinstance(result, dict):
                 self.summary.set_text('Could not run checks. See the status message below.')
                 return
             self.report = result['report']
             self.comparison = result['comparison']
-            self.loaded_from_history = False
-            self.saved_context = ''
+            self.loaded_from_history = probe
+            self.saved_context = (
+                'Expected simulated failure. No C64U was contacted and this probe was not saved.'
+                if probe else '')
             self.analysis = None
             self.ai_status.set_text('')
             self.ai_details.get_buffer().set_text('')
             self.render()
-            self.refresh_history()
-            message = 'Test Lab: ' + summary(self.report)
-            if not result['saved']:
+            if not probe:
+                self.refresh_history()
+            message = ('Local AI probe: expected simulated FTP login failure.'
+                       if probe else 'Test Lab: ' + summary(self.report))
+            if not probe and not result['saved']:
                 message += ' · Run history could not be saved.'
             self.app.status.set_text(message)
-            if self.report['status'] == 'fail' and self.auto_analyze.get_active():
+            if probe and self.report['status'] == 'fail':
+                model = (self.unattended_model.get_text().strip()
+                         if self.unattended_ai.get_active() else
+                         self.model.get_text().strip())
+                self._analyze_with_gateway('ollama', model)
+            elif self.report['status'] == 'fail' and self.auto_analyze.get_active():
                 self.analyze()
 
         def task():
             try:
+                if probe:
+                    return {'report': runner(), 'comparison': None, 'saved': False}
                 return run_with_history(self.app.preferences.path, runner,
                                         profile_id=profile_id)
             except Exception as exc:
@@ -370,11 +392,14 @@ class TestLabTab:
         self.details.get_buffer().set_text(text)
 
     def analyze(self):
+        provider = 'ollama' if self.provider.get_selected() == 0 else 'openai'
+        self._analyze_with_gateway(provider, self.model.get_text().strip())
+
+    def _analyze_with_gateway(self, provider, model):
         if self.app.busy or self.report is None or self.report['status'] != 'fail':
             return
-        provider = 'ollama' if self.provider.get_selected() == 0 else 'openai'
         try:
-            gateway = AIGateway(GatewayConfig(provider, self.model.get_text().strip()))
+            gateway = AIGateway(GatewayConfig(provider, model))
         except GatewayError as exc:
             self.ai_status.set_text(str(exc))
             return

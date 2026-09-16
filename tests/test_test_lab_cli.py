@@ -168,6 +168,25 @@ class HeadlessCliTests(unittest.TestCase):
         self.assertEqual(report['suite'], 'offline')
         self.assertEqual(len(report['checks']), 14)
 
+    def test_diagnosis_probe_is_an_expected_offline_failure_with_separate_ai(self):
+        output = io.StringIO()
+        with patch('c64u_browser.test_lab_cli.AIGateway',
+                   return_value=lambda _: 'Inspect local FTP login.') as gateway, patch(
+                   'socket.create_connection') as connect:
+            code = main(['--suite', 'diagnosis_probe', '--explain-failures',
+                         '--ai-provider', 'ollama', '--ai-model', 'local-test'],
+                        stdout=output)
+        result = json.loads(output.getvalue())
+        self.assertEqual(code, 1)
+        self.assertEqual(result['suite'], 'diagnosis_probe')
+        self.assertEqual(result['status'], 'fail')
+        self.assertEqual(result['analysis']['status'], 'analyzed')
+        self.assertEqual(result['analysis']['diagnosis'],
+                         'Inspect local FTP login.')
+        self.assertNotIn('history_saved', result)
+        connect.assert_not_called()
+        gateway.assert_called_once()
+
     def test_hardware_uses_development_profile_and_stdin_secret(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)

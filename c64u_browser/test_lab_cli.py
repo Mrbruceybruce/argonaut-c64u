@@ -12,6 +12,7 @@ from .hardware_checks import run_hardware_checks
 from .platform_support import config_base
 from .profiles import Preferences
 from .test_lab import run_default_checks
+from .test_lab_probe import run_diagnosis_probe
 from .test_lab_history import run_with_history
 
 
@@ -47,7 +48,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
     parser = argparse.ArgumentParser(description='Run deterministic Argonaut Test Lab checks.')
-    parser.add_argument('--suite', choices=('offline', 'hardware'), default='offline')
+    parser.add_argument('--suite', choices=('offline', 'hardware', 'diagnosis_probe'),
+                        default='offline')
     parser.add_argument('--password-stdin', action='store_true',
                         help='Read one C64U password line from standard input (hardware only).')
     parser.add_argument('--timeout', type=int, default=10,
@@ -65,10 +67,11 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     args = parser.parse_args(argv)
     if args.device_id is not None and args.profile_id is not None:
         parser.error('--device-id and --profile-id cannot be combined')
-    if args.suite == 'offline':
+    if args.suite != 'hardware':
         if args.password_stdin or args.device_id is not None or args.profile_id is not None:
             parser.error('Hardware connection options require --suite hardware')
-        report = run_default_checks()
+        report = (run_diagnosis_probe() if args.suite == 'diagnosis_probe'
+                  else run_default_checks())
         result = {'report': report, 'comparison': None, 'saved': False}
     else:
         if not 1 <= args.timeout <= 30:
