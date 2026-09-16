@@ -15,6 +15,7 @@ from .test_lab import run_default_checks
 from .test_lab_probe import run_diagnosis_probe
 from .hardware_checks import run_hardware_checks
 from .ai_analysis import analyze_failures
+from .ai_presentation import readable_diagnosis
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .test_lab_history import run_with_history
 from .test_lab_presentation import (
@@ -260,7 +261,7 @@ class TestLabTab:
                 self.unattended_ai_path.parent / CACHE_NAME, profile_id, report)
             if diagnosis:
                 self.ai_status.set_text('Saved unattended local AI diagnosis:')
-                self.ai_details.get_buffer().set_text(diagnosis)
+                self.ai_details.get_buffer().set_text(readable_diagnosis(diagnosis))
         except (KeyError, TypeError, ValueError, IndexError):
             self.report = None
             while self.checks.get_first_child():
@@ -422,7 +423,8 @@ class TestLabTab:
                 return
             self.analysis = result
             self.ai_status.set_text('AI diagnosis for ' + ', '.join(result['check_ids']))
-            self.ai_details.get_buffer().set_text(result['diagnosis'] or '')
+            self.ai_details.get_buffer().set_text(
+                readable_diagnosis(result['diagnosis']))
             self.app.status.set_text('AI diagnosis is ready; test verdicts are unchanged.')
 
         self.app.run(task, done)
