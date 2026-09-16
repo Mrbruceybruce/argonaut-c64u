@@ -214,6 +214,15 @@ class UltimateClient:
         return self._request_json(
             'PUT', '/v1/runners:run_prg?' + urlencode({'file': path}))
 
+    def write_memory(self, address, data):
+        if (type(address) is not int or not 0 <= address <= 0xffff
+                or not isinstance(data, bytes) or not 1 <= len(data) <= 128
+                or address + len(data) > 0x10000):
+            raise BrowserError('Use a valid C64 memory address and 1 to 128 bytes.')
+        return self._request_json('PUT', '/v1/machine:writemem?' + urlencode({
+            'address': f'{address:04X}', 'data': data.hex().upper(),
+        }))
+
     @staticmethod
     def sid_parameters(path, song=None):
         if not isinstance(path,str):raise BrowserError('Choose a SID file on the C64U.')

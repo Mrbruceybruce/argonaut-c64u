@@ -96,7 +96,7 @@ The Test Lab also presents the managed bridge as a normal application feature.
 It reports whether the bridge is ready, stopped, unavailable, or needs setup,
 along with the local model, listener address, and paired-address count. The
 private token is never returned to the interface. **Start bridge** and **Restart
-bridge** provide recovery without a terminal. **Pair connected C64U** first
+bridge** provide recovery without a terminal. **Install & pair C64U** first
 re-verifies the active profile against the live device, then adds only that
 fixed IPv4 address while preserving the existing token. A failed restart
 restores the prior private pairing file and restarts the previous bridge.
@@ -115,3 +115,14 @@ matching C64 program, and leaves the bridge ready. The development Debian
 package supplies the bridge launcher and systemd user unit. Ollama, the chosen
 downloaded model, and a narrow TCP 6464 firewall allowance remain explicit
 computer prerequisites; installation does not silently alter them.
+
+The second identity-bound C64U, `C64-Ultimate-7F01C9` at `192.168.68.70`, was
+then installed and paired through this workflow. Its optional DMA text service
+did not open TCP port 64 when enabled temporarily, so Argonaut added a bounded
+fallback using the documented REST `machine:writemem` operation and the
+standard ten-byte KERNAL keyboard buffer. An uncertain chunk is never retried.
+The DMA setting was restored to Disabled and was not saved to flash. With the
+narrow TCP 6464 firewall rule in place, Argonaut sent `WHAT IS A VIC II CHIP?`,
+observed the second C64U connect to the paired bridge, and read back the screen
+reply: `IT'S THE COMMODORE 64'S GRAPHICS CHIP. DISPLAYS COLORS AND SHAPES.` The
+interactive client returned to its question prompt.

@@ -51,6 +51,24 @@ def send_text(client, text, enter=False):
         return _send_text(client, text, enter)
 
 
+def _send_text_rest(client, data):
+    queued = 0
+    try:
+        wait_empty(client)
+        for offset in range(0, len(data), 10):
+            wait_empty(client)
+            chunk = data[offset:offset + 10]
+            client.write_memory(0x0277, chunk)
+            queued = offset + len(chunk)
+            client.write_memory(0x00C6, bytes((len(chunk),)))
+            wait_empty(client)
+    except (OSError, BrowserError) as exc:
+        raise BrowserError(
+            f'REST Send Text stopped; up to {queued} bytes may have been sent. '
+            f'Check the C64U before retrying. {exc}') from exc
+    return len(data)
+
+
 def _send_text(client, text, enter=False):
     data=encode_text(text,enter)
     queued=0
@@ -72,6 +90,12 @@ def _send_text(client, text, enter=False):
                 if not length:raise BrowserError('DMA service returned an empty response.')
                 receive_exact(connection,length)
                 wait_empty(client)
+    except ConnectionRefusedError as exc:
+        if queued == 0:
+            return _send_text_rest(client, data)
+        raise BrowserError(
+            f'Send Text stopped; up to {queued} bytes may have been sent. '
+            f'Check the C64U before retrying. {exc}') from exc
     except (OSError,BrowserError) as exc:
         raise BrowserError(f'Send Text stopped; up to {queued} bytes may have been sent. Check the C64U before retrying. {exc}') from exc
     return len(data)

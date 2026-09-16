@@ -40,3 +40,13 @@ class Tests(unittest.TestCase):
         for path in ('relative.prg','/USB2/../bad.prg','/USB2/readme.txt'):
             with self.subTest(path=path),self.assertRaises(BrowserError):
                 client.run_prg(path)
+    def test_write_memory_is_bounded_and_encoded(self):
+        client=UltimateClient('device')
+        with patch.object(client,'_request_json',return_value={'errors':[]}) as request:
+            client.write_memory(0x0277,b'A\r')
+        request.assert_called_once_with(
+            'PUT','/v1/machine:writemem?address=0277&data=410D')
+        for address,data in ((-1,b'A'),(0xffff,b'AB'),(0x0277,b''),
+                             (0x0277,b'A'*129),(0x0277,'A')):
+            with self.subTest(address=address,data=data),self.assertRaises(BrowserError):
+                client.write_memory(address,data)
