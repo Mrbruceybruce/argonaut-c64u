@@ -31,6 +31,8 @@ class GatewayTests(unittest.TestCase):
         payload = json.loads(request.data)
         self.assertFalse(payload['stream'])
         self.assertEqual(payload['model'], 'local-model')
+        self.assertEqual(payload['options']['num_predict'], 256)
+        self.assertEqual(build.return_value.open.call_args.kwargs['timeout'], 60)
         self.assertEqual(json.loads(payload['messages'][1]['content']), EVIDENCE)
         self.assertNotIn('Authorization', request.headers)
 
@@ -80,6 +82,13 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(caught.exception.kind, 'authentication')
         with patch('urllib.request.build_opener') as build:
             build.return_value.open.return_value = response({'done': False})
+            with self.assertRaises(GatewayError) as caught:
+                AIGateway(GatewayConfig('ollama', 'local-model'))(EVIDENCE)
+        self.assertEqual(caught.exception.kind, 'response')
+        with patch('urllib.request.build_opener') as build:
+            build.return_value.open.return_value = response({
+                'done': True, 'done_reason': 'length',
+                'message': {'content': 'Incomplete'}})
             with self.assertRaises(GatewayError) as caught:
                 AIGateway(GatewayConfig('ollama', 'local-model'))(EVIDENCE)
         self.assertEqual(caught.exception.kind, 'response')

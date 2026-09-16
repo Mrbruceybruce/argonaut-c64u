@@ -105,6 +105,8 @@ diagnosis on the next failed run. When a retry succeeds, it sends one local
 diagnosis-ready alert. Saving the switch off in the Development Test Lab tab
 disables unattended AI analysis. The unattended layer analyzes at most four
 failed C64Us per run; larger fleets keep the ordinary saved results and alerts.
+Local requests allow up to 60 seconds per failed C64U and cap the diagnosis at
+256 generated tokens so the unattended service remains bounded.
 
 The simulated checks exercise the real REST and FTP transport code against
 in-process fixtures. They cover valid and malformed REST responses, REST and
