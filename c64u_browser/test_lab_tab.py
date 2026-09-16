@@ -64,11 +64,12 @@ class TestLabTab:
                                        self.show_history)
         self.verified_button = app.button(saved_row, 'View last verified result',
                                           self.show_verified_history)
+        app.button(saved_row, 'Refresh saved results', self.refresh_saved_history)
         self.saved_button.set_sensitive(False)
         self.verified_button.set_sensitive(False)
         archive_row = Gtk.Box(spacing=8)
         self.box.append(archive_row)
-        archive_row.append(Gtk.Label(label='Earlier saved run:', xalign=0))
+        archive_row.append(Gtk.Label(label='Saved runs:', xalign=0))
         self.saved_run_choice = Gtk.DropDown.new_from_strings(['No saved runs'])
         self.saved_run_choice.set_hexpand(True)
         archive_row.append(self.saved_run_choice)
@@ -164,6 +165,9 @@ class TestLabTab:
     def shown(self, _, page, _index):
         if page == self.box:
             self.refresh_history(auto_load=True)
+
+    def refresh_saved_history(self):
+        self.refresh_history(auto_load=True)
 
     def refresh_history(self, auto_load=False):
         self.saved_records = saved_hardware_results(self.app.preferences)
