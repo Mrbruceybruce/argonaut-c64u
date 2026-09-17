@@ -53,7 +53,7 @@ class C64AIBridgeTests(unittest.TestCase):
 
     def test_interactive_client_prompts_and_reconnects(self):
         source = render_chat_client('192.0.2.1', 6464, 'B' * 64)
-        self.assertIn('40 input "ask argonaut (blank exits)";q$', source)
+        self.assertIn('40 q$="":input "ask argonaut (blank exits)";q$', source)
         self.assertIn('45 if len(q$)>80', source)
         self.assertIn('+mid$(str$(len(q$)),2)+chr$(10)+q$', source)
         self.assertIn('900 goto 40', source)

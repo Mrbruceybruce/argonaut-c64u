@@ -19,10 +19,10 @@ CONFIG = C64BridgeConfig(
 class C64AIInstallTests(unittest.TestCase):
     def test_built_in_tokenizer_matches_verified_petcat_fixture(self):
         program = build_c64_ai_client(CONFIG)
-        self.assertEqual(len(program), 1526)
+        self.assertEqual(len(program), 1532)
         self.assertEqual(
             sha256(program).hexdigest(),
-            '343d0c00a729a90a76c615c4d5c8adf97b235e7e5f1381829888981001ee64b9')
+            '03824eabf37ad745bdd21d5b27f3844249e926c42819d787880cd79d4f8a9c79')
         self.assertEqual(program[:2], b'\x01\x08')
         self.assertEqual(program[-2:], b'\x00\x00')
 
@@ -40,11 +40,11 @@ class C64AIInstallTests(unittest.TestCase):
         upload.side_effect = uploaded
         result = install_c64_ai_client(Mock(), CONFIG)
         self.assertTrue(result.installed)
-        self.assertEqual(result.size, 1526)
+        self.assertEqual(result.size, 1532)
 
     @patch('c64u_browser.c64_ai_install.download')
     @patch('c64u_browser.c64_ai_install.inspect',
-           return_value=Entry('argonaut-ai.prg', 'file', 1526))
+           return_value=Entry('argonaut-ai.prg', 'file', 1532))
     def test_identical_existing_client_is_kept(self, _inspect, download):
         program = build_c64_ai_client(CONFIG)
         download.side_effect = lambda _client, _source, destination: Path(

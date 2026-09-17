@@ -26,7 +26,10 @@ def _render_client(host, port, token, interactive):
         request = (_quoted('argonaut/1 ' + token.lower() + ' ')
                    + '+mid$(str$(len(q$)),2)+chr$(10)+q$')
         title = 'argonaut local ai'
-        question_line = '40 input "ask argonaut (blank exits)";q$:if q$="" then end'
+        # Commodore BASIC can retain the previous string value when INPUT is
+        # submitted without text. Clear it first so the documented blank exit
+        # is deterministic after any number of questions.
+        question_line = '40 q$="":input "ask argonaut (blank exits)";q$:if q$="" then end'
         request_line = '45 if len(q$)>80 then print "question is too long":goto 40'
     else:
         request = (_quoted('argonaut/1 ' + token.lower() + ' ' + str(len(question)))
