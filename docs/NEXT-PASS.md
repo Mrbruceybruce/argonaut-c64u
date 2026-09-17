@@ -12,8 +12,9 @@ built and physically tested at milestones instead of after each small change.
 2. **Complete (2026-09-16):** Verified the ai.2 Send Text fallback on a physical
    C64U at a BASIC READY prompt without starting a video preview. The command
    executed and the UI returned promptly from its working state.
-3. Use **Install & pair C64U** to upgrade an exact ai.1-generated C64 AI client,
-   then verify that Return at an empty prompt exits after a completed question.
+3. **Complete (2026-09-16):** Used **Install & pair C64U** to upgrade the
+   ai.1-generated C64 AI client on physical hardware. A question completed and
+   Return at the next empty prompt exited cleanly to BASIC READY.
 4. Exercise the local-model outage and recovery path while confirming that AI
    availability never changes saved deterministic C64U verdicts.
 5. Keep the four read-only checks passing for every identity-bound C64U through
