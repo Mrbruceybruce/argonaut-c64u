@@ -15,10 +15,11 @@ built and physically tested at milestones instead of after each small change.
 3. **Complete (2026-09-16):** Used **Install & pair C64U** to upgrade the
    ai.1-generated C64 AI client on physical hardware. A question completed and
    Return at the next empty prompt exited cleanly to BASIC READY.
-4. Exercise the local-model outage and recovery path while confirming that AI
-   availability never changes saved deterministic C64U verdicts.
-5. Keep the four read-only checks passing for every identity-bound C64U through
-   the unattended 30-minute fleet timer.
+4. **Complete (2026-09-16):** Stopped and restored the dedicated Argonaut Ollama
+   service. Health changed from `model_unavailable` back to `ready`; both C64Us
+   retained identical passing verdicts before, during, and after the outage.
+5. **Passing:** Both identity-bound C64Us pass all four read-only checks. The
+   unattended 30-minute fleet timer remains active for continued monitoring.
 
 ## Completed foundation
 
