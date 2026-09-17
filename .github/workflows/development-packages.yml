@@ -54,7 +54,7 @@ jobs:
         $exe = Join-Path $env:GITHUB_WORKSPACE 'dist\Argonaut\Argonaut.exe'
         $env:PATH = "$env:SystemRoot\system32;$env:SystemRoot"
         $process = Start-Process -FilePath $exe -ArgumentList @('--self-test', $report) -PassThru
-        if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Startup test timed out' }
+        if (-not $process.WaitForExit(90000)) { $process.Kill(); throw 'Startup test timed out' }
         if ($process.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Packaged startup failed' }
         $result = Get-Content $report | ConvertFrom-Json
         if ($result.result -ne 'passed' -or $result.suite -ne 'package' -or $result.build -ne $env:ARGONAUT_SOURCE_COMMIT) { throw 'Package self-test did not pass' }

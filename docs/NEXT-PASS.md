@@ -31,6 +31,11 @@ These retained artifacts were not published because the ai.2 name already
 identifies the earlier prerelease; physical cross-platform testing will use the
 next numbered prerelease.
 
+Prerelease 1.5-ai.3 was published from exact commit `c3b480c` after Windows and
+both Mac architectures passed their source and packaged-app checks. One Windows
+hosted runner exceeded the original 60-second cold-start allowance without a
+failed check; an immediate clean retry passed, and future runs allow 90 seconds.
+
 ## Completed foundation
 
 - Structured, sanitized REST, FTP, DMA, file, and background-operation records.
