@@ -9,8 +9,9 @@ built and physically tested at milestones instead of after each small change.
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
    fleet timer on the same source build. Stable Argonaut remains separate.
-2. Verify the ai.2 Send Text fallback at a BASIC READY prompt without requiring
-   a video preview.
+2. **Complete (2026-09-16):** Verified the ai.2 Send Text fallback on a physical
+   C64U at a BASIC READY prompt without starting a video preview. The command
+   executed and the UI returned promptly from its working state.
 3. Use **Install & pair C64U** to upgrade an exact ai.1-generated C64 AI client,
    then verify that Return at an empty prompt exits after a completed question.
 4. Exercise the local-model outage and recovery path while confirming that AI
