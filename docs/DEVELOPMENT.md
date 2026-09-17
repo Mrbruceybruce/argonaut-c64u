@@ -13,6 +13,12 @@ Keep work on the development branch. Commit tested changes here; push/release
 when ready. The argonaut-windows directory is legacy staging, not the active
 checkout. GitHub Actions still builds Windows and Mac packages.
 
+Development is currently Linux-first. Complete implementation and hardware
+validation on Linux, where the C64Us and local AI services are available, and
+build Windows plus both Mac architectures at milestone boundaries. Portable
+code and platform tests remain required throughout; repeated desktop packaging
+is deferred until a milestone is ready for consolidated regression testing.
+
 This separates app settings, not the connected C64U hardware or files: operations
 in either app still affect the selected real device. Mount & Run and Send Text have passed initial hardware testing; the
 current prerelease checklist is in DEVELOPMENT-TEST.md.
