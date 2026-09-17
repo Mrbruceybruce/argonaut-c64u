@@ -16,7 +16,7 @@ from .test_lab import run_default_checks
 from .test_lab_probe import run_diagnosis_probe
 from .hardware_checks import run_hardware_checks
 from .ai_analysis import analyze_failures
-from .ai_presentation import readable_diagnosis
+from .ai_presentation import readable_diagnosis, unavailable_message
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .c64_ai_launch import launch_c64_ai
 from .c64_ai_bridge_control import (
@@ -569,10 +569,11 @@ class TestLabTab:
         try:
             gateway = AIGateway(GatewayConfig(provider, model))
         except GatewayError as exc:
-            self.ai_status.set_text(str(exc))
+            self._show_ai_unavailable(provider, exc)
             return
         report = self.report
         self.ai_status.set_text('Analyzing failed checks…')
+        self.ai_details.get_buffer().set_text('Waiting for the AI service…')
         self.analyze_button.set_sensitive(False)
 
         def task():
@@ -584,7 +585,7 @@ class TestLabTab:
         def done(result):
             self.analyze_button.set_sensitive(self.report is report and report['status'] == 'fail')
             if isinstance(result, Exception):
-                self.ai_status.set_text(str(result))
+                self._show_ai_unavailable(provider, result)
                 return
             if self.report is not report:
                 return
@@ -595,6 +596,14 @@ class TestLabTab:
             self.app.status.set_text('AI diagnosis is ready; test verdicts are unchanged.')
 
         self.app.run(task, done)
+
+    def _show_ai_unavailable(self, provider, error):
+        message = unavailable_message(provider, error)
+        self.analysis = None
+        self.ai_status.set_text(message)
+        self.ai_details.get_buffer().set_text(message)
+        self.app.status.set_text(
+            message + ' Test results are complete and their verdicts are unchanged.')
 
     def export(self):
         if self.report is None or self.chooser is not None:
