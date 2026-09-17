@@ -59,19 +59,23 @@ class TestLabTab:
         self.saved_records = []
         self.schedule = HardwareSchedule()
         self.schedule_source = None
-        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        self.box.append(Gtk.Label(
+        self.box = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
+        self.box.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.content.set_hexpand(True)
+        self.box.set_child(self.content)
+        self.content.append(Gtk.Label(
             label='Offline checks use simulations. C64U checks read the connected device without changing settings, drives, or files.',
             xalign=0, wrap=True))
-        self.box.append(Gtk.Label(
+        self.content.append(Gtk.Label(
             label=(getattr(app, 'operation_log_error', None) or
-                   'Detailed C64U activity is saved privately while Development is open.'),
+                   'Detailed C64U activity is saved privately while Test Lab is open.'),
             xalign=0, wrap=True))
         self.saved_overview = Gtk.Label(label='No saved C64U results loaded.',
                                         xalign=0, wrap=True)
-        self.box.append(self.saved_overview)
+        self.content.append(self.saved_overview)
         saved_row = Gtk.Box(spacing=8)
-        self.box.append(saved_row)
+        self.content.append(saved_row)
         saved_row.append(Gtk.Label(label='Saved C64U:', xalign=0))
         self.saved_choice = Gtk.DropDown.new_from_strings(['No bound C64Us'])
         self.saved_choice.set_hexpand(True)
@@ -85,7 +89,7 @@ class TestLabTab:
         self.saved_button.set_sensitive(False)
         self.verified_button.set_sensitive(False)
         archive_row = Gtk.Box(spacing=8)
-        self.box.append(archive_row)
+        self.content.append(archive_row)
         archive_row.append(Gtk.Label(label='Saved runs:', xalign=0))
         self.saved_run_choice = Gtk.DropDown.new_from_strings(['No saved runs'])
         self.saved_run_choice.set_hexpand(True)
@@ -94,7 +98,7 @@ class TestLabTab:
                                            self.show_selected_history)
         self.saved_run_button.set_sensitive(False)
         toolbar = Gtk.Box(spacing=8)
-        self.box.append(toolbar)
+        self.content.append(toolbar)
         self.run_button = app.button(toolbar, 'Run offline checks', self.run)
         self.hardware_button = app.button(toolbar, 'Run C64U checks', self.run_hardware)
         self.export_button = app.button(toolbar, 'Export JSON…', self.export)
@@ -109,7 +113,7 @@ class TestLabTab:
         self.c64_ai_button.set_tooltip_text(
             'Enable the Command Interface for this session and start the paired USB2 client.')
         bridge_row = Gtk.Box(spacing=8)
-        self.box.append(bridge_row)
+        self.content.append(bridge_row)
         bridge_row.append(Gtk.Label(label='C64 AI bridge:', xalign=0))
         self.bridge_status = Gtk.Label(
             label='Checking local bridge…', xalign=0, hexpand=True, wrap=True)
@@ -130,7 +134,7 @@ class TestLabTab:
         self.bridge_loaded = False
         self.bridge_state = 'unknown'
         health_row = Gtk.Box(spacing=8)
-        self.box.append(health_row)
+        self.content.append(health_row)
         health_row.append(Gtk.Label(label='Automatic health alerts:', xalign=0))
         self.health_status = Gtk.Label(
             label='Checking…', xalign=0, hexpand=True, wrap=True)
@@ -138,7 +142,7 @@ class TestLabTab:
         self.health_button = app.button(
             health_row, 'Enable alerts', self.enable_health_alerts)
         ai_test_row = Gtk.Box(spacing=8)
-        self.box.append(ai_test_row)
+        self.content.append(ai_test_row)
         ai_test_row.append(Gtk.Label(label='Automatic AI tests:', xalign=0))
         self.ai_test_status = Gtk.Label(
             label='Checking…', xalign=0, hexpand=True, wrap=True)
@@ -151,7 +155,7 @@ class TestLabTab:
         self.ai_test_state = 'unknown'
         self.ai_test_record = None
         background_row = Gtk.Box(spacing=8)
-        self.box.append(background_row)
+        self.content.append(background_row)
         background_row.append(Gtk.Label(label='Background C64U checks:', xalign=0))
         self.background_status = Gtk.Label(
             label='Checking…', xalign=0, hexpand=True, wrap=True)
@@ -162,13 +166,13 @@ class TestLabTab:
         self.schedule_check = Gtk.CheckButton(
             label='Run C64U checks every 30 minutes while this window is open')
         self.schedule_check.connect('toggled', self.schedule_toggled)
-        self.box.append(self.schedule_check)
+        self.content.append(self.schedule_check)
         self.summary = Gtk.Label(label='No run yet.', xalign=0, wrap=True)
-        self.box.append(self.summary)
+        self.content.append(self.summary)
         self.changes = Gtk.Label(label='', xalign=0, wrap=True)
-        self.box.append(self.changes)
+        self.content.append(self.changes)
         ai_options = Gtk.Box(spacing=8)
-        self.box.append(ai_options)
+        self.content.append(ai_options)
         ai_options.append(Gtk.Label(label='AI:', xalign=0))
         self.provider = Gtk.DropDown.new_from_strings(['Local Ollama', 'OpenAI cloud'])
         ai_options.append(self.provider)
@@ -176,7 +180,7 @@ class TestLabTab:
         self.model.set_text(os.environ.get('ARGONAUT_AI_MODEL', ''))
         ai_options.append(self.model)
         self.auto_analyze = Gtk.CheckButton(label='Explain failed runs automatically')
-        self.box.append(self.auto_analyze)
+        self.content.append(self.auto_analyze)
         self.unattended_ai_path = self.app.preferences.path.parent / 'test-lab' / CONFIG_NAME
         local_config_error = ''
         try:
@@ -185,7 +189,7 @@ class TestLabTab:
             local_config = None
             local_config_error = 'Saved unattended local AI setting could not be read.'
         local_row = Gtk.Box(spacing=8)
-        self.box.append(local_row)
+        self.content.append(local_row)
         self.unattended_ai = Gtk.CheckButton(
             label='Explain unattended C64U failures with local AI')
         self.unattended_ai.set_active(local_config is not None)
@@ -200,15 +204,16 @@ class TestLabTab:
         app.button(local_row, 'Save local AI setting', self.save_unattended_ai)
         self.unattended_status = Gtk.Label(label=local_config_error,
                                            xalign=0, wrap=True)
-        self.box.append(self.unattended_status)
-        self.box.append(Gtk.Label(
+        self.content.append(self.unattended_status)
+        self.content.append(Gtk.Label(
             label='Only failed check details are sent for AI analysis. OpenAI cloud uses the OPENAI_API_KEY environment variable; the key is never saved in reports.',
             xalign=0, wrap=True))
         self.ai_status = Gtk.Label(label='', xalign=0, wrap=True)
-        self.box.append(self.ai_status)
-        panes = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL, vexpand=True)
+        self.content.append(self.ai_status)
+        panes = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        panes.set_size_request(-1, 260)
         panes.set_position(300)
-        self.box.append(panes)
+        self.content.append(panes)
         self.checks = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self.checks.connect('row-selected', self.selected)
         left = Gtk.ScrolledWindow(min_content_width=220)
@@ -223,7 +228,7 @@ class TestLabTab:
                                        wrap_mode=Gtk.WrapMode.WORD)
         ai_scroll = Gtk.ScrolledWindow(min_content_height=110)
         ai_scroll.set_child(self.ai_details)
-        self.box.append(ai_scroll)
+        self.content.append(ai_scroll)
         self.app.tabs.connect('switch-page', self.shown)
 
     def save_unattended_ai(self):
@@ -392,7 +397,7 @@ class TestLabTab:
             self.ai_test_record['recent'] is not None)
         self.saved_records = saved_hardware_results(self.app.preferences)
         if not self.saved_records:
-            self.saved_overview.set_text('No identity-bound Development C64U profiles.')
+            self.saved_overview.set_text('No identity-bound C64U profiles.')
             self.saved_choice.set_model(Gtk.StringList.new(['No bound C64Us']))
             self.saved_button.set_sensitive(False)
             self.verified_button.set_sensitive(False)

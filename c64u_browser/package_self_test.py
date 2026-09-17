@@ -129,6 +129,11 @@ def run(package_metadata, report_path):
                          'Enable checks',
                          'development.test_lab_controls',
                          'Test Lab automation controls are incorrect.', checks)
+                _require(isinstance(app.test_lab_tab.box, Gtk.ScrolledWindow) and
+                         app.test_lab_tab.box.get_vscrollbar_policy() ==
+                         Gtk.PolicyType.AUTOMATIC,
+                         'development.test_lab_scroll',
+                         'Test Lab cannot scroll vertically.', checks)
                 saved_scale = app.preferences.app_options['preview_scale']
                 app.streams_tab.set_zoom(300)
                 app.streams_tab.apply_scale()
