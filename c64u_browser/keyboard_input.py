@@ -74,7 +74,16 @@ def _send_text(client, text, enter=False):
     queued=0
     try:
         wait_empty(client)
-        with socket.create_connection((client.host,64),timeout=client.timeout) as connection:
+        # A disabled or filtered DMA service can silently drop TCP attempts.
+        # REST has already proved the device and keyboard buffer reachable, so
+        # fail over before any text is queued instead of leaving the UI waiting
+        # for the client's longer general network timeout.
+        try:
+            connection=socket.create_connection(
+                (client.host,64),timeout=min(client.timeout,3))
+        except OSError:
+            return _send_text_rest(client,data)
+        with connection:
             password=client.password.encode('utf-8')
             if len(password)>65535:raise BrowserError('Network password is too long.')
             connection.sendall(struct.pack('<HH',0xff1f,len(password))+password)
@@ -90,12 +99,6 @@ def _send_text(client, text, enter=False):
                 if not length:raise BrowserError('DMA service returned an empty response.')
                 receive_exact(connection,length)
                 wait_empty(client)
-    except ConnectionRefusedError as exc:
-        if queued == 0:
-            return _send_text_rest(client, data)
-        raise BrowserError(
-            f'Send Text stopped; up to {queued} bytes may have been sent. '
-            f'Check the C64U before retrying. {exc}') from exc
     except (OSError,BrowserError) as exc:
         raise BrowserError(f'Send Text stopped; up to {queued} bytes may have been sent. Check the C64U before retrying. {exc}') from exc
     return len(data)
