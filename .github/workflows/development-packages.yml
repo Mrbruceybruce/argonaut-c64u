@@ -23,6 +23,8 @@ jobs:
   windows:
     runs-on: windows-2022
     timeout-minutes: 40
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
     steps:
     - uses: actions/checkout@v5
       with:
@@ -53,7 +55,7 @@ jobs:
         if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Startup test timed out' }
         if ($process.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Packaged startup failed' }
         $result = Get-Content $report | ConvertFrom-Json
-        if ($result.result -ne 'passed' -or $result.suite -ne 'package') { throw 'Package self-test did not pass' }
+        if ($result.result -ne 'passed' -or $result.suite -ne 'package' -or $result.build -ne $env:ARGONAUT_SOURCE_COMMIT) { throw 'Package self-test did not pass' }
         Get-Content $report
     - name: Package and test portable development app
       shell: pwsh
@@ -68,7 +70,7 @@ jobs:
         if (-not $p.WaitForExit(90000)) { $p.Kill(); throw 'Portable test timeout' }
         if ($p.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Portable test failed' }
         $result = Get-Content $report | ConvertFrom-Json
-        if ($result.result -ne 'passed' -or $result.suite -ne 'package') { throw 'Portable self-test did not pass' }
+        if ($result.result -ne 'passed' -or $result.suite -ne 'package' -or $result.build -ne $env:ARGONAUT_SOURCE_COMMIT) { throw 'Portable self-test did not pass' }
         if (-not (Test-Path "$bundle/Data/argonaut-development/config.json")) { throw 'Development preferences missing' }
         Copy-Item $report artifacts/package-self-test-Windows.json
         Remove-Item "$bundle/Data" -Recurse -Force
@@ -82,6 +84,8 @@ jobs:
   macos:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
     steps:
     - uses: actions/checkout@v5
       with:
@@ -125,7 +129,8 @@ jobs:
         if not report.is_file():
             raise SystemExit('Package self-test report is missing')
         result=json.loads(report.read_text())
-        if result.get('result')!='passed' or result.get('suite')!='package':
+        if (result.get('result')!='passed' or result.get('suite')!='package' or
+                result.get('build')!=os.environ['ARGONAUT_SOURCE_COMMIT']):
             raise SystemExit('Package self-test did not pass')
         print(report.read_text())
         PYTHON
