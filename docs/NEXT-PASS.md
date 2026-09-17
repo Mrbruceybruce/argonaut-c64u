@@ -73,7 +73,9 @@ The next Linux package adds **View latest result** beside the automatic AI-test
 schedule so an unattended alert can be reopened after restarting Argonaut. It
 uses the validated private history and reconstructs the comparison against the
 prior verified bridge run. All 330 source tests pass in normal and optimized
-Python modes; installed GTK validation remains.
+Python modes. Installed build `37d02d9` passed all 18 package checks, retained
+the active six-hour timer across the upgrade, and reopened the latest passing
+bridge report with its resolved `bridge.end_to_end` comparison in Test Lab.
 
 ## Completed foundation
 
