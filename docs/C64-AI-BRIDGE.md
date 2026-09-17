@@ -147,6 +147,12 @@ does not determine the result, and its text is neither displayed nor saved.
 The result appears as a structured Test Lab check with the stable ID
 `bridge.end_to_end`, a sanitized bridge operation, and a code-determined
 verdict that can be exported and compared with later runs.
+The Linux package exposes the same saved result headlessly through
+`argonaut-development-ai-bridge-check`, with exit 0 for pass, 1 for fail, 2 for
+skip, and 3 for a setup or invalid-result error. Its JSON output contains the
+report, comparison, and whether private history was saved, but no token,
+addresses, question, or answer text. A history-save failure leaves the check's
+code-determined verdict unchanged and reports `"saved": false`.
 The host may connect to its own listener for this probe; remote clients remain
 limited to the explicitly paired C64U addresses and still require the token.
 

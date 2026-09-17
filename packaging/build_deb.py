@@ -40,6 +40,9 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
   write('usr/lib/systemd/user/argonaut-c64-ai-health.service',health)
   write('usr/lib/systemd/user/argonaut-c64-ai-health.timer',
         (source/'packaging/linux/argonaut-c64-ai-health.timer').read_text())
+  bridge_check_name=app_name+'-ai-bridge-check'
+  write(f'usr/bin/{bridge_check_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/bridge_check.py "$@"\n',0o755)
+  write(f'usr/lib/{app_name}/bridge_check.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.c64_ai_bridge_check import main\nraise SystemExit(main())\n')
   alert_name=app_name+'-test-lab-alert'
   write(f'usr/bin/{alert_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/alert.py "$@"\n',0o755)
   write(f'usr/lib/{app_name}/alert.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.test_lab_alert import main\nraise SystemExit(main())\n')

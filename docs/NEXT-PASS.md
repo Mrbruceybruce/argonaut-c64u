@@ -52,6 +52,11 @@ that reply text was not saved. The next increment records this as a structured,
 exportable `bridge.end_to_end` Test Lab verdict with sanitized operation
 evidence and run comparison.
 
+The structured bridge verdict also has a Linux headless entry point with stable
+exit codes and sanitized JSON so a timer can run the identical check without an
+open Argonaut window. Automatic scheduling and changed-state notifications are
+the next step.
+
 ## Completed foundation
 
 - Structured, sanitized REST, FTP, DMA, file, and background-operation records.
