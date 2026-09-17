@@ -51,4 +51,6 @@ with an explicit recovery plan.
 As an initial defense, Development now marks SuperCPU Detect as a hardware
 compatibility risk in Restore and Undo previews, leaves it unselected, and
 requires a clearly labeled high-risk Apply confirmation. This protection has
-automated coverage and does not attempt to reproduce the reported freeze.
+automated coverage. The warning and high-risk Apply label were verified in the
+installed Linux app on 2026-09-16; the change was canceled and discarded without
+being sent to the C64U. This does not attempt to reproduce the reported freeze.
