@@ -118,8 +118,8 @@ class PreferencesUI(unittest.TestCase):
     def test_test_lab_bridge_setup_state_is_non_secret_and_actionable(self):
         tab=self.app.test_lab_tab
         self.assertIsInstance(tab.box,self.Gtk.ScrolledWindow)
-        self.assertIs(tab.box.get_child(),tab.content)
-        self.assertEqual(tab.box.get_vscrollbar_policy(),
+        self.assertIs(tab.content.get_ancestor(self.Gtk.ScrolledWindow),tab.box)
+        self.assertEqual(tab.box.get_policy()[1],
                          self.Gtk.PolicyType.AUTOMATIC)
         self.app.tabs.set_current_page(6);self.pump()
         self.assertIn('Setup needed',tab.bridge_status.get_text())
@@ -161,7 +161,7 @@ class PreferencesUI(unittest.TestCase):
                 self.assertIsInstance(stable.test_lab_tab.box,
                                       self.Gtk.ScrolledWindow)
                 self.assertEqual(
-                    stable.test_lab_tab.box.get_vscrollbar_policy(),
+                    stable.test_lab_tab.box.get_policy()[1],
                     self.Gtk.PolicyType.AUTOMATIC)
             finally:
                 stable.window.close()

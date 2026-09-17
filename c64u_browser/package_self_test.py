@@ -130,7 +130,7 @@ def run(package_metadata, report_path):
                          'development.test_lab_controls',
                          'Test Lab automation controls are incorrect.', checks)
                 _require(isinstance(app.test_lab_tab.box, Gtk.ScrolledWindow) and
-                         app.test_lab_tab.box.get_vscrollbar_policy() ==
+                         app.test_lab_tab.box.get_policy()[1] ==
                          Gtk.PolicyType.AUTOMATIC,
                          'development.test_lab_scroll',
                          'Test Lab cannot scroll vertically.', checks)
