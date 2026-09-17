@@ -57,6 +57,13 @@ exit codes and sanitized JSON. An independent six-hour Linux timer can run the
 identical test without an open Argonaut window, keep its private report history,
 and notify only when the deterministic result changes or recovers.
 
+The installed `1.5-ai.3+linux.2` package at build `84789e4` passed all 18
+package self-tests. Its installed headless check passed against the real bridge
+and Gemma model, and the enabled six-hour service completed its first scheduled
+path successfully. The alert state is mode 0600 and the service journal contains
+only sanitized structured evidence. Visible Test Lab timer controls remain to be
+confirmed in the installed UI.
+
 ## Completed foundation
 
 - Structured, sanitized REST, FTP, DMA, file, and background-operation records.
