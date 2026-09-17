@@ -131,7 +131,9 @@ def run(package_metadata, report_path):
                          'Test Lab automation controls are incorrect.', checks)
                 _require(isinstance(app.test_lab_tab.box, Gtk.ScrolledWindow) and
                          app.test_lab_tab.box.get_policy()[1] ==
-                         Gtk.PolicyType.AUTOMATIC,
+                         Gtk.PolicyType.ALWAYS and
+                         app.test_lab_tab.ai_scroll.get_policy()[1] ==
+                         Gtk.PolicyType.ALWAYS,
                          'development.test_lab_scroll',
                          'Test Lab cannot scroll vertically.', checks)
                 saved_scale = app.preferences.app_options['preview_scale']

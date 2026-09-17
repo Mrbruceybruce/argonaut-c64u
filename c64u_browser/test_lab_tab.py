@@ -54,13 +54,15 @@ class TestLabTab:
         self.comparison = None
         self.chooser = None
         self.analysis = None
+        self.probe_mode = False
         self.loaded_from_history = False
         self.saved_context = ''
         self.saved_records = []
         self.schedule = HardwareSchedule()
         self.schedule_source = None
         self.box = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
-        self.box.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.box.set_overlay_scrolling(False)
+        self.box.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.ALWAYS)
         self.content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.content.set_hexpand(True)
         self.box.set_child(self.content)
@@ -211,23 +213,30 @@ class TestLabTab:
         self.ai_status = Gtk.Label(label='', xalign=0, wrap=True)
         self.content.append(self.ai_status)
         panes = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        panes.set_vexpand(False)
         panes.set_size_request(-1, 260)
         panes.set_position(300)
         self.content.append(panes)
         self.checks = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self.checks.connect('row-selected', self.selected)
         left = Gtk.ScrolledWindow(min_content_width=220)
+        left.set_overlay_scrolling(False)
         left.set_child(self.checks)
         panes.set_start_child(left)
         self.details = Gtk.TextView(editable=False, cursor_visible=False,
                                     monospace=True, wrap_mode=Gtk.WrapMode.WORD)
-        right = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
+        right = Gtk.ScrolledWindow(hexpand=True)
+        right.set_overlay_scrolling(False)
         right.set_child(self.details)
         panes.set_end_child(right)
         self.ai_details = Gtk.TextView(editable=False, cursor_visible=False,
                                        wrap_mode=Gtk.WrapMode.WORD)
-        ai_scroll = Gtk.ScrolledWindow(min_content_height=110)
+        ai_scroll = Gtk.ScrolledWindow()
+        ai_scroll.set_size_request(-1, 170)
+        ai_scroll.set_overlay_scrolling(False)
+        ai_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.ALWAYS)
         ai_scroll.set_child(self.ai_details)
+        self.ai_scroll = ai_scroll
         self.content.append(ai_scroll)
         self.app.tabs.connect('switch-page', self.shown)
 
@@ -467,6 +476,7 @@ class TestLabTab:
                 'Latest saved result', None, record)
 
     def show_saved(self, report, name, source, profile_id, record):
+        self.probe_mode = False
         self.report = report
         self.comparison = saved_comparison(record, report)
         self.loaded_from_history = True
@@ -491,6 +501,7 @@ class TestLabTab:
                 self.ai_details.get_buffer().set_text(readable_diagnosis(diagnosis))
         except (KeyError, TypeError, ValueError, IndexError):
             self.report = None
+            self.probe_mode = False
             while self.checks.get_first_child():
                 self.checks.remove(self.checks.get_first_child())
             self.details.get_buffer().set_text('')
@@ -573,6 +584,7 @@ class TestLabTab:
                 return
             self.report = result['report']
             self.comparison = result['comparison']
+            self.probe_mode = probe
             self.loaded_from_history = probe
             self.saved_context = (
                 'Expected simulated failure. No C64U was contacted and this probe was not saved.'
@@ -614,7 +626,9 @@ class TestLabTab:
         while self.checks.get_first_child():
             self.checks.remove(self.checks.get_first_child())
         report = self.report
-        self.summary.set_text(summary(report))
+        self.summary.set_text(
+            'Expected simulation failure detected; requesting a local AI explanation.'
+            if self.probe_mode and report['status'] == 'fail' else summary(report))
         self.changes.set_text(self.saved_context if self.loaded_from_history
                               else comparison_summary(self.comparison))
         self.export_button.set_sensitive(True)
@@ -622,8 +636,11 @@ class TestLabTab:
         for index, check in enumerate(report['checks']):
             row = Gtk.ListBoxRow()
             row.check_index = index
-            marker = {'pass': '✓', 'fail': '✕', 'skip': '–'}[check['status']]
-            label = Gtk.Label(label=f"{marker}  {check['title']}",
+            expected = self.probe_mode and check['status'] == 'fail'
+            marker = ('✓' if expected else
+                      {'pass': '✓', 'fail': '✕', 'skip': '–'}[check['status']])
+            title = ('Expected fixture: ' if expected else '') + check['title']
+            label = Gtk.Label(label=f"{marker}  {title}",
                               xalign=0, wrap=True)
             label.set_margin_top(7)
             label.set_margin_bottom(7)
@@ -671,6 +688,9 @@ class TestLabTab:
             self.ai_status.set_text('AI diagnosis for ' + ', '.join(result['check_ids']))
             self.ai_details.get_buffer().set_text(
                 readable_diagnosis(result['diagnosis']))
+            if self.probe_mode:
+                self.summary.set_text(
+                    'Local AI simulation passed; the expected fixture was explained.')
             self.app.status.set_text('AI diagnosis is ready; test verdicts are unchanged.')
 
         self.app.run(task, done)

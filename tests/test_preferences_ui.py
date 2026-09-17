@@ -119,8 +119,11 @@ class PreferencesUI(unittest.TestCase):
         tab=self.app.test_lab_tab
         self.assertIsInstance(tab.box,self.Gtk.ScrolledWindow)
         self.assertIs(tab.content.get_ancestor(self.Gtk.ScrolledWindow),tab.box)
-        self.assertEqual(tab.box.get_policy()[1],
-                         self.Gtk.PolicyType.AUTOMATIC)
+        self.assertEqual(tab.box.get_policy()[1],self.Gtk.PolicyType.ALWAYS)
+        self.assertEqual(tab.ai_scroll.get_policy()[1],
+                         self.Gtk.PolicyType.ALWAYS)
+        self.assertFalse(tab.box.get_overlay_scrolling())
+        self.assertFalse(tab.ai_scroll.get_overlay_scrolling())
         self.app.tabs.set_current_page(6);self.pump()
         self.assertIn('Setup needed',tab.bridge_status.get_text())
         self.assertNotIn('token',tab.bridge_status.get_text().casefold())
@@ -137,6 +140,19 @@ class PreferencesUI(unittest.TestCase):
         self.assertTrue(tab.background_status.get_text())
         self.assertIn(tab.background_button.get_label(),
                       ('Enable checks', 'Stop checks'))
+
+    def test_test_lab_presents_probe_failure_as_expected_fixture(self):
+        from c64u_browser.test_lab_probe import run_diagnosis_probe
+        tab=self.app.test_lab_tab
+        tab.report=run_diagnosis_probe();tab.comparison=None
+        tab.probe_mode=True;tab.loaded_from_history=True
+        tab.saved_context=('Expected simulated failure. No C64U was contacted '
+                           'and this probe was not saved.')
+        tab.render()
+        self.assertIn('Expected simulation failure',tab.summary.get_text())
+        row=tab.checks.get_row_at_index(0)
+        self.assertTrue(row.get_child().get_text().startswith(
+            '✓  Expected fixture:'))
 
     def test_stable_developer_mode_is_opt_in_and_builds_test_lab_after_restart(self):
         from c64u_browser.gui import Browser
@@ -162,6 +178,6 @@ class PreferencesUI(unittest.TestCase):
                                       self.Gtk.ScrolledWindow)
                 self.assertEqual(
                     stable.test_lab_tab.box.get_policy()[1],
-                    self.Gtk.PolicyType.AUTOMATIC)
+                    self.Gtk.PolicyType.ALWAYS)
             finally:
                 stable.window.close()
