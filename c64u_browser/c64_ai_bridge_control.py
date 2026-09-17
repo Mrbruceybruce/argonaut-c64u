@@ -17,6 +17,7 @@ from .c64_ai_bridge_config import (
     C64BridgeConfig, load_bridge_config, save_bridge_config,
 )
 from .c64_ai_chat import MAX_REPLY_BYTES
+from .diagnostics import operation_event
 
 
 SERVICE = 'argonaut-c64-ai-bridge.service'
@@ -47,42 +48,60 @@ class BridgeProbeResult:
     duration_ms: float
 
 
+class BridgeProbeError(BrowserError):
+    def __init__(self, kind, message):
+        self.kind = kind
+        super().__init__(message)
+
+
 def probe_bridge(path, connector=socket.create_connection,
                  clock=time.monotonic):
     """Exercise the deployed C64 protocol without retaining model text."""
     try:
         config = load_bridge_config(path)
     except FileNotFoundError as exc:
-        raise BrowserError('Set up the private C64 AI bridge before testing it.') from exc
+        raise BridgeProbeError(
+            'configuration',
+            'Set up the private C64 AI bridge before testing it.') from exc
     except (OSError, ValueError) as exc:
-        raise BrowserError('The private C64 AI bridge setting could not be read.') from exc
+        raise BridgeProbeError(
+            'configuration',
+            'The private C64 AI bridge setting could not be read.') from exc
     question = b'IS THE ARGONAUT AI BRIDGE READY?'
     request = (f'ARGONAUT/1 {config.token} {len(question)}\n'.encode('ascii')
                + question)
     started = clock()
-    try:
-        with connector((config.host, config.port), timeout=65) as connection:
-            connection.settimeout(65)
-            connection.sendall(request)
-            stream = connection.makefile('rb')
-            header = stream.readline(32)
-            parts = header.rstrip(b'\n').split(b' ')
-            if len(parts) != 2 or parts[0] != b'OK':
-                raise ValueError('Bridge rejected the readiness question.')
-            raw_length = parts[1]
-            if (not raw_length.isascii() or not raw_length.isdigit()
-                    or len(raw_length) > 3):
-                raise ValueError('Bridge returned an invalid answer length.')
-            length = int(raw_length)
-            if not 1 <= length <= MAX_REPLY_BYTES:
-                raise ValueError('Bridge returned an invalid answer length.')
-            answer = stream.read(length)
-            if (len(answer) != length or not answer.isascii()
-                    or any(byte < 32 or byte > 126 for byte in answer)):
-                raise ValueError('Bridge returned an invalid answer.')
-    except (OSError, TimeoutError, ValueError, UnicodeError) as exc:
-        raise BrowserError(
-            'End-to-end C64 AI bridge test failed. Refresh bridge status and retry.') from exc
+    with operation_event('bridge', 'readiness_probe', 'local_model'):
+        try:
+            with connector((config.host, config.port), timeout=65) as connection:
+                connection.settimeout(65)
+                connection.sendall(request)
+                stream = connection.makefile('rb')
+                header = stream.readline(32)
+                parts = header.rstrip(b'\n').split(b' ')
+                if len(parts) != 2 or parts[0] != b'OK':
+                    raise ValueError('Bridge rejected the readiness question.')
+                raw_length = parts[1]
+                if (not raw_length.isascii() or not raw_length.isdigit()
+                        or len(raw_length) > 3):
+                    raise ValueError('Bridge returned an invalid answer length.')
+                length = int(raw_length)
+                if not 1 <= length <= MAX_REPLY_BYTES:
+                    raise ValueError('Bridge returned an invalid answer length.')
+                answer = stream.read(length)
+                if (len(answer) != length or not answer.isascii()
+                        or any(byte < 32 or byte > 126 for byte in answer)):
+                    raise ValueError('Bridge returned an invalid answer.')
+        except (OSError, TimeoutError) as exc:
+            raise BridgeProbeError(
+                'network',
+                'End-to-end C64 AI bridge test could not reach the bridge. '
+                'Refresh bridge status and retry.') from exc
+        except (ValueError, UnicodeError) as exc:
+            raise BridgeProbeError(
+                'response',
+                'End-to-end C64 AI bridge test received an invalid response. '
+                'Restart the bridge and retry.') from exc
     return BridgeProbeResult(length, round((clock() - started) * 1000, 3))
 
 

@@ -253,7 +253,10 @@ readiness check. It uses the private bridge setting to send a fixed question
 through the same authenticated compact protocol used by the C64 client.
 Ordinary code verifies the reply framing, bounded length, completeness, and
 printable ASCII. It does not judge the model's wording, and it does not display
-or retain the response text.
+or retain the response text. The check uses the stable ID
+`bridge.end_to_end`, produces a sanitized `bridge/readiness_probe/local_model`
+operation record, and participates in the ordinary private history and
+comparison mechanism.
 
 API contracts: [Ollama chat](https://docs.ollama.com/api/chat),
 [Ollama nonstreaming](https://docs.ollama.com/api/streaming), and

@@ -46,6 +46,12 @@ saving the model text. The source implementation passed against the real local
 Gemma 3 4B model in 4.7 seconds. The installed Development package and visible
 button remain to be updated and checked on Linux.
 
+The `1.5-ai.3+linux.1` installed UI was verified on 2026-09-16: **Test bridge
+AI** passed the deployed bridge and Gemma path in 4.741 seconds and reported
+that reply text was not saved. The next increment records this as a structured,
+exportable `bridge.end_to_end` Test Lab verdict with sanitized operation
+evidence and run comparison.
+
 ## Completed foundation
 
 - Structured, sanitized REST, FTP, DMA, file, and background-operation records.

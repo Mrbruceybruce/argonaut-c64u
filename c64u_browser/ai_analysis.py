@@ -13,14 +13,17 @@ SAFE_OPERATIONS = {
                       'file_delete', 'file_unknown')),
     'dma': frozenset(('mount_and_run', 'send_text')),
     'local': frozenset(('replace_file',)),
+    'bridge': frozenset(('readiness_probe',)),
 }
 SAFE_TARGETS = {
     'ftp': frozenset(('directory', 'file', 'entry')),
     'dma': frozenset(('disk', 'keyboard')),
     'local': frozenset(('file',)),
+    'bridge': frozenset(('local_model',)),
 }
 SAFE_ERROR_KINDS = frozenset((
     'authentication', 'network', 'host', 'api', 'ftp', 'identity',
+    'configuration', 'response',
     'BrowserError', 'UploadFailure', 'AssertionError', 'ValueError',
     'OSError', 'EOFError', 'TimeoutError', 'UnicodeError',
 ))
@@ -34,7 +37,7 @@ SAFE_CHECK_IDS = frozenset((
     'sim.identity.wrong_device', 'sim.hardware.complete',
     'sim.transfer.download', 'sim.transfer.interrupted',
     'sim.transfer.upload', 'sim.transfer.collision',
-    'probe.ftp_authentication',
+    'probe.ftp_authentication', 'bridge.end_to_end',
 ))
 
 

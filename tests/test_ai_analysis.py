@@ -54,6 +54,22 @@ class AnalysisBoundaryTests(unittest.TestCase):
         self.assertNotIn('private', json.dumps(evidence))
         self.assertNotIn('secret', json.dumps(evidence))
 
+    def test_bridge_failure_uses_only_stable_probe_evidence(self):
+        report = {'schema': 1, 'suite': 'bridge', 'status': 'fail', 'checks': [
+            {'id': 'bridge.end_to_end', 'title': 'private model answer',
+             'status': 'fail', 'error_kind': 'response', 'operations': [
+                 {'transport': 'bridge', 'operation': 'readiness_probe',
+                  'target': 'local_model', 'outcome': 'error',
+                  'error_kind': 'response', 'reply': 'private answer'}]}]}
+        evidence = failure_evidence(report)
+        self.assertEqual(evidence['failures'], [{
+            'id': 'bridge.end_to_end', 'error_kind': 'response',
+            'operations': [{
+                'transport': 'bridge', 'operation': 'readiness_probe',
+                'target': 'local_model', 'outcome': 'error',
+                'error_kind': 'response'}]}])
+        self.assertNotIn('private', json.dumps(evidence))
+
     def test_passing_report_does_not_call_adapter(self):
         adapter = Mock()
         result = analyze_failures({'schema': 1, 'status': 'pass', 'checks': [

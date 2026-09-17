@@ -19,9 +19,10 @@ from .ai_analysis import analyze_failures
 from .ai_presentation import readable_diagnosis, unavailable_message
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .c64_ai_launch import launch_c64_ai
+from .c64_ai_bridge_check import run_bridge_checks
 from .c64_ai_bridge_control import (
     activate_bridge, bridge_status, enable_health_monitor,
-    health_monitor_status, probe_bridge, setup_bridge,
+    health_monitor_status, setup_bridge,
 )
 from .c64_ai_install import install_and_pair_c64_ai
 from .test_lab_history import run_with_history
@@ -311,25 +312,8 @@ class TestLabTab:
     def test_bridge_ai(self):
         if self.app.busy or self.bridge_state != 'ready':
             return
-        previous = self.bridge_status.get_text()
-        self.bridge_status.set_text('Testing the deployed C64 AI bridge…')
-
-        def task():
-            try:
-                return probe_bridge(self.bridge_path)
-            except Exception as exc:
-                return exc
-
-        def done(result):
-            if isinstance(result, Exception):
-                self.bridge_status.set_text(previous)
-                self.app.status.set_text(str(result))
-                return
-            self.bridge_status.set_text(previous)
-            self.app.status.set_text(
-                f'End-to-end C64 AI bridge test passed in {result.duration_ms:.0f} ms; reply text was not saved.')
-
-        self.app.run(task, done)
+        self._run_checks(
+            lambda: run_bridge_checks(self.bridge_path), bridge=True)
 
     def pair_connected_c64(self):
         client = None if getattr(self.app, 'offline_message', None) else self.app.client
@@ -509,7 +493,7 @@ class TestLabTab:
             GLib.source_remove(self.schedule_source)
             self.schedule_source = None
 
-    def _run_checks(self, runner, profile_id=None, probe=False):
+    def _run_checks(self, runner, profile_id=None, probe=False, bridge=False):
         if self.app.busy:
             return
         self.summary.set_text('Simulating an FTP login failure…' if probe
@@ -517,11 +501,13 @@ class TestLabTab:
         self.run_button.set_sensitive(False)
         self.hardware_button.set_sensitive(False)
         self.probe_button.set_sensitive(False)
+        self.probe_bridge_button.set_sensitive(False)
 
         def done(result):
             self.run_button.set_sensitive(True)
             self.hardware_button.set_sensitive(True)
             self.probe_button.set_sensitive(True)
+            self.probe_bridge_button.set_sensitive(self.bridge_state == 'ready')
             if not isinstance(result, dict):
                 self.summary.set_text('Could not run checks. See the status message below.')
                 return
@@ -538,7 +524,10 @@ class TestLabTab:
             if not probe:
                 self.refresh_history()
             message = ('Local AI probe: expected simulated FTP login failure.'
-                       if probe else 'Test Lab: ' + summary(self.report))
+                       if probe else
+                       'C64 AI bridge: ' + summary(self.report) +
+                       ' · reply text was not saved.' if bridge else
+                       'Test Lab: ' + summary(self.report))
             if not probe and not result['saved']:
                 message += ' · Run history could not be saved.'
             self.app.status.set_text(message)

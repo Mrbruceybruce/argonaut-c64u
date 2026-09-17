@@ -144,6 +144,9 @@ host through the managed bridge and configured local model. It sends one fixed
 readiness question, then ordinary code validates the authenticated response
 frame, size, completeness, and printable ASCII contract. The reply's meaning
 does not determine the result, and its text is neither displayed nor saved.
+The result appears as a structured Test Lab check with the stable ID
+`bridge.end_to_end`, a sanitized bridge operation, and a code-determined
+verdict that can be exported and compared with later runs.
 The host may connect to its own listener for this probe; remote clients remain
 limited to the explicitly paired C64U addresses and still require the token.
 

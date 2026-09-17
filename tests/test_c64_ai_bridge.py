@@ -1,4 +1,5 @@
 import http.client
+import json
 import os
 from pathlib import Path
 import socket
@@ -14,7 +15,8 @@ from c64u_browser.c64_ai_client import render_chat_client, render_link_probe
 from c64u_browser.c64_ai_bridge_config import (
     C64BridgeConfig, load_bridge_config, save_bridge_config,
 )
-from c64u_browser.c64_ai_bridge_control import probe_bridge
+from c64u_browser.c64_ai_bridge_control import BridgeProbeError, probe_bridge
+from c64u_browser.c64_ai_bridge_check import run_bridge_checks
 from c64u_browser.c64_ai_service import (
     loopback_server, paired_c64_server, paired_lan_server,
 )
@@ -180,14 +182,36 @@ class C64AIBridgeTests(unittest.TestCase):
                     ('192.0.2.10',), TOKEN))
                 ticks = iter((10.0, 10.25))
                 result = probe_bridge(path, clock=lambda: next(ticks))
+                report = run_bridge_checks(path)
             self.assertEqual(result.reply_bytes, len(b'BRIDGE READY.'))
             self.assertEqual(result.duration_ms, 250.0)
-            gateway.assert_called_once_with('IS THE ARGONAUT AI BRIDGE READY?')
+            self.assertEqual(gateway.call_count, 2)
+            gateway.assert_called_with('IS THE ARGONAUT AI BRIDGE READY?')
             self.assertFalse(hasattr(result, 'reply'))
+            self.assertEqual(report['suite'], 'bridge')
+            self.assertEqual(report['status'], 'pass')
+            check = report['checks'][0]
+            self.assertEqual(check['id'], 'bridge.end_to_end')
+            self.assertEqual(check['operations'][0]['transport'], 'bridge')
+            self.assertEqual(check['operations'][0]['target'], 'local_model')
+            self.assertNotIn('BRIDGE READY', json.dumps(report))
         finally:
             server.shutdown()
             server.server_close()
             thread.join(timeout=2)
+
+    def test_probe_failure_has_stable_category_without_private_details(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'bridge.json'
+            save_bridge_config(path, C64BridgeConfig(
+                'gemma3:4b', '127.0.0.1', 6464,
+                ('192.0.2.10',), TOKEN))
+            def unavailable(*_args, **_kwargs):
+                raise OSError('private network detail')
+            with self.assertRaises(BridgeProbeError) as caught:
+                probe_bridge(path, connector=unavailable)
+        self.assertEqual(caught.exception.kind, 'network')
+        self.assertNotIn('private', str(caught.exception))
 
 
 if __name__ == '__main__':
