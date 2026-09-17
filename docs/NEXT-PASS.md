@@ -21,6 +21,10 @@ built and physically tested at milestones instead of after each small change.
 5. **Passing:** Both identity-bound C64Us pass all four read-only checks. The
    unattended 30-minute fleet timer remains active for continued monitoring.
 
+The installed Linux package at build `807562f` passed all 18 package self-tests
+against the real GTK desktop on 2026-09-16. The source suite also passed all 317
+tests in normal and optimized Python modes.
+
 ## Completed foundation
 
 - Structured, sanitized REST, FTP, DMA, file, and background-operation records.
