@@ -124,6 +124,19 @@ class PreferencesUI(unittest.TestCase):
                          self.Gtk.PolicyType.ALWAYS)
         self.assertFalse(tab.box.get_overlay_scrolling())
         self.assertFalse(tab.ai_scroll.get_overlay_scrolling())
+        self.assertEqual(tab.latest_action.get_text(), 'Action: None yet')
+        self.assertIn('No test has run', tab.latest_deterministic.get_text())
+        self.assertEqual(tab.latest_ai.get_text(),
+                         'AI analysis: Not requested.')
+        tab.update_latest(
+            'Local AI simulation',
+            'PASS — expected simulated failure was detected.',
+            'UNAVAILABLE — enter a downloaded model name.')
+        self.assertEqual(tab.latest_action.get_text(),
+                         'Action: Local AI simulation')
+        self.assertIn('PASS', tab.latest_deterministic.get_text())
+        self.assertIn('UNAVAILABLE', tab.latest_ai.get_text())
+        self.assertTrue(tab.latest_status_path.is_file())
         self.app.tabs.set_current_page(6);self.pump()
         for check in (tab.schedule_check,tab.auto_analyze,tab.unattended_ai):
             self.assertEqual(check.get_halign(),self.Gtk.Align.START)

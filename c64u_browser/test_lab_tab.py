@@ -46,6 +46,7 @@ from .test_lab_background import set_enabled as set_background_enabled
 from .test_lab_background import status as background_status
 from .service_migration import migrate_legacy_services
 from .test_lab_access import initialize_stable_automation
+from .test_lab_snapshot import save_latest
 
 
 class TestLabTab:
@@ -115,6 +116,25 @@ class TestLabTab:
         self.c64_ai_button = app.button(toolbar, 'Launch C64 AI', self.launch_c64_ai)
         self.c64_ai_button.set_tooltip_text(
             'Enable the Command Interface for this session and start the paired USB2 client.')
+        self.latest_status_path = (
+            self.app.preferences.path.parent / 'test-lab' / 'latest-status.json')
+        latest = Gtk.Frame(label='Latest Test Lab result')
+        latest_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=4,
+            margin_top=8, margin_bottom=8, margin_start=10, margin_end=10)
+        latest.set_child(latest_box)
+        self.latest_action = Gtk.Label(
+            label='Action: None yet', xalign=0, wrap=True, selectable=True)
+        self.latest_deterministic = Gtk.Label(
+            label='Deterministic result: No test has run.', xalign=0,
+            wrap=True, selectable=True)
+        self.latest_ai = Gtk.Label(
+            label='AI analysis: Not requested.', xalign=0,
+            wrap=True, selectable=True)
+        latest_box.append(self.latest_action)
+        latest_box.append(self.latest_deterministic)
+        latest_box.append(self.latest_ai)
+        self.content.append(latest)
         bridge_row = Gtk.Box(spacing=8)
         self.content.append(bridge_row)
         bridge_row.append(Gtk.Label(label='C64 AI bridge:', xalign=0))
@@ -526,16 +546,18 @@ class TestLabTab:
             self.analyze_button.set_sensitive(False)
 
     def run(self):
-        self._run_checks(run_default_checks)
+        self._run_checks(run_default_checks, action='Offline checks')
 
     def run_probe(self):
-        self._run_checks(run_diagnosis_probe, probe=True)
+        self._run_checks(run_diagnosis_probe, probe=True,
+                         action='Local AI simulation')
 
     def run_hardware(self):
         client = None if getattr(self.app, 'offline_message', None) else self.app.client
         profile = self.app.active_profile if client is not None else None
         self._run_checks(lambda: run_hardware_checks(client, profile),
-                         profile_id=profile.id if profile else None)
+                         profile_id=profile.id if profile else None,
+                         action='Read-only C64U checks')
 
     def launch_c64_ai(self):
         client = None if getattr(self.app, 'offline_message', None) else self.app.client
@@ -579,9 +601,12 @@ class TestLabTab:
             GLib.source_remove(self.schedule_source)
             self.schedule_source = None
 
-    def _run_checks(self, runner, profile_id=None, probe=False, bridge=False):
+    def _run_checks(self, runner, profile_id=None, probe=False, bridge=False,
+                    action=None):
         if self.app.busy:
             return
+        action = action or ('C64 AI bridge test' if bridge else 'Test Lab checks')
+        self.update_latest(action, 'Running…', 'Not requested.')
         self.summary.set_text('Simulating an FTP login failure…' if probe
                               else 'Running checks…')
         self.run_button.set_sensitive(False)
@@ -596,6 +621,8 @@ class TestLabTab:
             self.probe_bridge_button.set_sensitive(self.bridge_state == 'ready')
             if not isinstance(result, dict):
                 self.summary.set_text('Could not run checks. See the status message below.')
+                self.update_latest(
+                    action, 'Could not run checks.', 'Not requested.')
                 return
             self.report = result['report']
             self.comparison = result['comparison']
@@ -608,6 +635,15 @@ class TestLabTab:
             self.ai_status.set_text('')
             self.ai_details.get_buffer().set_text('')
             self.render()
+            deterministic = (
+                'PASS — expected simulated failure was detected.'
+                if probe and self.report['status'] == 'fail' else
+                self.report['status'].upper() + ' — ' + summary(self.report))
+            ai_result = (
+                'Pending local explanation.'
+                if probe and self.report['status'] == 'fail' else
+                'Not requested.')
+            self.update_latest(action, deterministic, ai_result)
             if not probe:
                 self.refresh_history()
             message = ('Local AI probe: expected simulated FTP login failure.'
@@ -684,6 +720,11 @@ class TestLabTab:
         report = self.report
         self.ai_status.set_text('Analyzing failed checks…')
         self.ai_details.get_buffer().set_text('Waiting for the AI service…')
+        self.update_latest(
+            self.latest_action.get_text().removeprefix('Action: '),
+            self.latest_deterministic.get_text().removeprefix(
+                'Deterministic result: '),
+            'Running…')
         self.analyze_button.set_sensitive(False)
 
         def task():
@@ -706,6 +747,11 @@ class TestLabTab:
             if self.probe_mode:
                 self.summary.set_text(
                     'Local AI simulation passed; the expected fixture was explained.')
+            self.update_latest(
+                self.latest_action.get_text().removeprefix('Action: '),
+                self.latest_deterministic.get_text().removeprefix(
+                    'Deterministic result: '),
+                'PASS — explanation received; verdict unchanged.')
             self.app.status.set_text('AI diagnosis is ready; test verdicts are unchanged.')
 
         self.app.run(task, done)
@@ -715,8 +761,23 @@ class TestLabTab:
         self.analysis = None
         self.ai_status.set_text(message)
         self.ai_details.get_buffer().set_text(message)
+        self.update_latest(
+            self.latest_action.get_text().removeprefix('Action: '),
+            self.latest_deterministic.get_text().removeprefix(
+                'Deterministic result: '),
+            'UNAVAILABLE — ' + message)
         self.app.status.set_text(
             message + ' Test results are complete and their verdicts are unchanged.')
+
+    def update_latest(self, action, deterministic, ai):
+        self.latest_action.set_text('Action: ' + action)
+        self.latest_deterministic.set_text(
+            'Deterministic result: ' + deterministic)
+        self.latest_ai.set_text('AI analysis: ' + ai)
+        try:
+            save_latest(self.latest_status_path, action, deterministic, ai)
+        except (OSError, ValueError):
+            pass
 
     def export(self):
         if self.report is None or self.chooser is not None:

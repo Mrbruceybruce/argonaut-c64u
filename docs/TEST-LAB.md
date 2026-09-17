@@ -198,6 +198,15 @@ report to explain failures, but must never decide whether a check passed. That
 service should sit behind a separate gateway for local or cloud models; a C64
 PETSCII client can use the gateway later without entering the test runner.
 
+The Test Lab keeps the latest action in one labeled panel with **Action**,
+**Deterministic result**, and **AI analysis** fields. The same three fields are
+written automatically to the private mode-0600 `latest-status.json` file in the
+Test Lab settings folder. This provides a machine-readable status snapshot for
+support and automated inspection without relying on the position of messages in
+the window or on a user-supplied screenshot. It contains summary text only; it
+does not contain credentials, device addresses, model replies, or operation
+details. A new Test Lab action replaces the previous snapshot.
+
 Opening the Development Test Lab tab loads the latest saved hardware result
 for the first profile needing attention, or the selected profile when all are
 passing. The saved C64U row shows each bound profile's most recent result.
