@@ -2,9 +2,10 @@
 
 Linux is the active development and hardware-validation platform. It has both
 C64 Ultimates, Ollama, the local AI bridge, health alerts, and unattended fleet
-checks on one machine. Windows, Apple Silicon Mac, and Intel Mac packages are
-built and physically tested at major-release boundaries instead of after minor
-development increments.
+checks on one machine. Complete every item and Linux acceptance gate in one
+roadmap section before building and validating Windows, Apple Silicon Mac, and
+Intel Mac packages. Begin the next roadmap section only after that cross-platform
+release gate passes.
 
 ## Current milestone: Linux hardening
 
@@ -93,12 +94,13 @@ bridge report with its resolved `bridge.end_to_end` comparison in Test Lab.
 - File copy, Settings, Drives, Mount & Run, preview, screenshots, recordings,
   audio, persistence, and Quit regression coverage on physical hardware.
 
-## Major-release boundary
+## Roadmap-section release boundary
 
-Continue implementation and physical validation on Linux between major
-releases. At the next major-release boundary, build all desktop packages once
-and run a focused Windows and Mac regression covering package launch, build
-identity, the accumulated changes, and core file/media operations.
+Implement and physically validate an entire roadmap section on Linux. When the
+section is complete, build all desktop packages and run a focused Windows and Mac
+regression covering package launch, build identity, that section's changes, and
+core file/media operations. Do not begin implementation of the next roadmap
+section until this cross-platform release gate passes.
 
 Stable promotion will use an opt-in **Developer Mode and Test Lab** preference.
 The ordinary stable interface remains unchanged while the switch is off.
