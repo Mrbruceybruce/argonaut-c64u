@@ -133,7 +133,11 @@ def run(package_metadata, report_path):
                          app.test_lab_tab.box.get_policy()[1] ==
                          Gtk.PolicyType.ALWAYS and
                          app.test_lab_tab.ai_scroll.get_policy()[1] ==
-                         Gtk.PolicyType.ALWAYS,
+                         Gtk.PolicyType.ALWAYS and
+                         all(control.get_halign() == Gtk.Align.START for control in (
+                             app.test_lab_tab.schedule_check,
+                             app.test_lab_tab.auto_analyze,
+                             app.test_lab_tab.unattended_ai)),
                          'development.test_lab_scroll',
                          'Test Lab cannot scroll vertically.', checks)
                 saved_scale = app.preferences.app_options['preview_scale']

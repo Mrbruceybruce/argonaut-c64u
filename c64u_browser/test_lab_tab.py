@@ -166,7 +166,8 @@ class TestLabTab:
             background_row, 'Enable checks', self.toggle_background_checks)
         self.background_state = 'unknown'
         self.schedule_check = Gtk.CheckButton(
-            label='Run C64U checks every 30 minutes while this window is open')
+            label='Run C64U checks every 30 minutes while this window is open',
+            halign=Gtk.Align.START)
         self.schedule_check.connect('toggled', self.schedule_toggled)
         self.content.append(self.schedule_check)
         self.summary = Gtk.Label(label='No run yet.', xalign=0, wrap=True)
@@ -181,7 +182,8 @@ class TestLabTab:
         self.model = Gtk.Entry(placeholder_text='Model name', hexpand=True)
         self.model.set_text(os.environ.get('ARGONAUT_AI_MODEL', ''))
         ai_options.append(self.model)
-        self.auto_analyze = Gtk.CheckButton(label='Explain failed runs automatically')
+        self.auto_analyze = Gtk.CheckButton(
+            label='Explain failed runs automatically', halign=Gtk.Align.START)
         self.content.append(self.auto_analyze)
         self.unattended_ai_path = self.app.preferences.path.parent / 'test-lab' / CONFIG_NAME
         local_config_error = ''
@@ -193,7 +195,8 @@ class TestLabTab:
         local_row = Gtk.Box(spacing=8)
         self.content.append(local_row)
         self.unattended_ai = Gtk.CheckButton(
-            label='Explain unattended C64U failures with local AI')
+            label='Explain unattended C64U failures with local AI',
+            halign=Gtk.Align.START)
         self.unattended_ai.set_active(local_config is not None)
         local_row.append(self.unattended_ai)
         self.unattended_model = Gtk.Entry(

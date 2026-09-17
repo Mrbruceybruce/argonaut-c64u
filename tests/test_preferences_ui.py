@@ -125,6 +125,9 @@ class PreferencesUI(unittest.TestCase):
         self.assertFalse(tab.box.get_overlay_scrolling())
         self.assertFalse(tab.ai_scroll.get_overlay_scrolling())
         self.app.tabs.set_current_page(6);self.pump()
+        for check in (tab.schedule_check,tab.auto_analyze,tab.unattended_ai):
+            self.assertEqual(check.get_halign(),self.Gtk.Align.START)
+            self.assertLess(check.get_width(),tab.content.get_width()-80)
         self.assertIn('Setup needed',tab.bridge_status.get_text())
         self.assertNotIn('token',tab.bridge_status.get_text().casefold())
         self.assertEqual(tab.pair_bridge_button.get_label(),
