@@ -34,9 +34,23 @@ def make_handler(gateway, token, allowed_clients=None):
             self.end_headers()
             self.wfile.write(body)
 
+        def _discard_small_body(self):
+            """Drain a bounded prompt so Windows can deliver an early denial."""
+            raw_length = self.headers.get('Content-Length', '')
+            if (raw_length.isascii() and raw_length.isdecimal()
+                    and len(raw_length) <= 5):
+                length = int(raw_length)
+                if 0 < length <= MAX_PROMPT_BYTES:
+                    self.connection.settimeout(2)
+                    try:
+                        self.rfile.read(length)
+                    except (OSError, TimeoutError):
+                        pass
+
         def do_POST(self):
             if (allowed_clients is not None
                     and self.client_address[0] not in allowed_clients):
+                self._discard_small_body()
                 self._send(403, b'Client is not paired.')
                 return
             if self.path != '/v1/chat':
