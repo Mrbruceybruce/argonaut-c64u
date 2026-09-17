@@ -43,6 +43,14 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
   bridge_check_name=app_name+'-ai-bridge-check'
   write(f'usr/bin/{bridge_check_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/bridge_check.py "$@"\n',0o755)
   write(f'usr/lib/{app_name}/bridge_check.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.c64_ai_bridge_check import main\nraise SystemExit(main())\n')
+  ai_test_name=app_name+'-ai-test-alert'
+  write(f'usr/bin/{ai_test_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/ai_test_alert.py "$@"\n',0o755)
+  write(f'usr/lib/{app_name}/ai_test_alert.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.c64_ai_bridge_alert import main\nraise SystemExit(main())\n')
+  ai_test=(source/'packaging/linux/argonaut-c64-ai-test.service').read_text()
+  ai_test=ai_test.replace('@AI_TEST_EXECUTABLE@','/usr/bin/'+ai_test_name)
+  write('usr/lib/systemd/user/argonaut-c64-ai-test.service',ai_test)
+  write('usr/lib/systemd/user/argonaut-c64-ai-test.timer',
+        (source/'packaging/linux/argonaut-c64-ai-test.timer').read_text())
   alert_name=app_name+'-test-lab-alert'
   write(f'usr/bin/{alert_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/alert.py "$@"\n',0o755)
   write(f'usr/lib/{app_name}/alert.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.test_lab_alert import main\nraise SystemExit(main())\n')

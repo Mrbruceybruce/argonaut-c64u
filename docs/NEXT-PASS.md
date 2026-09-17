@@ -53,9 +53,9 @@ exportable `bridge.end_to_end` Test Lab verdict with sanitized operation
 evidence and run comparison.
 
 The structured bridge verdict also has a Linux headless entry point with stable
-exit codes and sanitized JSON so a timer can run the identical check without an
-open Argonaut window. Automatic scheduling and changed-state notifications are
-the next step.
+exit codes and sanitized JSON. An independent six-hour Linux timer can run the
+identical test without an open Argonaut window, keep its private report history,
+and notify only when the deterministic result changes or recovers.
 
 ## Completed foundation
 

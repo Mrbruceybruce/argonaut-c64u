@@ -20,6 +20,10 @@ from .ai_presentation import readable_diagnosis, unavailable_message
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .c64_ai_launch import launch_c64_ai
 from .c64_ai_bridge_check import run_bridge_checks
+from .c64_ai_bridge_background import (
+    set_enabled as set_bridge_tests_enabled,
+)
+from .c64_ai_bridge_background import status as bridge_tests_status
 from .c64_ai_bridge_control import (
     activate_bridge, bridge_status, enable_health_monitor,
     health_monitor_status, setup_bridge,
@@ -132,6 +136,15 @@ class TestLabTab:
         health_row.append(self.health_status)
         self.health_button = app.button(
             health_row, 'Enable alerts', self.enable_health_alerts)
+        ai_test_row = Gtk.Box(spacing=8)
+        self.box.append(ai_test_row)
+        ai_test_row.append(Gtk.Label(label='Automatic AI tests:', xalign=0))
+        self.ai_test_status = Gtk.Label(
+            label='Checking…', xalign=0, hexpand=True, wrap=True)
+        ai_test_row.append(self.ai_test_status)
+        self.ai_test_button = app.button(
+            ai_test_row, 'Enable tests', self.toggle_bridge_tests)
+        self.ai_test_state = 'unknown'
         background_row = Gtk.Box(spacing=8)
         self.box.append(background_row)
         background_row.append(Gtk.Label(label='Background C64U checks:', xalign=0))
@@ -255,6 +268,13 @@ class TestLabTab:
             'Stop checks' if status.state == 'ready' else 'Enable checks')
         self.background_button.set_sensitive(status.state != 'unavailable')
 
+    def show_ai_test_status(self, status):
+        self.ai_test_state = status.state
+        self.ai_test_status.set_text(status.message)
+        self.ai_test_button.set_label(
+            'Stop tests' if status.state == 'ready' else 'Enable tests')
+        self.ai_test_button.set_sensitive(status.state != 'unavailable')
+
     def connection_changed(self):
         connected = (self.app.client is not None
                      and not getattr(self.app, 'offline_message', None)
@@ -268,16 +288,19 @@ class TestLabTab:
             return
         self.bridge_status.set_text('Checking local bridge…')
         self.health_status.set_text('Checking…')
+        self.ai_test_status.set_text('Checking…')
         self.background_status.set_text('Checking…')
         def done(statuses):
             self.show_bridge_status(statuses[0])
             self.show_health_status(statuses[1])
-            self.show_background_status(statuses[2])
+            self.show_ai_test_status(statuses[2])
+            self.show_background_status(statuses[3])
             self.app.status.set_text('Test Lab automation status refreshed.')
 
         self.app.run(
             lambda: (bridge_status(self.bridge_path, check_model=True),
-                     health_monitor_status(), background_status()), done)
+                     health_monitor_status(), bridge_tests_status(),
+                     background_status()), done)
 
     def enable_health_alerts(self):
         self.health_status.set_text('Enabling automatic health alerts…')
@@ -297,6 +320,18 @@ class TestLabTab:
                 'Background C64U checks are on.' if enable else
                 'Background C64U checks are off.')
         self.app.run(lambda: set_background_enabled(enable), done)
+
+    def toggle_bridge_tests(self):
+        enable = self.ai_test_state != 'ready'
+        self.ai_test_status.set_text(
+            'Enabling automatic AI tests…' if enable else
+            'Stopping automatic AI tests…')
+        def done(status):
+            self.show_ai_test_status(status)
+            self.app.status.set_text(
+                'Automatic C64 AI tests are on.' if enable else
+                'Automatic C64 AI tests are off.')
+        self.app.run(lambda: set_bridge_tests_enabled(enable), done)
 
     def activate_bridge(self):
         def done(status):

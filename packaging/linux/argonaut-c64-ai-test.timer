@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Argonaut end-to-end C64 AI test every 6 hours
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=6h
+Unit=argonaut-c64-ai-test.service
+
+[Install]
+WantedBy=timers.target

@@ -153,6 +153,11 @@ skip, and 3 for a setup or invalid-result error. Its JSON output contains the
 report, comparison, and whether private history was saved, but no token,
 addresses, question, or answer text. A history-save failure leaves the check's
 code-determined verdict unchanged and reports `"saved": false`.
+On Linux, Test Lab can enable an independent six-hour schedule for this full
+end-to-end test. It stays quiet after the first passing baseline, alerts once
+when the deterministic verdict changes to failed or skipped, and alerts once
+when the test passes again. The alert state stores only `pass`, `fail`, or
+`skip`; model reply text is never retained.
 The host may connect to its own listener for this probe; remote clients remain
 limited to the explicitly paired C64U addresses and still require the token.
 
