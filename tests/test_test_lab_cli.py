@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -19,6 +20,14 @@ def fixture_report(status):
 
 
 class HeadlessCliTests(unittest.TestCase):
+    def setUp(self):
+        self.development = patch.dict(
+            os.environ, {'ARGONAUT_DEVELOPMENT': '1'})
+        self.development.start()
+
+    def tearDown(self):
+        self.development.stop()
+
     def test_device_id_selects_only_matching_development_profile(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
@@ -233,6 +242,28 @@ class HeadlessCliTests(unittest.TestCase):
             opener.assert_not_called()
             dev_path = base / 'argonaut-development' / 'config.json'
             self.assertIsNone(TestLabHistory(dev_path).latest('hardware'))
+
+    def test_stable_developer_mode_uses_only_stable_profile_and_history(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+                os.environ, {'ARGONAUT_DEVELOPMENT': '0'}):
+            base = Path(directory)
+            path = base / 'argonaut' / 'config.json'
+            preferences = Preferences(path)
+            profile = Profile.new('Stable', 'stable.invalid', device_id='STABLE')
+            preferences.profiles = [profile]
+            preferences.selected_id = profile.id
+            preferences.save()
+            output = io.StringIO()
+            with patch('c64u_browser.test_lab_cli.config_base',
+                       return_value=base), patch(
+                       'c64u_browser.test_lab_cli.run_hardware_checks',
+                       return_value=fixture_report('pass')):
+                code = main(['--suite', 'hardware'], stdout=output)
+            self.assertEqual(code, 0)
+            self.assertEqual(
+                TestLabHistory(path, profile.id).latest('hardware')['status'],
+                'pass')
+            self.assertFalse((base / 'argonaut-development').exists())
 
     def test_invalid_password_is_not_echoed_or_sent(self):
         output, error = io.StringIO(), io.StringIO()

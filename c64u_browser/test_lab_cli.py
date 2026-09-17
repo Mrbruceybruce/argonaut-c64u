@@ -5,6 +5,7 @@ import argparse
 import json
 import sys
 
+from . import development
 from .ai_analysis import analyze_failures
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .api import BrowserError, safe_argument
@@ -81,8 +82,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
             if len(password) > MAX_PASSWORD_LENGTH:
                 raise BrowserError('Password input was too long.')
             safe_argument(password)
-            # Hardware automation never loads stable Argonaut preferences.
-            path = config_base() / 'argonaut-development' / 'config.json'
+            path = config_base() / development.config_name() / 'config.json'
             preferences = Preferences(path).load()
             profile = (profile_for_id(preferences, args.profile_id)
                        if args.profile_id is not None else

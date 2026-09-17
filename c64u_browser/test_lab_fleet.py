@@ -6,6 +6,7 @@ import io
 import json
 import sys
 
+from . import development
 from .api import BrowserError, safe_argument
 from .platform_support import config_base
 from .profiles import Preferences
@@ -34,7 +35,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         if len(password) > MAX_PASSWORD_LENGTH:
             raise BrowserError('Password input was too long.')
         safe_argument(password)
-        preferences = Preferences(config_base() / 'argonaut-development' / 'config.json').load()
+        preferences = Preferences(
+            config_base() / development.config_name() / 'config.json').load()
     except (BrowserError, OSError, ValueError) as exc:
         print('Test Lab fleet could not start: ' + str(exc), file=stderr)
         return 3

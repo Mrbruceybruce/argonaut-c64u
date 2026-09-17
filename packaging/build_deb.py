@@ -25,40 +25,41 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
          f'sys.path.insert(0, "/usr/lib/{app_name}")\nimport c64u_browser\nmetadata_path=Path(c64u_browser.__file__).parent/"_build.json"\npackage_metadata=json.loads(metadata_path.read_text())\n'+
          'if "--self-test" in sys.argv:\n from c64u_browser.package_self_test import run\n run(package_metadata,sys.argv[sys.argv.index("--self-test")+1])\nelse:\n from c64u_browser.gui import main\n main()\n')
  write(f'usr/lib/{app_name}/launch.py',launch)
- if args.development:
-  bridge_name=app_name+'-ai-bridge'
-  write(f'usr/bin/{bridge_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/bridge.py "$@"\n',0o755)
-  write(f'usr/lib/{app_name}/bridge.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.c64_ai_bridge_cli import main\nraise SystemExit(main())\n')
-  unit=(source/'packaging/linux/argonaut-c64-ai-bridge.service').read_text()
-  unit=unit.replace('@BRIDGE_EXECUTABLE@','/usr/bin/'+bridge_name)
-  write('usr/lib/systemd/user/argonaut-c64-ai-bridge.service',unit)
-  health_name=app_name+'-ai-health'
-  write(f'usr/bin/{health_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/health.py "$@"\n',0o755)
-  write(f'usr/lib/{app_name}/health.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.c64_ai_health_alert import main\nraise SystemExit(main())\n')
-  health=(source/'packaging/linux/argonaut-c64-ai-health.service').read_text()
-  health=health.replace('@HEALTH_EXECUTABLE@','/usr/bin/'+health_name)
-  write('usr/lib/systemd/user/argonaut-c64-ai-health.service',health)
-  write('usr/lib/systemd/user/argonaut-c64-ai-health.timer',
-        (source/'packaging/linux/argonaut-c64-ai-health.timer').read_text())
-  bridge_check_name=app_name+'-ai-bridge-check'
-  write(f'usr/bin/{bridge_check_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/bridge_check.py "$@"\n',0o755)
-  write(f'usr/lib/{app_name}/bridge_check.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.c64_ai_bridge_check import main\nraise SystemExit(main())\n')
-  ai_test_name=app_name+'-ai-test-alert'
-  write(f'usr/bin/{ai_test_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/ai_test_alert.py "$@"\n',0o755)
-  write(f'usr/lib/{app_name}/ai_test_alert.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.c64_ai_bridge_alert import main\nraise SystemExit(main())\n')
-  ai_test=(source/'packaging/linux/argonaut-c64-ai-test.service').read_text()
-  ai_test=ai_test.replace('@AI_TEST_EXECUTABLE@','/usr/bin/'+ai_test_name)
-  write('usr/lib/systemd/user/argonaut-c64-ai-test.service',ai_test)
-  write('usr/lib/systemd/user/argonaut-c64-ai-test.timer',
-        (source/'packaging/linux/argonaut-c64-ai-test.timer').read_text())
-  alert_name=app_name+'-test-lab-alert'
-  write(f'usr/bin/{alert_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/alert.py "$@"\n',0o755)
-  write(f'usr/lib/{app_name}/alert.py', f'import os,sys\nos.environ["ARGONAUT_DEVELOPMENT"]="1"\nsys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.test_lab_alert import main\nraise SystemExit(main())\n')
-  fleet=(source/'packaging/linux/argonaut-test-lab-fleet.service').read_text()
-  fleet=fleet.replace('@ALERT_EXECUTABLE@','/usr/bin/'+alert_name)
-  write('usr/lib/systemd/user/argonaut-test-lab-fleet.service',fleet)
-  write('usr/lib/systemd/user/argonaut-test-lab-fleet.timer',
-        (source/'packaging/linux/argonaut-test-lab-fleet.timer').read_text())
+ identity='os.environ["ARGONAUT_DEVELOPMENT"]="1"\n' if args.development else ''
+ def tool(script,module,name):
+  executable=app_name+'-'+name
+  write(f'usr/bin/{executable}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/{script}.py "$@"\n',0o755)
+  write(f'usr/lib/{app_name}/{script}.py', f'import os,sys\n{identity}sys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.{module} import main\nraise SystemExit(main())\n')
+  return executable
+ config_name=app_name
+ development_env='Environment=ARGONAUT_DEVELOPMENT=1' if args.development else ''
+ bridge_name=tool('bridge','c64_ai_bridge_cli','ai-bridge')
+ bridge_unit=app_name+'-c64-ai-bridge.service'
+ unit=(source/'packaging/linux/argonaut-c64-ai-bridge.service').read_text()
+ unit=unit.replace('@BRIDGE_EXECUTABLE@','/usr/bin/'+bridge_name)
+ write('usr/lib/systemd/user/'+bridge_unit,unit)
+ health_name=tool('health','c64_ai_health_alert','ai-health')
+ health_unit=app_name+'-c64-ai-health.service'
+ health=(source/'packaging/linux/argonaut-c64-ai-health.service').read_text()
+ health=health.replace('@HEALTH_EXECUTABLE@','/usr/bin/'+health_name).replace('@CONFIG_NAME@',config_name).replace('@DEVELOPMENT_ENV@',development_env)
+ write('usr/lib/systemd/user/'+health_unit,health)
+ health_timer=(source/'packaging/linux/argonaut-c64-ai-health.timer').read_text().replace('@SERVICE_UNIT@',health_unit)
+ write('usr/lib/systemd/user/'+app_name+'-c64-ai-health.timer',health_timer)
+ tool('bridge_check','c64_ai_bridge_check','ai-bridge-check')
+ ai_test_name=tool('ai_test_alert','c64_ai_bridge_alert','ai-test-alert')
+ ai_test_unit=app_name+'-c64-ai-test.service'
+ ai_test=(source/'packaging/linux/argonaut-c64-ai-test.service').read_text()
+ ai_test=ai_test.replace('@AI_TEST_EXECUTABLE@','/usr/bin/'+ai_test_name).replace('@CONFIG_NAME@',config_name).replace('@DEVELOPMENT_ENV@',development_env)
+ write('usr/lib/systemd/user/'+ai_test_unit,ai_test)
+ ai_test_timer=(source/'packaging/linux/argonaut-c64-ai-test.timer').read_text().replace('@SERVICE_UNIT@',ai_test_unit)
+ write('usr/lib/systemd/user/'+app_name+'-c64-ai-test.timer',ai_test_timer)
+ alert_name=tool('alert','test_lab_alert','test-lab-alert')
+ fleet_unit=app_name+'-test-lab-fleet.service'
+ fleet=(source/'packaging/linux/argonaut-test-lab-fleet.service').read_text()
+ fleet=fleet.replace('@ALERT_EXECUTABLE@','/usr/bin/'+alert_name).replace('@CONFIG_NAME@',config_name).replace('@DEVELOPMENT_ENV@',development_env)
+ write('usr/lib/systemd/user/'+fleet_unit,fleet)
+ fleet_timer=(source/'packaging/linux/argonaut-test-lab-fleet.timer').read_text().replace('@SERVICE_UNIT@',fleet_unit)
+ write('usr/lib/systemd/user/'+app_name+'-test-lab-fleet.timer',fleet_timer)
  desktop=(assets/'desktop/argonaut.desktop').read_text().replace('Exec=argonaut','Exec='+app_name).replace('Icon=argonaut','Icon='+app_name)
  if args.development:desktop=desktop.replace('Name=Argonaut','Name=Argonaut Development '+version.replace('~','-'))
  write(f'usr/share/applications/{app_name}.desktop',desktop)

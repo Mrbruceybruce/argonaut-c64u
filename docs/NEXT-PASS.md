@@ -104,9 +104,12 @@ Stable promotion will use an opt-in **Developer Mode and Test Lab** preference.
 The ordinary stable interface remains unchanged while the switch is off.
 Enabling it reveals Test Lab after restart and starts nothing automatically;
 disabling it stops Argonaut-managed Linux test timers but retains private
-reports and settings. Linux service identities must be separated next so stable
-and Development installations can coexist without controlling each other's
-bridge or timers.
+reports and settings. Stable and Development Linux packages now generate
+separate bridge and timer identities so they can coexist without controlling
+each other's automation. A guarded one-time migration preserves enabled legacy
+Development services and cannot claim later stable units. All 340 source tests
+pass in normal and optimized Python modes; installed migration validation is
+next.
 
 The unresolved SuperCPU Detect freeze remains tracked in GitHub issue #1. Do not
 change that setting during routine hardware tests; investigate it separately

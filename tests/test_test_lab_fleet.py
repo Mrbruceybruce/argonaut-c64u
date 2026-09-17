@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -18,6 +19,14 @@ def report(status):
 
 
 class FleetTests(unittest.TestCase):
+    def setUp(self):
+        self.development = patch.dict(
+            os.environ, {'ARGONAUT_DEVELOPMENT': '1'})
+        self.development.start()
+
+    def tearDown(self):
+        self.development.stop()
+
     def test_each_bound_development_profile_gets_its_own_report(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)

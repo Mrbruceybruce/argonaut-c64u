@@ -4,10 +4,11 @@
 from dataclasses import dataclass
 import subprocess
 
+from . import development
 from .api import BrowserError
 
 
-TIMER = 'argonaut-test-lab-fleet.timer'
+TIMER = development.service_name('test-lab-fleet.timer')
 
 
 @dataclass(frozen=True)

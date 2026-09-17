@@ -44,6 +44,7 @@ from .test_lab_auto_analysis import (
 )
 from .test_lab_background import set_enabled as set_background_enabled
 from .test_lab_background import status as background_status
+from .service_migration import migrate_legacy_services
 
 
 class TestLabTab:
@@ -301,10 +302,13 @@ class TestLabTab:
             self.show_background_status(statuses[3])
             self.app.status.set_text('Test Lab automation status refreshed.')
 
-        self.app.run(
-            lambda: (bridge_status(self.bridge_path, check_model=True),
-                     health_monitor_status(), bridge_tests_status(),
-                     background_status()), done)
+        def task():
+            migrate_legacy_services(
+                self.bridge_path.parent / 'service-scope-v1')
+            return (bridge_status(self.bridge_path, check_model=True),
+                    health_monitor_status(), bridge_tests_status(),
+                    background_status())
+        self.app.run(task, done)
 
     def enable_health_alerts(self):
         self.health_status.set_text('Enabling automatic health alerts…')

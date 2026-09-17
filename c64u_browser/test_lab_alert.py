@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 
+from . import development
 from .platform_support import config_base
 from .ai_gateway import GatewayError
 from .test_lab_auto_analysis import (
@@ -138,17 +139,19 @@ def desktop_notify(title, body):
 
 
 def alert_text(previous, current):
+    qualifier = 'Development ' if development.enabled() else ''
+    app_name = 'Argonaut Development' if development.enabled() else 'Argonaut'
     if not current:
         return ('Argonaut Test Lab recovered',
-                'All saved Development C64U checks passed again.')
+                f'All saved {qualifier}C64U checks passed again.')
     count = len({item.split(':', 1)[0] for item in current})
     if previous:
         title = 'Argonaut Test Lab failures changed'
     else:
         title = 'Argonaut Test Lab needs attention'
     noun = 'connection' if count == 1 else 'connections'
-    return title, (f'{count} Development C64U {noun} need review. '
-                   'Open Argonaut Development’s Test Lab for the saved results.')
+    return title, (f'{count} {qualifier}C64U {noun} need review. '
+                   f'Open {app_name}’s Test Lab for the saved results.')
 
 
 def main(argv=None, stdin=None, stdout=None, stderr=None, *,
@@ -160,7 +163,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None, *,
     output = buffer.getvalue()
     stdout.write(output)
     path = (Path(state_path) if state_path is not None else
-            config_base() / 'argonaut-development/test-lab' / STATE_NAME)
+            config_base() / development.config_name() / 'test-lab' / STATE_NAME)
     previous = read_state(path)
     current = merge_unconfirmed(previous, failure_set(output, code), output, code)
     diagnosis = None

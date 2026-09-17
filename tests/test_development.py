@@ -4,6 +4,7 @@ from unittest.mock import patch
 from c64u_browser.profiles import Preferences
 from c64u_browser.credentials import Credentials, SessionCredentials
 from c64u_browser.version import build_info
+from c64u_browser import development
 
 class DevelopmentTests(unittest.TestCase):
     def test_settings_are_separate_and_empty(self):
@@ -14,6 +15,18 @@ class DevelopmentTests(unittest.TestCase):
         self.assertNotEqual(stable,dev)
         self.assertEqual(dev.parent.name,'argonaut-development')
         self.assertEqual(stable.parent.name,'argonaut')
+
+    def test_config_and_service_names_follow_package_identity(self):
+        with patch.dict(os.environ, {'ARGONAUT_DEVELOPMENT': '1'}):
+            self.assertEqual(development.config_name(), 'argonaut-development')
+            self.assertEqual(
+                development.service_name('c64-ai-test.timer'),
+                'argonaut-development-c64-ai-test.timer')
+        with patch.dict(os.environ, {'ARGONAUT_DEVELOPMENT': '0'}):
+            self.assertEqual(development.config_name(), 'argonaut')
+            self.assertEqual(
+                development.service_name('c64-ai-test.timer'),
+                'argonaut-c64-ai-test.timer')
 
     def test_development_never_opens_keyring(self):
         with patch.dict(os.environ, {'ARGONAUT_DEVELOPMENT':'1'}):

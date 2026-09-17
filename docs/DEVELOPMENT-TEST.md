@@ -31,9 +31,12 @@ Fixes carried forward from the ai.1 physical Mac test and verified on Linux:
   Restore, Undo, and Apply reviews and require a high-risk confirmation.
 
 The Debian Development package includes the local bridge, health monitor, and
-fleet-check user services. Ollama, a downloaded model, and the narrow TCP 6464
-firewall rules for paired C64U addresses remain explicit prerequisites. The
-pairing token and saved diagnostic material stay private and are not committed.
+fleet-check user services. These now use Development-scoped service identities
+so a future stable Developer Mode installation cannot control them. The first
+updated launch migrates enabled legacy services once. Ollama, a downloaded
+model, and the narrow TCP 6464 firewall rules for paired C64U addresses remain
+explicit prerequisites. The pairing token and saved diagnostic material stay
+private and are not committed.
 
 Windows: extract the portable ZIP to a writable folder and run `Argonaut.exe`.
 Mac: open the DMG and copy Argonaut Development.app to Applications, or extract

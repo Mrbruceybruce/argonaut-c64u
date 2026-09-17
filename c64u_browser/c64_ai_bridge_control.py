@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.request
 
+from . import development
 from .api import BrowserError
 from .c64_ai_bridge_config import (
     C64BridgeConfig, load_bridge_config, save_bridge_config,
@@ -20,8 +21,8 @@ from .c64_ai_chat import MAX_REPLY_BYTES
 from .diagnostics import operation_event
 
 
-SERVICE = 'argonaut-c64-ai-bridge.service'
-HEALTH_TIMER = 'argonaut-c64-ai-health.timer'
+SERVICE = development.service_name('c64-ai-bridge.service')
+HEALTH_TIMER = development.service_name('c64-ai-health.timer')
 
 
 @dataclass(frozen=True)

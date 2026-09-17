@@ -28,3 +28,10 @@ are retained in case Developer Mode is enabled again.
 
 Argonaut Development always enables Test Lab and continues to use its separate
 profiles, reports, settings, and session-only credentials.
+
+On Linux, stable and Development installations use separate bridge processes,
+launchers, health monitors, fleet schedules, and end-to-end AI-test schedules.
+They cannot enable, stop, or read each other's service state. The first updated
+Development launch migrates any enabled legacy service names once, records that
+the migration completed privately, and never treats later stable services as
+legacy Development services.
