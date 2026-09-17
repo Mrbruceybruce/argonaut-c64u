@@ -140,9 +140,13 @@ def paired_c64_server(gateway, token, host, allowed_clients, port=6464):
     if type(port) is not int or (port != 0 and not 1024 <= port <= 65535):
         raise ValueError('Use a bridge port from 1024 to 65535.')
 
+    # The bridge host may exercise the exact deployed protocol for a local
+    # readiness probe. Remote access remains limited to paired C64U addresses.
+    accepted_clients = clients | {host}
+
     class Handler(socketserver.BaseRequestHandler):
         def handle(self):
-            if self.client_address[0] not in clients:
+            if self.client_address[0] not in accepted_clients:
                 self.request.sendall(b'ERR CLIENT\n')
                 return
             self.request.settimeout(5)

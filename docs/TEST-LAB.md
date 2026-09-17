@@ -248,6 +248,13 @@ local model list, and distinguishes an unavailable service from a missing
 configured model. These operational health states remain separate from C64U
 test verdicts and from AI-generated failure explanations.
 
+The Linux Test Lab also provides **Test bridge AI** for an explicit end-to-end
+readiness check. It uses the private bridge setting to send a fixed question
+through the same authenticated compact protocol used by the C64 client.
+Ordinary code verifies the reply framing, bounded length, completeness, and
+printable ASCII. It does not judge the model's wording, and it does not display
+or retain the response text.
+
 API contracts: [Ollama chat](https://docs.ollama.com/api/chat),
 [Ollama nonstreaming](https://docs.ollama.com/api/streaming), and
 [OpenAI Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).

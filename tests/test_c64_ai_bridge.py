@@ -14,6 +14,7 @@ from c64u_browser.c64_ai_client import render_chat_client, render_link_probe
 from c64u_browser.c64_ai_bridge_config import (
     C64BridgeConfig, load_bridge_config, save_bridge_config,
 )
+from c64u_browser.c64_ai_bridge_control import probe_bridge
 from c64u_browser.c64_ai_service import (
     loopback_server, paired_c64_server, paired_lan_server,
 )
@@ -160,6 +161,29 @@ class C64AIBridgeTests(unittest.TestCase):
                 self.assertEqual(client.recv(100),
                                  b'OK 18\nA SID MAKES SOUND.')
             gateway.assert_called_once_with('What is SID?')
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_host_can_probe_deployed_c64_protocol_without_saved_reply(self):
+        gateway = Mock(return_value=b'Bridge ready.')
+        server = paired_c64_server(gateway, TOKEN, '127.0.0.1',
+                                   '192.0.2.10', 0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as folder:
+                path = Path(folder) / 'bridge.json'
+                save_bridge_config(path, C64BridgeConfig(
+                    'gemma3:4b', '127.0.0.1', server.server_address[1],
+                    ('192.0.2.10',), TOKEN))
+                ticks = iter((10.0, 10.25))
+                result = probe_bridge(path, clock=lambda: next(ticks))
+            self.assertEqual(result.reply_bytes, len(b'BRIDGE READY.'))
+            self.assertEqual(result.duration_ms, 250.0)
+            gateway.assert_called_once_with('IS THE ARGONAUT AI BRIDGE READY?')
+            self.assertFalse(hasattr(result, 'reply'))
         finally:
             server.shutdown()
             server.server_close()

@@ -139,6 +139,14 @@ model absent from Ollama and a listener address absent from the computer's
 current interfaces are covered by deterministic fixtures and do not depend on
 model output.
 
+**Test bridge AI** exercises the deployed compact C64 protocol from the Linux
+host through the managed bridge and configured local model. It sends one fixed
+readiness question, then ordinary code validates the authenticated response
+frame, size, completeness, and printable ASCII contract. The reply's meaning
+does not determine the result, and its text is neither displayed nor saved.
+The host may connect to its own listener for this probe; remote clients remain
+limited to the explicitly paired C64U addresses and still require the token.
+
 The Development package also includes a separate five-minute health monitor.
 Completing **Set up & install C64 AI** enables its per-user timer. The monitor
 uses ordinary code to check the bridge process, saved listener address, Ollama,

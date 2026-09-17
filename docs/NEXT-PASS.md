@@ -3,7 +3,8 @@
 Linux is the active development and hardware-validation platform. It has both
 C64 Ultimates, Ollama, the local AI bridge, health alerts, and unattended fleet
 checks on one machine. Windows, Apple Silicon Mac, and Intel Mac packages are
-built and physically tested at milestones instead of after each small change.
+built and physically tested at major-release boundaries instead of after minor
+development increments.
 
 ## Current milestone: Linux hardening
 
@@ -36,6 +37,15 @@ both Mac architectures passed their source and packaged-app checks. One Windows
 hosted runner exceeded the original 60-second cold-start allowance without a
 failed check; an immediate clean retry passed, and future runs allow 90 seconds.
 
+## Active Linux development
+
+Test Lab now has an explicit end-to-end C64 AI bridge probe. It sends a fixed
+readiness question through the deployed authenticated protocol and uses
+ordinary code to verify the reply contract without judging, displaying, or
+saving the model text. The source implementation passed against the real local
+Gemma 3 4B model in 4.7 seconds. The installed Development package and visible
+button remain to be updated and checked on Linux.
+
 ## Completed foundation
 
 - Structured, sanitized REST, FTP, DMA, file, and background-operation records.
@@ -52,12 +62,12 @@ failed check; an immediate clean retry passed, and future runs allow 90 seconds.
 - File copy, Settings, Drives, Mount & Run, preview, screenshots, recordings,
   audio, persistence, and Quit regression coverage on physical hardware.
 
-## Milestone boundary
+## Major-release boundary
 
-After the Linux hardening items pass, build all desktop packages once. Run a
-focused Windows and Mac regression covering package launch, build identity, the
-fixed behaviors, and core file/media operations. Resolve portability failures,
-then decide whether the result is another prerelease or the stable candidate.
+Continue implementation and physical validation on Linux between major
+releases. At the next major-release boundary, build all desktop packages once
+and run a focused Windows and Mac regression covering package launch, build
+identity, the accumulated changes, and core file/media operations.
 
 The unresolved SuperCPU Detect freeze remains tracked in GitHub issue #1. Do not
 change that setting during routine hardware tests; investigate it separately

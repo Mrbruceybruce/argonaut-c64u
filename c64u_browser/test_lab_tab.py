@@ -21,7 +21,7 @@ from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .c64_ai_launch import launch_c64_ai
 from .c64_ai_bridge_control import (
     activate_bridge, bridge_status, enable_health_monitor,
-    health_monitor_status, setup_bridge,
+    health_monitor_status, probe_bridge, setup_bridge,
 )
 from .c64_ai_install import install_and_pair_c64_ai
 from .test_lab_history import run_with_history
@@ -109,6 +109,11 @@ class TestLabTab:
             label='Checking local bridge…', xalign=0, hexpand=True, wrap=True)
         bridge_row.append(self.bridge_status)
         app.button(bridge_row, 'Refresh bridge', self.refresh_bridge_status)
+        self.probe_bridge_button = app.button(
+            bridge_row, 'Test bridge AI', self.test_bridge_ai)
+        self.probe_bridge_button.set_tooltip_text(
+            'Send a fixed readiness question through the deployed C64 protocol and verify the bounded reply without saving its text.')
+        self.probe_bridge_button.set_sensitive(False)
         self.activate_bridge_button = app.button(
             bridge_row, 'Restart bridge', self.activate_bridge)
         self.pair_bridge_button = app.button(
@@ -236,6 +241,7 @@ class TestLabTab:
             'Restart bridge')
         self.activate_bridge_button.set_sensitive(
             status.state in ('ready', 'stopped', 'network_changed'))
+        self.probe_bridge_button.set_sensitive(status.state == 'ready')
 
     def show_health_status(self, status):
         self.health_status.set_text(status.message)
@@ -299,6 +305,29 @@ class TestLabTab:
         def task():
             activate_bridge(self.bridge_path)
             return bridge_status(self.bridge_path, check_model=True)
+
+        self.app.run(task, done)
+
+    def test_bridge_ai(self):
+        if self.app.busy or self.bridge_state != 'ready':
+            return
+        previous = self.bridge_status.get_text()
+        self.bridge_status.set_text('Testing the deployed C64 AI bridge…')
+
+        def task():
+            try:
+                return probe_bridge(self.bridge_path)
+            except Exception as exc:
+                return exc
+
+        def done(result):
+            if isinstance(result, Exception):
+                self.bridge_status.set_text(previous)
+                self.app.status.set_text(str(result))
+                return
+            self.bridge_status.set_text(previous)
+            self.app.status.set_text(
+                f'End-to-end C64 AI bridge test passed in {result.duration_ms:.0f} ms; reply text was not saved.')
 
         self.app.run(task, done)
 
