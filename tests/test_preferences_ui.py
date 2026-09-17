@@ -128,6 +128,8 @@ class PreferencesUI(unittest.TestCase):
         self.assertTrue(tab.health_status.get_text())
         self.assertNotIn('token', tab.health_status.get_text().casefold())
         self.assertEqual(tab.health_button.get_label(), 'Enable alerts')
+        self.assertEqual(tab.ai_test_result_button.get_label(),
+                         'View latest result')
         self.assertTrue(tab.background_status.get_text())
         self.assertIn(tab.background_button.get_label(),
                       ('Enable checks', 'Stop checks'))

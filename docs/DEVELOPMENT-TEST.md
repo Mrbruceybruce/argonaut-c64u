@@ -13,8 +13,10 @@ The Development Test Lab now includes:
   changed-failure and recovery notifications, and bounded local AI diagnoses;
 - a paired local C64 AI bridge and interactive USB2 PETSCII client;
 - deterministic bridge, network, Ollama, and downloaded-model health checks;
-- separate controls for five-minute AI health alerts, persistent 30-minute fleet
-  checks, and the temporary schedule that runs only while the window is open.
+- separate controls for five-minute AI health alerts, six-hour end-to-end AI
+  tests, persistent 30-minute fleet checks, and the temporary schedule that runs
+  only while the window is open;
+- reopening the latest saved automatic AI test directly in Test Lab.
 
 Fixes carried forward from the ai.1 physical Mac test and verified on Linux:
 

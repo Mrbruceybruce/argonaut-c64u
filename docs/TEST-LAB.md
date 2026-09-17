@@ -258,6 +258,13 @@ or retain the response text. The check uses the stable ID
 operation record, and participates in the ordinary private history and
 comparison mechanism.
 
+The Linux package can schedule the same check every six hours independently of
+the Argonaut window. **Automatic AI tests** enables or stops that user timer.
+It stays quiet for its first passing baseline, then alerts only when the verdict
+changes or recovers. **View latest result** reopens the newest saved automatic
+bridge report in Test Lab with its deterministic comparison and sanitized
+operation evidence.
+
 API contracts: [Ollama chat](https://docs.ollama.com/api/chat),
 [Ollama nonstreaming](https://docs.ollama.com/api/streaming), and
 [OpenAI Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).

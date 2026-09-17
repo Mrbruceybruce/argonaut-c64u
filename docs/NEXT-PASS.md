@@ -61,8 +61,13 @@ The installed `1.5-ai.3+linux.2` package at build `84789e4` passed all 18
 package self-tests. Its installed headless check passed against the real bridge
 and Gemma model, and the enabled six-hour service completed its first scheduled
 path successfully. The alert state is mode 0600 and the service journal contains
-only sanitized structured evidence. Visible Test Lab timer controls remain to be
-confirmed in the installed UI.
+only sanitized structured evidence.
+
+The installed timer controls were confirmed in Test Lab. A controlled local
+bridge stop then produced a saved `network` failure, a `new_failures` comparison,
+and a desktop alert. Restoring the bridge produced a passing result, a
+`resolved` comparison, and the recovery alert. The bridge and six-hour timer
+were left active.
 
 ## Completed foundation
 

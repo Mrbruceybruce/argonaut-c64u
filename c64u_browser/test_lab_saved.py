@@ -20,6 +20,19 @@ def saved_hardware_results(preferences):
     return records
 
 
+def saved_suite_result(preferences, suite):
+    """Load one unscoped suite for a UI that must reopen unattended results."""
+    history = TestLabHistory(preferences.path)
+    runs = history.recent_runs(suite)
+    verified, previous_verified = history.verified_pair(suite, runs=runs)
+    return {
+        'recent': runs[0]['report'] if runs else None,
+        'verified': verified,
+        'previous_verified': previous_verified,
+        'runs': runs,
+    }
+
+
 def saved_comparison(record, report):
     """A skipped saved run cannot prove any check recovered."""
     if report['status'] == 'skip':

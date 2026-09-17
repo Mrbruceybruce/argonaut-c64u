@@ -123,6 +123,8 @@ def run(package_metadata, report_path):
                          'Development Streams controls are incorrect.', checks)
                 _require(app.test_lab_tab.health_button.get_label() ==
                          'Enable alerts' and
+                         app.test_lab_tab.ai_test_result_button.get_label() ==
+                         'View latest result' and
                          app.test_lab_tab.background_button.get_label() ==
                          'Enable checks',
                          'development.test_lab_controls',

@@ -36,7 +36,7 @@ from .test_lab_presentation import (
 from .test_lab_schedule import HardwareSchedule
 from .test_lab_saved import (
     preferred_record, saved_comparison, saved_hardware_results, saved_run_label,
-    saved_status,
+    saved_status, saved_suite_result,
 )
 from .test_lab_auto_analysis import (
     CACHE_NAME, CONFIG_NAME, load_local_config, save_local_config,
@@ -144,7 +144,11 @@ class TestLabTab:
         ai_test_row.append(self.ai_test_status)
         self.ai_test_button = app.button(
             ai_test_row, 'Enable tests', self.toggle_bridge_tests)
+        self.ai_test_result_button = app.button(
+            ai_test_row, 'View latest result', self.show_bridge_history)
+        self.ai_test_result_button.set_sensitive(False)
         self.ai_test_state = 'unknown'
+        self.ai_test_record = None
         background_row = Gtk.Box(spacing=8)
         self.box.append(background_row)
         background_row.append(Gtk.Label(label='Background C64U checks:', xalign=0))
@@ -378,6 +382,10 @@ class TestLabTab:
         self.refresh_history(auto_load=True)
 
     def refresh_history(self, auto_load=False):
+        self.ai_test_record = saved_suite_result(
+            self.app.preferences, 'bridge')
+        self.ai_test_result_button.set_sensitive(
+            self.ai_test_record['recent'] is not None)
         self.saved_records = saved_hardware_results(self.app.preferences)
         if not self.saved_records:
             self.saved_overview.set_text('No identity-bound Development C64U profiles.')
@@ -442,6 +450,13 @@ class TestLabTab:
                                 'Last verified C64U result', record['profile'].id,
                                 record)
 
+    def show_bridge_history(self):
+        record = self.ai_test_record
+        if record and record['recent']:
+            self.show_saved(
+                record['recent'], 'automatic C64 AI test',
+                'Latest saved result', None, record)
+
     def show_saved(self, report, name, source, profile_id, record):
         self.report = report
         self.comparison = saved_comparison(record, report)
@@ -459,8 +474,9 @@ class TestLabTab:
         self.ai_details.get_buffer().set_text('')
         try:
             self.render()
-            diagnosis = saved_diagnosis(
+            diagnosis = (saved_diagnosis(
                 self.unattended_ai_path.parent / CACHE_NAME, profile_id, report)
+                if profile_id is not None else None)
             if diagnosis:
                 self.ai_status.set_text('Saved unattended local AI diagnosis:')
                 self.ai_details.get_buffer().set_text(readable_diagnosis(diagnosis))
