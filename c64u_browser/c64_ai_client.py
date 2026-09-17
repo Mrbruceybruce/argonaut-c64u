@@ -11,7 +11,7 @@ def _quoted(value):
     return '"' + value + '"'
 
 
-def _render_client(host, port, token, interactive):
+def _render_client(host, port, token, interactive, clear_question=True):
     host = str(ipaddress.IPv4Address(host))
     if type(port) is not int or not 1024 <= port <= 65535:
         raise ValueError('Use a bridge port from 1024 to 65535.')
@@ -29,7 +29,8 @@ def _render_client(host, port, token, interactive):
         # Commodore BASIC can retain the previous string value when INPUT is
         # submitted without text. Clear it first so the documented blank exit
         # is deterministic after any number of questions.
-        question_line = '40 q$="":input "ask argonaut (blank exits)";q$:if q$="" then end'
+        question_line = ('40 q$="":' if clear_question else '40 ') + \
+            'input "ask argonaut (blank exits)";q$:if q$="" then end'
         request_line = '45 if len(q$)>80 then print "question is too long":goto 40'
     else:
         request = (_quoted('argonaut/1 ' + token.lower() + ' ' + str(len(question)))
@@ -91,3 +92,8 @@ def render_link_probe(host, port, token):
 def render_chat_client(host, port, token):
     """Return BASIC V2 source for an interactive paired local AI prompt."""
     return _render_client(host, port, token, True)
+
+
+def render_legacy_chat_client(host, port, token):
+    """Recreate the ai.1 client solely for exact, safe upgrade detection."""
+    return _render_client(host, port, token, True, clear_question=False)

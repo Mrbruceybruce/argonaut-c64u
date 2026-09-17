@@ -1,4 +1,4 @@
-# Argonaut 1.5-ai.1 — AI and Test Lab development testing
+# Argonaut 1.5-ai.2 — AI and Test Lab development testing
 
 This build starts from stable Argonaut 1.5 and keeps Development profiles,
 preferences, reports, and build identity separate from the installed stable app.
@@ -15,6 +15,16 @@ The Development Test Lab now includes:
 - deterministic bridge, network, Ollama, and downloaded-model health checks;
 - separate controls for five-minute AI health alerts, persistent 30-minute fleet
   checks, and the temporary schedule that runs only while the window is open.
+
+Changes verified during the ai.1 physical Mac test:
+
+- unavailable AI analysis now appears clearly in the diagnosis panel and status
+  bar, with local setup guidance and no change to deterministic verdicts;
+- pressing Return at an empty C64 AI prompt now exits after previous questions;
+- Send Text limits an unavailable DMA connection attempt and falls back to the
+  REST keyboard buffer before queuing any text;
+- an exact ai.1 C64 AI client is upgraded through the verified replacement path;
+  unknown or modified files remain untouched.
 
 The Debian Development package includes the local bridge, health monitor, and
 fleet-check user services. Ollama, a downloaded model, and the narrow TCP 6464
@@ -45,11 +55,12 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows 1.5-ai.1 and the expected source build identifier.
+1. Confirm About shows 1.5-ai.2 and the expected source build identifier.
 2. Connect each C64U and run **Run C64U checks**. Confirm all four read-only
    checks pass and saved runs remain selectable after restarting Argonaut.
-3. Run **Test local AI (simulation)**. Confirm the expected FTP failure appears
-   and the diagnosis explicitly identifies it as a fixture, not a device fault.
+3. Run **Test local AI (simulation)**. With local Ollama configured, confirm the
+   diagnosis identifies the expected FTP failure as a fixture. Without a local
+   model, confirm **Local AI unavailable** and setup guidance appear clearly.
 4. On Debian, confirm the C64 AI bridge, automatic health alerts, and background
    C64U checks all show **On**. The temporary checkbox must say it applies only
    while the window is open.

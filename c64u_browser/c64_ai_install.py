@@ -9,12 +9,14 @@ import subprocess
 import tempfile
 
 from .api import BrowserError
-from .c64_ai_client import render_chat_client
+from .c64_ai_client import render_chat_client, render_legacy_chat_client
 from .c64_ai_bridge_config import load_bridge_config
 from .c64_ai_bridge_control import activate_bridge, pair_bridge_address
 from .c64_ai_launch import CLIENT_PATH
 from .c64_basic import tokenize_basic_v2
 from .files import inspect
+from .folder_copy import Step
+from .replacement import replace_file
 from .transfers import download, upload
 
 
@@ -37,8 +39,13 @@ def build_c64_ai_client(config):
     return tokenize_basic_v2(source)
 
 
+def _build_legacy_c64_ai_client(config):
+    source = render_legacy_chat_client(config.host, config.port, config.token)
+    return tokenize_basic_v2(source)
+
+
 def install_c64_ai_client(client, config, path=CLIENT_PATH):
-    """Install only when absent; accept an existing byte-identical client."""
+    """Install when absent and safely upgrade Argonaut's exact ai.1 client."""
     program = build_c64_ai_client(config)
     digest = sha256(program).hexdigest()
     entry = inspect(client, path)
@@ -48,11 +55,18 @@ def install_c64_ai_client(client, config, path=CLIENT_PATH):
         local = Path(folder) / Path(path).name
         if entry is not None:
             download(client, path, local)
-            if local.read_bytes() != program:
+            existing = local.read_bytes()
+            if existing == program:
+                return ClientInstallResult(path, False, len(program), digest)
+            if existing != _build_legacy_c64_ai_client(config):
                 raise BrowserError(
                     'The existing USB2 Argonaut AI client differs from this pairing. '
                     'Keep or rename it in Files before installing the paired client.')
-            return ClientInstallResult(path, False, len(program), digest)
+            local.write_bytes(program)
+            replace_file(client, Step(
+                Path(path).name, local, path, False, True,
+                (entry.name, entry.size)), True, False, lambda _count: None)
+            return ClientInstallResult(path, True, len(program), digest)
         local.write_bytes(program)
         result = upload(client, local, str(Path(path).parent).replace('\\', '/'))
     if (result.get('path') != path or result.get('bytes') != len(program)

@@ -1,9 +1,11 @@
 name: Development Windows and Mac packages
+env:
+  ARGONAUT_DEV_VERSION: 1.5-ai.2
 'on':
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish the verified packages as the v1.5-ai.1 prerelease
+        description: Publish the verified packages as the current development prerelease
         required: true
         default: false
         type: boolean
@@ -41,7 +43,7 @@ jobs:
     - name: Build portable application
       shell: msys2 {0}
       run: |
-        python packaging/build_metadata.py --version 1.5-ai.1 --development
+        python packaging/build_metadata.py --version ${{ env.ARGONAUT_DEV_VERSION }} --development
         python -m PyInstaller --noconfirm --clean packaging/windows/argonaut.spec
         pacman -Q > dist/Argonaut/MSYS2-PACKAGES.txt
         cp LICENSE COPYRIGHT packaging/windows/README.txt dist/Argonaut/
@@ -74,7 +76,7 @@ jobs:
         if (-not (Test-Path "$bundle/Data/argonaut-development/config.json")) { throw 'Development preferences missing' }
         Copy-Item $report artifacts/package-self-test-Windows.json
         Remove-Item "$bundle/Data" -Recurse -Force
-        Compress-Archive -Path "$bundle/*" -DestinationPath artifacts/Argonaut-1.5-ai.1-Windows-x64-Portable.zip
+        Compress-Archive -Path "$bundle/*" -DestinationPath "artifacts/Argonaut-${{ env.ARGONAUT_DEV_VERSION }}-Windows-x64-Portable.zip"
     - uses: actions/upload-artifact@v7
       with:
         name: dev-Windows
@@ -110,7 +112,7 @@ jobs:
       run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
     - name: Build app
       run: |
-        .venv/bin/python packaging/build_metadata.py --version 1.5-ai.1 --development
+        .venv/bin/python packaging/build_metadata.py --version ${{ env.ARGONAUT_DEV_VERSION }} --development
         .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
     - name: Check relocated app with minimal environment
       run: |
@@ -141,8 +143,8 @@ jobs:
         cp docs/DEVELOPMENT-TEST.md LICENSE COPYRIGHT mac-package/
         brew info --json=v2 --installed > mac-package/Homebrew-packages.json
         ln -s /Applications mac-package/Applications
-        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-ai.1-macOS-${{ matrix.label }}.dmg
-        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-ai.1-macOS-${{ matrix.label }}.zip
+        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-${{ env.ARGONAUT_DEV_VERSION }}-macOS-${{ matrix.label }}.dmg
+        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-${{ env.ARGONAUT_DEV_VERSION }}-macOS-${{ matrix.label }}.zip
         cp "$RUNNER_TEMP/Argonaut App Test/self-test.json" "artifacts/package-self-test-macOS-${{ matrix.label }}.json"
     - uses: actions/upload-artifact@v7
       with:
@@ -182,7 +184,7 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        git archive --format=zip --prefix=argonaut-development/ -o release-assets/argonaut-1.5-ai.1-source.zip HEAD
+        git archive --format=zip --prefix=argonaut-development/ -o release-assets/argonaut-${{ env.ARGONAUT_DEV_VERSION }}-source.zip HEAD
         cd release-assets
         sha256sum *.zip *.dmg > SHA256SUMS
-        gh release create v1.5-ai.1 --target "${{ needs.source.outputs.sha }}" --prerelease --latest=false --title 'Argonaut 1.5-ai.1 — Development test packages' --notes-file ../docs/DEVELOPMENT-TEST.md *.zip *.dmg SHA256SUMS
+        gh release create "v${{ env.ARGONAUT_DEV_VERSION }}" --target "${{ needs.source.outputs.sha }}" --prerelease --latest=false --title "Argonaut ${{ env.ARGONAUT_DEV_VERSION }} — Development test packages" --notes-file ../docs/DEVELOPMENT-TEST.md *.zip *.dmg SHA256SUMS

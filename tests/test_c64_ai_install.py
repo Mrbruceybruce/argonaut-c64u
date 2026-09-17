@@ -7,7 +7,8 @@ from unittest.mock import Mock, patch
 from c64u_browser.api import BrowserError, Entry
 from c64u_browser.c64_ai_bridge_config import C64BridgeConfig
 from c64u_browser.c64_ai_install import (
-    ClientInstallResult, build_c64_ai_client, install_and_pair_c64_ai,
+    ClientInstallResult, _build_legacy_c64_ai_client, build_c64_ai_client,
+    install_and_pair_c64_ai,
     install_c64_ai_client,
 )
 
@@ -51,6 +52,27 @@ class C64AIInstallTests(unittest.TestCase):
             destination).write_bytes(program)
         result = install_c64_ai_client(Mock(), CONFIG)
         self.assertFalse(result.installed)
+
+    @patch('c64u_browser.c64_ai_install.replace_file')
+    @patch('c64u_browser.c64_ai_install.download')
+    @patch('c64u_browser.c64_ai_install.inspect',
+           return_value=Entry('argonaut-ai.prg', 'file', 1526))
+    def test_exact_ai1_client_is_safely_upgraded(self, _inspect, download, replace):
+        old_program = _build_legacy_c64_ai_client(CONFIG)
+        download.side_effect = lambda _client, _source, destination: Path(
+            destination).write_bytes(old_program)
+
+        def replaced(_client, step, source_local, local, _progress):
+            self.assertEqual(Path(step.source).read_bytes(),
+                             build_c64_ai_client(CONFIG))
+            self.assertEqual(step.signature, ('argonaut-ai.prg', 1526))
+            self.assertTrue(source_local)
+            self.assertFalse(local)
+
+        replace.side_effect = replaced
+        result = install_c64_ai_client(Mock(), CONFIG)
+        self.assertTrue(result.installed)
+        replace.assert_called_once()
 
     @patch('c64u_browser.c64_ai_install.upload')
     @patch('c64u_browser.c64_ai_install.download')
