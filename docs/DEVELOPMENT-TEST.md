@@ -28,6 +28,21 @@ is ad-hoc signed, not notarized. If blocked, use System Settings → Privacy &
 Security → Open Anyway. Linux background-service controls require systemd and
 will report unavailable on other platforms.
 
+## Automated package evidence
+
+Every Windows and Mac build runs the packaged application from its final bundle
+before the installer archive is retained. The package self-test uses explicit
+ordinary-code checks in normal and optimized Python modes. It records a structured
+JSON report with stable check IDs for the bundled GTK and media runtime, build
+identity, Development settings isolation, Preferences, Streams and Test Lab
+controls, local network enumeration, About and Quit behavior, and local file
+publication. A failed check exits unsuccessfully and blocks publication.
+
+GitHub retains separate reports for Windows, Apple Silicon Mac, and Intel Mac with
+the build artifacts. These checks do not contact a C64U, alter its files, or ask an
+AI model to decide the result. The physical-machine checklist below verifies the
+remaining display, network, media, and C64U hardware behavior.
+
 ## Test checklist
 
 1. Confirm About shows 1.5-ai.1 and the expected source build identifier.

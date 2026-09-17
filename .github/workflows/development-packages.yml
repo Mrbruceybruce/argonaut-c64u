@@ -52,6 +52,8 @@ jobs:
         $process = Start-Process -FilePath $exe -ArgumentList @('--self-test', $report) -PassThru
         if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Startup test timed out' }
         if ($process.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Packaged startup failed' }
+        $result = Get-Content $report | ConvertFrom-Json
+        if ($result.result -ne 'passed' -or $result.suite -ne 'package') { throw 'Package self-test did not pass' }
         Get-Content $report
     - name: Package and test portable development app
       shell: pwsh
@@ -65,7 +67,10 @@ jobs:
         $p = Start-Process "$bundle/Argonaut.exe" -ArgumentList @('--self-test', $report) -PassThru
         if (-not $p.WaitForExit(90000)) { $p.Kill(); throw 'Portable test timeout' }
         if ($p.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Portable test failed' }
+        $result = Get-Content $report | ConvertFrom-Json
+        if ($result.result -ne 'passed' -or $result.suite -ne 'package') { throw 'Portable self-test did not pass' }
         if (-not (Test-Path "$bundle/Data/argonaut-development/config.json")) { throw 'Development preferences missing' }
+        Copy-Item $report artifacts/package-self-test-Windows.json
         Remove-Item "$bundle/Data" -Recurse -Force
         Compress-Archive -Path "$bundle/*" -DestinationPath artifacts/Argonaut-1.5-ai.1-Windows-x64-Portable.zip
     - uses: actions/upload-artifact@v4
@@ -109,7 +114,7 @@ jobs:
         ditto "dist/Argonaut Development.app" "$RUNNER_TEMP/Argonaut App Test/Argonaut Development.app"
         codesign --verify --deep --strict "$RUNNER_TEMP/Argonaut App Test/Argonaut Development.app"
         .venv/bin/python - <<'PYTHON'
-        import os, subprocess
+        import json, os, subprocess
         from pathlib import Path
         folder=Path(os.environ['RUNNER_TEMP'])/'Argonaut App Test'
         report=folder/'self-test.json'
@@ -117,7 +122,11 @@ jobs:
         for key in ('PYTHONPATH','GI_TYPELIB_PATH','DYLD_LIBRARY_PATH','GST_PLUGIN_PATH'):
             env.pop(key,None)
         subprocess.run([str(folder/'Argonaut Development.app/Contents/MacOS/Argonaut'),'--self-test',str(report)],env=env,check=True,timeout=90)
-        assert report.is_file()
+        if not report.is_file():
+            raise SystemExit('Package self-test report is missing')
+        result=json.loads(report.read_text())
+        if result.get('result')!='passed' or result.get('suite')!='package':
+            raise SystemExit('Package self-test did not pass')
         print(report.read_text())
         PYTHON
     - name: Create development DMG and ZIP
@@ -129,6 +138,7 @@ jobs:
         ln -s /Applications mac-package/Applications
         hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-ai.1-macOS-${{ matrix.label }}.dmg
         ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-ai.1-macOS-${{ matrix.label }}.zip
+        cp "$RUNNER_TEMP/Argonaut App Test/self-test.json" "artifacts/package-self-test-macOS-${{ matrix.label }}.json"
     - uses: actions/upload-artifact@v4
       with:
         name: dev-macOS-${{ matrix.label }}
