@@ -1,6 +1,6 @@
 # Argonaut feature roadmap
 
-Status: proposed roadmap; the OBS development increment is now implemented locally.
+Status: proposed roadmap; the OBS development section is now implemented locally.
 See [implementation results](OBS-DEVELOPMENT-RESULTS.md) for its measured scope and
 remaining qualification. The inventory below describes the original stable baseline.
 Reviewed 2026-09-13 against stable **1.5**,
@@ -10,7 +10,7 @@ is promised for a particular release. No device or system configuration was chan
 
 **Preserve existing recording.** The next feature should extend the current
 receiver and WebM writer, not replace working recording with OBS. Start with the
-[focused OBS proposal](OBS-INTEGRATION-PROPOSAL.md), one reviewed increment at a time.
+[focused OBS proposal](OBS-INTEGRATION-PROPOSAL.md), one reviewed section at a time.
 
 ## Evidence and existing behavior
 
@@ -75,11 +75,13 @@ These are the baseline, not new roadmap work.
 
 ## Suggested implementation order and dependencies
 
-Each row is a milestone, potentially several small PRs. Finish its automated
-checks and applicable hardware gate before shipping or beginning its dependent
-milestone. Independent file/library work need not wait for all media features.
+Each row is a roadmap section, potentially several small PRs. Complete every
+item, automated check, and applicable Linux hardware gate in the section. Then
+build and validate the Windows, Apple Silicon Mac, and Intel Mac release before
+beginning the next section. Independent file/library work may be reordered by an
+explicit roadmap revision, but an active section is still completed as a whole.
 
-| Order | Increment | Dependencies | Completion gate |
+| Order | Section | Dependencies | Completion gate |
 | --- | --- | --- | --- |
 | 0 | Recording baseline and media characterization | Stable 1.5 | Reproducible synthetic media tests; document existing timing and shutdown behavior; retain working WebM output |
 | 1 | Small diagnostics foundation | 0 | Thread-safe stats snapshots, separate received/rendered/recorded counts, redacted report and useful no-signal messages |
@@ -223,6 +225,9 @@ mask entry, redact logs/reports, and avoid exposing keys in process arguments.
 - Use topic branches/PRs; main requires PRs. Do not build the whole roadmap at once.
   Each PR documents changes, automated results, remaining limits and required
   hardware checks. Publish development packages before stable promotion.
+- Complete one roadmap section and its Linux acceptance tests before starting
+  cross-platform release work. Validate Windows, Apple Silicon Mac, and Intel Mac
+  packages for that completed section before beginning the next roadmap section.
 - Existing decoder/session, transfer, replacement and lifecycle tests are useful
   foundations. Runtime startup checks find required codec elements; they do not
   establish A/V synchronization or a successful recording export. Add meaningful
