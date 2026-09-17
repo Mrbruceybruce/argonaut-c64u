@@ -47,3 +47,8 @@ then decide whether the result is another prerelease or the stable candidate.
 The unresolved SuperCPU Detect freeze remains tracked in GitHub issue #1. Do not
 change that setting during routine hardware tests; investigate it separately
 with an explicit recovery plan.
+
+As an initial defense, Development now marks SuperCPU Detect as a hardware
+compatibility risk in Restore and Undo previews, leaves it unselected, and
+requires a clearly labeled high-risk Apply confirmation. This protection has
+automated coverage and does not attempt to reproduce the reported freeze.

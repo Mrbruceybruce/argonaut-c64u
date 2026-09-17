@@ -11,6 +11,7 @@ from .flash_dialog import FlashFiles
 from .config_history import history_path, save_before_apply, read_previous
 from .dependencies import enabled, controls_dependencies, inactive_reason, NETWORK_CATEGORIES, STATIC_FIELDS
 from .settings_sections import section_entries, section_for, visible_entries, subsection_for, display_name
+from .settings_safety import warnings_for
 
 class SettingsTab:
     def __init__(self, app):
@@ -203,9 +204,13 @@ class SettingsTab:
         snapshot=dict(self.pending)
         originals={(c,s.name):s for c,rows in self.all_settings.items() for s in rows}
         lines=['Apply these changes to the running C64U? Nothing will be saved to flash.']
+        warnings=warnings_for(snapshot)
+        if warnings:
+            lines.extend(['CAUTION — hardware compatibility change',*warnings])
         for key,value in snapshot.items():
             lines.append(f'{key[0]} · {display_name(*key)}\n{originals[key].current} → {display(value)}')
-        return self.confirm('Review pending changes','\n\n'.join(lines),'Apply temporarily',lambda:self.apply_reviewed(snapshot))
+        button='Apply high-risk change' if warnings else 'Apply temporarily'
+        return self.confirm('Review pending changes','\n\n'.join(lines),button,lambda:self.apply_reviewed(snapshot))
 
     def apply_reviewed(self, snapshot):
         if snapshot != self.pending or self.errors or self.requires_refresh or not self.client or self.app.busy:return

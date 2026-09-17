@@ -76,3 +76,9 @@ suite itself is read-only. Mount & Run requires the DMA network service. The
 C64 AI launcher can enable Command Interface for the current runtime but does
 not save the C64U configuration to flash. This prerelease does not replace the
 stable 1.5 installation.
+
+SuperCPU Detect is marked as a hardware compatibility risk in Restore, Undo,
+and Apply reviews because an earlier combined settings change was associated
+with an unresponsive C64U. The cause remains unconfirmed. Routine testing must
+leave this setting unselected; a controlled reproduction requires a separate
+recovery plan and no unsaved work on the device.
