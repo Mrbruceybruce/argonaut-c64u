@@ -1,4 +1,6 @@
+#ifndef AppVersion
 #define AppVersion "1.5"
+#endif
 [Setup]
 SetupIconFile=..\icons\argonaut.ico
 AppId=Argonaut-C64U

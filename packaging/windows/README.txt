@@ -1,4 +1,4 @@
-Argonaut 1.5 — Windows x64
+Argonaut — Windows x64
 
 PORTABLE ZIP
 Extract the entire ZIP into a writable folder on your thumb drive.

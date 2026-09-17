@@ -69,7 +69,9 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
   shutil.copyfile(assets/f'icons/argonaut-{size}.png',destination)
  for name in ['README.md','LICENSE','COPYRIGHT']:
   write(f'usr/share/doc/{package}/'+name,(source/name).read_text())
- write(f'usr/share/doc/{package}/RELEASE-NOTES.md',(assets/'RELEASE-NOTES.md').read_text())
+ release_notes=assets/f'RELEASE-{version}.md'
+ if not release_notes.is_file():release_notes=assets/'RELEASE-NOTES.md'
+ write(f'usr/share/doc/{package}/RELEASE-NOTES.md',release_notes.read_text())
  write(f'usr/share/doc/{package}/copyright',(source/'COPYRIGHT').read_text() + '\nLicense: GPL-3.0-or-later. Full license: LICENSE in this directory.\n')
  size=sum(f.stat().st_size for f in root.rglob('*') if f.is_file())//1024+1
  write('DEBIAN/control',f'''Package: {package}
