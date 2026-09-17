@@ -1,4 +1,4 @@
-# Argonaut 1.5-ai.2 — AI and Test Lab development testing
+# Argonaut 1.5-ai.3 — AI and Test Lab development testing
 
 This build starts from stable Argonaut 1.5 and keeps Development profiles,
 preferences, reports, and build identity separate from the installed stable app.
@@ -16,7 +16,7 @@ The Development Test Lab now includes:
 - separate controls for five-minute AI health alerts, persistent 30-minute fleet
   checks, and the temporary schedule that runs only while the window is open.
 
-Changes verified during the ai.1 physical Mac test:
+Fixes carried forward from the ai.1 physical Mac test and verified on Linux:
 
 - unavailable AI analysis now appears clearly in the diagnosis panel and status
   bar, with local setup guidance and no change to deterministic verdicts;
@@ -25,6 +25,8 @@ Changes verified during the ai.1 physical Mac test:
   REST keyboard buffer before queuing any text;
 - an exact ai.1 C64 AI client is upgraded through the verified replacement path;
   unknown or modified files remain untouched.
+- SuperCPU Detect changes are marked as a hardware compatibility risk in
+  Restore, Undo, and Apply reviews and require a high-risk confirmation.
 
 The Debian Development package includes the local bridge, health monitor, and
 fleet-check user services. Ollama, a downloaded model, and the narrow TCP 6464
@@ -55,7 +57,7 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows 1.5-ai.2 and the expected source build identifier.
+1. Confirm About shows 1.5-ai.3 and the expected source build identifier.
 2. Connect each C64U and run **Run C64U checks**. Confirm all four read-only
    checks pass and saved runs remain selectable after restarting Argonaut.
 3. Run **Test local AI (simulation)**. With local Ollama configured, confirm the

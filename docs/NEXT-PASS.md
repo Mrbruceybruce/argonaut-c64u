@@ -25,6 +25,12 @@ The installed Linux package at build `807562f` passed all 18 package self-tests
 against the real GTK desktop on 2026-09-16. The source suite also passed all 317
 tests in normal and optimized Python modes.
 
+Build-only milestone run 35173537738 passed at exact commit `c80a5a5`: Windows
+passed 21 packaged checks, and Apple Silicon plus Intel Mac each passed 18.
+These retained artifacts were not published because the ai.2 name already
+identifies the earlier prerelease; physical cross-platform testing will use the
+next numbered prerelease.
+
 ## Completed foundation
 
 - Structured, sanitized REST, FTP, DMA, file, and background-operation records.
