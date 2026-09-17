@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Validated desktop preferences, separate from machine configuration."""
 DEFAULTS={'remember_window':True,'width':1200,'height':850,'preview_scale':150,
-          'preview_audio':True,'remember_folders':True,'local_folder':'','remote_folders':{}}
+          'preview_audio':True,'remember_folders':True,'developer_mode':False,
+          'local_folder':'','remote_folders':{}}
 
 def defaults():
     return {**DEFAULTS,'remote_folders':{}}
@@ -9,7 +10,8 @@ def defaults():
 def validate(options):
     result=defaults()
     if not isinstance(options,dict):raise ValueError('Invalid application preferences')
-    for key in ('remember_window','preview_audio','remember_folders'):
+    for key in ('remember_window','preview_audio','remember_folders',
+                'developer_mode'):
         value=options.get(key,result[key])
         if type(value) is not bool:raise ValueError('Invalid preference: '+key)
         result[key]=value
@@ -51,6 +53,8 @@ def scale_control(value,changed=None):
 def show_preferences(app, page=0):
     from gi.repository import Gtk,Gio
     from pathlib import Path
+    from . import development
+    from .test_lab_access import stop_background
     if app.preferences_error:
         app.status.set_text(app.preferences_error);return
     if app.busy:return
@@ -74,6 +78,15 @@ def show_preferences(app, page=0):
     checks={}
     for key,label in [('remember_window','Remember window size'),('preview_audio','Play preview audio by default'),('remember_folders','Remember last-used file folders')]:
         control=Gtk.CheckButton(label=label,active=prefs.app_options[key],halign=Gtk.Align.START);box.append(control);checks[key]=control
+    if not development.enabled():
+        developer_mode=Gtk.CheckButton(
+            label='Enable Developer Mode and Test Lab after restart',
+            active=prefs.app_options['developer_mode'],
+            halign=Gtk.Align.START)
+        developer_mode.set_tooltip_text(
+            'Adds deterministic checks, saved diagnostics, and optional AI analysis. Nothing starts automatically.')
+        box.append(developer_mode)
+        checks['developer_mode']=developer_mode
     row=Gtk.Box(spacing=8);box.append(row);row.append(Gtk.Label(label='Preview scale (%)'))
     scale_row,scale,set_scale=scale_control(prefs.app_options['preview_scale']);row.append(scale_row)
     folders={}
@@ -118,6 +131,7 @@ def show_preferences(app, page=0):
         for key,value in values.items():
             if value and not Path(value).expanduser().is_dir():error.set_text('Choose an existing folder for '+key.replace('_',' ')+'.');return
         old=prefs.app_options;oldfolders={key:getattr(prefs,key) for key in values}
+        developer_was_enabled=old['developer_mode']
         prefs.app_options=defaults() if reset_pending[0] else validate(old)
         prefs.app_options.update({key:control.get_active() for key,control in checks.items()})
         prefs.app_options['preview_scale']=int(scale.get_text().rstrip('%'))
@@ -132,7 +146,19 @@ def show_preferences(app, page=0):
         if reset_pending[0]:app.window.set_default_size(1200,850)
         for key,entry in folders.items():entry.set_text(getattr(prefs,key))
         reset_pending[0]=False
-        error.set_text('Preferences saved.')
+        developer_is_enabled=prefs.app_options['developer_mode']
+        if developer_was_enabled != developer_is_enabled:
+            error.set_text(
+                'Preferences saved. Restart Argonaut to apply Developer Mode.')
+            if developer_was_enabled and not developer_is_enabled:
+                def stopped(result):
+                    app.status.set_text(
+                        'Developer Mode is off; background tests stopped.'
+                        if result else
+                        'Developer Mode is off. Some background tests could not be stopped.')
+                app.run(stop_background, stopped)
+        else:
+            error.set_text('Preferences saved.')
         return True
     from .connection_dialog import ConnectionDialog
     connections=ConnectionDialog(app,window=dialog)

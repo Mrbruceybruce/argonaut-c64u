@@ -100,6 +100,14 @@ releases. At the next major-release boundary, build all desktop packages once
 and run a focused Windows and Mac regression covering package launch, build
 identity, the accumulated changes, and core file/media operations.
 
+Stable promotion will use an opt-in **Developer Mode and Test Lab** preference.
+The ordinary stable interface remains unchanged while the switch is off.
+Enabling it reveals Test Lab after restart and starts nothing automatically;
+disabling it stops Argonaut-managed Linux test timers but retains private
+reports and settings. Linux service identities must be separated next so stable
+and Development installations can coexist without controlling each other's
+bridge or timers.
+
 The unresolved SuperCPU Detect freeze remains tracked in GitHub issue #1. Do not
 change that setting during routine hardware tests; investigate it separately
 with an explicit recovery plan.

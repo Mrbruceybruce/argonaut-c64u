@@ -29,6 +29,7 @@ from .recovery import Recovery
 from .media_tab import MediaTab
 from .streams_tab import StreamsTab
 from .diagnostics import enable_private_log, disable_private_log
+from .test_lab_access import enabled as test_lab_enabled
 
 
 class Browser(Gtk.Application):
@@ -53,7 +54,7 @@ class Browser(Gtk.Application):
         except (BrowserError, OSError) as exc: self.preferences_error = str(exc)
         self.operation_log = None
         self.operation_log_error = None
-        if development.enabled():
+        if test_lab_enabled(self.preferences):
             try:
                 self.operation_log = enable_private_log(self.preferences.path)
             except OSError:
@@ -156,7 +157,7 @@ class Browser(Gtk.Application):
         self.tabs.append_page(self.media_tab.box,Gtk.Label(label='SID/Media'))
         self.streams_tab=StreamsTab(self)
         self.tabs.append_page(self.streams_tab.box,Gtk.Label(label='Streams'))
-        if development.enabled():
+        if test_lab_enabled(self.preferences):
             from .test_lab_tab import TestLabTab
             self.test_lab_tab = TestLabTab(self)
             self.tabs.append_page(self.test_lab_tab.box, Gtk.Label(label='Test Lab'))
@@ -170,7 +171,7 @@ class Browser(Gtk.Application):
         self.busy_controls = [connection, panes, self.partial_button,
             self.settings_tab.box, self.drives_tab.box, self.machine_tab.box,
             self.media_tab.box, self.streams_tab.box]
-        if development.enabled():
+        if hasattr(self, 'test_lab_tab'):
             self.busy_controls.append(self.test_lab_tab.box)
         self.refresh_local()
         self.window.present()

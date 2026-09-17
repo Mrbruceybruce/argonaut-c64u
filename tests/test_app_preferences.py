@@ -23,6 +23,13 @@ class AppPreferencesTests(unittest.TestCase):
             with self.assertRaises(ValueError):validate({'preview_scale':value})
         self.assertEqual(validate({})['preview_scale'],150)
 
+    def test_developer_mode_is_explicit_and_boolean(self):
+        self.assertFalse(validate({})['developer_mode'])
+        self.assertTrue(validate({'developer_mode': True})['developer_mode'])
+        for value in (1, 'true', None):
+            with self.assertRaises(ValueError):
+                validate({'developer_mode': value})
+
     def test_missing_remote_folder_falls_back_to_drive(self):
         client=Mock();client.list_directory.side_effect=[('/',[Entry('USB2','dir',0)]),BrowserError('Gone'),('/USB2',[])]
         self.assertEqual(initial_directory(client,'/USB2/Gone'),('/USB2',[]))
