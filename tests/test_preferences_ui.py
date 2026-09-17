@@ -11,7 +11,7 @@ class PreferencesUI(unittest.TestCase):
         from gi.repository import Gtk,Gio,GLib
         from c64u_browser.gui import Browser
         from c64u_browser.profiles import Preferences
-        self.Gtk=Gtk;self.GLib=GLib
+        self.Gtk=Gtk;self.GLib=GLib;self.Gio=Gio
         self.env=patch.dict(os.environ,{'ARGONAUT_DEVELOPMENT':'1'});self.env.start()
         self.temp=tempfile.TemporaryDirectory()
         self.app=Browser();self.app.preferences=Preferences(Path(self.temp.name)/'config.json')
@@ -133,3 +133,26 @@ class PreferencesUI(unittest.TestCase):
         self.assertTrue(tab.background_status.get_text())
         self.assertIn(tab.background_button.get_label(),
                       ('Enable checks', 'Stop checks'))
+
+    def test_stable_developer_mode_is_opt_in_and_builds_test_lab_after_restart(self):
+        from c64u_browser.gui import Browser
+        from c64u_browser.profiles import Preferences
+        from unittest.mock import patch
+        prefs = Preferences(Path(self.temp.name) / 'stable/config.json')
+        prefs.app_options['developer_mode'] = True
+        prefs.save()
+        with patch.dict(os.environ, {'ARGONAUT_DEVELOPMENT': '0'}), patch(
+                'c64u_browser.gui.Preferences', return_value=prefs):
+            stable = Browser()
+            stable.set_application_id('org.local.Argonaut.StableTest' + uuid.uuid4().hex)
+            stable.set_flags(self.Gio.ApplicationFlags.NON_UNIQUE)
+            stable.register(None)
+            stable.activate()
+            try:
+                self.assertTrue(hasattr(stable, 'test_lab_tab'))
+                labels = [stable.tabs.get_tab_label_text(
+                    stable.tabs.get_nth_page(index))
+                    for index in range(stable.tabs.get_n_pages())]
+                self.assertIn('Test Lab', labels)
+            finally:
+                stable.window.close()

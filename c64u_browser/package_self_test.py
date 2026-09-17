@@ -142,6 +142,16 @@ def run(package_metadata, report_path):
                 preferences_dialog.response(Gtk.ResponseType.CANCEL)
                 _require(app.lookup_action('quit').get_enabled(), 'ui.quit_action',
                          'The Quit action is unavailable.', checks)
+            else:
+                from .test_lab_access import enabled as test_lab_enabled
+                _require(not hasattr(app, 'test_lab_tab') and
+                         not test_lab_enabled(app.preferences),
+                         'stable.developer_mode_default_off',
+                         'Stable Developer Mode was not off by default.', checks)
+                app.preferences.app_options['developer_mode'] = True
+                _require(test_lab_enabled(app.preferences),
+                         'stable.developer_mode_opt_in',
+                         'Stable Developer Mode could not be enabled.', checks)
 
             about = show_about(app)
             _require(about is show_about(app), 'ui.about_singleton',
