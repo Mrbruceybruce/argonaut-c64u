@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tempfile
 import unittest
@@ -53,7 +54,8 @@ class TestLabAccessTests(unittest.TestCase):
             self.assertTrue(initialize_stable_automation(
                 marker, runner, 'linux'))
             self.assertEqual(marker.read_text(), 'stable-service-opt-in-v1\n')
-            self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':
+                self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
             self.assertFalse(initialize_stable_automation(
                 marker, runner, 'linux'))
         self.assertEqual([args[-1] for args in commands], list(UNITS))
