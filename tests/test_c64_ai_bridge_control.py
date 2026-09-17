@@ -11,7 +11,7 @@ from c64u_browser.c64_ai_bridge_config import (
 from c64u_browser.c64_ai_bridge_control import (
     HEALTH_TIMER, SERVICE, activate_bridge, bridge_status, enable_health_monitor,
     health_monitor_status, local_bridge_host, local_model_status,
-    pair_bridge_address, setup_bridge,
+    pair_bridge_address, set_health_monitor_enabled, setup_bridge,
 )
 
 
@@ -99,6 +99,23 @@ class C64AIBridgeControlTests(unittest.TestCase):
             ('enable', HEALTH_TIMER, ('--now',)),
             ('is-enabled', HEALTH_TIMER, ()),
             ('is-active', HEALTH_TIMER, ()),
+        ])
+
+    def test_health_monitor_can_be_stopped_and_verified(self):
+        commands = []
+
+        def runner(args, **_kwargs):
+            commands.append((args[2], args[-1], tuple(args[3:-1])))
+            if args[2] == 'is-enabled':
+                return result(args, code=1, output='disabled\n')
+            return result(args)
+
+        self.assertEqual(
+            set_health_monitor_enabled(False, runner).state, 'disabled')
+        self.assertEqual(commands, [
+            ('daemon-reload', 'daemon-reload', ()),
+            ('disable', HEALTH_TIMER, ('--now',)),
+            ('is-enabled', HEALTH_TIMER, ()),
         ])
 
     def test_bridge_status_reports_model_outage_separately(self):

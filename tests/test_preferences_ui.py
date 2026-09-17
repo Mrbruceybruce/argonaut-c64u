@@ -138,6 +138,14 @@ class PreferencesUI(unittest.TestCase):
         self.assertTrue(tab.health_status.get_text())
         self.assertNotIn('token', tab.health_status.get_text().casefold())
         self.assertEqual(tab.health_button.get_label(), 'Enable alerts')
+        from c64u_browser.c64_ai_bridge_control import HealthMonitorStatus
+        tab.show_health_status(HealthMonitorStatus(
+            'ready','On · checks every 5 minutes'))
+        self.assertEqual(tab.health_button.get_label(),'Stop alerts')
+        self.assertTrue(tab.health_button.get_sensitive())
+        tab.show_health_status(HealthMonitorStatus(
+            'disabled','Off · no alerts are scheduled'))
+        self.assertEqual(tab.health_button.get_label(),'Enable alerts')
         self.assertEqual(tab.ai_test_result_button.get_label(),
                          'View latest result')
         self.assertTrue(tab.background_status.get_text())

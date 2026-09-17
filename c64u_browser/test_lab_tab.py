@@ -25,7 +25,7 @@ from .c64_ai_bridge_background import (
 )
 from .c64_ai_bridge_background import status as bridge_tests_status
 from .c64_ai_bridge_control import (
-    activate_bridge, bridge_status, enable_health_monitor,
+    activate_bridge, bridge_status, set_health_monitor_enabled,
     health_monitor_status, setup_bridge,
 )
 from .c64_ai_install import install_and_pair_c64_ai
@@ -45,6 +45,7 @@ from .test_lab_auto_analysis import (
 from .test_lab_background import set_enabled as set_background_enabled
 from .test_lab_background import status as background_status
 from .service_migration import migrate_legacy_services
+from .test_lab_access import initialize_stable_automation
 
 
 class TestLabTab:
@@ -142,7 +143,8 @@ class TestLabTab:
             label='Checking…', xalign=0, hexpand=True, wrap=True)
         health_row.append(self.health_status)
         self.health_button = app.button(
-            health_row, 'Enable alerts', self.enable_health_alerts)
+            health_row, 'Enable alerts', self.toggle_health_alerts)
+        self.health_state = 'unknown'
         ai_test_row = Gtk.Box(spacing=8)
         self.content.append(ai_test_row)
         ai_test_row.append(Gtk.Label(label='Automatic AI tests:', xalign=0))
@@ -280,8 +282,11 @@ class TestLabTab:
         self.probe_bridge_button.set_sensitive(status.state == 'ready')
 
     def show_health_status(self, status):
+        self.health_state = status.state
         self.health_status.set_text(status.message)
-        self.health_button.set_sensitive(status.state != 'ready')
+        self.health_button.set_label(
+            'Stop alerts' if status.state == 'ready' else 'Enable alerts')
+        self.health_button.set_sensitive(status.state != 'unavailable')
 
     def show_background_status(self, status):
         self.background_state = status.state
@@ -320,6 +325,8 @@ class TestLabTab:
             self.app.status.set_text('Test Lab automation status refreshed.')
 
         def task():
+            initialize_stable_automation(
+                self.bridge_path.parent / 'stable-service-opt-in-v1')
             migrate_legacy_services(
                 self.bridge_path.parent / 'service-scope-v1')
             return (bridge_status(self.bridge_path, check_model=True),
@@ -327,12 +334,17 @@ class TestLabTab:
                     background_status())
         self.app.run(task, done)
 
-    def enable_health_alerts(self):
-        self.health_status.set_text('Enabling automatic health alerts…')
+    def toggle_health_alerts(self):
+        enable = self.health_state != 'ready'
+        self.health_status.set_text(
+            'Enabling automatic health alerts…' if enable else
+            'Stopping automatic health alerts…')
         def done(status):
             self.show_health_status(status)
-            self.app.status.set_text('Automatic C64 AI health alerts are on.')
-        self.app.run(enable_health_monitor, done)
+            self.app.status.set_text(
+                'Automatic C64 AI health alerts are on.' if enable else
+                'Automatic C64 AI health alerts are off.')
+        self.app.run(lambda: set_health_monitor_enabled(enable), done)
 
     def toggle_background_checks(self):
         enable = self.background_state != 'ready'

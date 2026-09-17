@@ -141,15 +141,23 @@ def health_monitor_status(runner=subprocess.run):
         'stopped', 'Scheduled but stopped · enable alerts to restart monitoring')
 
 
-def enable_health_monitor(runner=subprocess.run):
+def set_health_monitor_enabled(enabled, runner=subprocess.run):
     _reload_user_services(runner)
-    enabled = _systemctl('enable', runner, HEALTH_TIMER, ('--now',))
-    if enabled.returncode != 0:
-        raise BrowserError('Automatic C64 AI health alerts could not be enabled.')
+    command = 'enable' if enabled else 'disable'
+    changed = _systemctl(command, runner, HEALTH_TIMER, ('--now',))
+    if changed.returncode != 0:
+        action = 'enabled' if enabled else 'stopped'
+        raise BrowserError(
+            f'Automatic C64 AI health alerts could not be {action}.')
     status = health_monitor_status(runner)
-    if status.state != 'ready':
-        raise BrowserError('Automatic C64 AI health alerts did not start.')
+    expected = 'ready' if enabled else 'disabled'
+    if status.state != expected:
+        raise BrowserError('Automatic C64 AI health alerts did not change.')
     return status
+
+
+def enable_health_monitor(runner=subprocess.run):
+    return set_health_monitor_enabled(True, runner)
 
 
 def _local_model_names():
