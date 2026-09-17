@@ -65,9 +65,10 @@ remaining display, network, media, and C64U hardware behavior.
 3. Run **Test local AI (simulation)**. With local Ollama configured, confirm the
    diagnosis identifies the expected FTP failure as a fixture. Without a local
    model, confirm **Local AI unavailable** and setup guidance appear clearly.
-4. On Debian, confirm the C64 AI bridge, automatic health alerts, and background
-   C64U checks all show **On**. The temporary checkbox must say it applies only
-   while the window is open.
+4. On Debian, confirm the C64 AI bridge, automatic health alerts, automatic AI
+   tests, and background C64U checks all show **On**. **View latest result** must
+   reopen the most recent automatic bridge report. The temporary checkbox must
+   say it applies only while the window is open.
 5. Launch the paired C64 AI client on each C64U and ask one short question. Check
    that the reply appears on the C64 and the prompt returns.
 6. Stop and restore Ollama once. Confirm Test Lab reports the model outage and

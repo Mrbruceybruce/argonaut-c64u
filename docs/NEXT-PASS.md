@@ -69,6 +69,12 @@ and a desktop alert. Restoring the bridge produced a passing result, a
 `resolved` comparison, and the recovery alert. The bridge and six-hour timer
 were left active.
 
+The next Linux package adds **View latest result** beside the automatic AI-test
+schedule so an unattended alert can be reopened after restarting Argonaut. It
+uses the validated private history and reconstructs the comparison against the
+prior verified bridge run. All 330 source tests pass in normal and optimized
+Python modes; installed GTK validation remains.
+
 ## Completed foundation
 
 - Structured, sanitized REST, FTP, DMA, file, and background-operation records.
