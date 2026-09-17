@@ -73,7 +73,7 @@ jobs:
         Copy-Item $report artifacts/package-self-test-Windows.json
         Remove-Item "$bundle/Data" -Recurse -Force
         Compress-Archive -Path "$bundle/*" -DestinationPath artifacts/Argonaut-1.5-ai.1-Windows-x64-Portable.zip
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: dev-Windows
         path: artifacts/
@@ -139,7 +139,7 @@ jobs:
         hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-1.5-ai.1-macOS-${{ matrix.label }}.dmg
         ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-1.5-ai.1-macOS-${{ matrix.label }}.zip
         cp "$RUNNER_TEMP/Argonaut App Test/self-test.json" "artifacts/package-self-test-macOS-${{ matrix.label }}.json"
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: dev-macOS-${{ matrix.label }}
         path: artifacts/
@@ -168,7 +168,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         ref: ${{ needs.source.outputs.sha }}
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         pattern: dev-*
         path: release-assets
