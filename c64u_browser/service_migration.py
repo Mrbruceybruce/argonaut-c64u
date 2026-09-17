@@ -19,6 +19,13 @@ LEGACY_UNITS = (
      'argonaut-development-test-lab-fleet.timer'),
 )
 
+LEGACY_STATE = {
+    'argonaut-development-c64-ai-bridge.service': 'c64-ai-bridge.json',
+    'argonaut-development-c64-ai-health.timer': 'c64-ai-health-state.json',
+    'argonaut-development-c64-ai-test.timer': 'c64-ai-test-state.json',
+    'argonaut-development-test-lab-fleet.timer': 'alert-state.json',
+}
+
 
 def _run(runner, *args):
     try:
@@ -42,17 +49,24 @@ def migrate_legacy_services(marker_path, runner=subprocess.run):
     if not development.enabled() or marker_path.exists():
         return False
     enabled = []
+    legacy = []
     for old, new in LEGACY_UNITS:
         is_enabled = _run(runner, 'is-enabled', old).returncode == 0
         definition = _run(runner, 'cat', old)
-        is_development = ('argonaut-development' in definition.stdout
-                          if definition.returncode == 0 else False)
-        if is_enabled and is_development:
+        active = _run(runner, 'status', old)
+        is_development = ('argonaut-development' in
+                          (definition.stdout + active.stdout))
+        if is_development and (is_enabled or active.returncode == 0):
+            legacy.append(old)
             enabled.append((old, new))
+    known_targets = {new for _old, new in enabled}
+    for new, state_name in LEGACY_STATE.items():
+        if (marker_path.parent / state_name).exists() and new not in known_targets:
+            enabled.append(('', new))
+            known_targets.add(new)
     if not enabled:
-        _mark_complete(marker_path)
         return False
-    for old, _new in enabled:
+    for old in legacy:
         _run(runner, 'disable', '--now', old)
     if _run(runner, 'daemon-reload').returncode != 0:
         raise BrowserError(

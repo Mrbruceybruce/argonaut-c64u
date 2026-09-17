@@ -84,8 +84,31 @@ class ServiceMigrationTests(unittest.TestCase):
                 'os.environ', {'ARGONAUT_DEVELOPMENT': '1'}):
             marker = Path(folder) / 'marker'
             self.assertFalse(migrate_legacy_services(marker, runner))
-            self.assertTrue(marker.is_file())
+            self.assertFalse(marker.exists())
         self.assertFalse(any(command[0] == 'disable' for command in commands))
+
+    def test_removed_units_restore_intent_from_private_legacy_state(self):
+        commands = []
+
+        def runner(args, **_kwargs):
+            commands.append(args[2:])
+            return result(args, 1 if args[2] in (
+                'is-enabled', 'cat', 'status') else 0)
+
+        with tempfile.TemporaryDirectory() as folder, patch.dict(
+                'os.environ', {'ARGONAUT_DEVELOPMENT': '1'}):
+            base = Path(folder)
+            (base / 'c64-ai-bridge.json').write_text('{}')
+            (base / 'c64-ai-test-state.json').write_text('{}')
+            marker = base / 'marker'
+            self.assertTrue(migrate_legacy_services(marker, runner))
+            self.assertTrue(marker.is_file())
+        enabled = [command[-1] for command in commands
+                   if command[0:2] == ['enable', '--now']]
+        self.assertEqual(enabled, [
+            'argonaut-development-c64-ai-bridge.service',
+            'argonaut-development-c64-ai-test.timer',
+        ])
 
 
 if __name__ == '__main__':

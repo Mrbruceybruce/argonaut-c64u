@@ -111,6 +111,15 @@ Development services and cannot claim later stable units. All 340 source tests
 pass in normal and optimized Python modes; installed migration validation is
 next.
 
+Installed build `2366daa` exposed an upgrade-order defect: package replacement
+removed the legacy unit definitions before the app could read their enabled
+state. The private settings and reports were intact, but the new scoped units
+started disabled and the still-running legacy bridge temporarily held the
+listener port. The legacy process was stopped, all four scoped services were
+restored, and the new bridge passed end to end. Migration now also reconstructs
+legacy enabled intent from the existing private bridge and alert-state files,
+while continuing to reject genuine stable service definitions.
+
 The unresolved SuperCPU Detect freeze remains tracked in GitHub issue #1. Do not
 change that setting during routine hardware tests; investigate it separately
 with an explicit recovery plan.
