@@ -42,15 +42,15 @@ failed check; an immediate clean retry passed, and future runs allow 90 seconds.
 Test Lab now has an explicit end-to-end C64 AI bridge probe. It sends a fixed
 readiness question through the deployed authenticated protocol and uses
 ordinary code to verify the reply contract without judging, displaying, or
-saving the model text. The source implementation passed against the real local
-Gemma 3 4B model in 4.7 seconds. The installed Development package and visible
-button remain to be updated and checked on Linux.
+saving the model text. Both the visible button and the headless scheduled path
+have passed against the real local Gemma 3 4B model.
 
 The `1.5-ai.3+linux.1` installed UI was verified on 2026-09-16: **Test bridge
 AI** passed the deployed bridge and Gemma path in 4.741 seconds and reported
-that reply text was not saved. The next increment records this as a structured,
-exportable `bridge.end_to_end` Test Lab verdict with sanitized operation
-evidence and run comparison.
+that reply text was not saved. The `1.5-ai.3+linux.2` package adds its structured,
+exportable `bridge.end_to_end` verdict, sanitized comparison history, headless
+runner, and optional six-hour changed-state alert schedule. Installed Linux UI
+and timer validation remain.
 
 The structured bridge verdict also has a Linux headless entry point with stable
 exit codes and sanitized JSON. An independent six-hour Linux timer can run the
