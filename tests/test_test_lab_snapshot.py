@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,7 +16,8 @@ class TestLabSnapshotTests(unittest.TestCase):
                 'PASS — expected simulated failure was detected.',
                 'UNAVAILABLE — enter a model name.')
             self.assertEqual(json.loads(path.read_text()), saved)
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(saved['action'], 'Local AI simulation')
             self.assertIn('expected simulated failure',
                           saved['deterministic_result'])
