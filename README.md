@@ -62,11 +62,13 @@ Argonaut 1.5 running on macOS (Apple Silicon), connected to a C64 Ultimate.
 
 **Files — local and C64U storage side by side.**
 
-Open a D64 or D71 to view its authentic flat Commodore directory. Standard
+Open a D64, D71, or D81 to view its authentic Commodore directory. Standard
 35-track D64 images can stage filename changes, file removal, and PRG/SEQ/USR
 additions. Argonaut validates the complete result and saves it as a new local
 D64; it never rewrites the source image or replaces an existing destination.
-D71 images are currently read-only and validate both physical sides and BAMs.
+D71 and D81 images are currently read-only and validate both BAM regions.
+Authentic 1581 CBM partitions are labeled as disk partitions and are never
+presented as ordinary host folders or extractable chained files.
 
 ![Mac Files tab showing local folders and a selected C64U disk image](docs/images/macos-files.png)
 

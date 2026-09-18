@@ -8,12 +8,14 @@ from c64u_browser.api import BrowserError
 from c64u_browser.disk_image import D64Image
 from c64u_browser.disk_image_io import (
     extract_new, read_host_file_for_d64, read_local_d64, read_local_d71,
-    read_local_disk_image, read_remote_d64, read_remote_d71,
+    read_local_d81, read_local_disk_image, read_remote_d64, read_remote_d71,
+    read_remote_d81,
     read_remote_disk_image, suggested_name)
 
 
 FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-authentic.d64'
 D71_FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1571-authentic.d71'
+D81_FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1581-authentic.d81'
 
 
 class DiskImageIOTests(unittest.TestCase):
@@ -52,11 +54,22 @@ class DiskImageIOTests(unittest.TestCase):
         self.assertEqual((image.format_name, dispatched.format_name), ('D71', 'D71'))
         self.assertEqual(reader.call_count, 2)
 
+    def test_local_and_remote_d81_readers_dispatch_by_real_suffix(self):
+        self.assertEqual(read_local_d81(D81_FIXTURE).directory().disk_id, '81')
+        self.assertEqual(read_local_disk_image(D81_FIXTURE).format_name, 'D81')
+        client = Mock()
+        with patch('c64u_browser.disk_image_io.read_remote',
+                   return_value=D81_FIXTURE.read_bytes()) as reader:
+            image = read_remote_d81(client, '/USB2/GAMES/DISK.D81')
+            dispatched = read_remote_disk_image(client, '/USB2/GAMES/DISK.D81')
+        self.assertEqual((image.format_name, dispatched.format_name), ('D81', 'D81'))
+        self.assertEqual(reader.call_count, 2)
+
     def test_disk_image_dispatch_rejects_unimplemented_formats(self):
-        with self.assertRaisesRegex(BrowserError, 'supported D64 or D71'):
-            read_local_disk_image('disk.d81')
-        with self.assertRaisesRegex(BrowserError, 'supported D64 or D71'):
-            read_remote_disk_image(Mock(), '/USB2/disk.d81')
+        with self.assertRaisesRegex(BrowserError, 'D64, D71 or D81'):
+            read_local_disk_image('disk.d80')
+        with self.assertRaisesRegex(BrowserError, 'D64, D71 or D81'):
+            read_remote_disk_image(Mock(), '/USB2/disk.d80')
 
     def test_extracts_exact_bytes_without_replacing_destination(self):
         image = D64Image.from_path(FIXTURE)

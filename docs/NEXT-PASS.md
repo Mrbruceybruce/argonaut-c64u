@@ -70,11 +70,25 @@ crosses onto the second physical side, and keeps the authentic flat directory.
 Format details are checked against the
 [VICE D71 specification](https://vice-emu.sourceforge.io/vice_17.html#SEC388).
 
-The D71 directory and cross-side extraction passed installed Linux acceptance:
-the authentic 170,000-byte `CROSSSIDE` file was extracted successfully. The
-next package also hides dot-prefixed and operating-system-hidden entries in the
-local Files pane by default. **Preferences → General → Show hidden local files
-and folders** reveals them immediately when needed; C64U listings are unchanged.
+Read-only D71 passed installed Linux and physical C64U acceptance on 2026-09-17.
+The authentic 170,000-byte `CROSSSIDE` file extracted successfully. Mounted on
+an emulated 1571 connected to a C64, the directory first reported zero free
+blocks because a 1571 starts in single-sided 1541 compatibility mode. The
+authentic `U0>M1` command enabled double-sided mode, after which BASIC displayed
+the expected `657 BLOCKS FREE`. This confirms both the fixture and Argonaut's
+geometry against real drive behavior.
+
+The next package also hides dot-prefixed and operating-system-hidden entries in
+the local Files pane by default. **Preferences → General → Show hidden local
+files and folders** reveals them immediately when needed; C64U listings are
+unchanged. Read-only D81 support is now active.
+
+The D81 parser follows the documented 1581 layout: 80 tracks with 40 sectors
+each, header at 40/0, BAMs at 40/1 and 40/2, and the fixed root directory at
+40/3. Its VICE-generated fixture contains a 410,000-byte file that crosses both
+BAM halves and a genuine contiguous CBM partition allocation that VICE retains
+across validation. Argonaut labels CBM entries as partitions, validates their
+linear allocation, and does not expose them as host folders or chained files.
 
 ## Current milestone: Linux hardening
 

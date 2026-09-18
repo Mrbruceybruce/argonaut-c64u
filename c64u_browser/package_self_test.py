@@ -54,7 +54,7 @@ def run(package_metadata, report_path):
 
         from .about import show_about
         from .credentials import Credentials
-        from .disk_image import D64Image, D71Image, sectors_on_track
+        from .disk_image import D64Image, D71Image, D81Image, sectors_on_track
         from .disk_image_dialog import DiskImageDialog
         from .gui import Browser
         from .platform_support import local_roots, portable_root, publish_new
@@ -139,6 +139,36 @@ def run(package_metadata, report_path):
                      'ui.d71_directory',
                      'The read-only D71 directory window is incorrect.', checks)
             d71_dialog.dialog.destroy()
+            d81_data = bytearray(819200)
+            d81_header = (40 - 1) * 40 * 256
+            d81_directory = d81_header + 3 * 256
+            d81_data[d81_header:d81_header + 3] = bytes((40, 3, 0x44))
+            d81_data[d81_header + 4:d81_header + 20] = (
+                b'PACKAGE D81' + b'\xa0' * 5)
+            d81_data[d81_header + 0x16:d81_header + 0x18] = b'81'
+            d81_data[d81_header + 0x19:d81_header + 0x1b] = b'3D'
+            d81_data[d81_header + 256:d81_header + 262] = bytes(
+                (40, 2, 0x44, 0xbb, 0x38, 0x31))
+            d81_data[d81_header + 512:d81_header + 518] = bytes(
+                (0, 255, 0x44, 0xbb, 0x38, 0x31))
+            d81_data[d81_directory:d81_directory + 2] = bytes((0, 255))
+            d81_entry = d81_directory + 2
+            d81_data[d81_entry:d81_entry + 3] = bytes((0x85, 80, 0))
+            d81_data[d81_entry + 3:d81_entry + 19] = (
+                b'PARTITION' + b'\xa0' * 7)
+            d81_data[d81_entry + 28:d81_entry + 30] = bytes((10, 0))
+            d81_dialog = DiskImageDialog(
+                app, 'Package D81 check', D81Image(d81_data))
+            d81_row = d81_dialog.listing.get_first_child()
+            d81_dialog.listing.select_row(d81_row)
+            _require(d81_dialog.dialog.get_title() == 'D81 disk directory' and
+                     'CBM partition' in d81_row.get_child().get_text() and
+                     not d81_dialog.extract_button.get_sensitive() and
+                     d81_dialog.status.get_text().startswith('Read-only D81') and
+                     not d81_dialog.add_button.get_sensitive(),
+                     'ui.d81_directory',
+                     'The read-only D81 directory window is incorrect.', checks)
+            d81_dialog.dialog.destroy()
             _require(bool(local_roots()), 'filesystem.local_roots',
                      'No local file roots were found.', checks)
             _require((ASSETS / 'about-background.png').is_file() and

@@ -9,7 +9,7 @@ import time
 
 from .api import BrowserError, UltimateClient, parse_list
 from .diagnostics import LOGGER, operation_origin
-from .disk_image import D64Image, D71Image, sectors_on_track, sectors_on_d71_track
+from .disk_image import D64Image, D71Image, D81Image, sectors_on_track, sectors_on_d71_track
 from .disk_image_edit import D64EditSession
 
 
@@ -169,11 +169,45 @@ def _check_d71_parser():
             'D71 double-sided structure validation differed')
 
 
+def _check_d81_parser():
+    data = bytearray(819200)
+    header = (40 - 1) * 40 * 256
+    first_bam = header + 256
+    second_bam = header + 2 * 256
+    directory = header + 3 * 256
+    data[header:header + 3] = bytes((40, 3, 0x44))
+    data[header + 4:header + 20] = b'ARGONAUT' + b'\xa0' * 8
+    data[header + 0x16:header + 0x18] = b'81'
+    data[header + 0x19:header + 0x1b] = b'3D'
+    data[first_bam:first_bam + 6] = bytes((40, 2, 0x44, 0xbb, 0x38, 0x31))
+    data[second_bam:second_bam + 6] = bytes((0, 255, 0x44, 0xbb, 0x38, 0x31))
+    data[directory:directory + 2] = bytes((0, 255))
+    entry = directory + 2
+    data[entry:entry + 3] = bytes((0x82, 41, 0))
+    data[entry + 3:entry + 19] = b'SIDE TWO' + b'\xa0' * 8
+    data[entry + 28:entry + 30] = bytes((1, 0))
+    side_two_file = 40 * 40 * 256
+    data[side_two_file:side_two_file + 5] = bytes((0, 4, 1, 8, 0))
+    image = D81Image(data)
+    parsed = image.directory()
+    require((parsed.disk_name, parsed.disk_id, parsed.dos_type,
+             parsed.geometry.tracks) == ('ARGONAUT', '81', '3D', 80),
+            'D81 header or geometry differed')
+    require(len(parsed.entries) == 1 and parsed.entries[0].name == 'SIDE TWO',
+            'D81 flat root-directory entry differed')
+    require(image.read_file(parsed.entries[0]) == b'\x01\x08\x00',
+            'D81 second-BAM file chain differed')
+    validation = image.validate()
+    require(validation.standard_compatible and validation.entries_checked == 1,
+            'D81 double-BAM structure validation differed')
+
+
 DEFAULT_CHECKS = (
     Check('ftp.listing_parser', 'FTP listing parser', _check_listing_parser),
     Check('rest.sid_path_validation', 'SID path validation', _check_sid_path_validation),
     Check('disk.d64_parser', 'D64 parser and staged editor', _check_d64_parser),
     Check('disk.d71_parser', 'Read-only D71 parser', _check_d71_parser),
+    Check('disk.d81_parser', 'Read-only D81 parser', _check_d81_parser),
 )
 
 

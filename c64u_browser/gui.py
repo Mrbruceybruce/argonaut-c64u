@@ -503,7 +503,7 @@ class Browser(Gtk.Application):
         if name == '..':
             self.navigate(local, str(self.local.parent) if local else (posixpath.dirname(self.remote) if self.remote != self.remote_root else self.remote_root))
         elif directory: self.navigate(local, str(self.local / name) if local else posixpath.join(self.remote, name))
-        elif name.casefold().endswith(('.d64', '.d71')): self.open_disk_image(local, name)
+        elif name.casefold().endswith(('.d64', '.d71', '.d81')): self.open_disk_image(local, name)
 
     def open_disk_image(self, local, name):
         if self.busy:return
@@ -610,7 +610,7 @@ class Browser(Gtk.Application):
         if row:
             name, directory = row.item
             multiple = len(listing.get_selected_rows()) > 1
-            if not multiple and not directory and name.casefold().endswith(('.d64', '.d71')):
+            if not multiple and not directory and name.casefold().endswith(('.d64', '.d71', '.d81')):
                 self.button(box, 'Open disk image',
                             lambda: action(lambda: self.open_disk_image(local, name)))
             if not multiple and not local and not directory and name.lower().endswith('.sid'):

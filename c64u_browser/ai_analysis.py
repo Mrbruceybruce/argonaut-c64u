@@ -24,7 +24,7 @@ SAFE_TARGETS = {
     'dma': frozenset(('disk', 'keyboard')),
     'local': frozenset(('file',)),
     'bridge': frozenset(('local_model',)),
-    'disk_image': frozenset(('d64', 'd71', 'entry', 'file')),
+    'disk_image': frozenset(('d64', 'd71', 'd81', 'entry', 'file')),
 }
 SAFE_ERROR_KINDS = frozenset((
     'authentication', 'network', 'host', 'api', 'ftp', 'identity',
@@ -36,7 +36,7 @@ SAFE_ERROR_KINDS = frozenset((
 MAX_FAILURES = 32
 SAFE_CHECK_IDS = frozenset((
     'ftp.listing_parser', 'rest.sid_path_validation', 'disk.d64_parser',
-    'disk.d71_parser',
+    'disk.d71_parser', 'disk.d81_parser',
     'hardware.identity', 'hardware.drives', 'hardware.storage',
     'hardware.version_stability',
     'sim.rest.success', 'sim.rest.malformed', 'sim.rest.authentication',

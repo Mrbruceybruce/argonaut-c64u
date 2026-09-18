@@ -36,6 +36,7 @@ class DiskDirectoryEntry:
     directory_track: int
     directory_sector: int
     directory_slot: int
+    partition_kind: str = ''
 
 
 @dataclass(frozen=True)
@@ -421,6 +422,217 @@ class D71Image(D64Image):
                     issues.append(f'entry.{index}.cross_link')
                 if any(self._bam_is_free(header, second_bam, *location)
                        for location in sectors):
+                    issues.append(f'entry.{index}.marked_free')
+                occupied.update(sectors)
+            return D64Validation(
+                standard_compatible=not issues,
+                entries_checked=checked,
+                issues=tuple(issues),
+            )
+
+
+class D81Image(D64Image):
+    """An immutable read-only view of a standard Commodore 1581 D81."""
+
+    format_name = 'D81'
+    drive_model = '1581'
+
+    def __init__(self, data):
+        self._source = bytes(data)
+        sizes = {819200: False, 822400: True}
+        try:
+            error_table = sizes[len(self._source)]
+        except KeyError as exc:
+            raise DiskImageError(
+                'Unsupported D81 size. Expected a standard 80-track image, '
+                'with or without a 3200-byte error table.') from exc
+        self.geometry = D64Geometry(80, 3200, error_table, True)
+        self._disk_data = self._source[:819200]
+
+    def sector(self, track, sector):
+        if not 1 <= track <= 80:
+            raise DiskImageError(f'Track {track} is outside this D81 image.')
+        if not 0 <= sector < 40:
+            raise DiskImageError(
+                f'Sector {sector} is outside track {track}; valid sectors are 0-39.')
+        return self._disk_data[((track - 1) * 40 + sector) * 256:
+                               ((track - 1) * 40 + sector + 1) * 256]
+
+    def _directory_start(self, header):
+        # A 1581 root directory always begins at 40/3. The header link is
+        # retained only for validation because real DOS does not trust it.
+        return 40, 3
+
+    def _directory(self):
+        header = self.sector(40, 0)
+        entries = []
+        seen = set()
+        track, sector = self._directory_start(header)
+        while track:
+            if not 1 <= track <= 80 or not 0 <= sector < 40:
+                raise DiskImageError('D81 directory chain leaves the disk geometry.')
+            location = (track, sector)
+            if location in seen:
+                raise DiskImageError('D81 directory chain contains a loop.')
+            seen.add(location)
+            block = self.sector(track, sector)
+            for index in range(8):
+                start = 2 + index * 32
+                raw_type = block[start]
+                if raw_type == 0:
+                    continue
+                kind = raw_type & 0x0f
+                blocks = int.from_bytes(block[start + 28:start + 30], 'little')
+                partition_kind = ''
+                if kind == 5:
+                    crosses_system_track = (
+                        block[start + 1] <= 40 <=
+                        block[start + 1] + max(blocks - 1, 0) // 40)
+                    partition_kind = (
+                        'subdirectory-capable'
+                        if block[start + 2] == 0 and blocks >= 120 and
+                        blocks % 40 == 0 and not crosses_system_track
+                        else 'protected')
+                entries.append(DiskDirectoryEntry(
+                    name=decode_petscii(block[start + 3:start + 19]),
+                    raw_name=bytes(block[start + 3:start + 19]),
+                    file_type=('CBM' if kind == 5 else
+                               _FILE_TYPES.get(kind, f'${kind:X}')),
+                    closed=bool(raw_type & 0x80),
+                    locked=bool(raw_type & 0x40),
+                    start_track=block[start + 1],
+                    start_sector=block[start + 2],
+                    blocks=blocks,
+                    directory_track=track,
+                    directory_sector=sector,
+                    directory_slot=index,
+                    partition_kind=partition_kind,
+                ))
+            track, sector = block[0], block[1]
+
+        blocks_free = 0
+        for track in range(1, 81):
+            if track == 40:
+                continue
+            bam = self.sector(40, 1 if track <= 40 else 2)
+            offset = 0x10 + ((track - 1) % 40) * 6
+            free = bam[offset]
+            if free > 40:
+                raise DiskImageError(
+                    f'D81 BAM has an invalid free-block count for track {track}.')
+            blocks_free += free
+
+        return D64Directory(
+            disk_name=decode_petscii(header[4:20]),
+            raw_disk_name=bytes(header[4:20]),
+            disk_id=decode_petscii(header[0x16:0x18]),
+            dos_type=decode_petscii(header[0x19:0x1b]),
+            dos_version=decode_petscii(header[2:3]),
+            blocks_free=blocks_free,
+            entries=tuple(entries),
+            geometry=self.geometry,
+        )
+
+    def _file_chain(self, entry):
+        if isinstance(entry, DiskDirectoryEntry) and entry.file_type == 'CBM':
+            raise DiskImageError(
+                f'{entry.name} is a 1581 CBM partition, not a chained file.')
+        return super()._file_chain(entry)
+
+    def _bam_is_free(self, track, sector):
+        bam = self.sector(40, 1 if track <= 40 else 2)
+        offset = 0x10 + ((track - 1) % 40) * 6
+        return bool(bam[offset + 1 + sector // 8] & (1 << (sector % 8)))
+
+    def _partition_sectors(self, entry):
+        if entry.file_type != 'CBM' or entry.blocks <= 0:
+            raise DiskImageError(f'{entry.name} has an invalid CBM partition size.')
+        track, sector = entry.start_track, entry.start_sector
+        locations = []
+        for _ in range(entry.blocks):
+            if not 1 <= track <= 80 or not 0 <= sector < 40:
+                raise DiskImageError(f'{entry.name} partition leaves the D81 geometry.')
+            locations.append((track, sector))
+            sector += 1
+            if sector == 40:
+                track += 1
+                sector = 0
+        return tuple(locations)
+
+    def validate(self):
+        """Validate both 1581 BAMs, root directory, and chained files."""
+        with operation_event('disk_image', 'validate', 'd81'):
+            directory = self._directory()
+            header = self.sector(40, 0)
+            first_bam = self.sector(40, 1)
+            second_bam = self.sector(40, 2)
+            issues = []
+            if header[:2] != bytes((40, 3)):
+                issues.append('format.directory_pointer')
+            if header[2] not in (0, 0x44):
+                issues.append('format.dos_version')
+            if first_bam[:2] != bytes((40, 2)) or second_bam[:2] != bytes((0, 255)):
+                issues.append('format.bam_chain')
+            if any(bam[2] != 0x44 or bam[3] != 0xbb
+                   for bam in (first_bam, second_bam)):
+                issues.append('format.bam_version')
+            if any(bam[4:6] != header[0x16:0x18]
+                   for bam in (first_bam, second_bam)):
+                issues.append('format.bam_disk_id')
+
+            for track in range(1, 81):
+                bam = first_bam if track <= 40 else second_bam
+                offset = 0x10 + ((track - 1) % 40) * 6
+                free_bits = sum(self._bam_is_free(track, sector)
+                                for sector in range(40))
+                if bam[offset] != free_bits:
+                    issues.append(f'bam.track.{track}.free_count')
+
+            directory_sectors = set()
+            track, sector = self._directory_start(header)
+            while track:
+                location = (track, sector)
+                if location in directory_sectors:
+                    break
+                directory_sectors.add(location)
+                block = self.sector(track, sector)
+                track, sector = block[0], block[1]
+            if any(track != 40 for track, _ in directory_sectors):
+                issues.append('directory.extended_track')
+            for location in ((40, 0), (40, 1), (40, 2), *directory_sectors):
+                if self._bam_is_free(*location):
+                    issues.append('bam.system_sector_marked_free')
+                    break
+
+            occupied = set()
+            checked = 0
+            for index, entry in enumerate(directory.entries, 1):
+                if entry.file_type == 'DEL':
+                    continue
+                if entry.file_type == 'CBM':
+                    try:
+                        sectors = self._partition_sectors(entry)
+                    except DiskImageError:
+                        issues.append(f'entry.{index}.partition')
+                        continue
+                    system = {(40, 0), (40, 1), (40, 2), *directory_sectors}
+                    if occupied.intersection(sectors) or system.intersection(sectors):
+                        issues.append(f'entry.{index}.cross_link')
+                    if any(self._bam_is_free(*location) for location in sectors):
+                        issues.append(f'entry.{index}.marked_free')
+                    occupied.update(sectors)
+                    continue
+                checked += 1
+                try:
+                    _, sectors = self._file_chain(entry)
+                except DiskImageError:
+                    issues.append(f'entry.{index}.chain')
+                    continue
+                if len(sectors) != entry.blocks:
+                    issues.append(f'entry.{index}.block_count')
+                if occupied.intersection(sectors):
+                    issues.append(f'entry.{index}.cross_link')
+                if any(self._bam_is_free(*location) for location in sectors):
                     issues.append(f'entry.{index}.marked_free')
                 occupied.update(sectors)
             return D64Validation(

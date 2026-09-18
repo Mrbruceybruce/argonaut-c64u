@@ -90,6 +90,11 @@ class DiskImageDialog:
         for entry in directory.entries:
             display_type = (('*' if not entry.closed else '') + entry.file_type
                             + ('<' if entry.locked else ''))
+            if entry.file_type == 'CBM':
+                display_type = ('CBM partition' +
+                                (' (subdirectory-capable)'
+                                 if entry.partition_kind == 'subdirectory-capable'
+                                 else ''))
             row = Gtk.ListBoxRow()
             row.entry = entry
             row.set_child(Gtk.Label(
@@ -97,9 +102,13 @@ class DiskImageDialog:
                 xalign=0))
             self.listing.append(row)
         self.free_label.set_text(f'{directory.blocks_free} BLOCKS FREE.')
+        partitions = sum(entry.file_type == 'CBM' for entry in directory.entries)
+        checked = f'{validation.entries_checked} file chain(s)'
+        if partitions:
+            checked += f' and {partitions} CBM partition allocation(s)'
         self.validation_label.set_text(
             f'Structure check: standard {image.drive_model} directory and '
-                   f'{validation.entries_checked} file chain(s) passed.'
+                   f'{checked} passed.'
                    if validation.standard_compatible else
                    f'Structure check: {len(validation.issues)} nonstandard or damaged '
                    'condition(s) detected. The image remains available read-only.')
@@ -143,7 +152,8 @@ class DiskImageDialog:
         row = self.listing.get_selected_row()
         selected = row is not None
         editable = self.session is not None
-        self.extract_button.set_sensitive(selected)
+        self.extract_button.set_sensitive(
+            selected and row.entry.file_type in ('PRG', 'SEQ', 'USR', 'REL'))
         self.add_button.set_sensitive(editable)
         self.rename_button.set_sensitive(editable and selected)
         self.remove_button.set_sensitive(
