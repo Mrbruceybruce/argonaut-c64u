@@ -1,0 +1,72 @@
+import hashlib
+from pathlib import Path
+import unittest
+
+from c64u_browser.disk_image import D64Image, DiskImageError, sectors_on_track
+
+
+FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-authentic.d64'
+
+
+class D64ImageTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.data = FIXTURE.read_bytes()
+
+    def test_reads_flat_directory_created_by_vice_c1541(self):
+        image = D64Image(self.data)
+        directory = image.directory()
+        self.assertEqual((directory.disk_name, directory.disk_id, directory.dos_type),
+                         ('ARGONAUT', '64', '2A'))
+        self.assertEqual(directory.blocks_free, 663)
+        self.assertEqual(len(directory.entries), 1)
+        entry = directory.entries[0]
+        self.assertEqual((entry.name, entry.file_type, entry.closed, entry.locked, entry.blocks),
+                         ('HELLO', 'PRG', True, False, 1))
+        self.assertTrue(directory.geometry.standard)
+        self.assertEqual(directory.geometry.tracks, 35)
+
+    def test_parsing_does_not_change_any_source_byte(self):
+        before = hashlib.sha256(self.data).digest()
+        image = D64Image(self.data)
+        image.directory()
+        self.assertEqual(hashlib.sha256(image.source_bytes).digest(), before)
+        self.assertEqual(image.source_bytes, self.data)
+
+    def test_recognizes_error_table_without_treating_it_as_disk_sectors(self):
+        image = D64Image(self.data + bytes([1]) * 683)
+        self.assertTrue(image.geometry.error_table)
+        self.assertEqual(image.directory().disk_name, 'ARGONAUT')
+
+    def test_recognizes_extended_images_as_nonstandard(self):
+        extended = self.data + bytes(196608 - len(self.data))
+        image = D64Image(extended)
+        self.assertEqual(image.geometry.tracks, 40)
+        self.assertFalse(image.geometry.standard)
+        self.assertEqual(image.directory().disk_name, 'ARGONAUT')
+
+    def test_rejects_unknown_size(self):
+        with self.assertRaisesRegex(DiskImageError, 'Unsupported D64 size'):
+            D64Image(self.data[:-1])
+
+    def test_rejects_invalid_directory_pointer(self):
+        damaged = bytearray(self.data)
+        header = sum(sectors_on_track(track) for track in range(1, 18)) * 256
+        damaged[header] = 17
+        with self.assertRaisesRegex(DiskImageError, 'does not point'):
+            D64Image(damaged).directory()
+
+    def test_rejects_directory_loop(self):
+        damaged = bytearray(self.data)
+        directory = (sum(sectors_on_track(track) for track in range(1, 18)) + 1) * 256
+        damaged[directory:directory + 2] = bytes((18, 1))
+        with self.assertRaisesRegex(DiskImageError, 'loop'):
+            D64Image(damaged).directory()
+
+    def test_track_geometry_matches_1541_zones(self):
+        self.assertEqual([sectors_on_track(track) for track in (1, 17, 18, 24, 25, 30, 31, 35)],
+                         [21, 21, 19, 19, 18, 18, 17, 17])
+
+
+if __name__ == '__main__':
+    unittest.main()
