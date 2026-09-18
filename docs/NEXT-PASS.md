@@ -70,6 +70,12 @@ crosses onto the second physical side, and keeps the authentic flat directory.
 Format details are checked against the
 [VICE D71 specification](https://vice-emu.sourceforge.io/vice_17.html#SEC388).
 
+The D71 directory and cross-side extraction passed installed Linux acceptance:
+the authentic 170,000-byte `CROSSSIDE` file was extracted successfully. The
+next package also hides dot-prefixed and operating-system-hidden entries in the
+local Files pane by default. **Preferences → General → Show hidden local files
+and folders** reveals them immediately when needed; C64U listings are unchanged.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

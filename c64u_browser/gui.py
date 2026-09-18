@@ -30,6 +30,7 @@ from .media_tab import MediaTab
 from .streams_tab import StreamsTab
 from .diagnostics import enable_private_log, disable_private_log
 from .test_lab_access import enabled as test_lab_enabled
+from .platform_support import local_hidden
 
 
 class Browser(Gtk.Application):
@@ -252,7 +253,11 @@ class Browser(Gtk.Application):
     def refresh_local(self):
         try:
             entries = []
+            show_hidden = bool(self.preferences.app_options.get(
+                'show_hidden_local', False))
             for p in self.local.iterdir():
+                if not show_hidden and local_hidden(p):
+                    continue
                 # Some files never resolve via stat(), most notably dangling
                 # symlinks such as Emacs' ".#name" lock files, which point at
                 # a "user@host.pid:boot-time" string that was never a real

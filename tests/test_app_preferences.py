@@ -30,6 +30,13 @@ class AppPreferencesTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate({'developer_mode': value})
 
+    def test_hidden_local_files_are_hidden_by_default_and_boolean(self):
+        self.assertFalse(validate({})['show_hidden_local'])
+        self.assertTrue(validate({'show_hidden_local': True})['show_hidden_local'])
+        for value in (1, 'true', None):
+            with self.assertRaises(ValueError):
+                validate({'show_hidden_local': value})
+
     def test_missing_remote_folder_falls_back_to_drive(self):
         client=Mock();client.list_directory.side_effect=[('/',[Entry('USB2','dir',0)]),BrowserError('Gone'),('/USB2',[])]
         self.assertEqual(initial_directory(client,'/USB2/Gone'),('/USB2',[]))

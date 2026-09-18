@@ -5,6 +5,8 @@ A GTK desktop application for controlling and managing a Commodore 64 Ultimate.
 Features include connection profiles, local and C64U USB/SD file management,
 settings and favorites, ROM selection, configuration backups and Undo,
 live screen preview, screenshots, and WebM recordings.
+Hidden local files and folders are omitted by default. They can be shown from
+**Preferences → General** without affecting the C64U file listing.
 
 Start with the [quick-start guide](docs/QUICK-START.md) for connection setup,
 file transfers, settings, backups, and preview.

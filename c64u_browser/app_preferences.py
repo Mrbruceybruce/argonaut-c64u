@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Validated desktop preferences, separate from machine configuration."""
 DEFAULTS={'remember_window':True,'width':1200,'height':850,'preview_scale':150,
-          'preview_audio':True,'remember_folders':True,'developer_mode':False,
+          'preview_audio':True,'remember_folders':True,'show_hidden_local':False,
+          'developer_mode':False,
           'local_folder':'','remote_folders':{}}
 
 def defaults():
@@ -10,7 +11,7 @@ def defaults():
 def validate(options):
     result=defaults()
     if not isinstance(options,dict):raise ValueError('Invalid application preferences')
-    for key in ('remember_window','preview_audio','remember_folders',
+    for key in ('remember_window','preview_audio','remember_folders','show_hidden_local',
                 'developer_mode'):
         value=options.get(key,result[key])
         if type(value) is not bool:raise ValueError('Invalid preference: '+key)
@@ -80,7 +81,7 @@ def show_preferences(app, page=0):
     pages.append_page(general_scroll,Gtk.Label(label='General'))
     for side in ('top','bottom','start','end'):getattr(box,'set_margin_'+side)(16)
     checks={}
-    for key,label in [('remember_window','Remember window size'),('preview_audio','Play preview audio by default'),('remember_folders','Remember last-used file folders')]:
+    for key,label in [('remember_window','Remember window size'),('preview_audio','Play preview audio by default'),('remember_folders','Remember last-used file folders'),('show_hidden_local','Show hidden local files and folders')]:
         control=Gtk.CheckButton(label=label,active=prefs.app_options[key],halign=Gtk.Align.START);box.append(control);checks[key]=control
     if not development.enabled():
         developer_mode=Gtk.CheckButton(
@@ -160,6 +161,8 @@ def show_preferences(app, page=0):
         show_general(prefs.app_options,
                      {key:getattr(prefs,key) for key in folders})
         developer_is_enabled=prefs.app_options['developer_mode']
+        if old['show_hidden_local'] != prefs.app_options['show_hidden_local']:
+            app.refresh_local()
         if developer_was_enabled != developer_is_enabled:
             error.set_text(
                 'Preferences saved automatically. Restart Argonaut to apply Developer Mode.')

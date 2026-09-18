@@ -63,6 +63,14 @@ class PreferencesUI(unittest.TestCase):
         self.assertIn('Close',labels);self.assertIn('Undo',labels)
         self.assertIn('Restore defaults…',labels)
         self.assertNotIn('Save preferences',labels)
+        hidden=next(w for w in checks
+                    if w.get_label()=='Show hidden local files and folders')
+        self.assertFalse(hidden.get_active())
+        with patch.object(self.app,'refresh_local') as refresh:
+            hidden.set_active(True)
+            refresh.assert_called_once_with()
+        self.assertTrue(Preferences(self.app.preferences.path).load().app_options[
+            'show_hidden_local'])
         plus=next(w for w in self.walk(general) if isinstance(w,self.Gtk.Button) and w.get_label()=='+')
         plus.emit('clicked')
         self.assertEqual(self.app.preferences.app_options['preview_scale'],175)
