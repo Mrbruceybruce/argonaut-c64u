@@ -107,6 +107,11 @@ line. The local Files pane hid dot entries by default and refreshed immediately
 when **Show hidden local files and folders** was enabled or disabled. Section 4
 is now frozen for the Windows, Apple Silicon Mac, and Intel Mac release gate.
 
+The published `v1.7-disk.7` packages at build `a9a59bb` passed their hosted
+package checks on Windows, Apple Silicon Mac, and Intel Mac. Physical Windows
+and Apple Silicon testing passed on 2026-09-18. Physical Intel Mac acceptance
+remains with contributor OldMan252 and is the final Section 4 release-gate item.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
