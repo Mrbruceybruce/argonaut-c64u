@@ -99,6 +99,19 @@ backup paths; inspect those paths before retrying.
 After inserting or moving a thumb drive, use **Refresh** to discover it.
 Use your computer's normal eject/unmount controls for local removable media.
 
+### Create and edit a D64 disk image
+
+Open the local folder where the image should be saved and choose **New D64
+disk…**. Enter a local filename, a C64 disk name of up to 16 characters, and an
+exactly two-character disk ID. Argonaut creates a standard blank 35-track D64,
+validates it, and opens its flat Commodore directory with 664 blocks free.
+
+In a standard D64 directory window, you can stage filename changes, scratch
+supported files, or add local PRG, SEQ, and USR files. Choose the save action to
+publish the complete edited image under a new local filename. Argonaut does not
+rewrite the source image or replace an existing destination. D71 and D81 images
+remain read-only in this release.
+
 ## 4. Change settings and use Favorites
 
 Open **Settings**. Use the section list or **Search settings…** to find an item.

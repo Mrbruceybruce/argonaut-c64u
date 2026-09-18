@@ -55,6 +55,7 @@ def run(package_metadata, report_path):
         from .about import show_about
         from .credentials import Credentials
         from .disk_image import D64Image, D71Image, D81Image, sectors_on_track
+        from .disk_image_edit import create_blank_d64_image
         from .disk_image_dialog import DiskImageDialog
         from .gui import Browser
         from .platform_support import local_roots, portable_root, publish_new
@@ -93,9 +94,24 @@ def run(package_metadata, report_path):
             _require(bool(app.window), 'ui.main_window',
                      'The main window did not open.', checks)
             _require(app.quick_connect_button.get_label() == 'Quick Connect' and
-                     not app.disconnect_button.get_sensitive(),
+                     not app.disconnect_button.get_sensitive() and
+                     app.new_d64_button.get_tooltip_text() == 'New D64 disk…',
                      'ui.quick_connect',
-                     'Quick Connect controls are incorrect.', checks)
+                     'Main-window connection or disk controls are incorrect.', checks)
+            blank = create_blank_d64_image('PACKAGE BLANK', 'P1')
+            _require(blank.directory().blocks_free == 664 and
+                     not blank.directory().entries and
+                     blank.validate().standard_compatible,
+                     'disk.blank_d64',
+                     'Blank D64 creation is not structurally valid.', checks)
+            create_dialog = app.new_d64()
+            create_entries = app.d64_create_entries
+            _require(create_dialog.get_title() == 'Create blank D64 disk' and
+                     tuple(entry.get_text() for entry in create_entries) ==
+                     ('new-disk.d64', 'UNTITLED', '64'),
+                     'ui.blank_d64',
+                     'Blank D64 creation controls are incorrect.', checks)
+            create_dialog.response(Gtk.ResponseType.CANCEL)
             image_data = bytearray(174848)
             header_offset = sum(sectors_on_track(track)
                                 for track in range(1, 18)) * 256

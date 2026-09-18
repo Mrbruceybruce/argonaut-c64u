@@ -7,14 +7,14 @@ roadmap section before building and validating Windows, Apple Silicon Mac, and
 Intel Mac packages. Begin the next roadmap section only after that cross-platform
 release gate passes.
 
-## Completed Section 4: authentic disk-image management
+## Active Section 4: authentic disk-image management
 
 Disk images must remain compatible with Commodore hardware and CBM DOS. D64
 and D71 images have one flat directory; Argonaut must not invent folders or a
 parent entry inside either format. A D81 may expose a valid Commodore 1581 CBM
 partition explicitly, but it must not be presented as an ordinary host folder.
 
-Section 4 proceeds in this order:
+The original read-only and D64-editing milestone proceeded in this order:
 
 1. Read and validate standard 35-track D64 images without changing any source
    byte. Recognized 40/42-track extended images remain readable but are labeled
@@ -110,7 +110,34 @@ is now frozen for the Windows, Apple Silicon Mac, and Intel Mac release gate.
 The published `v1.7-disk.7` packages at build `a9a59bb` passed their hosted
 package checks on Windows, Apple Silicon Mac, and Intel Mac. Physical Windows
 and Apple Silicon testing passed on 2026-09-18. Physical Intel Mac acceptance
-remains with contributor OldMan252 and is the final Section 4 release-gate item.
+remains with contributor OldMan252.
+
+Section 4 continues on Linux before another cross-platform release gate:
+
+1. Create an authentic blank standard 35-track D64 with a user-selected disk
+   label and two-character ID. Validate it before publishing, never replace an
+   existing local file, and verify it independently with VICE `c1541` and a
+   physical C64U.
+2. Support safe REL removal only after its data and side-sector chains can be
+   reclaimed and independently verified. Evaluate REL creation separately;
+   do not synthesize a REL layout until record-length and side-sector behavior
+   can be represented faithfully.
+3. Extend staged flat-directory editing to standard D71 images, including both
+   BAM regions and files that cross physical sides.
+4. Extend staged editing to standard D81 images while preserving genuine CBM
+   partition entries and both BAM halves.
+5. Evaluate D80 and D82 support against documented 8050/8250 layouts and
+   independent fixtures before deciding the supported read and edit scope.
+6. Evaluate G64 as a bitstream preservation format. Prefer whole-image handling
+   or an explicit read-only scope over pretending copy-protected tracks are a
+   normal CBM DOS directory.
+
+Blank D64 creation now has deterministic source coverage. The generated image
+is exactly 174,848 bytes, reserves the BAM and first directory sector, reports
+664 blocks free, uses hardware-readable PETSCII for its label and ID, and accepts
+the existing staged PRG/SEQ/USR editor. VICE `c1541` independently lists and
+validates the generated image. Installed Linux and physical C64U acceptance are
+next.
 
 ## Current milestone: Linux hardening
 

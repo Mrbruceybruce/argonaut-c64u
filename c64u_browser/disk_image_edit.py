@@ -31,6 +31,70 @@ def encode_petscii_name(name):
     return ascii_name.ljust(16, b'\xa0')
 
 
+def encode_disk_id(disk_id):
+    """Encode the two hardware-readable characters stored in a 1541 header."""
+    if not isinstance(disk_id, str):
+        raise TypeError('disk_id must be text')
+    disk_id = disk_id.strip().upper()
+    if len(disk_id) != 2:
+        raise DiskImageError('A 1541 disk ID must contain exactly 2 characters.')
+    try:
+        value = disk_id.encode('ascii')
+    except UnicodeEncodeError as exc:
+        raise DiskImageError('Use simple C64-compatible characters in the disk ID.') from exc
+    if any(byte < 0x20 or byte > 0x7e or byte in (0x2f, 0x5c) for byte in value):
+        raise DiskImageError(
+            'Use simple C64-compatible characters without / or \\ in the disk ID.')
+    return value
+
+
+def create_blank_d64_image(disk_name, disk_id):
+    """Return a validated, standard 35-track disk formatted for CBM DOS 2A."""
+    with operation_event('disk_image', 'create_blank', 'd64'):
+        raw_name = encode_petscii_name(disk_name)
+        raw_id = encode_disk_id(disk_id)
+        data = bytearray(683 * 256)
+
+        def offset(track, sector):
+            return (sum(sectors_on_track(value) for value in range(1, track))
+                    + sector) * 256
+
+        bam_offset = offset(18, 0)
+        bam = memoryview(data)[bam_offset:bam_offset + 256]
+        bam[:4] = bytes((18, 1, 0x41, 0))
+        for track in range(1, 36):
+            count = sectors_on_track(track)
+            location = 4 + (track - 1) * 4
+            bitmap = bytearray(3)
+            for sector in range(count):
+                bitmap[sector // 8] |= 1 << (sector % 8)
+            bam[location] = count
+            bam[location + 1:location + 4] = bitmap
+
+        # Track 18 sector 0 is the BAM/header and sector 1 is the first
+        # directory sector. Both are allocated on a freshly formatted disk.
+        track_18 = 4 + 17 * 4
+        for sector in (0, 1):
+            bam[track_18 + 1 + sector // 8] &= ~(1 << (sector % 8))
+            bam[track_18] -= 1
+        bam[0x90:0xa0] = raw_name
+        bam[0xa0:0xa2] = b'\xa0\xa0'
+        bam[0xa2:0xa4] = raw_id
+        bam[0xa4] = 0xa0
+        bam[0xa5:0xa7] = b'2A'
+        bam[0xa7:0xab] = b'\xa0' * 4
+
+        directory_offset = offset(18, 1)
+        data[directory_offset:directory_offset + 2] = bytes((0, 255))
+        image = D64Image(data)
+        directory = image.directory()
+        validation = image.validate()
+        if (directory.entries or directory.blocks_free != 664
+                or not validation.standard_compatible):
+            raise DiskImageError('The blank D64 did not pass complete validation.')
+        return image
+
+
 @dataclass(frozen=True)
 class D64Edit:
     operation: str

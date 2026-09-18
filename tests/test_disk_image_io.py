@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 from c64u_browser.api import BrowserError
 from c64u_browser.disk_image import D64Image
 from c64u_browser.disk_image_io import (
-    extract_new, read_host_file_for_d64, read_local_d64, read_local_d71,
+    create_blank_d64, extract_new, read_host_file_for_d64, read_local_d64, read_local_d71,
     read_local_d81, read_local_disk_image, read_remote_d64, read_remote_d71,
     read_remote_d81,
     read_remote_disk_image, suggested_name)
@@ -103,6 +103,22 @@ class DiskImageIOTests(unittest.TestCase):
             large.write_bytes(bytes(174849))
             with self.assertRaisesRegex(BrowserError, 'too large'):
                 read_host_file_for_d64(large)
+
+    def test_creates_blank_d64_atomically_without_replacement(self):
+        with tempfile.TemporaryDirectory() as folder:
+            destination = Path(folder) / 'blank.d64'
+            result = create_blank_d64(destination, 'NEW DISK', 'N1')
+            self.assertEqual(result['bytes'], 174848)
+            saved = D64Image.from_path(destination)
+            self.assertEqual((saved.directory().disk_name, saved.directory().disk_id,
+                              saved.directory().blocks_free), ('NEW DISK', 'N1', 664))
+            self.assertTrue(saved.validate().standard_compatible)
+            with self.assertRaisesRegex(BrowserError, 'already exists'):
+                create_blank_d64(destination, 'OTHER', 'O1')
+            self.assertEqual(D64Image.from_path(destination).directory().disk_name,
+                             'NEW DISK')
+            with self.assertRaisesRegex(BrowserError, r'\.d64'):
+                create_blank_d64(Path(folder) / 'blank.img', 'NEW DISK', 'N1')
 
 
 if __name__ == '__main__':

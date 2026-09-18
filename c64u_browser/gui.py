@@ -200,6 +200,9 @@ class Browser(Gtk.Application):
         self.icon_button(toolbar, 'Copy', 'edit-copy-symbolic', lambda: self.copy_selection(local))
         self.icon_button(toolbar, 'Paste', 'edit-paste-symbolic', lambda: self.paste_files(local))
         self.icon_button(toolbar, 'New folder…', 'folder-new-symbolic', lambda: self.new_folder(local))
+        if local:
+            self.new_d64_button = self.icon_button(
+                toolbar, 'New D64 disk…', 'document-new-symbolic', self.new_d64)
         drives=DriveButtons(self,local);self.drive_bars[local]=drives
         box.append(drives.box)
         path = Gtk.Entry()
@@ -625,6 +628,8 @@ class Browser(Gtk.Application):
             self.button(box, 'Delete selected…' if multiple else 'Delete…', lambda: action(lambda: self.delete_selected(local)))
         else:
             self.button(box, 'New folder…', lambda: action(lambda: self.new_folder(local)))
+            if local:
+                self.button(box, 'New D64 disk…', lambda: action(self.new_d64))
         self.button(box, 'Paste', lambda: action(lambda: self.paste_files(local)))
         popover.connect('closed', lambda widget: widget.unparent())
         popover.popup()
@@ -775,6 +780,87 @@ class Browser(Gtk.Application):
                 return str(target)
             self.run(task, self.completed)
         self.prompt('New folder', 'Folder name:', submit, action_label='Create folder')
+
+    def new_d64(self):
+        """Create a validated blank D64 in the current local folder."""
+        if self.busy or getattr(self, 'd64_create_prompt', None) is not None:
+            return
+        dialog = Gtk.Dialog(
+            title='Create blank D64 disk', transient_for=self.window, modal=True)
+        self.d64_create_prompt = dialog
+        dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
+        create = dialog.add_button('Create disk', Gtk.ResponseType.OK)
+        dialog.set_default_response(Gtk.ResponseType.OK)
+        content = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=8,
+            margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
+        content.append(Gtk.Label(
+            label='The new standard 35-track image will be created in:\n' + str(self.local),
+            xalign=0, wrap=True, selectable=True))
+        filename = Gtk.Entry(text='new-disk.d64', hexpand=True)
+        disk_name = Gtk.Entry(text='UNTITLED', max_length=16, hexpand=True)
+        disk_id = Gtk.Entry(text='64', max_length=2, hexpand=True)
+        self.d64_create_entries = (filename, disk_name, disk_id)
+        for label, entry in (
+                ('Local filename:', filename),
+                ('C64 disk name (up to 16 characters):', disk_name),
+                ('C64 disk ID (exactly 2 characters):', disk_id)):
+            content.append(Gtk.Label(label=label, xalign=0))
+            content.append(entry)
+        feedback = Gtk.Label(xalign=0, wrap=True)
+        content.append(feedback)
+        dialog.get_content_area().append(content)
+
+        def validate(*_):
+            leaf = filename.get_text().strip()
+            okay = (bool(leaf and disk_name.get_text().strip())
+                    and len(disk_id.get_text().strip()) == 2
+                    and leaf not in ('.', '..')
+                    and '/' not in leaf and '\\' not in leaf)
+            create.set_sensitive(okay)
+            feedback.set_text('' if okay else
+                              'Enter one local filename, a disk name, and a 2-character ID.')
+            return okay
+
+        for entry in self.d64_create_entries:
+            entry.connect('changed', validate)
+        filename.connect('activate', lambda *_: disk_name.grab_focus())
+        disk_name.connect('activate', lambda *_: disk_id.grab_focus())
+        disk_id.connect(
+            'activate', lambda *_: dialog.response(Gtk.ResponseType.OK)
+            if validate() else None)
+        validate()
+
+        folder = self.local
+        def response(_, code):
+            leaf = filename.get_text().strip()
+            name = disk_name.get_text()
+            identifier = disk_id.get_text()
+            if code == Gtk.ResponseType.OK and not validate():
+                return
+            dialog.destroy()
+            self.d64_create_prompt = None
+            self.d64_create_entries = None
+            if code != Gtk.ResponseType.OK:
+                return
+            if not leaf.casefold().endswith('.d64'):
+                leaf += '.d64'
+            destination = folder / leaf
+            from .disk_image_io import create_blank_d64
+            def done(result):
+                self.refresh_local()
+                from .disk_image_dialog import DiskImageDialog
+                self.disk_image_dialog = DiskImageDialog(
+                    self, result['path'], result['image'])
+                self.status.set_text(
+                    'Created a validated standard D64 with 664 blocks free. '
+                    'The disk is ready for file additions.')
+            self.run(lambda: create_blank_d64(destination, name, identifier), done)
+
+        dialog.connect('response', response)
+        dialog.present()
+        filename.grab_focus()
+        return dialog
 
     def rename_item(self, local, name):
         parent = self.local if local else self.remote

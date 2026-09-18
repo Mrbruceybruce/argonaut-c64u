@@ -186,3 +186,32 @@ def save_edited_copy(session, destination):
         finally:
             if temporary is not None and os.path.exists(temporary):
                 os.unlink(temporary)
+
+
+def create_blank_d64(destination, disk_name, disk_id):
+    """Create and atomically publish one validated standard D64 without replacement."""
+    from .disk_image_edit import create_blank_d64_image
+    destination = Path(destination).absolute()
+    with operation_event('disk_image', 'publish_blank', 'd64'):
+        if destination.suffix.casefold() != '.d64':
+            raise BrowserError('Save the new disk with a .d64 filename.')
+        if not destination.parent.is_dir():
+            raise BrowserError('Choose an existing destination folder.')
+        image = create_blank_d64_image(disk_name, disk_id)
+        data = image.source_bytes
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                    dir=destination.parent, prefix='.argonaut-disk-', delete=False) as stream:
+                temporary = stream.name
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                publish_new(temporary, destination)
+            except FileExistsError as exc:
+                raise BrowserError('Destination already exists; nothing was overwritten.') from exc
+            return {'path': str(destination), 'bytes': len(data), 'image': image}
+        finally:
+            if temporary is not None and os.path.exists(temporary):
+                os.unlink(temporary)

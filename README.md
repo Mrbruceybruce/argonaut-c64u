@@ -68,6 +68,9 @@ Open a D64, D71, or D81 to view its authentic Commodore directory. Standard
 35-track D64 images can stage filename changes, file removal, and PRG/SEQ/USR
 additions. Argonaut validates the complete result and saves it as a new local
 D64; it never rewrites the source image or replaces an existing destination.
+Use **New D64 disk…** in the local Files toolbar to create a validated blank
+35-track image with a C64 disk label and two-character ID. The new image starts
+with 664 blocks free and is opened immediately for file additions.
 D71 and D81 images are currently read-only and validate both BAM regions.
 Authentic 1581 CBM partitions are labeled as disk partitions and are never
 presented as ordinary host folders or extractable chained files.

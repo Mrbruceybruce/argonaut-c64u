@@ -4,7 +4,9 @@ import unittest
 
 from c64u_browser.api import BrowserError
 from c64u_browser.disk_image import D64Image, DiskImageError
-from c64u_browser.disk_image_edit import D64EditSession, encode_petscii_name
+from c64u_browser.disk_image_edit import (
+    D64EditSession, create_blank_d64_image, encode_disk_id,
+    encode_petscii_name)
 from c64u_browser.disk_image_io import save_edited_copy
 
 
@@ -96,6 +98,34 @@ class D64EditTests(unittest.TestCase):
         self.assertEqual(edited[174848 + bam_number], 1)
         self.assertEqual(edited[174848 + file_number], 1)
         self.assertEqual(edited[174848 + 500], 5)
+
+    def test_creates_authentic_blank_d64_and_accepts_staged_files(self):
+        image = create_blank_d64_image('MY DISK', 'A1')
+        directory = image.directory()
+        self.assertEqual(len(image.source_bytes), 174848)
+        self.assertEqual((directory.disk_name, directory.disk_id, directory.dos_type),
+                         ('MY DISK', 'A1', '2A'))
+        self.assertEqual((directory.blocks_free, directory.entries), (664, ()))
+        self.assertEqual(directory.raw_disk_name[:7], b'MY DISK')
+        self.assertTrue(image.validate().standard_compatible)
+
+        session = D64EditSession(image)
+        self.assertFalse(session._is_free(18, 0))
+        self.assertFalse(session._is_free(18, 1))
+        self.assertTrue(session._is_free(18, 2))
+        session.add_file(b'\x01\x08READY', 'HELLO', 'PRG')
+        added = session.image.directory().entries[0]
+        self.assertEqual(session.image.read_file(added), b'\x01\x08READY')
+        self.assertEqual(session.image.directory().blocks_free, 663)
+        self.assertTrue(session.image.validate().standard_compatible)
+
+    def test_blank_d64_rejects_invalid_label_and_id(self):
+        for name, disk_id in (('', '64'), ('x' * 17, '64'), ('bad/name', '64'),
+                              ('GOOD', ''), ('GOOD', '1'), ('GOOD', '123'),
+                              ('GOOD', '\u2603!')):
+            with self.subTest(name=name, disk_id=disk_id), self.assertRaises(DiskImageError):
+                create_blank_d64_image(name, disk_id)
+        self.assertEqual(encode_disk_id('a1'), b'A1')
 
 
 if __name__ == '__main__':
