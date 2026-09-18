@@ -48,8 +48,9 @@ class PreferencesUI(unittest.TestCase):
         v=tab.preview_scroll.get_vadjustment();self.assertGreater(v.get_upper(),v.get_page_size())
         for _ in range(8):minus.emit('clicked')
         self.assertEqual(tab.zoom.get_text(),'100%');self.assertFalse(minus.get_sensitive())
-    def test_preferences_save_cancel_reopen_and_checkbox_extent(self):
+    def test_preferences_auto_save_undo_close_and_checkbox_extent(self):
         from c64u_browser.app_preferences import show_preferences
+        from c64u_browser.profiles import Preferences
         dialog=show_preferences(self.app);self.pump()
         self.assertEqual(dialog.pages.get_n_pages(),3)
         general=dialog.pages.get_nth_page(0)
@@ -57,16 +58,32 @@ class PreferencesUI(unittest.TestCase):
         for w in checks:
             self.assertEqual(w.get_halign(),self.Gtk.Align.START)
             self.assertLess(w.get_width(),general.get_width()-80)
+        labels=[w.get_label() for w in self.walk(dialog)
+                if isinstance(w,self.Gtk.Button)]
+        self.assertIn('Close',labels);self.assertIn('Undo',labels)
+        self.assertIn('Restore defaults…',labels)
+        self.assertNotIn('Save preferences',labels)
         plus=next(w for w in self.walk(general) if isinstance(w,self.Gtk.Button) and w.get_label()=='+')
-        plus.emit('clicked');dialog.response(self.Gtk.ResponseType.CLOSE)
-        self.assertIsNotNone(dialog.unsaved_prompt)
-        dialog.unsaved_prompt.response(self.Gtk.ResponseType.REJECT)
-        self.assertIsNone(self.app.preferences_dialog);self.assertEqual(self.app.preferences.app_options['preview_scale'],150)
-        dialog=show_preferences(self.app)
-        plus=next(w for w in self.walk(dialog.pages.get_nth_page(0)) if isinstance(w,self.Gtk.Button) and w.get_label()=='+')
-        plus.emit('clicked');dialog.response(self.Gtk.ResponseType.OK)
+        plus.emit('clicked')
         self.assertEqual(self.app.preferences.app_options['preview_scale'],175)
-        dialog=show_preferences(self.app);dialog.close();self.pump();self.assertIsNone(self.app.preferences_dialog)
+        self.assertEqual(Preferences(self.app.preferences.path).load().app_options['preview_scale'],175)
+        undo=next(w for w in self.walk(general) if isinstance(w,self.Gtk.Button) and w.get_label()=='Undo')
+        undo.emit('clicked')
+        self.assertEqual(self.app.preferences.app_options['preview_scale'],150)
+        self.assertEqual(Preferences(self.app.preferences.path).load().app_options['preview_scale'],150)
+        plus.emit('clicked')
+        restore=next(w for w in self.walk(general)
+                     if isinstance(w,self.Gtk.Button) and
+                     w.get_label()=='Restore defaults…')
+        restore.emit('clicked')
+        dialog.restore_prompt.response(self.Gtk.ResponseType.CANCEL)
+        self.assertEqual(self.app.preferences.app_options['preview_scale'],175)
+        restore.emit('clicked')
+        dialog.restore_prompt.response(self.Gtk.ResponseType.OK)
+        self.assertEqual(self.app.preferences.app_options['preview_scale'],150)
+        plus.emit('clicked');dialog.response(self.Gtk.ResponseType.CLOSE)
+        self.assertIsNone(self.app.preferences_dialog)
+        self.assertEqual(Preferences(self.app.preferences.path).load().app_options['preview_scale'],175)
     def test_device_details_follow_profile_and_save_box_model(self):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Profile,Preferences
@@ -74,6 +91,10 @@ class PreferencesUI(unittest.TestCase):
         two=Profile.new('Second','second.local',case_edition='Second case')
         self.app.preferences.profiles=[one,two];self.app.preferences.selected_id=one.id
         dialog=show_preferences(self.app,1);c=dialog.connections
+        labels=[w.get_label() for w in self.walk(c.page)
+                if isinstance(w,self.Gtk.Button)]
+        self.assertIn('Save device profile',labels)
+        self.assertNotIn('Save profile details',labels)
         self.assertEqual(c.fields['case_edition'].get_text(),'Existing case')
         self.assertTrue(c.fields['case_edition'].get_editable());self.assertFalse(c.model.get_editable())
         c.saved.set_active_id(two.id);c.fields['case_edition'].set_text('New box');c.fields['serial_number'].set_text('SN2')
@@ -83,7 +104,7 @@ class PreferencesUI(unittest.TestCase):
         self.assertEqual(loaded.profiles[0].case_edition,'Existing case')
         self.assertEqual(loaded.profiles[1].case_edition,'New box');self.assertEqual(loaded.profiles[1].serial_number,'SN2')
 
-    def test_close_prompt_keeps_edits_and_saves_both_pages(self):
+    def test_close_prompt_keeps_profile_edits_while_general_is_already_saved(self):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Profile,Preferences
         profile=Profile.new('Test','test.local')
@@ -96,7 +117,7 @@ class PreferencesUI(unittest.TestCase):
         dialog.close();self.pump()
         dialog.unsaved_prompt.response(self.Gtk.ResponseType.CANCEL)
         self.assertIs(self.app.preferences_dialog,dialog)
-        self.assertEqual(self.app.preferences.app_options['preview_scale'],150)
+        self.assertEqual(self.app.preferences.app_options['preview_scale'],175)
         self.app.run=lambda task,done:done(task())
         dialog.response(self.Gtk.ResponseType.CLOSE)
         dialog.unsaved_prompt.response(self.Gtk.ResponseType.OK)

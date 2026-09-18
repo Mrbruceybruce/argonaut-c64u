@@ -128,8 +128,13 @@ class Browser(Gtk.Application):
         self.connection_label = Gtk.Label(xalign=0, hexpand=True, wrap=True)
         connection.append(self.connection_label)
         from .app_preferences import show_preferences
+        self.quick_connect_button = self.button(
+            connection, 'Quick Connect', self.quick_connect)
+        self.quick_connect_button.set_tooltip_text(
+            'Connect to the last-used device profile')
         self.button(connection, 'Preferences…', lambda: show_preferences(self))
-        self.button(connection, 'Disconnect', self.disconnect_device)
+        self.disconnect_button = self.button(
+            connection, 'Disconnect', self.disconnect_device)
         self.tabs = Gtk.Notebook(vexpand=True)
         self.controls.append(self.tabs)
         files = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -309,8 +314,35 @@ class Browser(Gtk.Application):
         else:
             text = 'Disconnected' + (f' · Selected: {selected.name}' if selected else ' · No device selected')
         self.connection_label.set_text(text)
+        self.quick_connect_button.set_sensitive(self.active_profile is None)
+        self.disconnect_button.set_sensitive(self.active_profile is not None)
         if hasattr(self, 'test_lab_tab'):
             self.test_lab_tab.connection_changed()
+
+    def quick_connect(self):
+        """Connect to the selected (last-used) profile without opening Preferences."""
+        if self.busy or self.active_profile:
+            return
+        if self.preferences_error:
+            self.status.set_text(self.preferences_error)
+            return
+        profile = self.preferences.selected()
+        if not profile:
+            self.status.set_text(
+                'Choose or create a device profile before using Quick Connect.')
+            self.open_connections()
+            return
+        password = (self.session_passwords.get(profile.id) or
+                    self.credentials.get(profile.id))
+        def task():
+            client = profile.client(password)
+            info = client.test_connection()
+            profile.verify_identity(info, require_bound=True)
+            folder = (self.preferences.app_options['remote_folders'].get(
+                profile.id, '/USB2')
+                if self.preferences.app_options['remember_folders'] else '/USB2')
+            return profile, client, info, initial_directory(client, folder)
+        self.run(task, lambda result: self.activate_connection(*result))
 
     def activate_connection(self, profile, client, info, listing):
         self.offline_message=None

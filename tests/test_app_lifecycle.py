@@ -46,6 +46,38 @@ class Lifecycle(unittest.TestCase):
         self.assertTrue(Browser.close(app))
         app.pool.shutdown.assert_not_called();app.quit.assert_not_called()
 
+    def test_quick_connect_uses_last_profile_and_checks_identity(self):
+        profile=Mock(id='profile-id')
+        client=Mock();profile.client.return_value=client
+        info={'info':{'unique_id':'ABC'}};client.test_connection.return_value=info
+        preferences=SimpleNamespace(
+            selected=lambda:profile,
+            app_options={'remember_folders':True,
+                         'remote_folders':{'profile-id':'/USB1'}})
+        app=SimpleNamespace(
+            busy=False,active_profile=None,preferences_error=None,
+            preferences=preferences,session_passwords={'profile-id':'session-secret'},
+            credentials=Mock(),status=Mock(),activate_connection=Mock(),
+            open_connections=Mock())
+        app.run=lambda task,done:done(task())
+        listing=('/USB1',[])
+        with patch('c64u_browser.gui.initial_directory',return_value=listing) as initial:
+            Browser.quick_connect(app)
+        profile.client.assert_called_once_with('session-secret')
+        profile.verify_identity.assert_called_once_with(info,require_bound=True)
+        initial.assert_called_once_with(client,'/USB1')
+        app.activate_connection.assert_called_once_with(profile,client,info,listing)
+        app.open_connections.assert_not_called()
+
+    def test_quick_connect_without_profile_opens_device_details(self):
+        app=SimpleNamespace(
+            busy=False,active_profile=None,preferences_error=None,
+            preferences=SimpleNamespace(selected=lambda:None),status=Mock(),
+            open_connections=Mock())
+        Browser.quick_connect(app)
+        app.open_connections.assert_called_once_with()
+        self.assertIn('Choose or create',app.status.set_text.call_args.args[0])
+
 
 @unittest.skipIf(Browser is None, 'GTK runtime unavailable')
 class QuitAction(unittest.TestCase):

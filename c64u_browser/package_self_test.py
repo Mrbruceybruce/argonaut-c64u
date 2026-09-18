@@ -90,6 +90,10 @@ def run(package_metadata, report_path):
             app.activate()
             _require(bool(app.window), 'ui.main_window',
                      'The main window did not open.', checks)
+            _require(app.quick_connect_button.get_label() == 'Quick Connect' and
+                     not app.disconnect_button.get_sensitive(),
+                     'ui.quick_connect',
+                     'Quick Connect controls are incorrect.', checks)
             _require(bool(local_roots()), 'filesystem.local_roots',
                      'No local file roots were found.', checks)
             _require((ASSETS / 'about-background.png').is_file() and

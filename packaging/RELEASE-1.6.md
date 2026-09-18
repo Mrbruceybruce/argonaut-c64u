@@ -30,6 +30,12 @@ identities are separate. Existing stable profiles remain in place during an
 upgrade. The normal Files, Settings, Drives, Machine, SID/Media, and Streams
 features remain available with Developer Mode disabled.
 
+The main window now provides **Quick Connect** for the last-used device profile
+while retaining the normal device-identity check. General preferences save
+automatically and provide **Undo**, **Restore defaults…**, and a single **Close**
+button. Device profile edits keep one explicit **Save device profile** action and
+an unfinished-edit confirmation when Preferences closes.
+
 Downloads include a Debian package, Windows Setup and Portable packages, and
 Apple Silicon and Intel macOS packages. Mac packages require macOS 15 or newer.
 Windows packages are unsigned; Mac apps are ad-hoc signed and are not notarized
