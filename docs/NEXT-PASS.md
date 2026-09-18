@@ -7,7 +7,7 @@ roadmap section before building and validating Windows, Apple Silicon Mac, and
 Intel Mac packages. Begin the next roadmap section only after that cross-platform
 release gate passes.
 
-## Active Section 4: authentic disk-image management
+## Completed Section 4: authentic disk-image management
 
 Disk images must remain compatible with Commodore hardware and CBM DOS. D64
 and D71 images have one flat directory; Argonaut must not invent folders or a
@@ -98,6 +98,14 @@ the C64U's emulated 1581 with the expected directory and free-block count.
 The next package improves consecutive commands in Streams: Return sends the
 current line, clears it only after success, and returns focus to the empty field.
 A failed send preserves the text for retry.
+
+Section 4 passed its final installed Linux acceptance gate on 2026-09-17 using
+Development package `1.7-disk.7` at build `04a0904`. All 24 packaged checks
+passed. On the physical C64U, consecutive Streams commands sent on Return,
+cleared after each successful send, and retained keyboard focus for the next
+line. The local Files pane hid dot entries by default and refreshed immediately
+when **Show hidden local files and folders** was enabled or disabled. Section 4
+is now frozen for the Windows, Apple Silicon Mac, and Intel Mac release gate.
 
 ## Current milestone: Linux hardening
 

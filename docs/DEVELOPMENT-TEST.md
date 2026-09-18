@@ -1,7 +1,19 @@
-# Argonaut 1.5-ai.3 — AI and Test Lab development testing
+# Argonaut 1.7-disk.7 — Section 4 cross-platform testing
 
-This build starts from stable Argonaut 1.5 and keeps Development profiles,
-preferences, reports, and build identity separate from the installed stable app.
+This build completes the authentic disk-image management roadmap section. It
+keeps Development profiles, preferences, reports, and build identity separate
+from the installed stable app.
+
+Section 4 adds:
+
+- read-only D64, D71, and D81 directory browsing and extraction with authentic
+  CBM geometry, BAM, sector-chain, cross-link, and free-space validation;
+- explicit D81 CBM partition labels without presenting partitions as folders;
+- staged, validated D64 rename, scratch, and PRG/SEQ/USR addition while leaving
+  the source image unchanged;
+- a local-files preference that hides hidden entries by default;
+- Return-to-send Streams input that clears after success and remains ready for
+  the next command.
 
 The Development Test Lab now includes:
 
@@ -62,22 +74,30 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows 1.5-ai.3 and the expected source build identifier.
-2. Connect each C64U and run **Run C64U checks**. Confirm all four read-only
-   checks pass and saved runs remain selectable after restarting Argonaut.
-3. Run **Test local AI (simulation)**. With local Ollama configured, confirm the
-   diagnosis identifies the expected FTP failure as a fixture. Without a local
-   model, confirm **Local AI unavailable** and setup guidance appear clearly.
-4. On Debian, confirm the C64 AI bridge, automatic health alerts, automatic AI
-   tests, and background C64U checks all show **On**. **View latest result** must
-   reopen the most recent automatic bridge report. The temporary checkbox must
-   say it applies only while the window is open.
-5. Launch the paired C64 AI client on each C64U and ask one short question. Check
-   that the reply appears on the C64 and the prompt returns.
-6. Stop and restore Ollama once. Confirm Test Lab reports the model outage and
-   later recovery without changing any saved C64U verdict.
-7. Check file copy, Settings, Drives, Send Text, screenshot/recording, Mount &
-   Run, and Quit as stable 1.5 regression checks.
+1. Confirm About shows `1.7-disk.7` and the source commit shown for this release.
+2. Open the supplied **Test Disk Images** D64, D71, and D81 fixtures. Confirm
+   each directory opens, validates, reports free blocks, and extracts its large
+   test file. Confirm the D81 CBM entry is labeled as a partition and cannot be
+   opened as a folder.
+3. On a copied standard D64, stage a rename and add a small PRG. Save to a new
+   filename, reopen it, and confirm both changes. Cancel another staged edit and
+   confirm the source file remains unchanged.
+4. In the local Files pane, confirm hidden files are initially absent. Enable
+   **Preferences → General → Show hidden local files and folders**, confirm they
+   appear, then disable it and confirm they disappear.
+5. Connect to a C64U at BASIC READY. In Streams, enter `PRINT "ONE"` and press
+   Return, then enter `PRINT "TWO"` without clicking the input again. Confirm
+   each command sends, the field clears, and focus remains ready for the next
+   line. Video preview is not required.
+6. Run **Run offline checks** in Test Lab and confirm every check passes. Connect
+   the C64U, run **Run C64U checks**, and confirm all read-only checks pass.
+7. Check upload/download, Settings, Drives, video/audio preview, screenshot,
+   recording, Mount & Run, Preferences persistence, and Quit as core regression
+   checks.
+
+The release's source commit differs from Linux-accepted build `04a0904` only in
+this cross-platform checklist, bundle metadata, and fixture packaging. No
+application code changed after Linux acceptance.
 
 Operations still affect the connected real C64U and its files. The hardware
 suite itself is read-only. Mount & Run requires the DMA network service. The
