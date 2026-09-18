@@ -25,11 +25,10 @@ def encode_petscii_name(name):
         raise DiskImageError('Use simple C64-compatible characters in the disk filename.') from exc
     if any(byte < 0x20 or byte > 0x7e or byte in (0x2f, 0x5c) for byte in ascii_name):
         raise DiskImageError('Use simple C64-compatible characters without / or \\ in the disk filename.')
-    # VICE c1541 and CBM DOS directory sectors conventionally store uppercase
-    # letters in PETSCII's shifted $C1-$DA range.
-    raw = bytes(byte + 0x80 if 0x41 <= byte <= 0x5a else byte
-                for byte in ascii_name)
-    return raw.ljust(16, b'\xa0')
+    # Directory text loaded with LOAD"$",8 is printed directly by BASIC. Keep
+    # uppercase letters in PETSCII's screen-readable $41-$5A range; $C1-$DA
+    # renders as graphic/reversed characters on physical C64 hardware.
+    return ascii_name.ljust(16, b'\xa0')
 
 
 @dataclass(frozen=True)

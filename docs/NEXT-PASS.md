@@ -49,6 +49,12 @@ independently verified. VICE `c1541` validated an edited image whose ninth entry
 extended the real directory chain, then extracted its new multi-sector payload
 byte for byte.
 
+The first physical C64 directory listing exposed an important text-encoding
+correction: VICE's host-text conversion had written uppercase names with their
+high bit set, which BASIC displayed as graphic characters. Hardware-readable
+directory names use PETSCII `$41-$5A`; the editor and regression fixture now
+enforce those bytes before physical acceptance is repeated.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

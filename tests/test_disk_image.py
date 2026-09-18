@@ -18,11 +18,13 @@ class D64ImageTests(unittest.TestCase):
         directory = image.directory()
         self.assertEqual((directory.disk_name, directory.disk_id, directory.dos_type),
                          ('ARGONAUT', '64', '2A'))
+        self.assertEqual(directory.raw_disk_name[:8], b'ARGONAUT')
         self.assertEqual(directory.blocks_free, 660)
         self.assertEqual(len(directory.entries), 2)
         entry = directory.entries[0]
         self.assertEqual((entry.name, entry.file_type, entry.closed, entry.locked, entry.blocks),
                          ('HELLO', 'PRG', True, False, 1))
+        self.assertEqual(entry.raw_name[:5], b'HELLO')
         self.assertTrue(directory.geometry.standard)
         self.assertEqual(directory.geometry.tracks, 35)
 

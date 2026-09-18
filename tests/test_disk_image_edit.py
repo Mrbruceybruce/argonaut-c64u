@@ -20,6 +20,7 @@ class D64EditTests(unittest.TestCase):
         hello = self.session.image.directory().entries[0]
         self.session.rename(hello, 'new hello')
         self.assertEqual(self.session.image.directory().entries[0].name, 'NEW HELLO')
+        self.assertEqual(self.session.image.directory().entries[0].raw_name[:9], b'NEW HELLO')
         self.assertEqual(D64Image(self.original).directory().entries[0].name, 'HELLO')
         self.assertEqual(self.session.changes[0].operation, 'rename')
         self.assertTrue(self.session.image.validate().standard_compatible)
@@ -55,6 +56,7 @@ class D64EditTests(unittest.TestCase):
         self.assertTrue(self.session.image.validate().standard_compatible)
 
     def test_rejects_unsafe_names_duplicates_and_unsupported_types(self):
+        self.assertEqual(encode_petscii_name('C64 TEST')[:8], b'C64 TEST')
         for name in ('', 'x' * 17, 'bad/name', 'snowman \u2603'):
             with self.subTest(name=name), self.assertRaises(DiskImageError):
                 encode_petscii_name(name)
