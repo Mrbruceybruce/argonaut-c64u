@@ -15,7 +15,9 @@ SAFE_OPERATIONS = {
     'local': frozenset(('replace_file',)),
     'bridge': frozenset(('readiness_probe',)),
     'disk_image': frozenset(('open_local', 'open_remote', 'read_directory',
-                             'read_file', 'validate', 'extract')),
+                             'read_file', 'validate', 'extract',
+                             'import_host_file', 'stage_add', 'stage_rename',
+                             'stage_remove', 'validate_edits', 'save_copy')),
 }
 SAFE_TARGETS = {
     'ftp': frozenset(('directory', 'file', 'entry')),

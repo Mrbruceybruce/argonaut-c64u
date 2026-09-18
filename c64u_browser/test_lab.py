@@ -10,6 +10,7 @@ import time
 from .api import BrowserError, UltimateClient, parse_list
 from .diagnostics import LOGGER, operation_origin
 from .disk_image import D64Image, sectors_on_track
+from .disk_image_edit import D64EditSession
 
 
 @dataclass(frozen=True)
@@ -131,12 +132,19 @@ def _check_d64_parser():
     validation = image.validate()
     require(validation.standard_compatible and validation.entries_checked == 1,
             'D64 standard structure validation differed')
+    source = image.source_bytes
+    edit = D64EditSession(image)
+    edit.rename(parsed.entries[0], 'RENAMED')
+    require(edit.image.directory().entries[0].name == 'RENAMED',
+            'Staged D64 rename differed')
+    require(edit.validated_bytes() != source and image.source_bytes == source,
+            'Staged D64 edit changed its source image')
 
 
 DEFAULT_CHECKS = (
     Check('ftp.listing_parser', 'FTP listing parser', _check_listing_parser),
     Check('rest.sid_path_validation', 'SID path validation', _check_sid_path_validation),
-    Check('disk.d64_parser', 'Read-only D64 parser', _check_d64_parser),
+    Check('disk.d64_parser', 'D64 parser and staged editor', _check_d64_parser),
 )
 
 

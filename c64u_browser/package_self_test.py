@@ -109,9 +109,11 @@ def run(package_metadata, report_path):
             disk_dialog = DiskImageDialog(
                 app, 'Package D64 check', D64Image(image_data))
             _require(disk_dialog.listing.get_first_child() is None and
-                     disk_dialog.status.get_text().startswith('Read-only view.'),
+                     disk_dialog.status.get_text().startswith('Source image is unchanged.') and
+                     disk_dialog.add_button.get_sensitive() and
+                     not disk_dialog.save_button.get_sensitive(),
                      'ui.disk_directory',
-                     'The read-only D64 directory window is incorrect.', checks)
+                     'The staged D64 directory window is incorrect.', checks)
             disk_dialog.dialog.destroy()
             _require(bool(local_roots()), 'filesystem.local_roots',
                      'No local file roots were found.', checks)

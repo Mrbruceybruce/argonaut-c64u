@@ -514,7 +514,7 @@ class Browser(Gtk.Application):
                 self.status.set_text('Connection changed. Open the disk image again.');return
             from .disk_image_dialog import DiskImageDialog
             self.disk_image_dialog = DiskImageDialog(self, str(source), image)
-            self.status.set_text('Opened a read-only Commodore 1541 disk directory.')
+            self.status.set_text('Opened an authentic Commodore 1541 disk directory.')
         self.run(task,done)
 
     def selected(self, local):

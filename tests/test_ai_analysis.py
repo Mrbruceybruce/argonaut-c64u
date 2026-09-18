@@ -2,7 +2,7 @@ import json
 import unittest
 from unittest.mock import Mock
 
-from c64u_browser.ai_analysis import analyze_failures, failure_evidence
+from c64u_browser.ai_analysis import analyze_failures, failure_evidence, safe_operation
 
 
 class AnalysisBoundaryTests(unittest.TestCase):
@@ -85,6 +85,16 @@ class AnalysisBoundaryTests(unittest.TestCase):
                 'target': 'd64', 'outcome': 'error',
                 'error_kind': 'DiskImageError'}]}])
         self.assertNotIn('private', json.dumps(evidence))
+
+    def test_staged_disk_edit_operation_is_safe_ai_evidence(self):
+        event = safe_operation({
+            'transport': 'disk_image', 'operation': 'save_copy',
+            'target': 'd64', 'outcome': 'error',
+            'error_kind': 'DiskImageError', 'path': '/private/disk.d64'})
+        self.assertEqual(event, {
+            'transport': 'disk_image', 'operation': 'save_copy',
+            'target': 'd64', 'outcome': 'error',
+            'error_kind': 'DiskImageError'})
 
     def test_passing_report_does_not_call_adapter(self):
         adapter = Mock()

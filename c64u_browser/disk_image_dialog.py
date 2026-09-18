@@ -1,18 +1,29 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
-"""Read-only presentation of an authentic flat 1541 disk directory."""
+"""Authentic flat 1541 directory with staged, copy-only D64 editing."""
+from pathlib import Path
+import posixpath
+
 from gi.repository import Gtk
 
-from .disk_image_io import extract_new, suggested_name
+from .disk_image_edit import D64EditSession
+from .disk_image_io import (
+    extract_new, read_host_file_for_d64, save_edited_copy, suggested_name)
 
 
 class DiskImageDialog:
     def __init__(self, app, source, image):
         self.app = app
         self.image = image
+        self.source = source
         self.chooser = None
+        self.prompt = None
         directory = image.directory()
         validation = image.validate()
+        try:
+            self.session = D64EditSession(image)
+        except Exception:
+            self.session = None
         self.dialog = Gtk.Dialog(
             title='D64 disk directory', transient_for=app.window, modal=True)
         self.dialog.set_default_size(760, 560)
@@ -30,15 +41,49 @@ class DiskImageDialog:
                    + (' · standard 1541 format' if directory.geometry.standard
                       else ' · extended nonstandard format')),
             xalign=0, wrap=True, selectable=True))
-        actions = Gtk.Box(spacing=8)
-        self.controls.append(actions)
-        self.extract_button = app.button(actions, 'Extract selected…', self.extract)
+        file_actions = Gtk.Box(spacing=8)
+        self.controls.append(file_actions)
+        self.extract_button = app.button(file_actions, 'Extract selected…', self.extract)
         self.extract_button.set_sensitive(False)
+        self.add_button = app.button(file_actions, 'Add file…', self.add_file)
+        self.rename_button = app.button(file_actions, 'Rename…', self.rename)
+        self.remove_button = app.button(file_actions, 'Remove', self.remove)
+        edit_actions = Gtk.Box(spacing=8)
+        self.controls.append(edit_actions)
+        self.discard_button = app.button(edit_actions, 'Discard staged changes', self.discard)
+        self.save_button = app.button(edit_actions, 'Save edited copy…', self.save_copy)
         self.listing = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self.listing.connect('row-selected', lambda *_: self.update())
         scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
         scroll.set_child(self.listing)
         self.controls.append(scroll)
+        self.free_label = Gtk.Label(xalign=0, selectable=True)
+        self.controls.append(self.free_label)
+        self.validation_label = Gtk.Label(xalign=0, wrap=True, selectable=True)
+        self.controls.append(self.validation_label)
+        self.staged_label = Gtk.Label(xalign=0, wrap=True, selectable=True)
+        self.controls.append(self.staged_label)
+        self.status = Gtk.Label(
+            label=('Source image is unchanged. Stage edits here, then save a validated '
+                   'copy under a new local filename.' if self.session else
+                   'Read-only view. This image is nonstandard or damaged and cannot be edited.'),
+            xalign=0, wrap=True, selectable=True)
+        box.append(self.status)
+        self.render()
+        if not directory.geometry.standard:
+            self.status.set_text(
+                'Read-only view. This extended-track image is not a standard 35-track 1541 disk.')
+        self.dialog.present()
+
+    def render(self):
+        image = self.session.image if self.session else self.image
+        directory = image.directory()
+        validation = image.validate()
+        child = self.listing.get_first_child()
+        while child is not None:
+            following = child.get_next_sibling()
+            self.listing.remove(child)
+            child = following
         for entry in directory.entries:
             display_type = (('*' if not entry.closed else '') + entry.file_type
                             + ('<' if entry.locked else ''))
@@ -48,28 +93,43 @@ class DiskImageDialog:
                 label=f'{entry.blocks:>5}  "{entry.name}"  {display_type}',
                 xalign=0))
             self.listing.append(row)
-        self.controls.append(Gtk.Label(
-            label=f'{directory.blocks_free} BLOCKS FREE.', xalign=0, selectable=True))
-        self.controls.append(Gtk.Label(
-            label=(f'Structure check: standard 1541 directory and '
+        self.free_label.set_text(f'{directory.blocks_free} BLOCKS FREE.')
+        self.validation_label.set_text(
+            f'Structure check: standard 1541 directory and '
                    f'{validation.entries_checked} file chain(s) passed.'
                    if validation.standard_compatible else
                    f'Structure check: {len(validation.issues)} nonstandard or damaged '
-                   'condition(s) detected. The image remains available read-only.'),
-            xalign=0, wrap=True, selectable=True))
-        if not directory.geometry.standard:
-            self.controls.append(Gtk.Label(
-                label='This extended-track image is readable but is not a standard 35-track 1541 disk.',
-                xalign=0, wrap=True))
-        self.status = Gtk.Label(
-            label='Read-only view. Opening this directory does not change the disk image.',
-            xalign=0, wrap=True, selectable=True)
-        box.append(self.status)
-        self.dialog.present()
+                   'condition(s) detected. The image remains available read-only.')
+        count = len(self.session.changes) if self.session else 0
+        self.staged_label.set_text(
+            f'Staged changes: {count}. The source image has not been changed.' if count else
+            'Staged changes: none.')
+        self.update()
 
     def close(self, *_):
         if self.app.busy:
             self.status.set_text('Wait for the current extraction to finish.')
+            return
+        if self.prompt is not None:
+            return
+        if self.session and self.session.has_unsaved_changes:
+            prompt = Gtk.Dialog(
+                title='Discard staged disk changes?', transient_for=self.dialog, modal=True)
+            self.prompt = prompt
+            prompt.add_button('Keep editing', Gtk.ResponseType.CANCEL)
+            prompt.add_button('Discard', Gtk.ResponseType.OK)
+            prompt.get_content_area().append(Gtk.Label(
+                label='The source disk image is unchanged, but the staged edits will be lost.',
+                margin_top=12, margin_bottom=12, margin_start=12, margin_end=12,
+                wrap=True))
+            def response(_, code):
+                prompt.destroy()
+                self.prompt = None
+                if code == Gtk.ResponseType.OK:
+                    self.session.discard()
+                    self.close()
+            prompt.connect('response', response)
+            prompt.present()
             return
         if self.chooser is not None:
             self.chooser.destroy()
@@ -77,7 +137,163 @@ class DiskImageDialog:
         self.dialog.destroy()
 
     def update(self):
-        self.extract_button.set_sensitive(self.listing.get_selected_row() is not None)
+        row = self.listing.get_selected_row()
+        selected = row is not None
+        editable = self.session is not None
+        self.extract_button.set_sensitive(selected)
+        self.add_button.set_sensitive(editable)
+        self.rename_button.set_sensitive(editable and selected)
+        self.remove_button.set_sensitive(
+            editable and selected and row.entry.file_type in ('PRG', 'SEQ', 'USR')
+            and row.entry.closed and not row.entry.locked)
+        dirty = editable and self.session.dirty
+        self.discard_button.set_sensitive(dirty)
+        self.save_button.set_sensitive(editable and self.session.has_unsaved_changes)
+
+    def _name_prompt(self, title, name, accept, callback, file_type=None):
+        prompt = Gtk.Dialog(title=title, transient_for=self.dialog, modal=True)
+        self.prompt = prompt
+        prompt.add_button('Cancel', Gtk.ResponseType.CANCEL)
+        action = prompt.add_button(accept, Gtk.ResponseType.OK)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
+                          margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
+        entry = Gtk.Entry(text=name, max_length=16, hexpand=True)
+        content.append(Gtk.Label(label='C64 disk filename (up to 16 characters):', xalign=0))
+        content.append(entry)
+        types = None
+        if file_type is not None:
+            types = Gtk.ComboBoxText()
+            for value in ('PRG', 'SEQ', 'USR'):
+                types.append_text(value)
+            types.set_active(('PRG', 'SEQ', 'USR').index(file_type))
+            content.append(Gtk.Label(label='C64 file type:', xalign=0))
+            content.append(types)
+        prompt.get_content_area().append(content)
+        def update(*_):
+            action.set_sensitive(bool(entry.get_text().strip()))
+        entry.connect('changed', update)
+        update()
+        def response(_, code):
+            value = entry.get_text()
+            chosen_type = types.get_active_text() if types else None
+            prompt.destroy()
+            self.prompt = None
+            if code == Gtk.ResponseType.OK:
+                callback(value, chosen_type)
+        prompt.connect('response', response)
+        prompt.present()
+
+    def rename(self):
+        row = self.listing.get_selected_row()
+        if self.app.busy or not self.session or row is None:
+            return
+        def apply(name, _):
+            try:
+                self.session.rename(row.entry, name)
+                self.render()
+                self.status.set_text('Rename staged. Save an edited copy to publish the change.')
+            except Exception as exc:
+                self.status.set_text(str(exc))
+        self._name_prompt('Rename disk file', row.entry.name, 'Stage rename', apply)
+
+    def remove(self):
+        row = self.listing.get_selected_row()
+        if self.app.busy or not self.session or row is None:
+            return
+        try:
+            self.session.remove(row.entry)
+            self.render()
+            self.status.set_text('Removal staged. The source image is unchanged.')
+        except Exception as exc:
+            self.status.set_text(str(exc))
+
+    def discard(self):
+        if self.app.busy or not self.session:
+            return
+        self.session.discard()
+        self.render()
+        self.status.set_text('All staged changes discarded. The source image was unchanged.')
+
+    def add_file(self):
+        if self.app.busy or not self.session:
+            return
+        chooser = Gtk.FileChooserNative.new(
+            'Choose file to add to D64 copy', self.dialog, Gtk.FileChooserAction.OPEN,
+            'Choose', 'Cancel')
+        self.chooser = chooser
+        def response(_, code):
+            file = chooser.get_file()
+            chooser.destroy()
+            self.chooser = None
+            if code != Gtk.ResponseType.ACCEPT or not file:
+                return
+            path = file.get_path()
+            if not path:
+                self.status.set_text('Choose a local file.')
+                return
+            suffix = Path(path).suffix.casefold()
+            file_type = {'.seq': 'SEQ', '.usr': 'USR'}.get(suffix, 'PRG')
+            name = Path(path).stem[:16]
+            def loaded(result):
+                if isinstance(result, Exception):
+                    self.status.set_text(str(result))
+                    return
+                def apply(disk_name, chosen_type):
+                    try:
+                        self.session.add_file(result, disk_name, chosen_type)
+                        self.render()
+                        self.status.set_text('File addition staged. The source image is unchanged.')
+                    except Exception as exc:
+                        self.status.set_text(str(exc))
+                self._name_prompt('Add file to D64 copy', name, 'Stage addition',
+                                  apply, file_type)
+            def caught():
+                try:
+                    return read_host_file_for_d64(path)
+                except Exception as exc:
+                    return exc
+            self.app.run(caught, loaded)
+        chooser.connect('response', response)
+        chooser.show()
+
+    def save_copy(self):
+        if self.app.busy or not self.session or not self.session.dirty:
+            return
+        chooser = Gtk.FileChooserNative.new(
+            'Save edited D64 copy', self.dialog, Gtk.FileChooserAction.SAVE,
+            'Save copy', 'Cancel')
+        self.chooser = chooser
+        source_leaf = posixpath.basename(str(self.source).replace('\\', '/'))
+        stem = source_leaf[:-4] if source_leaf.casefold().endswith('.d64') else 'disk'
+        chooser.set_current_name(stem + '-edited.d64')
+        def response(_, code):
+            file = chooser.get_file()
+            chooser.destroy()
+            self.chooser = None
+            if code != Gtk.ResponseType.ACCEPT or not file:
+                return
+            path = file.get_path()
+            if not path:
+                self.status.set_text('Choose a local destination file.')
+                return
+            self.controls.set_sensitive(False)
+            def caught():
+                try:
+                    return save_edited_copy(self.session, path)
+                except Exception as exc:
+                    return exc
+            def done(result):
+                self.controls.set_sensitive(True)
+                self.update()
+                if isinstance(result, Exception):
+                    self.status.set_text(str(result))
+                else:
+                    self.status.set_text(
+                        f'Saved validated copy with {result["changes"]} staged change(s) '
+                        f'to {result["path"]}. The source image was unchanged.')
+            self.app.run(caught, done)
+        chooser.connect('response', response)
+        chooser.show()
 
     def extract(self):
         row = self.listing.get_selected_row()
@@ -103,7 +319,8 @@ class DiskImageDialog:
 
             def caught():
                 try:
-                    return extract_new(self.image, row.entry, path)
+                    image = self.session.image if self.session else self.image
+                    return extract_new(image, row.entry, path)
                 except Exception as exc:
                     return exc
 

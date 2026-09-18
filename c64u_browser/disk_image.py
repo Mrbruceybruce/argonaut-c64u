@@ -33,6 +33,9 @@ class DiskDirectoryEntry:
     start_track: int
     start_sector: int
     blocks: int
+    directory_track: int
+    directory_sector: int
+    directory_slot: int
 
 
 @dataclass(frozen=True)
@@ -171,6 +174,9 @@ class D64Image:
                     start_track=block[start + 1],
                     start_sector=block[start + 2],
                     blocks=int.from_bytes(block[start + 28:start + 30], 'little'),
+                    directory_track=track,
+                    directory_sector=sector,
+                    directory_slot=index,
                 ))
             track, sector = block[0], block[1]
 
@@ -231,6 +237,29 @@ class D64Image:
             issues = []
             if not self.geometry.standard:
                 issues.append('geometry.extended_tracks')
+            header = self.sector(18, 0)
+            for track in range(1, 36):
+                location = 4 + (track - 1) * 4
+                free_bits = sum(
+                    bool(header[location + 1 + sector // 8] & (1 << (sector % 8)))
+                    for sector in range(sectors_on_track(track)))
+                if header[location] != free_bits:
+                    issues.append(f'bam.track.{track}.free_count')
+
+            directory_sectors = set()
+            track, sector = header[0], header[1]
+            while track:
+                location = (track, sector)
+                if location in directory_sectors:
+                    break
+                directory_sectors.add(location)
+                block = self.sector(track, sector)
+                track, sector = block[0], block[1]
+            for track, sector in ((18, 0), *directory_sectors):
+                location = 4 + (track - 1) * 4
+                if header[location + 1 + sector // 8] & (1 << (sector % 8)):
+                    issues.append('bam.directory_marked_free')
+                    break
             occupied = set()
             checked = 0
             for index, entry in enumerate(directory.entries, 1):
@@ -246,6 +275,11 @@ class D64Image:
                     issues.append(f'entry.{index}.block_count')
                 if occupied.intersection(sectors):
                     issues.append(f'entry.{index}.cross_link')
+                for track, sector in sectors:
+                    location = 4 + (track - 1) * 4
+                    if header[location + 1 + sector // 8] & (1 << (sector % 8)):
+                        issues.append(f'entry.{index}.marked_free')
+                        break
                 occupied.update(sectors)
             return D64Validation(
                 standard_compatible=not issues,

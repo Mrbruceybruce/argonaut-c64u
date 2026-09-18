@@ -60,6 +60,11 @@ Argonaut 1.5 running on macOS (Apple Silicon), connected to a C64 Ultimate.
 
 **Files — local and C64U storage side by side.**
 
+Open a D64 to view its authentic flat 1541 directory. Standard 35-track images
+can stage filename changes, file removal, and PRG/SEQ/USR additions. Argonaut
+validates the complete result and saves it as a new local D64; it never rewrites
+the source image or replaces an existing destination.
+
 ![Mac Files tab showing local folders and a selected C64U disk image](docs/images/macos-files.png)
 
 **Drives — mount disk images or use Mount & Run.**

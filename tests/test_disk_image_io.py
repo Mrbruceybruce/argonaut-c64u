@@ -7,7 +7,8 @@ from unittest.mock import Mock, patch
 from c64u_browser.api import BrowserError
 from c64u_browser.disk_image import D64Image
 from c64u_browser.disk_image_io import (
-    extract_new, read_local_d64, read_remote_d64, suggested_name)
+    extract_new, read_host_file_for_d64, read_local_d64, read_remote_d64,
+    suggested_name)
 
 
 FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-authentic.d64'
@@ -55,6 +56,21 @@ class DiskImageIOTests(unittest.TestCase):
     def test_suggested_name_is_safe_for_host_chooser(self):
         entry = D64Image.from_path(FIXTURE).directory().entries[0]
         self.assertEqual(suggested_name(entry), 'HELLO.prg')
+
+    def test_import_reader_accepts_bounded_regular_file_only(self):
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            source = folder / 'hello.prg'
+            source.write_bytes(b'hello')
+            self.assertEqual(read_host_file_for_d64(source), b'hello')
+            link = folder / 'link.prg'
+            os.symlink(source, link)
+            with self.assertRaisesRegex(BrowserError, 'regular local file'):
+                read_host_file_for_d64(link)
+            large = folder / 'large.prg'
+            large.write_bytes(bytes(174849))
+            with self.assertRaisesRegex(BrowserError, 'too large'):
+                read_host_file_for_d64(large)
 
 
 if __name__ == '__main__':

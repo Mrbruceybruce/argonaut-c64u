@@ -34,6 +34,21 @@ The first read-only parser uses a D64 created by VICE `c1541` as an independent
 fixture. Its flat directory and extracted single- and multi-sector PRG data must
 match `c1541` byte for byte.
 
+Read-only D64 handling passed physical Linux acceptance on 2026-09-17. A real
+`Downfall.d64` opened from the C64U, reported a standard 1541 directory and two
+valid file chains, and extracted a file without changing the image. The installed
+Test Lab reported all 15 checks passing and included **Read-only D64 parser**.
+
+The staged D64 editor has completed automated acceptance and awaits physical
+Linux acceptance. It is limited to standard 35-track images and authentic
+flat-directory operations: rename, scratch, and adding PRG, SEQ, or USR files.
+The original remains read-only; publishing requires complete validation and a
+new local `.d64` filename that does not already exist. REL creation or removal
+remains disabled until its 1541 side-sector structure is implemented and
+independently verified. VICE `c1541` validated an edited image whose ninth entry
+extended the real directory chain, then extracted its new multi-sector payload
+byte for byte.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

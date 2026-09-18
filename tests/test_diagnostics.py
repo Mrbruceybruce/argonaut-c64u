@@ -16,6 +16,7 @@ from c64u_browser.files import operate
 from c64u_browser.native_files import read_remote
 from c64u_browser.disk_run import mount_and_run
 from c64u_browser.disk_image import D64Image
+from c64u_browser.disk_image_edit import D64EditSession
 from c64u_browser.test_lab import run_default_checks
 
 
@@ -152,6 +153,15 @@ class DiagnosticEventsTest(unittest.TestCase):
         self.assertEqual((event['transport'], event['operation'], event['target']),
                          ('disk_image', 'read_file', 'entry'))
         self.assertNotIn('HELLO', self.stream.getvalue())
+        self.stream.seek(0)
+        self.stream.truncate()
+        session = D64EditSession(image)
+        session.rename(directory.entries[0], 'PRIVATE NAME')
+        events = [json.loads(line) for line in self.stream.getvalue().splitlines()]
+        event = next(item for item in events if item['operation'] == 'stage_rename')
+        self.assertEqual((event['transport'], event['operation'], event['target']),
+                         ('disk_image', 'stage_rename', 'entry'))
+        self.assertNotIn('PRIVATE NAME', self.stream.getvalue())
 
     def test_development_log_is_private_bounded_jsonl(self):
         with tempfile.TemporaryDirectory() as directory:

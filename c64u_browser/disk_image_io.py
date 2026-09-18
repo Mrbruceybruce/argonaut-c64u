@@ -37,6 +37,17 @@ def read_remote_d64(client, path):
         return image
 
 
+def read_host_file_for_d64(path):
+    """Read one bounded regular host file for a staged D64 import."""
+    with operation_event('disk_image', 'import_host_file', 'file'):
+        path = Path(path)
+        if path.is_symlink() or not path.is_file():
+            raise BrowserError('Choose a regular local file to add to the disk copy.')
+        if path.stat().st_size > 174848:
+            raise BrowserError('The selected file is too large for a standard D64 disk.')
+        return path.read_bytes()
+
+
 def suggested_name(entry):
     if not isinstance(entry, DiskDirectoryEntry):
         raise TypeError('entry must be a DiskDirectoryEntry')
@@ -75,3 +86,37 @@ def _extract_new(image, entry, destination):
     finally:
         if temporary is not None and os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def save_edited_copy(session, destination):
+    """Validate and atomically publish a staged image under a new local name."""
+    from .disk_image_edit import D64EditSession
+    with operation_event('disk_image', 'save_copy', 'd64'):
+        if not isinstance(session, D64EditSession):
+            raise TypeError('session must be a D64EditSession')
+        if not session.dirty:
+            raise BrowserError('Stage at least one disk change before saving a copy.')
+        destination = Path(destination).absolute()
+        if destination.suffix.casefold() != '.d64':
+            raise BrowserError('Save the edited disk copy with a .d64 filename.')
+        if not destination.parent.is_dir():
+            raise BrowserError('Choose an existing destination folder.')
+        data = session.validated_bytes()
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                    dir=destination.parent, prefix='.argonaut-disk-', delete=False) as stream:
+                temporary = stream.name
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                publish_new(temporary, destination)
+            except FileExistsError as exc:
+                raise BrowserError('Destination already exists; the original and staged image were unchanged.') from exc
+            session.mark_saved()
+            return {'path': str(destination), 'bytes': len(data),
+                    'changes': len(session.changes)}
+        finally:
+            if temporary is not None and os.path.exists(temporary):
+                os.unlink(temporary)
