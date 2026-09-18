@@ -17,6 +17,13 @@ class DiskImageNavigationTests(unittest.TestCase):
         app.open_disk_image.assert_called_once_with(True, 'GAME.D64')
         app.navigate.assert_not_called()
 
+    def test_double_click_opens_d71_instead_of_treating_it_as_folder(self):
+        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock())
+        row = SimpleNamespace(item=('DOUBLE.D71', False))
+        Browser.activate_row(app, False, row)
+        app.open_disk_image.assert_called_once_with(False, 'DOUBLE.D71')
+        app.navigate.assert_not_called()
+
     def test_other_files_are_not_opened_as_disk_images(self):
         app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock())
         Browser.activate_row(app, True, SimpleNamespace(item=('GAME.PRG', False)))

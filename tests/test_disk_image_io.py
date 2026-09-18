@@ -7,11 +7,13 @@ from unittest.mock import Mock, patch
 from c64u_browser.api import BrowserError
 from c64u_browser.disk_image import D64Image
 from c64u_browser.disk_image_io import (
-    extract_new, read_host_file_for_d64, read_local_d64, read_remote_d64,
-    suggested_name)
+    extract_new, read_host_file_for_d64, read_local_d64, read_local_d71,
+    read_local_disk_image, read_remote_d64, read_remote_d71,
+    read_remote_disk_image, suggested_name)
 
 
 FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-authentic.d64'
+D71_FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1571-authentic.d71'
 
 
 class DiskImageIOTests(unittest.TestCase):
@@ -38,6 +40,23 @@ class DiskImageIOTests(unittest.TestCase):
         for path in ('/USB2', '/Flash/disk.d64', '/USB2/disk.prg'):
             with self.subTest(path=path), self.assertRaises(BrowserError):
                 read_remote_d64(Mock(), path)
+
+    def test_local_and_remote_d71_readers_dispatch_by_real_suffix(self):
+        self.assertEqual(read_local_d71(D71_FIXTURE).directory().disk_id, '71')
+        self.assertEqual(read_local_disk_image(D71_FIXTURE).format_name, 'D71')
+        client = Mock()
+        with patch('c64u_browser.disk_image_io.read_remote',
+                   return_value=D71_FIXTURE.read_bytes()) as reader:
+            image = read_remote_d71(client, '/USB2/GAMES/DISK.D71')
+            dispatched = read_remote_disk_image(client, '/USB2/GAMES/DISK.D71')
+        self.assertEqual((image.format_name, dispatched.format_name), ('D71', 'D71'))
+        self.assertEqual(reader.call_count, 2)
+
+    def test_disk_image_dispatch_rejects_unimplemented_formats(self):
+        with self.assertRaisesRegex(BrowserError, 'supported D64 or D71'):
+            read_local_disk_image('disk.d81')
+        with self.assertRaisesRegex(BrowserError, 'supported D64 or D71'):
+            read_remote_disk_image(Mock(), '/USB2/disk.d81')
 
     def test_extracts_exact_bytes_without_replacing_destination(self):
         image = D64Image.from_path(FIXTURE)

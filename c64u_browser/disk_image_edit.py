@@ -41,7 +41,7 @@ class D64EditSession:
     """Keep D64 changes staged in memory until a new image is explicitly saved."""
 
     def __init__(self, image):
-        if not isinstance(image, D64Image):
+        if type(image) is not D64Image:
             raise TypeError('image must be a D64Image')
         if not image.geometry.standard:
             raise DiskImageError('Editing requires a standard 35-track D64 image.')

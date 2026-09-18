@@ -58,6 +58,18 @@ enforce those bytes before physical acceptance is repeated.
 The next package also makes Return activate the primary action in disk filename
 prompts, including **Stage addition** and **Stage rename**.
 
+Staged D64 editing passed physical Linux acceptance on 2026-09-17. A newly saved
+image mounted in the C64U, and `LOAD"$",8` displayed its disk label, original
+files, and added `UCI PROBE` entry as ordinary readable text on the physical C64.
+
+Read-only D71 work is now active. Its parser follows the documented 1571 layout:
+70 tracks, the side-one BAM on 18/0, side-two allocation maps on 53/0, and the
+side-two free counts in bytes `$DD-$FF` of 18/0. The initial independent fixture
+is generated and validated by VICE `c1541`, includes a 670-block file whose chain
+crosses onto the second physical side, and keeps the authentic flat directory.
+Format details are checked against the
+[VICE D71 specification](https://vice-emu.sourceforge.io/vice_17.html#SEC388).
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

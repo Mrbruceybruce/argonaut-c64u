@@ -95,6 +95,12 @@ class AnalysisBoundaryTests(unittest.TestCase):
             'transport': 'disk_image', 'operation': 'save_copy',
             'target': 'd64', 'outcome': 'error',
             'error_kind': 'DiskImageError'})
+        d71 = safe_operation({
+            'transport': 'disk_image', 'operation': 'validate',
+            'target': 'd71', 'outcome': 'error',
+            'error_kind': 'DiskImageError', 'disk_name': 'private'})
+        self.assertEqual(d71['target'], 'd71')
+        self.assertNotIn('disk_name', d71)
 
     def test_passing_report_does_not_call_adapter(self):
         adapter = Mock()

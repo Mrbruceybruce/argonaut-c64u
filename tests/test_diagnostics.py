@@ -15,7 +15,7 @@ from c64u_browser.transfers import download, upload
 from c64u_browser.files import operate
 from c64u_browser.native_files import read_remote
 from c64u_browser.disk_run import mount_and_run
-from c64u_browser.disk_image import D64Image
+from c64u_browser.disk_image import D64Image, D71Image
 from c64u_browser.disk_image_edit import D64EditSession
 from c64u_browser.test_lab import run_default_checks
 
@@ -162,6 +162,14 @@ class DiagnosticEventsTest(unittest.TestCase):
         self.assertEqual((event['transport'], event['operation'], event['target']),
                          ('disk_image', 'stage_rename', 'entry'))
         self.assertNotIn('PRIVATE NAME', self.stream.getvalue())
+
+    def test_d71_directory_event_uses_only_format_label(self):
+        fixture = Path(__file__).with_name('fixtures') / 'vice-1571-authentic.d71'
+        D71Image.from_path(fixture).directory()
+        event = self.event()
+        self.assertEqual((event['transport'], event['operation'], event['target']),
+                         ('disk_image', 'read_directory', 'd71'))
+        self.assertNotIn('ARGONAUT', self.stream.getvalue())
 
     def test_development_log_is_private_bounded_jsonl(self):
         with tempfile.TemporaryDirectory() as directory:

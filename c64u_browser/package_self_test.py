@@ -54,7 +54,7 @@ def run(package_metadata, report_path):
 
         from .about import show_about
         from .credentials import Credentials
-        from .disk_image import D64Image, sectors_on_track
+        from .disk_image import D64Image, D71Image, sectors_on_track
         from .disk_image_dialog import DiskImageDialog
         from .gui import Browser
         from .platform_support import local_roots, portable_root, publish_new
@@ -123,6 +123,22 @@ def run(package_metadata, report_path):
                      'ui.disk_name_return',
                      'Return does not activate the disk filename action.', checks)
             disk_dialog.dialog.destroy()
+            d71_data = bytearray(349696)
+            d71_data[header_offset:header_offset + 4] = bytes((18, 1, 0x41, 0x80))
+            d71_data[header_offset + 0x90:header_offset + 0xa0] = (
+                b'PACKAGE D71' + b'\xa0' * 5)
+            d71_data[header_offset + 0xa2:header_offset + 0xa4] = b'71'
+            d71_data[header_offset + 0xa5:header_offset + 0xa7] = b'2A'
+            d71_data[directory_offset:directory_offset + 2] = bytes((0, 255))
+            d71_dialog = DiskImageDialog(
+                app, 'Package D71 check', D71Image(d71_data))
+            _require(d71_dialog.dialog.get_title() == 'D71 disk directory' and
+                     d71_dialog.listing.get_first_child() is None and
+                     d71_dialog.status.get_text().startswith('Read-only D71') and
+                     not d71_dialog.add_button.get_sensitive(),
+                     'ui.d71_directory',
+                     'The read-only D71 directory window is incorrect.', checks)
+            d71_dialog.dialog.destroy()
             _require(bool(local_roots()), 'filesystem.local_roots',
                      'No local file roots were found.', checks)
             _require((ASSETS / 'about-background.png').is_file() and

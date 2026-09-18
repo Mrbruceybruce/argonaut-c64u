@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
-"""Authentic flat 1541 directory with staged, copy-only D64 editing."""
+"""Authentic flat Commodore disk directory and safe D64 staging."""
 from pathlib import Path
 import posixpath
 
@@ -21,12 +21,14 @@ class DiskImageDialog:
         self.name_entry = None
         directory = image.directory()
         validation = image.validate()
+        format_name = image.format_name
+        drive_model = image.drive_model
         try:
             self.session = D64EditSession(image)
         except Exception:
             self.session = None
         self.dialog = Gtk.Dialog(
-            title='D64 disk directory', transient_for=app.window, modal=True)
+            title=f'{format_name} disk directory', transient_for=app.window, modal=True)
         self.dialog.set_default_size(760, 560)
         self.dialog.add_button('Close', Gtk.ResponseType.CLOSE)
         self.dialog.connect('response', self.close)
@@ -38,8 +40,8 @@ class DiskImageDialog:
         self.controls.append(Gtk.Label(
             label=(f'Disk directory: 0 "{directory.disk_name}" '
                    f'{directory.disk_id} {directory.dos_type}  ·  '
-                   f'{directory.geometry.tracks}-track D64'
-                   + (' · standard 1541 format' if directory.geometry.standard
+                   f'{directory.geometry.tracks}-track {format_name}'
+                   + (f' · standard {drive_model} format' if directory.geometry.standard
                       else ' · extended nonstandard format')),
             xalign=0, wrap=True, selectable=True))
         file_actions = Gtk.Box(spacing=8)
@@ -67,7 +69,7 @@ class DiskImageDialog:
         self.status = Gtk.Label(
             label=('Source image is unchanged. Stage edits here, then save a validated '
                    'copy under a new local filename.' if self.session else
-                   'Read-only view. This image is nonstandard or damaged and cannot be edited.'),
+                   f'Read-only {format_name} view. The source image is unchanged.'),
             xalign=0, wrap=True, selectable=True)
         box.append(self.status)
         self.render()
@@ -96,7 +98,7 @@ class DiskImageDialog:
             self.listing.append(row)
         self.free_label.set_text(f'{directory.blocks_free} BLOCKS FREE.')
         self.validation_label.set_text(
-            f'Structure check: standard 1541 directory and '
+            f'Structure check: standard {image.drive_model} directory and '
                    f'{validation.entries_checked} file chain(s) passed.'
                    if validation.standard_compatible else
                    f'Structure check: {len(validation.issues)} nonstandard or damaged '

@@ -7,7 +7,7 @@ import posixpath
 import tempfile
 
 from .api import BrowserError
-from .disk_image import D64Image, DiskDirectoryEntry
+from .disk_image import D64Image, D71Image, DiskDirectoryEntry
 from .diagnostics import operation_event
 from .native_files import read_remote
 from .platform_support import publish_new
@@ -35,6 +35,46 @@ def read_remote_d64(client, path):
         image = D64Image(read_remote(client, path))
         image.directory()
         return image
+
+
+def read_local_d71(path):
+    with operation_event('disk_image', 'open_local', 'd71'):
+        path = Path(path)
+        if path.suffix.casefold() != '.d71' or path.is_symlink() or not path.is_file():
+            raise BrowserError('Choose a regular local D71 image.')
+        with path.open('rb') as stream:
+            data = stream.read(351063)
+        image = D71Image(data)
+        image.directory()
+        return image
+
+
+def read_remote_d71(client, path):
+    with operation_event('disk_image', 'open_remote', 'd71'):
+        if (not storage_root(path) or storage_root(path) == path
+                or posixpath.splitext(path)[1].casefold() != '.d71'):
+            raise BrowserError('Choose a D71 image inside a C64U USB or SD drive.')
+        image = D71Image(read_remote(client, path))
+        image.directory()
+        return image
+
+
+def read_local_disk_image(path):
+    suffix = Path(path).suffix.casefold()
+    if suffix == '.d64':
+        return read_local_d64(path)
+    if suffix == '.d71':
+        return read_local_d71(path)
+    raise BrowserError('Choose a supported D64 or D71 disk image.')
+
+
+def read_remote_disk_image(client, path):
+    suffix = posixpath.splitext(path)[1].casefold()
+    if suffix == '.d64':
+        return read_remote_d64(client, path)
+    if suffix == '.d71':
+        return read_remote_d71(client, path)
+    raise BrowserError('Choose a supported D64 or D71 disk image.')
 
 
 def read_host_file_for_d64(path):
