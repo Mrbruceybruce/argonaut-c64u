@@ -7,6 +7,8 @@ settings and favorites, ROM selection, configuration backups and Undo,
 live screen preview, screenshots, and WebM recordings.
 Hidden local files and folders are omitted by default. They can be shown from
 **Preferences → General** without affecting the C64U file listing.
+In Streams, pressing Return sends the current text and leaves an empty focused
+field ready for the next C64 command after a successful send.
 
 Start with the [quick-start guide](docs/QUICK-START.md) for connection setup,
 file transfers, settings, backups, and preview.

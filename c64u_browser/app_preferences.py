@@ -181,7 +181,7 @@ def show_preferences(app, page=0):
     for entry in folders.values():
         entry.connect('activate',lambda *_:auto_save_general())
         entry.connect('notify::has-focus',
-                      lambda field,_:None if field.get_has_focus()
+                      lambda field,_:None if field.has_focus()
                       else auto_save_general())
 
     def undo_general(*_):

@@ -217,7 +217,15 @@ class StreamsTab:
             except Exception as exc:return exc
         def done(result):
             if self.client is not client:return
-            self.text_status.set_text(str(result) if isinstance(result,Exception) else f'Sent {result} bytes. Check the C64U screen.')
+            if isinstance(result,Exception):
+                self.text_status.set_text(str(result))
+                return
+            # Keep newly typed text if the user managed to edit the field while
+            # the asynchronous send was finishing.
+            if self.text_input.get_text() == text:
+                self.text_input.set_text('')
+            self.text_input.grab_focus()
+            self.text_status.set_text(f'Sent {result} bytes. Ready for the next line.')
         self.app.run(task,done)
 
     def scale_preview(self,*_):

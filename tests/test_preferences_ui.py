@@ -135,14 +135,28 @@ class PreferencesUI(unittest.TestCase):
         self.assertEqual(stored.profiles[0].case_edition,'Test box')
 
     def test_enter_sends_text_once_and_respects_busy_guard(self):
+        from c64u_browser.api import BrowserError
         from unittest.mock import Mock
         tab=self.app.streams_tab;tab.client=Mock();tab.text_input.set_text('PRINT "HELLO"')
+        self.app.tabs.set_current_page(5);self.pump()
         self.app.run=lambda task,done:done(task())
-        with patch('c64u_browser.keyboard_input.send_text',return_value=14) as send:
+        with patch('c64u_browser.keyboard_input.send_text',return_value=14) as send, \
+                patch.object(tab.text_input, 'grab_focus',
+                             wraps=tab.text_input.grab_focus) as focus:
             tab.text_input.emit('activate')
             send.assert_called_once_with(tab.client,'PRINT "HELLO"',True)
+            self.assertEqual(tab.text_input.get_text(),'')
+            focus.assert_called_once_with()
+            self.assertEqual(tab.text_status.get_text(),
+                             'Sent 14 bytes. Ready for the next line.')
+            tab.text_input.set_text('RUN')
             self.app.busy=True;tab.text_input.emit('activate');self.assertEqual(send.call_count,1)
         self.app.busy=False
+        with patch('c64u_browser.keyboard_input.send_text',
+                   side_effect=BrowserError('Send failed')):
+            tab.text_input.emit('activate')
+        self.assertEqual(tab.text_input.get_text(),'RUN')
+        self.assertEqual(tab.text_status.get_text(),'Send failed')
 
     def test_test_lab_bridge_setup_state_is_non_secret_and_actionable(self):
         tab=self.app.test_lab_tab

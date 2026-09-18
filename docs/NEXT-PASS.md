@@ -90,6 +90,15 @@ BAM halves and a genuine contiguous CBM partition allocation that VICE retains
 across validation. Argonaut labels CBM entries as partitions, validates their
 linear allocation, and does not expose them as host folders or chained files.
 
+Read-only D81 passed installed Linux and physical C64U acceptance on 2026-09-17.
+The installed package opened the VICE fixture, validated both BAM halves and
+its CBM partition, extracted the 410,000-byte cross-side file, and mounted it on
+the C64U's emulated 1581 with the expected directory and free-block count.
+
+The next package improves consecutive commands in Streams: Return sends the
+current line, clears it only after success, and returns focus to the empty field.
+A failed send preserves the text for retry.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
