@@ -18,13 +18,22 @@ class D64ImageTests(unittest.TestCase):
         directory = image.directory()
         self.assertEqual((directory.disk_name, directory.disk_id, directory.dos_type),
                          ('ARGONAUT', '64', '2A'))
-        self.assertEqual(directory.blocks_free, 663)
-        self.assertEqual(len(directory.entries), 1)
+        self.assertEqual(directory.blocks_free, 660)
+        self.assertEqual(len(directory.entries), 2)
         entry = directory.entries[0]
         self.assertEqual((entry.name, entry.file_type, entry.closed, entry.locked, entry.blocks),
                          ('HELLO', 'PRG', True, False, 1))
         self.assertTrue(directory.geometry.standard)
         self.assertEqual(directory.geometry.tracks, 35)
+
+    def test_reads_single_and_multi_sector_files_exactly(self):
+        image = D64Image(self.data)
+        hello, bigfile = image.directory().entries
+        self.assertEqual(image.read_file(hello),
+                         b'\x01\x08\x0b\x08\x00\x00\x9e2061\x00\x00\x00')
+        expected = bytes((index * 37 + 11) % 256 for index in range(600))
+        self.assertEqual(bigfile.blocks, 3)
+        self.assertEqual(image.read_file(bigfile), expected)
 
     def test_parsing_does_not_change_any_source_byte(self):
         before = hashlib.sha256(self.data).digest()
@@ -62,6 +71,26 @@ class D64ImageTests(unittest.TestCase):
         damaged[directory:directory + 2] = bytes((18, 1))
         with self.assertRaisesRegex(DiskImageError, 'loop'):
             D64Image(damaged).directory()
+
+    def test_rejects_file_chain_loop(self):
+        image = D64Image(self.data)
+        entry = image.directory().entries[1]
+        damaged = bytearray(self.data)
+        offset = (sum(sectors_on_track(track) for track in range(1, entry.start_track))
+                  + entry.start_sector) * 256
+        damaged[offset:offset + 2] = bytes((entry.start_track, entry.start_sector))
+        with self.assertRaisesRegex(DiskImageError, 'loop in its file chain'):
+            D64Image(damaged).read_file(entry)
+
+    def test_rejects_invalid_final_sector_length(self):
+        image = D64Image(self.data)
+        entry = image.directory().entries[0]
+        damaged = bytearray(self.data)
+        offset = (sum(sectors_on_track(track) for track in range(1, entry.start_track))
+                  + entry.start_sector) * 256
+        damaged[offset:offset + 2] = b'\x00\x00'
+        with self.assertRaisesRegex(DiskImageError, 'final-sector length'):
+            D64Image(damaged).read_file(entry)
 
     def test_track_geometry_matches_1541_zones(self):
         self.assertEqual([sectors_on_track(track) for track in (1, 17, 18, 24, 25, 30, 31, 35)],

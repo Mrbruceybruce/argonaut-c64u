@@ -54,6 +54,8 @@ def run(package_metadata, report_path):
 
         from .about import show_about
         from .credentials import Credentials
+        from .disk_image import D64Image, sectors_on_track
+        from .disk_image_dialog import DiskImageDialog
         from .gui import Browser
         from .platform_support import local_roots, portable_root, publish_new
         from .profiles import Preferences
@@ -94,6 +96,23 @@ def run(package_metadata, report_path):
                      not app.disconnect_button.get_sensitive(),
                      'ui.quick_connect',
                      'Quick Connect controls are incorrect.', checks)
+            image_data = bytearray(174848)
+            header_offset = sum(sectors_on_track(track)
+                                for track in range(1, 18)) * 256
+            directory_offset = header_offset + 256
+            image_data[header_offset:header_offset + 3] = bytes((18, 1, 0x41))
+            image_data[header_offset + 0x90:header_offset + 0xa0] = (
+                b'PACKAGE TEST' + b'\xa0' * 4)
+            image_data[header_offset + 0xa2:header_offset + 0xa4] = b'64'
+            image_data[header_offset + 0xa5:header_offset + 0xa7] = b'2A'
+            image_data[directory_offset:directory_offset + 2] = bytes((0, 255))
+            disk_dialog = DiskImageDialog(
+                app, 'Package D64 check', D64Image(image_data))
+            _require(disk_dialog.listing.get_first_child() is None and
+                     disk_dialog.status.get_text().startswith('Read-only view.'),
+                     'ui.disk_directory',
+                     'The read-only D64 directory window is incorrect.', checks)
+            disk_dialog.dialog.destroy()
             _require(bool(local_roots()), 'filesystem.local_roots',
                      'No local file roots were found.', checks)
             _require((ASSETS / 'about-background.png').is_file() and

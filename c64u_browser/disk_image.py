@@ -171,3 +171,35 @@ class D64Image:
             entries=tuple(entries),
             geometry=self.geometry,
         )
+
+    def read_file(self, entry):
+        """Return the file's raw CBM data bytes by following its sector chain."""
+        if not isinstance(entry, DiskDirectoryEntry):
+            raise TypeError('entry must be a DiskDirectoryEntry')
+        track, sector = entry.start_track, entry.start_sector
+        if track == 0:
+            if sector == 0 and entry.blocks == 0:
+                return b''
+            raise DiskImageError(f'{entry.name} has an invalid starting track and sector.')
+
+        result = bytearray()
+        seen = set()
+        while track:
+            location = (track, sector)
+            if location in seen:
+                raise DiskImageError(f'{entry.name} contains a loop in its file chain.')
+            seen.add(location)
+            block = self.sector(track, sector)
+            next_track, next_sector = block[0], block[1]
+            if next_track == 0:
+                # On a terminal CBM DOS sector, byte 1 is one greater than the
+                # number of payload bytes used (valid values are 1 through 255).
+                if not 1 <= next_sector <= 255:
+                    raise DiskImageError(f'{entry.name} has an invalid final-sector length.')
+                result.extend(block[2:next_sector + 1])
+                break
+            result.extend(block[2:])
+            track, sector = next_track, next_sector
+            if len(seen) > self.geometry.sectors:
+                raise DiskImageError(f'{entry.name} file chain is longer than the disk.')
+        return bytes(result)

@@ -7,6 +7,33 @@ roadmap section before building and validating Windows, Apple Silicon Mac, and
 Intel Mac packages. Begin the next roadmap section only after that cross-platform
 release gate passes.
 
+## Active Section 4: authentic disk-image management
+
+Disk images must remain compatible with Commodore hardware and CBM DOS. D64
+and D71 images have one flat directory; Argonaut must not invent folders or a
+parent entry inside either format. A D81 may expose a valid Commodore 1581 CBM
+partition explicitly, but it must not be presented as an ordinary host folder.
+
+Section 4 proceeds in this order:
+
+1. Read and validate standard 35-track D64 images without changing any source
+   byte. Recognized 40/42-track extended images remain readable but are labeled
+   nonstandard.
+2. Show the authentic disk header, file types and flags, block counts, and free
+   blocks in a read-only flat directory window.
+3. Extract PRG, SEQ, USR, and REL data by following CBM sector chains. Host
+   extraction must be atomic and must never replace an existing file.
+4. Add deterministic corruption checks, independent tool comparison, structured
+   diagnostics, and Linux package self-tests.
+5. Add staged D64 editing only after read-only handling passes physical Linux
+   acceptance. Validate the complete image and preserve or back up the original
+   before publishing a changed image.
+6. Extend the validated model to D71, then D81 and genuine 1581 CBM partitions.
+
+The first read-only parser uses a D64 created by VICE `c1541` as an independent
+fixture. Its flat directory and extracted single- and multi-sector PRG data must
+match `c1541` byte for byte.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

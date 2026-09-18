@@ -498,6 +498,24 @@ class Browser(Gtk.Application):
         if name == '..':
             self.navigate(local, str(self.local.parent) if local else (posixpath.dirname(self.remote) if self.remote != self.remote_root else self.remote_root))
         elif directory: self.navigate(local, str(self.local / name) if local else posixpath.join(self.remote, name))
+        elif name.casefold().endswith('.d64'): self.open_disk_image(local, name)
+
+    def open_disk_image(self, local, name):
+        if self.busy:return
+        from .disk_image_io import read_local_d64, read_remote_d64
+        source = self.local / name if local else posixpath.join(self.remote, name)
+        client = self.client
+        if not local and client is None:
+            self.status.set_text('Connect first.');return
+        def task():
+            return read_local_d64(source) if local else read_remote_d64(client, source)
+        def done(image):
+            if not local and self.client is not client:
+                self.status.set_text('Connection changed. Open the disk image again.');return
+            from .disk_image_dialog import DiskImageDialog
+            self.disk_image_dialog = DiskImageDialog(self, str(source), image)
+            self.status.set_text('Opened a read-only Commodore 1541 disk directory.')
+        self.run(task,done)
 
     def selected(self, local):
         rows = (self.llist if local else self.rlist).get_selected_rows()
@@ -585,6 +603,9 @@ class Browser(Gtk.Application):
         if row:
             name, directory = row.item
             multiple = len(listing.get_selected_rows()) > 1
+            if not multiple and not directory and name.casefold().endswith('.d64'):
+                self.button(box, 'Open disk image',
+                            lambda: action(lambda: self.open_disk_image(local, name)))
             if not multiple and not local and not directory and name.lower().endswith('.sid'):
                 client=self.client;path=posixpath.join(self.remote,name)
                 def open_sid():
