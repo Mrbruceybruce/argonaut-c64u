@@ -35,6 +35,12 @@ class D64ImageTests(unittest.TestCase):
         self.assertEqual(bigfile.blocks, 3)
         self.assertEqual(image.read_file(bigfile), expected)
 
+    def test_vice_fixture_passes_standard_structure_validation(self):
+        validation = D64Image(self.data).validate()
+        self.assertTrue(validation.standard_compatible)
+        self.assertEqual(validation.entries_checked, 2)
+        self.assertEqual(validation.issues, ())
+
     def test_parsing_does_not_change_any_source_byte(self):
         before = hashlib.sha256(self.data).digest()
         image = D64Image(self.data)
@@ -53,6 +59,16 @@ class D64ImageTests(unittest.TestCase):
         self.assertEqual(image.geometry.tracks, 40)
         self.assertFalse(image.geometry.standard)
         self.assertEqual(image.directory().disk_name, 'ARGONAUT')
+        self.assertEqual(image.validate().issues, ('geometry.extended_tracks',))
+
+    def test_validation_reports_block_count_without_blocking_read(self):
+        damaged = bytearray(self.data)
+        directory = (sum(sectors_on_track(track) for track in range(1, 18)) + 1) * 256
+        damaged[directory + 2 + 28:directory + 2 + 30] = bytes((2, 0))
+        image = D64Image(damaged)
+        self.assertEqual(image.read_file(image.directory().entries[0]),
+                         b'\x01\x08\x0b\x08\x00\x00\x9e2061\x00\x00\x00')
+        self.assertIn('entry.1.block_count', image.validate().issues)
 
     def test_rejects_unknown_size(self):
         with self.assertRaisesRegex(DiskImageError, 'Unsupported D64 size'):

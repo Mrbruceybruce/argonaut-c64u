@@ -8,6 +8,8 @@ the source image and does not invent host-style folders inside a floppy disk.
 from dataclasses import dataclass
 from pathlib import Path
 
+from .diagnostics import operation_event
+
 
 class DiskImageError(ValueError):
     """The image is not a supported, structurally readable D64."""
@@ -43,6 +45,13 @@ class D64Directory:
     blocks_free: int
     entries: tuple[DiskDirectoryEntry, ...]
     geometry: D64Geometry
+
+
+@dataclass(frozen=True)
+class D64Validation:
+    standard_compatible: bool
+    entries_checked: int
+    issues: tuple[str, ...]
 
 
 _GEOMETRIES = {
@@ -117,6 +126,10 @@ class D64Image:
         return self._disk_data[offset:offset + 256]
 
     def directory(self):
+        with operation_event('disk_image', 'read_directory', 'd64'):
+            return self._directory()
+
+    def _directory(self):
         header = self.sector(18, 0)
         raw_name = header[0x90:0xa0]
         first_track, first_sector = header[0], header[1]
@@ -174,12 +187,19 @@ class D64Image:
 
     def read_file(self, entry):
         """Return the file's raw CBM data bytes by following its sector chain."""
+        with operation_event('disk_image', 'read_file', 'entry'):
+            return self._read_file(entry)
+
+    def _read_file(self, entry):
+        return self._file_chain(entry)[0]
+
+    def _file_chain(self, entry):
         if not isinstance(entry, DiskDirectoryEntry):
             raise TypeError('entry must be a DiskDirectoryEntry')
         track, sector = entry.start_track, entry.start_sector
         if track == 0:
             if sector == 0 and entry.blocks == 0:
-                return b''
+                return b'', ()
             raise DiskImageError(f'{entry.name} has an invalid starting track and sector.')
 
         result = bytearray()
@@ -202,4 +222,33 @@ class D64Image:
             track, sector = next_track, next_sector
             if len(seen) > self.geometry.sectors:
                 raise DiskImageError(f'{entry.name} file chain is longer than the disk.')
-        return bytes(result)
+        return bytes(result), tuple(seen)
+
+    def validate(self):
+        """Report standard directory/file-chain issues without rejecting the image."""
+        with operation_event('disk_image', 'validate', 'd64'):
+            directory = self._directory()
+            issues = []
+            if not self.geometry.standard:
+                issues.append('geometry.extended_tracks')
+            occupied = set()
+            checked = 0
+            for index, entry in enumerate(directory.entries, 1):
+                if entry.file_type == 'DEL':
+                    continue
+                checked += 1
+                try:
+                    _, sectors = self._file_chain(entry)
+                except DiskImageError:
+                    issues.append(f'entry.{index}.chain')
+                    continue
+                if len(sectors) != entry.blocks:
+                    issues.append(f'entry.{index}.block_count')
+                if occupied.intersection(sectors):
+                    issues.append(f'entry.{index}.cross_link')
+                occupied.update(sectors)
+            return D64Validation(
+                standard_compatible=not issues,
+                entries_checked=checked,
+                issues=tuple(issues),
+            )

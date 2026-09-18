@@ -9,6 +9,7 @@ import time
 
 from .api import BrowserError, UltimateClient, parse_list
 from .diagnostics import LOGGER, operation_origin
+from .disk_image import D64Image, sectors_on_track
 
 
 @dataclass(frozen=True)
@@ -103,9 +104,39 @@ def _check_sid_path_validation():
         raise AssertionError('Parent traversal was accepted')
 
 
+def _check_d64_parser():
+    data = bytearray(174848)
+    header = sum(sectors_on_track(track) for track in range(1, 18)) * 256
+    directory = header + 256
+    data[header:header + 3] = bytes((18, 1, 0x41))
+    data[header + 0x90:header + 0xa0] = b'ARGONAUT' + b'\xa0' * 8
+    data[header + 0xa2:header + 0xa4] = b'64'
+    data[header + 0xa5:header + 0xa7] = b'2A'
+    data[directory:directory + 2] = bytes((0, 255))
+    entry = directory + 2
+    data[entry:entry + 3] = bytes((0x82, 1, 0))
+    data[entry + 3:entry + 19] = b'HELLO' + b'\xa0' * 11
+    data[entry + 28:entry + 30] = bytes((1, 0))
+    data[0:5] = bytes((0, 4, 1, 8, 0))
+    image = D64Image(data)
+    parsed = image.directory()
+    require((parsed.disk_name, parsed.disk_id, parsed.dos_type) ==
+            ('ARGONAUT', '64', '2A'), 'D64 header fields differed')
+    require(len(parsed.entries) == 1 and
+            (parsed.entries[0].name, parsed.entries[0].file_type,
+             parsed.entries[0].blocks) == ('HELLO', 'PRG', 1),
+            'D64 flat directory entry differed')
+    require(image.read_file(parsed.entries[0]) == b'\x01\x08\x00',
+            'D64 file chain differed')
+    validation = image.validate()
+    require(validation.standard_compatible and validation.entries_checked == 1,
+            'D64 standard structure validation differed')
+
+
 DEFAULT_CHECKS = (
     Check('ftp.listing_parser', 'FTP listing parser', _check_listing_parser),
     Check('rest.sid_path_validation', 'SID path validation', _check_sid_path_validation),
+    Check('disk.d64_parser', 'Read-only D64 parser', _check_d64_parser),
 )
 
 

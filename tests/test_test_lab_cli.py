@@ -175,7 +175,7 @@ class HeadlessCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(report['status'], 'pass')
         self.assertEqual(report['suite'], 'offline')
-        self.assertEqual(len(report['checks']), 14)
+        self.assertEqual(len(report['checks']), 15)
 
     def test_diagnosis_probe_is_an_expected_offline_failure_with_separate_ai(self):
         output = io.StringIO()

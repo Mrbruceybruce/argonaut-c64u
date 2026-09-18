@@ -12,6 +12,7 @@ class DiskImageDialog:
         self.image = image
         self.chooser = None
         directory = image.directory()
+        validation = image.validate()
         self.dialog = Gtk.Dialog(
             title='D64 disk directory', transient_for=app.window, modal=True)
         self.dialog.set_default_size(760, 560)
@@ -21,9 +22,10 @@ class DiskImageDialog:
         self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.append(self.controls)
         self.controls.append(Gtk.Label(
-            label=source, xalign=0, wrap=True, selectable=True))
+            label='Source image: ' + source, xalign=0, wrap=True, selectable=True))
         self.controls.append(Gtk.Label(
-            label=(f'0 "{directory.disk_name}" {directory.disk_id} {directory.dos_type}  ·  '
+            label=(f'Disk directory: 0 "{directory.disk_name}" '
+                   f'{directory.disk_id} {directory.dos_type}  ·  '
                    f'{directory.geometry.tracks}-track D64'
                    + (' · standard 1541 format' if directory.geometry.standard
                       else ' · extended nonstandard format')),
@@ -48,6 +50,13 @@ class DiskImageDialog:
             self.listing.append(row)
         self.controls.append(Gtk.Label(
             label=f'{directory.blocks_free} BLOCKS FREE.', xalign=0, selectable=True))
+        self.controls.append(Gtk.Label(
+            label=(f'Structure check: standard 1541 directory and '
+                   f'{validation.entries_checked} file chain(s) passed.'
+                   if validation.standard_compatible else
+                   f'Structure check: {len(validation.issues)} nonstandard or damaged '
+                   'condition(s) detected. The image remains available read-only.'),
+            xalign=0, wrap=True, selectable=True))
         if not directory.geometry.standard:
             self.controls.append(Gtk.Label(
                 label='This extended-track image is readable but is not a standard 35-track 1541 disk.',

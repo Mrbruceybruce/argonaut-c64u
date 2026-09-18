@@ -15,6 +15,7 @@ from c64u_browser.transfers import download, upload
 from c64u_browser.files import operate
 from c64u_browser.native_files import read_remote
 from c64u_browser.disk_run import mount_and_run
+from c64u_browser.disk_image import D64Image
 from c64u_browser.test_lab import run_default_checks
 
 
@@ -135,6 +136,22 @@ class DiagnosticEventsTest(unittest.TestCase):
                          ('dma', 'mount_and_run', 'disk', 'error'))
         self.assertNotIn('private-image.d81', self.stream.getvalue())
         self.assertNotIn('private-password', self.stream.getvalue())
+
+    def test_disk_image_events_use_format_and_generic_entry_labels(self):
+        fixture = Path(__file__).with_name('fixtures') / 'vice-1541-authentic.d64'
+        image = D64Image.from_path(fixture)
+        directory = image.directory()
+        event = self.event()
+        self.assertEqual((event['transport'], event['operation'], event['target']),
+                         ('disk_image', 'read_directory', 'd64'))
+        self.assertNotIn('ARGONAUT', self.stream.getvalue())
+        self.stream.seek(0)
+        self.stream.truncate()
+        self.assertEqual(len(image.read_file(directory.entries[0])), 14)
+        event = self.event()
+        self.assertEqual((event['transport'], event['operation'], event['target']),
+                         ('disk_image', 'read_file', 'entry'))
+        self.assertNotIn('HELLO', self.stream.getvalue())
 
     def test_development_log_is_private_bounded_jsonl(self):
         with tempfile.TemporaryDirectory() as directory:

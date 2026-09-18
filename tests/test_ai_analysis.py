@@ -70,6 +70,22 @@ class AnalysisBoundaryTests(unittest.TestCase):
                 'error_kind': 'response'}]}])
         self.assertNotIn('private', json.dumps(evidence))
 
+    def test_disk_failure_uses_only_generic_format_and_operation_labels(self):
+        report = {'schema': 1, 'suite': 'offline', 'status': 'fail', 'checks': [
+            {'id': 'disk.d64_parser', 'title': 'private disk label',
+             'status': 'fail', 'error_kind': 'DiskImageError', 'operations': [
+                 {'transport': 'disk_image', 'operation': 'validate',
+                  'target': 'd64', 'outcome': 'error',
+                  'error_kind': 'DiskImageError', 'filename': 'private.d64'}]}]}
+        evidence = failure_evidence(report)
+        self.assertEqual(evidence['failures'], [{
+            'id': 'disk.d64_parser', 'error_kind': 'DiskImageError',
+            'operations': [{
+                'transport': 'disk_image', 'operation': 'validate',
+                'target': 'd64', 'outcome': 'error',
+                'error_kind': 'DiskImageError'}]}])
+        self.assertNotIn('private', json.dumps(evidence))
+
     def test_passing_report_does_not_call_adapter(self):
         adapter = Mock()
         result = analyze_failures({'schema': 1, 'status': 'pass', 'checks': [

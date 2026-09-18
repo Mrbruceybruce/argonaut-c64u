@@ -8,26 +8,33 @@ import tempfile
 
 from .api import BrowserError
 from .disk_image import D64Image, DiskDirectoryEntry
+from .diagnostics import operation_event
 from .native_files import read_remote
 from .platform_support import publish_new
 from .storage import storage_root
 
 
 def read_local_d64(path):
-    path = Path(path)
-    if path.suffix.casefold() != '.d64' or path.is_symlink() or not path.is_file():
-        raise BrowserError('Choose a regular local D64 image.')
-    # All recognized D64 forms are smaller than this fixed bound.
-    with path.open('rb') as stream:
-        data = stream.read(206115)
-    return D64Image(data)
+    with operation_event('disk_image', 'open_local', 'd64'):
+        path = Path(path)
+        if path.suffix.casefold() != '.d64' or path.is_symlink() or not path.is_file():
+            raise BrowserError('Choose a regular local D64 image.')
+        # All recognized D64 forms are smaller than this fixed bound.
+        with path.open('rb') as stream:
+            data = stream.read(206115)
+        image = D64Image(data)
+        image.directory()
+        return image
 
 
 def read_remote_d64(client, path):
-    if (not storage_root(path) or storage_root(path) == path
-            or posixpath.splitext(path)[1].casefold() != '.d64'):
-        raise BrowserError('Choose a D64 image inside a C64U USB or SD drive.')
-    return D64Image(read_remote(client, path))
+    with operation_event('disk_image', 'open_remote', 'd64'):
+        if (not storage_root(path) or storage_root(path) == path
+                or posixpath.splitext(path)[1].casefold() != '.d64'):
+            raise BrowserError('Choose a D64 image inside a C64U USB or SD drive.')
+        image = D64Image(read_remote(client, path))
+        image.directory()
+        return image
 
 
 def suggested_name(entry):
@@ -41,6 +48,11 @@ def suggested_name(entry):
 
 def extract_new(image, entry, destination):
     """Extract one CBM file atomically without replacing an existing host file."""
+    with operation_event('disk_image', 'extract', 'file'):
+        return _extract_new(image, entry, destination)
+
+
+def _extract_new(image, entry, destination):
     if not isinstance(image, D64Image):
         raise TypeError('image must be a D64Image')
     destination = Path(destination).absolute()

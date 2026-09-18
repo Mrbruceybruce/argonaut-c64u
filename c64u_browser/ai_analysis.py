@@ -14,22 +14,26 @@ SAFE_OPERATIONS = {
     'dma': frozenset(('mount_and_run', 'send_text')),
     'local': frozenset(('replace_file',)),
     'bridge': frozenset(('readiness_probe',)),
+    'disk_image': frozenset(('open_local', 'open_remote', 'read_directory',
+                             'read_file', 'validate', 'extract')),
 }
 SAFE_TARGETS = {
     'ftp': frozenset(('directory', 'file', 'entry')),
     'dma': frozenset(('disk', 'keyboard')),
     'local': frozenset(('file',)),
     'bridge': frozenset(('local_model',)),
+    'disk_image': frozenset(('d64', 'entry', 'file')),
 }
 SAFE_ERROR_KINDS = frozenset((
     'authentication', 'network', 'host', 'api', 'ftp', 'identity',
     'configuration', 'response',
     'BrowserError', 'UploadFailure', 'AssertionError', 'ValueError',
     'OSError', 'EOFError', 'TimeoutError', 'UnicodeError',
+    'DiskImageError',
 ))
 MAX_FAILURES = 32
 SAFE_CHECK_IDS = frozenset((
-    'ftp.listing_parser', 'rest.sid_path_validation',
+    'ftp.listing_parser', 'rest.sid_path_validation', 'disk.d64_parser',
     'hardware.identity', 'hardware.drives', 'hardware.storage',
     'hardware.version_stability',
     'sim.rest.success', 'sim.rest.malformed', 'sim.rest.authentication',

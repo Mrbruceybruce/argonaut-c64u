@@ -12,7 +12,7 @@ class TestLabTests(unittest.TestCase):
     def test_offline_checks_pass_and_serialize(self):
         report = run_default_checks()
         self.assertEqual(report['status'], 'pass')
-        self.assertEqual(len(report['checks']), 14)
+        self.assertEqual(len(report['checks']), 15)
         self.assertEqual(json.loads(json.dumps(report))['schema'], 1)
 
     def test_simulated_checks_exercise_real_transports_without_leaking_fixtures(self):
