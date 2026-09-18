@@ -55,6 +55,9 @@ high bit set, which BASIC displayed as graphic characters. Hardware-readable
 directory names use PETSCII `$41-$5A`; the editor and regression fixture now
 enforce those bytes before physical acceptance is repeated.
 
+The next package also makes Return activate the primary action in disk filename
+prompts, including **Stage addition** and **Stage rename**.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

@@ -114,6 +114,14 @@ def run(package_metadata, report_path):
                      not disk_dialog.save_button.get_sensitive(),
                      'ui.disk_directory',
                      'The staged D64 directory window is incorrect.', checks)
+            activated = []
+            disk_dialog._name_prompt(
+                'Package filename check', 'TEST', 'Stage addition',
+                lambda name, kind: activated.append((name, kind)), 'PRG')
+            disk_dialog.name_entry.emit('activate')
+            _require(activated == [('TEST', 'PRG')] and disk_dialog.prompt is None,
+                     'ui.disk_name_return',
+                     'Return does not activate the disk filename action.', checks)
             disk_dialog.dialog.destroy()
             _require(bool(local_roots()), 'filesystem.local_roots',
                      'No local file roots were found.', checks)

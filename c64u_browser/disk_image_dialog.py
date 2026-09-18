@@ -18,6 +18,7 @@ class DiskImageDialog:
         self.source = source
         self.chooser = None
         self.prompt = None
+        self.name_entry = None
         directory = image.directory()
         validation = image.validate()
         try:
@@ -155,9 +156,11 @@ class DiskImageDialog:
         self.prompt = prompt
         prompt.add_button('Cancel', Gtk.ResponseType.CANCEL)
         action = prompt.add_button(accept, Gtk.ResponseType.OK)
+        prompt.set_default_response(Gtk.ResponseType.OK)
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
                           margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
         entry = Gtk.Entry(text=name, max_length=16, hexpand=True)
+        self.name_entry = entry
         content.append(Gtk.Label(label='C64 disk filename (up to 16 characters):', xalign=0))
         content.append(entry)
         types = None
@@ -172,12 +175,16 @@ class DiskImageDialog:
         def update(*_):
             action.set_sensitive(bool(entry.get_text().strip()))
         entry.connect('changed', update)
+        entry.connect(
+            'activate', lambda *_: prompt.response(Gtk.ResponseType.OK)
+            if action.get_sensitive() else None)
         update()
         def response(_, code):
             value = entry.get_text()
             chosen_type = types.get_active_text() if types else None
             prompt.destroy()
             self.prompt = None
+            self.name_entry = None
             if code == Gtk.ResponseType.OK:
                 callback(value, chosen_type)
         prompt.connect('response', response)
