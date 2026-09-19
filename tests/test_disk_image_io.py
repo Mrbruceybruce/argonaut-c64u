@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 from c64u_browser.api import BrowserError
 from c64u_browser.disk_image import D64Image
 from c64u_browser.disk_image_io import (
-    create_blank_d64, extract_new, read_host_file_for_d64, read_local_d64, read_local_d71,
+    create_blank_d64, create_remote_blank_d64, extract_new, read_host_file_for_d64, read_local_d64, read_local_d71,
     read_local_d81, read_local_disk_image, read_remote_d64, read_remote_d71,
     read_remote_d81,
     read_remote_disk_image, suggested_name)
@@ -119,6 +119,35 @@ class DiskImageIOTests(unittest.TestCase):
                              'NEW DISK')
             with self.assertRaisesRegex(BrowserError, r'\.d64'):
                 create_blank_d64(Path(folder) / 'blank.img', 'NEW DISK', 'N1')
+
+    def test_remote_blank_d64_is_preflighted_created_and_read_back(self):
+        from c64u_browser.disk_image_edit import create_blank_d64_image
+        client=Mock()
+        blank=create_blank_d64_image('REMOTE DISK','64')
+        with patch('c64u_browser.files.inspect',return_value=None) as inspect, \
+                patch('c64u_browser.disk_image_io.read_remote',
+                      return_value=blank.source_bytes):
+            result=create_remote_blank_d64(
+                client,'/USB2/New disk.d64','REMOTE DISK')
+        inspect.assert_called_once_with(client,'/USB2/New disk.d64')
+        client.create_d64.assert_called_once_with(
+            '/USB2/New disk.d64','REMOTE DISK')
+        self.assertEqual(result.directory().blocks_free,664)
+
+    def test_remote_blank_d64_refuses_conflict_before_create(self):
+        client=Mock()
+        with patch('c64u_browser.files.inspect',return_value=Mock()):
+            with self.assertRaisesRegex(BrowserError,'already exists'):
+                create_remote_blank_d64(client,'/USB2/existing.d64','DISK')
+        client.create_d64.assert_not_called()
+
+    def test_remote_blank_d64_warns_after_failed_readback(self):
+        client=Mock()
+        with patch('c64u_browser.files.inspect',return_value=None), \
+                patch('c64u_browser.disk_image_io.read_remote',return_value=b'bad'):
+            with self.assertRaisesRegex(BrowserError,'Inspect it before retrying'):
+                create_remote_blank_d64(client,'/USB2/new.d64','DISK')
+        client.create_d64.assert_called_once()
 
 
 if __name__ == '__main__':

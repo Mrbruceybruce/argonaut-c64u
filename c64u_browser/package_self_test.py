@@ -97,10 +97,21 @@ def run(package_metadata, report_path):
             _require(app.quick_connect_button.get_label() == 'Quick Connect' and
                      not app.disconnect_button.get_sensitive() and
                      app.new_d64_button.get_tooltip_text() == 'New D64 disk…' and
+                     app.remote_new_d64_button.get_tooltip_text() ==
+                     'New D64 disk on C64U…' and
+                     not app.remote_new_d64_button.get_sensitive() and
                      app.tabs.get_tab_label_text(app.settings_tab.box) ==
                      'Ultimate Menu',
                      'ui.quick_connect',
                      'Main-window connection or disk controls are incorrect.', checks)
+            _require(app.file_pane_labels[True].get_text() == 'Local files · Active' and
+                     app.file_pane_labels[False].get_text() == 'C64 Ultimate files' and
+                     app.file_pane_boxes[True].has_css_class(
+                         'argonaut-file-pane-active') and
+                     app.file_pane_boxes[False].has_css_class(
+                         'argonaut-file-pane-inactive'),
+                     'ui.active_file_pane',
+                     'The active file pane is not identified visibly.', checks)
             app.populate(app.llist, [
                 ('SOURCE COPY', False, 1), ('DESTINATION COPY', False, 1)])
             app.select_names(
@@ -187,10 +198,16 @@ def run(package_metadata, report_path):
             _require(disk_dialog.listing.get_first_child() is None and
                      disk_dialog.status.get_text().startswith('Source image is unchanged.') and
                      disk_dialog.add_button.get_sensitive() and
-                     disk_dialog.save_button.get_label() == 'Save as…' and
+                     disk_dialog.save_button.get_label() == 'Save image as…' and
+                     disk_dialog.discard_button.get_label() == 'Discard changes' and
                      not disk_dialog.save_button.get_sensitive(),
                      'ui.disk_directory',
                      'The staged D64 directory window is incorrect.', checks)
+            disk_dialog.add_file()
+            _require(disk_dialog.chooser.get_select_multiple(),
+                     'ui.disk_multi_add',
+                     'Add file does not permit selecting multiple host files.', checks)
+            disk_dialog.chooser.emit('response', Gtk.ResponseType.CANCEL)
             disk_dialog.session.add_file(b'package', 'SAVE FOLDER', 'PRG')
             disk_dialog.render()
             disk_dialog.save_copy()
@@ -208,7 +225,7 @@ def run(package_metadata, report_path):
             disk_dialog.chooser.emit('response', Gtk.ResponseType.CANCEL)
             activated = []
             disk_dialog._name_prompt(
-                'Package filename check', 'TEST', 'Stage addition',
+                'Package filename check', 'TEST', 'Add file',
                 lambda name, kind: activated.append((name, kind)), 'PRG')
             disk_dialog.name_entry.emit('activate')
             _require(activated == [('TEST', 'PRG')] and disk_dialog.prompt is None,

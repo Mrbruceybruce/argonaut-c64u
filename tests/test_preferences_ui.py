@@ -92,6 +92,25 @@ class PreferencesUI(unittest.TestCase):
         plus.emit('clicked');dialog.response(self.Gtk.ResponseType.CLOSE)
         self.assertIsNone(self.app.preferences_dialog)
         self.assertEqual(Preferences(self.app.preferences.path).load().app_options['preview_scale'],175)
+
+    def test_unchanged_missing_legacy_folder_does_not_trap_preferences(self):
+        from c64u_browser.app_preferences import show_preferences
+        missing=str(Path(self.temp.name)/'removed-screenshot-folder')
+        self.app.preferences.screenshot_folder=missing
+        self.app.preferences.save()
+        dialog=show_preferences(self.app);self.pump()
+        dialog.response(self.Gtk.ResponseType.CLOSE);self.pump()
+        self.assertIsNone(self.app.preferences_dialog)
+        self.assertEqual(self.app.preferences.screenshot_folder,missing)
+
+        dialog=show_preferences(self.app);self.pump()
+        general=dialog.pages.get_nth_page(0)
+        entry=next(w for w in self.walk(general)
+                   if isinstance(w,self.Gtk.Entry) and w.get_text()==missing)
+        entry.set_text(str(Path(self.temp.name)/'new-missing-folder'))
+        dialog.response(self.Gtk.ResponseType.CLOSE);self.pump()
+        self.assertIs(self.app.preferences_dialog,dialog)
+        self.assertEqual(dialog.pages.get_current_page(),0)
     def test_device_details_follow_profile_and_save_box_model(self):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Profile,Preferences

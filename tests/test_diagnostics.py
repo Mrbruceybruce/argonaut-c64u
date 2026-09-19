@@ -64,6 +64,14 @@ class DiagnosticEventsTest(unittest.TestCase):
         self.assertEqual(self.event()['target'], '/v1/configs/category')
         self.assertNotIn('private-category', self.stream.getvalue())
 
+    def test_create_d64_event_redacts_device_path_and_disk_name(self):
+        client = UltimateClient('c64u.local')
+        with patch.object(client, '_request_json_impl', return_value={'errors': []}):
+            client.create_d64('/USB2/private-folder/private-name.d64', 'PRIVATE DISK')
+        self.assertEqual(self.event()['target'], '/v1/files/image:create_d64')
+        self.assertNotIn('private-name', self.stream.getvalue())
+        self.assertNotIn('PRIVATE DISK', self.stream.getvalue())
+
     def test_ftp_listing_does_not_record_private_path(self):
         client = UltimateClient('c64u.local')
         with patch.object(client, '_list_directory', return_value=('/', [])):

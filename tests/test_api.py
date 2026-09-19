@@ -50,3 +50,19 @@ class Tests(unittest.TestCase):
                              (0x0277,b'A'*129),(0x0277,'A')):
             with self.subTest(address=address,data=data),self.assertRaises(BrowserError):
                 client.write_memory(address,data)
+
+    def test_create_d64_uses_native_encoded_route(self):
+        client=UltimateClient('device')
+        with patch.object(client,'_request_json',return_value={'errors':[]}) as request:
+            client.create_d64('/USB2/My disks/New disk.d64','MY DISK')
+        request.assert_called_once_with(
+            'PUT','/v1/files/USB2/My%20disks/New%20disk.d64:create_d64?tracks=35&diskname=MY+DISK')
+
+    def test_create_d64_rejects_unsafe_or_nonstandard_arguments(self):
+        client=UltimateClient('device')
+        cases=(('relative.d64','DISK',35),('/USB2/../bad.d64','DISK',35),
+               ('/USB2/not-d64.txt','DISK',35),('/USB2/new.d64','',35),
+               ('/USB2/new.d64','X'*17,35),('/USB2/new.d64','DISK',40))
+        for path,name,tracks in cases:
+            with self.subTest(path=path,name=name,tracks=tracks),self.assertRaises(BrowserError):
+                client.create_d64(path,name,tracks)

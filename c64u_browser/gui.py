@@ -49,6 +49,9 @@ class Browser(Gtk.Application):
         self.file_clipboard = None
         self.histories = {True: History(self.local), False: History(self.remote)}
         self.history_buttons = {}
+        self.file_pane_boxes = {}
+        self.file_pane_labels = {}
+        self.active_file_pane = True
         self.preferences = Preferences()
         self.preferences_error = None
         try: self.preferences.load()
@@ -153,6 +156,15 @@ class Browser(Gtk.Application):
         self.controls.set_vexpand(True)
         self.lpath, self.llist = self.pane(panes, True)
         self.rpath, self.rlist = self.pane(panes, False)
+        css = Gtk.CssProvider()
+        css.load_from_data(
+            b'.argonaut-file-pane { border: 2px solid transparent; border-radius: 6px; padding: 4px; }\n'
+            b'.argonaut-file-pane-active { border-color: @accent_bg_color; }\n'
+            b'.argonaut-file-pane-inactive row:selected { background-color: alpha(@accent_bg_color, 0.30); color: @window_fg_color; }')
+        Gtk.StyleContext.add_provider_for_display(
+            self.window.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.file_pane_css = css
+        self.set_active_file_pane(True)
         self.settings_tab = SettingsTab(self)
         self.tabs.append_page(self.settings_tab.box, Gtk.Label(label='Ultimate Menu'))
         self.drives_tab=DrivesTab(self)
@@ -189,6 +201,9 @@ class Browser(Gtk.Application):
     def pane(self, panes, local):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         label = Gtk.Label(label='Local files' if local else 'C64 Ultimate files', xalign=0)
+        box.add_css_class('argonaut-file-pane')
+        self.file_pane_boxes[local] = box
+        self.file_pane_labels[local] = label
         box.append(label)
         toolbar = Gtk.Box(spacing=6)
         box.append(toolbar)
@@ -203,6 +218,10 @@ class Browser(Gtk.Application):
         if local:
             self.new_d64_button = self.icon_button(
                 toolbar, 'New D64 disk…', 'document-new-symbolic', self.new_d64)
+        else:
+            self.remote_new_d64_button = self.icon_button(
+                toolbar, 'New D64 disk on C64U…', 'document-new-symbolic',
+                self.new_remote_d64)
         drives=DriveButtons(self,local);self.drive_bars[local]=drives
         box.append(drives.box)
         path = Gtk.Entry()
@@ -230,6 +249,9 @@ class Browser(Gtk.Application):
         keys = Gtk.EventControllerKey()
         keys.connect('key-pressed', lambda _, key, code, state: self.file_key(local, key, state))
         listing.add_controller(keys)
+        focus = Gtk.EventControllerFocus()
+        focus.connect('enter', lambda *_: self.set_active_file_pane(local))
+        listing.add_controller(focus)
         source = Gtk.DragSource(actions=Gdk.DragAction.COPY)
         source.connect('prepare', lambda _, x, y: self.drag_prepare(listing, local, x, y))
         source.connect('drag-end', lambda *_: setattr(self, 'drag_payload', None))
@@ -241,6 +263,18 @@ class Browser(Gtk.Application):
         box.append(scroll)
         (panes.set_start_child if local else panes.set_end_child)(box)
         return path, listing
+
+    def set_active_file_pane(self, local):
+        self.active_file_pane = local
+        for pane_local, box in self.file_pane_boxes.items():
+            active = pane_local == local
+            box.remove_css_class(
+                'argonaut-file-pane-inactive' if active else 'argonaut-file-pane-active')
+            box.add_css_class(
+                'argonaut-file-pane-active' if active else 'argonaut-file-pane-inactive')
+            base = 'Local files' if pane_local else 'C64 Ultimate files'
+            self.file_pane_labels[pane_local].set_text(
+                base + (' · Active' if active else ''))
 
     def populate(self, listing, entries):
         while listing.get_first_child(): listing.remove(listing.get_first_child())
@@ -336,6 +370,8 @@ class Browser(Gtk.Application):
         self.connection_label.set_text(text)
         self.quick_connect_button.set_sensitive(self.active_profile is None)
         self.disconnect_button.set_sensitive(self.active_profile is not None)
+        if hasattr(self, 'remote_new_d64_button'):
+            self.remote_new_d64_button.set_sensitive(self.client is not None)
         if hasattr(self, 'test_lab_tab'):
             self.test_lab_tab.connection_changed()
 
@@ -597,6 +633,7 @@ class Browser(Gtk.Application):
 
     def clicked(self, listing, local, gesture, count, x, y):
         if self.busy or count != 1: return
+        self.set_active_file_pane(local)
         gesture.set_state(Gtk.EventSequenceState.CLAIMED)
         row = listing.get_row_at_y(int(y))
         if row and row.item[0] == '..': return
@@ -647,6 +684,9 @@ class Browser(Gtk.Application):
             self.button(box, 'New folder…', lambda: action(lambda: self.new_folder(local)))
             if local:
                 self.button(box, 'New D64 disk…', lambda: action(self.new_d64))
+            else:
+                self.button(box, 'New D64 disk on C64U…',
+                            lambda: action(self.new_remote_d64))
         self.button(box, 'Paste', lambda: action(lambda: self.paste_files(local)))
         popover.connect('closed', lambda widget: widget.unparent())
         popover.popup()
@@ -663,6 +703,7 @@ class Browser(Gtk.Application):
 
     def drag_prepare(self, listing, local, x, y):
         self.menu_token = None
+        self.set_active_file_pane(local)
         if self.busy: return None
         row = listing.get_row_at_y(int(y))
         if row is None or row.item[0] == '..': return None
@@ -890,14 +931,101 @@ class Browser(Gtk.Application):
             destination = folder / leaf
             from .disk_image_io import create_blank_d64
             def done(result):
-                self.refresh_local()
-                from .disk_image_dialog import DiskImageDialog
-                self.disk_image_dialog = DiskImageDialog(
-                    self, result['path'], result['image'])
+                self.refresh_local((Path(result['path']).name,))
                 self.status.set_text(
                     'Created a validated standard D64 with 664 blocks free. '
-                    'The disk is ready for file additions.')
+                    'The new local image is selected.')
             self.run(lambda: create_blank_d64(destination, name, identifier), done)
+
+        dialog.connect('response', response)
+        dialog.present()
+        filename.grab_focus()
+        return dialog
+
+    def new_remote_d64(self):
+        """Create and verify a blank D64 using the connected C64U API."""
+        if self.busy or getattr(self, 'remote_d64_create_prompt', None) is not None:
+            return
+        if not self.client:
+            self.status.set_text('Connect first.')
+            return
+        dialog = Gtk.Dialog(
+            title='Create blank D64 on C64U', transient_for=self.window, modal=True)
+        self.remote_d64_create_prompt = dialog
+        dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
+        create = dialog.add_button('Create disk', Gtk.ResponseType.OK)
+        dialog.set_default_response(Gtk.ResponseType.OK)
+        content = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=8,
+            margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
+        content.append(Gtk.Label(
+            label='The C64U will create a standard 35-track image in:\n' + self.remote,
+            xalign=0, wrap=True))
+        filename = Gtk.Entry(text='new-disk.d64', hexpand=True)
+        disk_name = Gtk.Entry(text='UNTITLED', max_length=16, hexpand=True)
+        content.append(Gtk.Label(label='C64U filename:', xalign=0))
+        content.append(filename)
+        content.append(Gtk.Label(
+            label='C64 disk name (up to 16 characters):', xalign=0))
+        content.append(disk_name)
+        feedback = Gtk.Label(xalign=0, wrap=True)
+        content.append(feedback)
+        dialog.get_content_area().append(content)
+
+        def validate(*_):
+            leaf = filename.get_text().strip()
+            label = disk_name.get_text().strip()
+            okay = (bool(leaf and label) and leaf not in ('.', '..')
+                    and '/' not in leaf and '\\' not in leaf
+                    and not any(ord(character) < 32 or ord(character) == 127
+                                for character in leaf + label))
+            create.set_sensitive(okay)
+            feedback.set_text('' if okay else
+                              'Enter one ordinary filename and a disk name.')
+            return okay
+
+        filename.connect('changed', validate)
+        disk_name.connect('changed', validate)
+        filename.connect('activate', lambda *_: disk_name.grab_focus())
+        disk_name.connect(
+            'activate', lambda *_: dialog.response(Gtk.ResponseType.OK)
+            if validate() else None)
+        validate()
+        client, folder = self.client, self.remote
+
+        def response(_, code):
+            leaf = filename.get_text().strip()
+            label = disk_name.get_text().strip()
+            if code == Gtk.ResponseType.OK and not validate():
+                return
+            dialog.destroy()
+            self.remote_d64_create_prompt = None
+            if code != Gtk.ResponseType.OK:
+                return
+            if not leaf.casefold().endswith('.d64'):
+                leaf += '.d64'
+            try:
+                destination = child(folder, leaf)
+            except BrowserError as exc:
+                self.status.set_text(str(exc))
+                return
+
+            def task():
+                from .disk_image_io import create_remote_blank_d64
+                create_remote_blank_d64(client, destination, label)
+                return client.list_directory(folder), leaf
+
+            def done(result):
+                if self.client is not client:
+                    self.status.set_text(
+                        'Connection changed after D64 creation; refresh the C64U folder.')
+                    return
+                listing, created_leaf = result
+                self.show_remote(listing, (created_leaf,))
+                self.status.set_text(
+                    'Created and verified a standard blank D64 on the C64U; '
+                    'the new image is selected.')
+            self.run(task, done)
 
         dialog.connect('response', response)
         dialog.present()

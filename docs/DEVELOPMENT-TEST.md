@@ -1,4 +1,4 @@
-# Argonaut 1.7-disk.14 — Section 4 cross-platform testing
+# Argonaut 1.7-disk.15 — Section 4 Linux follow-up testing
 
 This build completes the authentic disk-image management roadmap section. It
 keeps Development profiles, preferences, reports, and build identity separate
@@ -14,7 +14,17 @@ Section 4 adds:
 - authentic blank 35-track D64 creation with a chosen label and disk ID;
 - validated D64 REL removal that reclaims both data and side sectors;
 - protected D81 CBM partitions that remain allocated and cannot be removed;
-- **Save as…** publication to a new validated local image without replacement;
+- **Save image as…** publication to a new validated local image without replacement;
+- multi-file host selection for staged disk additions, with one explicit C64
+  filename review per file;
+- native blank-D64 creation directly on supported C64U firmware, followed by a
+  complete readback and ordinary-code structural validation;
+- visible keyboard-focus identification for the active Files pane, with subdued
+  selection in the inactive pane;
+- local blank-D64 creation that refreshes and selects the result without
+  opening a disk-directory window automatically;
+- recovery from unavailable legacy screenshot or recording folders without
+  trapping the Preferences window;
 - extraction into the visible local folder with automatic refresh and selection;
 - right-click **Mount…** preparation for remote D64/G64/D71/G71/D81 images;
 - source and destination selection after successful copy/paste or drag-and-drop;
@@ -83,50 +93,49 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows `1.7-disk.14` and the source commit shown for this release.
-2. Confirm the settings tab is labeled **Ultimate Menu**. Close Preferences and
-   confirm keyboard focus returns to the main Argonaut window.
-3. Open a supplied disk fixture and choose **Extract selected…**. Confirm the
-   chooser opens in the folder shown in the local Files pane. Complete the
-   extraction and confirm the new file appears selected without a manual
-   refresh. Close the disk directory and confirm focus returns to Argonaut.
-4. On the C64U side of Files, right-click a D64, G64, D71, G71, or D81 and
-   choose **Mount…**. Confirm Drives opens with the complete image path prepared
-   for Drive A. Confirm no mount occurs until the existing review is accepted.
-5. Open the supplied **Test Disk Images** D64, D71, and D81 fixtures. Confirm
-   each directory opens, validates, reports free blocks, and extracts its large
-   test file. Confirm the D81 CBM entry is labeled as a partition and cannot be
-   opened as a folder.
-6. On copied standard D64, D71, and D81 images, stage a rename and add a small
-   PRG. Use **Save as…** for each and confirm the chooser opens in the folder
-   currently shown in the local Files pane. Reopen each output and confirm both
-   changes. Cancel another staged edit and confirm the source remains unchanged.
-   Confirm the D81 CBM partition cannot be removed.
-7. Create a blank D64 with a chosen label and two-character ID. Reopen it and
-   confirm it validates, has no files, and reports 664 blocks free.
-8. Open the supplied REL D64 fixture, remove its REL entry, save it under a new
-   name, and confirm the result validates and reports 664 blocks free. On a
-   C64U directory listing, confirm the fixture's `RELTEST` label and `RELFILE`
-   entry use normal readable characters.
-9. Copy one item between the local and C64U panes with Copy/Paste, then another
-   with drag-and-drop. After each success, confirm both the source item and new
-   destination copy remain selected.
-10. In the local Files pane, confirm hidden files are initially absent. Enable
-   **Preferences → General → Show hidden local files and folders**, confirm they
-   appear, then disable it and confirm they disappear.
-11. Connect to a C64U at BASIC READY. In Streams, enter `PRINT "ONE"` and press
-   Return, then enter `PRINT "TWO"` without clicking the input again. Confirm
-   each command sends, the field clears, and focus remains ready for the next
-   line. Video preview is not required.
-12. Run **Run offline checks** in Test Lab and confirm every check passes. Connect
-   the C64U, run **Run C64U checks**, and confirm all read-only checks pass.
-13. Check upload/download, Ultimate Menu, Drives, video/audio preview, screenshot,
-   recording, Mount & Run, Preferences persistence, and Quit as core regression
-   checks.
+1. Confirm About shows `1.7-disk.15` and the source commit shown for this release.
+2. Open Preferences with a previously saved screenshot or recording folder
+   unavailable. Confirm **Close** and the window close button work immediately
+   without using Restore defaults. Confirm a newly entered nonexistent folder
+   is still rejected.
+3. Click each Files pane. Confirm its **Active** label and border follow keyboard
+   focus and the inactive selection is subdued. Create a local blank D64 and
+   confirm the new image is selected without opening its directory.
+4. Open a D64 directory. Confirm Extract, Add, Rename, and Remove use labeled
+   icons; **Discard changes** and **Save image as…** are separated at the right;
+   the title does not show an I-beam; and closing staged edits still asks for
+   confirmation.
+5. Choose **Add file…**, select at least two small host files, and confirm each
+   gets a C64 filename prompt. Press Return to accept each. Save and reopen the
+   result and verify both files.
+6. In the C64U Files pane, choose **New D64 disk on C64U…**. Create a unique
+   image and confirm Argonaut refreshes, selects, reads back, and validates an
+   empty standard D64 with 664 blocks free. Repeat its name and confirm the
+   existing image is protected.
+7. Open the supplied D64, D71, D81, and REL fixtures. Confirm each validates,
+   reports expected free blocks, and extracts a file. Confirm D81 CBM partitions
+   remain protected and REL removal reclaims data and side sectors.
+8. Right-click a remote D64, G64, D71, G71, or D81 and choose **Mount…**.
+   Confirm Drives opens with the full path prepared for Drive A and no mount
+   occurs before review is accepted.
+9. Copy one item between local and C64U panes with Copy/Paste, then another with
+   drag-and-drop. Confirm source and destination copies remain selected and the
+   destination pane becomes visibly active when focused.
+10. Confirm hidden local entries are absent by default. Enable **Preferences →
+    General → Show hidden local files and folders**, confirm they appear, then
+    disable it and confirm they disappear.
+11. At C64 BASIC READY, use Streams Return-to-send for `PRINT "ONE"` and
+    `PRINT "TWO"`. Confirm each sends, clears, and leaves focus ready for the
+    next line. Video preview is not required.
+12. Run offline checks and connected read-only C64U checks in Test Lab. Confirm
+    ordinary-code verdicts complete and optional AI text does not alter them.
+13. Check upload/download, Ultimate Menu, Drives, video/audio preview,
+    screenshot, recording, Mount & Run, Preferences persistence,
+    disconnect/reconnect, and Quit.
 
-The release's source commit differs from Linux-accepted build `593e0b7` only in
-this cross-platform checklist, bundle metadata, and fixture packaging. No
-application code changed after Linux acceptance.
+The attached ODS checklist contains the same numbered tasks and provides a
+result selector plus a comments field for every item. Record the exact message
+and attach a task-numbered screenshot for any failure or unexpected result.
 
 Operations still affect the connected real C64U and its files. The hardware
 suite itself is read-only. Mount & Run requires the DMA network service. The

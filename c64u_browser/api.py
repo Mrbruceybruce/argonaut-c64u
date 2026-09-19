@@ -142,6 +142,24 @@ class UltimateClient:
         if mode not in ('readonly','readwrite','unlinked'):raise BrowserError('Unsupported disk write mode.')
         return self._request_json('PUT',self.drive_route(drive,'mount')+'?'+urlencode({'image':path,'mode':mode}))
 
+    def create_d64(self, path, disk_name, tracks=35):
+        """Ask supported C64U firmware to create a standard blank D64."""
+        if not isinstance(path, str) or not isinstance(disk_name, str):
+            raise BrowserError('Choose a C64U filename and disk name.')
+        safe_argument(path)
+        safe_argument(disk_name)
+        parts = path.split('/')
+        if (not path.startswith('/') or any(part in ('', '.', '..') for part in parts[1:])
+                or not path.casefold().endswith('.d64')):
+            raise BrowserError('Use an absolute C64U .d64 path without parent traversal.')
+        if not disk_name.strip() or len(disk_name) > 16:
+            raise BrowserError('Enter a C64 disk name of 1 to 16 characters.')
+        if tracks != 35:
+            raise BrowserError('Argonaut creates standard 35-track D64 images.')
+        route = '/v1/files/' + quote(path.lstrip('/'), safe='/') + ':create_d64'
+        return self._request_json(
+            'PUT', route + '?' + urlencode({'tracks': tracks, 'diskname': disk_name}))
+
     def set_drive_type(self, drive, mode):
         if mode not in ('1541','1571','1581'):raise BrowserError('Unsupported drive type.')
         return self._request_json('PUT',self.drive_route(drive,'set_mode')+'?'+urlencode({'mode':mode}))

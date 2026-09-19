@@ -43,25 +43,30 @@ class DiskImageDialog:
         self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.append(self.controls)
         self.controls.append(Gtk.Label(
-            label='Source image: ' + source, xalign=0, wrap=True, selectable=True))
+            label='Source image: ' + source, xalign=0, wrap=True))
         self.controls.append(Gtk.Label(
             label=(f'Disk directory: 0 "{directory.disk_name}" '
                    f'{directory.disk_id} {directory.dos_type}  ·  '
                    f'{directory.geometry.tracks}-track {format_name}'
                    + (f' · standard {drive_model} format' if directory.geometry.standard
                       else ' · extended nonstandard format')),
-            xalign=0, wrap=True, selectable=True))
+            xalign=0, wrap=True))
         file_actions = Gtk.Box(spacing=8)
         self.controls.append(file_actions)
-        self.extract_button = app.button(file_actions, 'Extract selected…', self.extract)
+        self.extract_button = app.icon_button(
+            file_actions, 'Extract selected…', 'document-save-symbolic', self.extract)
         self.extract_button.set_sensitive(False)
-        self.add_button = app.button(file_actions, 'Add file…', self.add_file)
-        self.rename_button = app.button(file_actions, 'Rename…', self.rename)
-        self.remove_button = app.button(file_actions, 'Remove', self.remove)
+        self.add_button = app.icon_button(
+            file_actions, 'Add file…', 'list-add-symbolic', self.add_file)
+        self.rename_button = app.icon_button(
+            file_actions, 'Rename…', 'edit-rename-symbolic', self.rename)
+        self.remove_button = app.icon_button(
+            file_actions, 'Remove', 'edit-delete-symbolic', self.remove)
         edit_actions = Gtk.Box(spacing=8)
+        edit_actions.set_halign(Gtk.Align.END)
         self.controls.append(edit_actions)
-        self.discard_button = app.button(edit_actions, 'Discard staged changes', self.discard)
-        self.save_button = app.button(edit_actions, 'Save as…', self.save_copy)
+        self.discard_button = app.button(edit_actions, 'Discard changes', self.discard)
+        self.save_button = app.button(edit_actions, 'Save image as…', self.save_copy)
         self.listing = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self.listing.connect('row-selected', lambda *_: self.update())
         scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
@@ -191,7 +196,8 @@ class DiskImageDialog:
         self.discard_button.set_sensitive(dirty)
         self.save_button.set_sensitive(editable and self.session.has_unsaved_changes)
 
-    def _name_prompt(self, title, name, accept, callback, file_type=None):
+    def _name_prompt(self, title, name, accept, callback, file_type=None,
+                     cancelled=None):
         prompt = Gtk.Dialog(title=title, transient_for=self.dialog, modal=True)
         self.prompt = prompt
         prompt.add_button('Cancel', Gtk.ResponseType.CANCEL)
@@ -227,6 +233,8 @@ class DiskImageDialog:
             self.name_entry = None
             if code == Gtk.ResponseType.OK:
                 callback(value, chosen_type)
+            elif cancelled:
+                cancelled()
         prompt.connect('response', response)
         prompt.present()
 
@@ -265,40 +273,61 @@ class DiskImageDialog:
         if self.app.busy or not self.session:
             return
         chooser = Gtk.FileChooserNative.new(
-            f'Choose file to add to {self.image.format_name} copy',
+            f'Choose files to add to {self.image.format_name} copy',
             self.dialog, Gtk.FileChooserAction.OPEN,
             'Choose', 'Cancel')
+        chooser.set_select_multiple(True)
         self.chooser = chooser
         def response(_, code):
-            file = chooser.get_file()
+            files = chooser.get_files()
+            chosen = ([files.get_item(index) for index in range(files.get_n_items())]
+                      if code == Gtk.ResponseType.ACCEPT else [])
             chooser.destroy()
             self.chooser = None
-            if code != Gtk.ResponseType.ACCEPT or not file:
+            if not chosen:
                 return
-            path = file.get_path()
-            if not path:
+            paths = [file.get_path() for file in chosen]
+            if any(not path for path in paths):
                 self.status.set_text('Choose a local file.')
                 return
-            suffix = Path(path).suffix.casefold()
-            file_type = {'.seq': 'SEQ', '.usr': 'USR'}.get(suffix, 'PRG')
-            name = Path(path).stem[:16]
+            if len(paths) > 64:
+                self.status.set_text('Choose at most 64 files in one Add operation.')
+                return
             def loaded(result):
                 if isinstance(result, Exception):
                     self.status.set_text(str(result))
                     return
-                def apply(disk_name, chosen_type):
+                pending = list(result)
+                added = [0]
+                def next_file():
+                    if not pending:
+                        self.status.set_text(
+                            f'{added[0]} file addition(s) staged. '
+                            'The source image is unchanged.')
+                        return
+                    path, data = pending.pop(0)
+                    suffix = Path(path).suffix.casefold()
+                    file_type = {'.seq': 'SEQ', '.usr': 'USR'}.get(suffix, 'PRG')
+                    name = Path(path).stem[:16]
+                    self._name_prompt(
+                        f'Add file {added[0] + 1} of {len(result)}', name,
+                        'Add file', lambda disk_name, chosen_type:
+                        apply(data, disk_name, chosen_type), file_type,
+                        cancelled=lambda: self.status.set_text(
+                            f'Add stopped after {added[0]} staged file(s).'))
+                def apply(data, disk_name, chosen_type):
                     try:
-                        self.session.add_file(result, disk_name, chosen_type)
+                        self.session.add_file(data, disk_name, chosen_type)
+                        added[0] += 1
                         self.render()
-                        self.status.set_text('File addition staged. The source image is unchanged.')
+                        next_file()
                     except Exception as exc:
                         self.status.set_text(str(exc))
-                self._name_prompt('Add file to D64 copy', name, 'Stage addition',
-                                  apply, file_type)
+                next_file()
             def caught():
                 try:
-                    return read_host_file_for_disk(
-                        path, self.image.geometry.sectors * 254)
+                    return [(path, read_host_file_for_disk(
+                        path, self.image.geometry.sectors * 254)) for path in paths]
                 except Exception as exc:
                     return exc
             self.app.run(caught, loaded)
@@ -309,9 +338,9 @@ class DiskImageDialog:
         if self.app.busy or not self.session or not self.session.dirty:
             return
         chooser = Gtk.FileChooserNative.new(
-            f'Save edited {self.image.format_name} copy',
+            f'Save {self.image.format_name} image as',
             self.dialog, Gtk.FileChooserAction.SAVE,
-            'Save copy', 'Cancel')
+            'Save image', 'Cancel')
         self.chooser = chooser
         chooser.set_current_folder(Gio.File.new_for_path(str(self.app.local)))
         source_leaf = posixpath.basename(str(self.source).replace('\\', '/'))

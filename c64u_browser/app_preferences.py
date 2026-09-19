@@ -144,11 +144,15 @@ def show_preferences(app, page=0):
         if updating[0]:return True
         if app.busy:return False
         values={key:entry.get_text().strip() for key,entry in folders.items()}
+        oldfolders={key:getattr(prefs,key) for key in values}
         for key,value in values.items():
-            if value and not Path(value).expanduser().is_dir():
+            # An upgraded installation can retain a folder which no longer exists.
+            # Let that unchanged value survive until the user deliberately replaces
+            # it; only newly edited folder values must exist before saving.
+            if (value != oldfolders[key] and value
+                    and not Path(value).expanduser().is_dir()):
                 error.set_text('Choose an existing folder for '+key.replace('_',' ')+'.');return False
         old=deepcopy(prefs.app_options)
-        oldfolders={key:getattr(prefs,key) for key in values}
         developer_was_enabled=old['developer_mode']
         prefs.app_options=validate(old)
         prefs.app_options.update({key:control.get_active() for key,control in checks.items()})

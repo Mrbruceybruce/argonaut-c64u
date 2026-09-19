@@ -34,6 +34,8 @@ def rest_target(path):
         return route
     if re.fullmatch(r'/v1/drives/[ab]:(reset|remove|on|off|mount|set_mode)', route):
         return route
+    if re.fullmatch(r'/v1/files/.+:create_d64', route):
+        return '/v1/files/image:create_d64'
     if route.startswith('/v1/configs/'):
         return '/v1/configs/category'
     return '/v1/other'

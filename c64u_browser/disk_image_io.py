@@ -37,6 +37,28 @@ def read_remote_d64(client, path):
         return image
 
 
+def create_remote_blank_d64(client, path, disk_name):
+    """Create via the C64U API, then read back and validate the exact result."""
+    from .files import inspect
+    if inspect(client, path) is not None:
+        raise BrowserError(
+            'That filename already exists on the C64U; nothing was overwritten.')
+    client.create_d64(path, disk_name)
+    try:
+        image = read_remote_d64(client, path)
+        directory = image.directory()
+        validation = image.validate()
+        if (len(image.source_bytes) != 174848 or directory.entries
+                or directory.blocks_free != 664
+                or not validation.standard_compatible):
+            raise BrowserError('The created image did not pass blank-D64 validation.')
+        return image
+    except Exception as exc:
+        raise BrowserError(
+            'The C64U reported success, but the new image could not be validated. '
+            'Inspect it before retrying. ' + str(exc)) from exc
+
+
 def read_local_d71(path):
     with operation_event('disk_image', 'open_local', 'd71'):
         path = Path(path)
