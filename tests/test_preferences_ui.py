@@ -135,6 +135,40 @@ class PreferencesUI(unittest.TestCase):
                          ('NEW DISK','A1'))
         dialog.response(self.Gtk.ResponseType.CANCEL)
 
+    def test_local_d64_visible_conflict_is_rejected_before_submission(self):
+        conflict=Path(self.temp.name)/'new-disk.d64'
+        conflict.write_bytes(b'existing')
+        self.app.local=Path(self.temp.name);self.app.refresh_local()
+        dialog=self.app.new_d64();self.pump()
+        buttons=[w for w in self.walk(dialog) if isinstance(w,self.Gtk.Button)]
+        create=next(w for w in buttons if w.get_label()=='Create disk')
+        self.assertFalse(create.get_sensitive())
+        messages=[w for w in self.walk(dialog)
+                  if isinstance(w,self.Gtk.Label) and 'already exists' in w.get_text()]
+        self.assertEqual(len(messages),1)
+        self.assertTrue(messages[0].has_css_class('argonaut-error-message'))
+        entries=[w for w in self.walk(dialog) if isinstance(w,self.Gtk.Entry)]
+        entries[0].set_text('another-disk');self.pump()
+        self.assertTrue(create.get_sensitive())
+        self.assertEqual(messages[0].get_text(),'')
+        dialog.response(self.Gtk.ResponseType.CANCEL)
+
+    def test_local_d64_late_conflict_stays_in_dialog_with_clear_feedback(self):
+        from c64u_browser.api import BrowserError
+        self.app.local=Path(self.temp.name);self.app.refresh_local()
+        self.app.run=lambda task,done:done(task())
+        with patch('c64u_browser.disk_image_io.create_blank_d64',
+                   side_effect=BrowserError(
+                       'That filename already exists; choose another name.')):
+            dialog=self.app.new_d64()
+            dialog.response(self.Gtk.ResponseType.OK);self.pump()
+        self.assertIs(self.app.d64_create_prompt,dialog)
+        messages=[w for w in self.walk(dialog)
+                  if isinstance(w,self.Gtk.Label) and 'already exists' in w.get_text()]
+        self.assertEqual(len(messages),1)
+        self.assertTrue(messages[0].has_css_class('argonaut-error-message'))
+        dialog.response(self.Gtk.ResponseType.CANCEL)
+
     def test_remote_d64_conflict_stays_in_dialog_with_clear_feedback(self):
         from unittest.mock import Mock
         from c64u_browser.api import BrowserError

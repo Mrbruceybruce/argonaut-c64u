@@ -917,17 +917,35 @@ class Browser(Gtk.Application):
         content.append(feedback)
         dialog.get_content_area().append(content)
 
+        existing_names = set()
+        row = self.llist.get_first_child()
+        while row is not None:
+            if row.item[0] != '..':
+                existing_names.add(row.item[0].casefold())
+            row = row.get_next_sibling()
+
         def validate(*_):
             leaf = filename.get_text().strip()
             identifier = disk_id.get_text().strip()
-            okay = (bool(leaf and disk_name.get_text().strip())
+            ordinary = (bool(leaf and disk_name.get_text().strip())
                     and len(identifier) in (0, 2)
                     and leaf not in ('.', '..')
                     and '/' not in leaf and '\\' not in leaf)
+            candidate = (leaf if leaf.casefold().endswith('.d64')
+                         else leaf + '.d64')
+            conflict = ordinary and candidate.casefold() in existing_names
+            okay = ordinary and not conflict
             create.set_sensitive(okay)
-            feedback.set_text('' if okay else
-                              'Enter one local filename and a disk name. '
-                              'Leave the disk ID blank or enter exactly 2 characters.')
+            if conflict:
+                feedback.add_css_class('argonaut-error-message')
+                feedback.set_text(
+                    'That filename already exists in the local folder. '
+                    'Choose another filename; nothing will be overwritten.')
+            else:
+                feedback.remove_css_class('argonaut-error-message')
+                feedback.set_text('' if okay else
+                                  'Enter one local filename and a disk name. '
+                                  'Leave the disk ID blank or enter exactly 2 characters.')
             return okay
 
         for entry in self.d64_create_entries:
@@ -946,21 +964,39 @@ class Browser(Gtk.Application):
             identifier = disk_id.get_text()
             if code == Gtk.ResponseType.OK and not validate():
                 return
-            dialog.destroy()
-            self.d64_create_prompt = None
-            self.d64_create_entries = None
             if code != Gtk.ResponseType.OK:
+                dialog.destroy()
+                self.d64_create_prompt = None
+                self.d64_create_entries = None
                 return
             if not leaf.casefold().endswith('.d64'):
                 leaf += '.d64'
             destination = folder / leaf
             from .disk_image_io import create_blank_d64
+            content.set_sensitive(False)
+            create.set_sensitive(False)
+            feedback.remove_css_class('argonaut-error-message')
+            feedback.set_text('Creating and validating the disk image…')
+            def task():
+                try:
+                    return create_blank_d64(destination, name, identifier)
+                except Exception as exc:
+                    return exc
             def done(result):
+                if isinstance(result, Exception):
+                    content.set_sensitive(True)
+                    create.set_sensitive(True)
+                    feedback.add_css_class('argonaut-error-message')
+                    feedback.set_text(str(result))
+                    return
+                dialog.destroy()
+                self.d64_create_prompt = None
+                self.d64_create_entries = None
                 self.refresh_local((Path(result['path']).name,))
                 self.status.set_text(
                     'Created a validated standard D64 with 664 blocks free. '
                     'The new local image is selected.')
-            self.run(lambda: create_blank_d64(destination, name, identifier), done)
+            self.run(task, done)
 
         dialog.connect('response', response)
         dialog.present()
