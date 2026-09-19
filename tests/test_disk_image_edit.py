@@ -7,7 +7,7 @@ from c64u_browser.disk_image import D64Image, DiskImageError, sectors_on_track
 from c64u_browser.disk_image_edit import (
     D64EditSession, create_blank_d64_image, encode_disk_id,
     encode_petscii_name)
-from c64u_browser.disk_image_io import save_edited_copy
+from c64u_browser.disk_image_io import save_edited_copy, suggested_import_type
 
 
 FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-authentic.d64'
@@ -69,6 +69,26 @@ class D64EditTests(unittest.TestCase):
         self.assertEqual(directory.blocks_free, before - 3)
         self.assertEqual(self.session.image.read_file(added), payload)
         self.assertTrue(self.session.image.validate().standard_compatible)
+
+    def test_add_batch_is_atomic_and_preserves_earlier_staged_edits(self):
+        first = self.session.image.directory().entries[0]
+        self.session.rename(first, 'RENAMED')
+        before = self.session.image.source_bytes
+        before_changes = self.session.changes
+        with self.assertRaisesRegex(DiskImageError, 'already in use'):
+            self.session.add_files((
+                (b'one', 'NEW ONE', 'PRG'),
+                (b'two', 'NEW ONE', 'SEQ'),
+            ))
+        self.assertEqual(self.session.image.source_bytes, before)
+        self.assertEqual(self.session.changes, before_changes)
+        self.session.add_files((
+            (b'one', 'NEW ONE', 'PRG'),
+            (b'two', 'NEW TWO', 'SEQ'),
+        ))
+        entries = self.session.image.directory().entries
+        self.assertEqual([(entry.name, entry.file_type) for entry in entries[-2:]],
+                         [('NEW ONE', 'PRG'), ('NEW TWO', 'SEQ')])
 
     def test_extends_the_real_directory_chain_after_eight_entries(self):
         for index in range(7):
@@ -147,6 +167,15 @@ class D64EditTests(unittest.TestCase):
             with self.subTest(name=name, disk_id=disk_id), self.assertRaises(DiskImageError):
                 create_blank_d64_image(name, disk_id)
         self.assertEqual(encode_disk_id('a1'), b'A1')
+
+    def test_suggests_authentic_types_for_basic_source_and_programs(self):
+        self.assertEqual(suggested_import_type('listing.bas', b'10 print "hi"\n'),
+                         'SEQ')
+        self.assertEqual(suggested_import_type('tokenized.bas', b'\x01\x08\x0b\x08'),
+                         'PRG')
+        self.assertEqual(suggested_import_type('program.prg', b'anything'), 'PRG')
+        self.assertEqual(suggested_import_type('data.seq', b'anything'), 'SEQ')
+        self.assertEqual(suggested_import_type('utility.usr', b'anything'), 'USR')
 
 
 if __name__ == '__main__':

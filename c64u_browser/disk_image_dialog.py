@@ -9,7 +9,8 @@ from gi.repository import Gio, GLib, Gtk
 from .disk_image import D64Image, D71Image, D81Image
 from .disk_image_edit import D64EditSession, D71EditSession, D81EditSession
 from .disk_image_io import (
-    extract_new, read_host_file_for_disk, save_edited_copy, suggested_name)
+    extract_new, read_host_file_for_disk, save_edited_copy, suggested_import_type,
+    suggested_name)
 
 
 class DiskImageDialog:
@@ -59,7 +60,7 @@ class DiskImageDialog:
         self.add_button = app.icon_button(
             file_actions, 'Add file…', 'list-add-symbolic', self.add_file)
         self.rename_button = app.icon_button(
-            file_actions, 'Rename…', 'edit-rename-symbolic', self.rename)
+            file_actions, 'Rename…', 'document-edit-symbolic', self.rename)
         self.remove_button = app.icon_button(
             file_actions, 'Remove', 'edit-delete-symbolic', self.remove)
         edit_actions = Gtk.Box(spacing=8)
@@ -277,6 +278,7 @@ class DiskImageDialog:
             self.dialog, Gtk.FileChooserAction.OPEN,
             'Choose', 'Cancel')
         chooser.set_select_multiple(True)
+        chooser.set_current_folder(Gio.File.new_for_path(str(self.app.local)))
         self.chooser = chooser
         def response(_, code):
             files = chooser.get_files()
@@ -297,33 +299,10 @@ class DiskImageDialog:
                 if isinstance(result, Exception):
                     self.status.set_text(str(result))
                     return
-                pending = list(result)
-                added = [0]
-                def next_file():
-                    if not pending:
-                        self.status.set_text(
-                            f'{added[0]} file addition(s) staged. '
-                            'The source image is unchanged.')
-                        return
-                    path, data = pending.pop(0)
-                    suffix = Path(path).suffix.casefold()
-                    file_type = {'.seq': 'SEQ', '.usr': 'USR'}.get(suffix, 'PRG')
-                    name = Path(path).stem[:16]
-                    self._name_prompt(
-                        f'Add file {added[0] + 1} of {len(result)}', name,
-                        'Add file', lambda disk_name, chosen_type:
-                        apply(data, disk_name, chosen_type), file_type,
-                        cancelled=lambda: self.status.set_text(
-                            f'Add stopped after {added[0]} staged file(s).'))
-                def apply(data, disk_name, chosen_type):
-                    try:
-                        self.session.add_file(data, disk_name, chosen_type)
-                        added[0] += 1
-                        self.render()
-                        next_file()
-                    except Exception as exc:
-                        self.status.set_text(str(exc))
-                next_file()
+                items = [(path, data, Path(path).stem[:16],
+                          suggested_import_type(path, data))
+                         for path, data in result]
+                self._batch_add_review(items)
             def caught():
                 try:
                     return [(path, read_host_file_for_disk(
@@ -333,6 +312,82 @@ class DiskImageDialog:
             self.app.run(caught, loaded)
         chooser.connect('response', response)
         chooser.show()
+
+    def _batch_add_review(self, items):
+        """Review and validate one or many imports before staging the batch."""
+        prompt = Gtk.Dialog(
+            title='Review files to add', transient_for=self.dialog, modal=True)
+        self.prompt = prompt
+        prompt.set_default_size(760, min(620, 190 + len(items) * 48))
+        prompt.add_button('Cancel', Gtk.ResponseType.CANCEL)
+        action = prompt.add_button(
+            'Add file' if len(items) == 1 else f'Add {len(items)} files',
+            Gtk.ResponseType.OK)
+        prompt.set_default_response(Gtk.ResponseType.OK)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10,
+                          margin_top=12, margin_bottom=12,
+                          margin_start=12, margin_end=12)
+        content.append(Gtk.Label(
+            label=('Review the C64 filename and type for each host file. '
+                   'The complete batch is validated before any file is staged.'),
+            xalign=0, wrap=True))
+        grid = Gtk.Grid(column_spacing=12, row_spacing=8)
+        for column, title in enumerate(('Host file', 'C64 filename', 'Type')):
+            heading = Gtk.Label(label=title, xalign=0)
+            heading.add_css_class('heading')
+            grid.attach(heading, column, 0, 1, 1)
+        rows = []
+        for index, (path, data, name, file_type) in enumerate(items, 1):
+            source = Gtk.Label(label=Path(path).name, xalign=0,
+                               hexpand=True, tooltip_text=str(path))
+            entry = Gtk.Entry(text=name, max_length=16, hexpand=True)
+            entry.set_activates_default(True)
+            types = Gtk.ComboBoxText()
+            for value in ('PRG', 'SEQ', 'USR'):
+                types.append_text(value)
+            types.set_active(('PRG', 'SEQ', 'USR').index(file_type))
+            grid.attach(source, 0, index, 1, 1)
+            grid.attach(entry, 1, index, 1, 1)
+            grid.attach(types, 2, index, 1, 1)
+            rows.append((path, data, entry, types))
+        scroll = Gtk.ScrolledWindow(hexpand=True, vexpand=True,
+                                    min_content_height=min(360, len(items) * 48 + 40))
+        scroll.set_child(grid)
+        content.append(scroll)
+        message = Gtk.Label(xalign=0, wrap=True)
+        message.add_css_class('error')
+        content.append(message)
+        prompt.get_content_area().append(content)
+
+        def update(*_):
+            action.set_sensitive(all(entry.get_text().strip()
+                                     for _, _, entry, _ in rows))
+        for _, _, entry, _ in rows:
+            entry.connect('changed', update)
+        update()
+
+        def response(_, code):
+            if code != Gtk.ResponseType.OK:
+                prompt.destroy()
+                self.prompt = None
+                return
+            reviewed = [(path, data, entry.get_text(), types.get_active_text())
+                        for path, data, entry, types in rows]
+            try:
+                self.session.add_files(
+                    (data, name, file_type)
+                    for _, data, name, file_type in reviewed)
+            except Exception as exc:
+                message.set_text(str(exc))
+                return
+            prompt.destroy()
+            self.prompt = None
+            self.render()
+            count = len(reviewed)
+            self.status.set_text(
+                f'{count} file addition(s) staged. The source image is unchanged.')
+        prompt.connect('response', response)
+        prompt.present()
 
     def save_copy(self):
         if self.app.busy or not self.session or not self.session.dirty:

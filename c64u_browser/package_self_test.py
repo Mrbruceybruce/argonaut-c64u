@@ -198,13 +198,41 @@ def run(package_metadata, report_path):
             _require(disk_dialog.listing.get_first_child() is None and
                      disk_dialog.status.get_text().startswith('Source image is unchanged.') and
                      disk_dialog.add_button.get_sensitive() and
+                     disk_dialog.rename_button.get_icon_name() ==
+                     'document-edit-symbolic' and
                      disk_dialog.save_button.get_label() == 'Save image as…' and
                      disk_dialog.discard_button.get_label() == 'Discard changes' and
                      not disk_dialog.save_button.get_sensitive(),
                      'ui.disk_directory',
                      'The staged D64 directory window is incorrect.', checks)
-            disk_dialog.session.add_file(b'package', 'SAVE FOLDER', 'PRG')
-            disk_dialog.render()
+            disk_dialog.add_file()
+            add_folder = disk_dialog.chooser.get_current_folder()
+            deadline = time.monotonic() + 3
+            while add_folder is None and time.monotonic() < deadline:
+                while GLib.MainContext.default().pending():
+                    GLib.MainContext.default().iteration(False)
+                time.sleep(0.01)
+                add_folder = disk_dialog.chooser.get_current_folder()
+            _require(add_folder is not None and
+                     Path(add_folder.get_path()).resolve() == app.local.resolve(),
+                     'ui.disk_add_folder',
+                     'Add file did not open in the visible local folder.', checks)
+            disk_dialog.chooser.emit('response', Gtk.ResponseType.CANCEL)
+            disk_dialog._batch_add_review([
+                ('ONE.PRG', b'package one', 'SAVE ONE', 'PRG'),
+                ('TWO.SEQ', b'package two', 'SAVE TWO', 'SEQ'),
+            ])
+            _require(disk_dialog.prompt is not None and
+                     disk_dialog.prompt.get_title() == 'Review files to add',
+                     'ui.disk_add_review',
+                     'A batch import did not open one review dialog.', checks)
+            disk_dialog.prompt.response(Gtk.ResponseType.OK)
+            added = disk_dialog.session.image.directory().entries
+            _require([(entry.name, entry.file_type) for entry in added] ==
+                     [('SAVE ONE', 'PRG'), ('SAVE TWO', 'SEQ')] and
+                     len(disk_dialog.session.changes) == 2,
+                     'ui.disk_add_batch',
+                     'The reviewed import batch was not staged together.', checks)
             disk_dialog.save_copy()
             save_folder = disk_dialog.chooser.get_current_folder()
             deadline = time.monotonic() + 3

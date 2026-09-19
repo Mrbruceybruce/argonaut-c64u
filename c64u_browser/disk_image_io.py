@@ -141,6 +141,24 @@ def read_host_file_for_disk(path, maximum_size):
         return path.read_bytes()
 
 
+def suggested_import_type(path, data):
+    """Choose a conservative Commodore disk type for one host file.
+
+    Text BASIC source is not a loadable PRG merely because its host suffix is
+    ``.bas``.  A tokenized C64 BASIC program normally carries the $0801 load
+    address; other .bas files default to SEQ and remain editable in the review
+    dialog before anything is staged.
+    """
+    suffix = Path(path).suffix.casefold()
+    if suffix == '.seq':
+        return 'SEQ'
+    if suffix == '.usr':
+        return 'USR'
+    if suffix == '.bas':
+        return 'PRG' if len(data) >= 2 and data[:2] == b'\x01\x08' else 'SEQ'
+    return 'PRG'
+
+
 def suggested_name(entry):
     if not isinstance(entry, DiskDirectoryEntry):
         raise TypeError('entry must be a DiskDirectoryEntry')

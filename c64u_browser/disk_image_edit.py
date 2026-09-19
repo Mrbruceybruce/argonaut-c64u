@@ -335,6 +335,20 @@ class D64EditSession:
                 self._data = before
                 raise
 
+    def add_files(self, files):
+        """Stage an import batch atomically, preserving earlier staged edits."""
+        before_data = self._data[:]
+        before_changes = self._changes[:]
+        before_saved_count = self._saved_change_count
+        try:
+            for data, name, file_type in files:
+                self.add_file(data, name, file_type)
+        except Exception:
+            self._data = before_data
+            self._changes = before_changes
+            self._saved_change_count = before_saved_count
+            raise
+
     def validated_bytes(self):
         with operation_event(
                 'disk_image', 'validate_edits', self.format_name.casefold()):

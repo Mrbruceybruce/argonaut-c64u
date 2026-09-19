@@ -1,4 +1,4 @@
-# Argonaut 1.7-disk.15 — Section 4 Linux follow-up testing
+# Argonaut 1.7-disk.16 — Section 4 Linux follow-up testing
 
 This build completes the authentic disk-image management roadmap section. It
 keeps Development profiles, preferences, reports, and build identity separate
@@ -15,8 +15,12 @@ Section 4 adds:
 - validated D64 REL removal that reclaims both data and side sectors;
 - protected D81 CBM partitions that remain allocated and cannot be removed;
 - **Save image as…** publication to a new validated local image without replacement;
-- multi-file host selection for staged disk additions, with one explicit C64
-  filename review per file;
+- single- and multi-file disk additions through one batch review table, with
+  editable C64 filenames and types and complete validation before staging;
+- Add File, Extract, and Save Image choosers that open in the folder currently
+  shown in the local Files pane;
+- content-aware `.bas` imports that default tokenized `$0801` programs to PRG
+  and text BASIC source to SEQ, while keeping the type editable before staging;
 - native blank-D64 creation directly on supported C64U firmware, followed by a
   complete readback and ordinary-code structural validation;
 - visible keyboard-focus identification for the active Files pane, with subdued
@@ -93,7 +97,7 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows `1.7-disk.15` and the source commit shown for this release.
+1. Confirm About shows `1.7-disk.16` and the source commit shown for this release.
 2. Open Preferences with a previously saved screenshot or recording folder
    unavailable. Confirm **Close** and the window close button work immediately
    without using Restore defaults. Confirm a newly entered nonexistent folder
@@ -101,13 +105,15 @@ remaining display, network, media, and C64U hardware behavior.
 3. Click each Files pane. Confirm its **Active** label and border follow keyboard
    focus and the inactive selection is subdued. Create a local blank D64 and
    confirm the new image is selected without opening its directory.
-4. Open a D64 directory. Confirm Extract, Add, Rename, and Remove use labeled
-   icons; **Discard changes** and **Save image as…** are separated at the right;
-   the title does not show an I-beam; and closing staged edits still asks for
-   confirmation.
-5. Choose **Add file…**, select at least two small host files, and confirm each
-   gets a C64 filename prompt. Press Return to accept each. Save and reopen the
-   result and verify both files.
+4. Open a D64 directory. Confirm Extract, Add, Rename, and Remove show clear
+   icons with identifying tooltips; **Discard changes** and **Save image as…**
+   are separated at the right; the title does not show an I-beam; and closing
+   staged edits still asks for confirmation.
+5. Choose **Add file…** and confirm the chooser starts in the folder shown in
+   the local Files pane. Select at least two small host files and confirm one
+   review table shows every host file with an editable C64 filename and type.
+   Include a text `.bas` file and confirm it defaults to SEQ; a tokenized `$0801`
+   `.bas` defaults to PRG. Confirm once, save, reopen, and verify every file.
 6. In the C64U Files pane, choose **New D64 disk on C64U…**. Create a unique
    image and confirm Argonaut refreshes, selects, reads back, and validates an
    empty standard D64 with 664 blocks free. Repeat its name and confirm the

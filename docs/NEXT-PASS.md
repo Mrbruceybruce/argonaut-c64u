@@ -251,6 +251,22 @@ without requiring the user to create it locally and upload it afterward.
 7. Complete installed Linux and physical C64U acceptance before including the
    feature in the next Section 4 package gate.
 
+This follow-up and the remaining Section 4 presentation work passed installed
+Linux acceptance in `1.7-disk.15+linux.5` at exact build `c72e0b6` on
+2026-09-19. Native C64U D64 creation protects existing files, reads the result
+back, and validates an empty 664-block image. Preferences recovers from stale
+media folders; active and inactive Files panes remain distinguishable across
+their complete control areas; local D64 creation selects without opening; and
+the disk editor uses **Save image as…** and **Discard changes**. All reported
+physical checks passed with no additional issue.
+
+The final queued usability pass is `1.7-disk.16`: Add File opens in the visible
+local folder and reviews single or multiple selections in one table. C64 names
+and PRG/SEQ/USR types remain editable, the complete batch stages atomically,
+text `.bas` source defaults to SEQ, tokenized `$0801` BASIC defaults to PRG, and
+Rename uses a clear standard edit icon. This pass remains Linux-only until its
+installed acceptance completes.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
