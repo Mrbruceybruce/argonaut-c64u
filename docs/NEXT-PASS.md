@@ -206,6 +206,8 @@ hardware-readable. The fixture is normalized to the same `$41-$5A` PETSCII
 range already required by Argonaut's editor without changing any REL, BAM, or
 sector-chain structure. **Save as…** also refreshes the visible local directory
 and selects the newly published image, removing the need for a manual refresh.
+Its file browser opens in the folder currently shown in Argonaut's local Files
+pane so the save destination and subsequent selection are clear.
 
 ## Current milestone: Linux hardening
 

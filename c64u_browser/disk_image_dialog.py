@@ -4,7 +4,7 @@
 from pathlib import Path
 import posixpath
 
-from gi.repository import Gtk
+from gi.repository import Gio, Gtk
 
 from .disk_image import D64Image, D71Image, D81Image
 from .disk_image_edit import D64EditSession, D71EditSession, D81EditSession
@@ -288,6 +288,7 @@ class DiskImageDialog:
             self.dialog, Gtk.FileChooserAction.SAVE,
             'Save copy', 'Cancel')
         self.chooser = chooser
+        chooser.set_current_folder(Gio.File.new_for_path(str(self.app.local)))
         source_leaf = posixpath.basename(str(self.source).replace('\\', '/'))
         extension = self.session.extension
         stem = (source_leaf[:-len(extension)]
