@@ -1,6 +1,6 @@
 name: Development Windows and Mac packages
 env:
-  ARGONAUT_DEV_VERSION: 1.7-disk.7
+  ARGONAUT_DEV_VERSION: 1.7-disk.12
 'on':
   workflow_dispatch:
     inputs:
@@ -69,6 +69,7 @@ jobs:
         Copy-Item docs/DEVELOPMENT-TEST.md "$bundle/README-DEVELOPMENT.md"
         New-Item -ItemType Directory -Force "$bundle/Test Disk Images" | Out-Null
         Copy-Item tests/fixtures/vice-1541-authentic.d64 "$bundle/Test Disk Images/"
+        Copy-Item tests/fixtures/vice-1541-rel.d64 "$bundle/Test Disk Images/"
         Copy-Item tests/fixtures/vice-1571-authentic.d71 "$bundle/Test Disk Images/"
         Copy-Item tests/fixtures/vice-1581-authentic.d81 "$bundle/Test Disk Images/"
         $report = Join-Path $env:RUNNER_TEMP 'portable-dev-test.json'
@@ -146,7 +147,7 @@ jobs:
         ditto "dist/Argonaut Development.app" "mac-package/Argonaut Development.app"
         cp docs/DEVELOPMENT-TEST.md LICENSE COPYRIGHT mac-package/
         mkdir -p 'mac-package/Test Disk Images'
-        cp tests/fixtures/vice-1541-authentic.d64 tests/fixtures/vice-1571-authentic.d71 tests/fixtures/vice-1581-authentic.d81 'mac-package/Test Disk Images/'
+        cp tests/fixtures/vice-1541-authentic.d64 tests/fixtures/vice-1541-rel.d64 tests/fixtures/vice-1571-authentic.d71 tests/fixtures/vice-1581-authentic.d81 'mac-package/Test Disk Images/'
         brew info --json=v2 --installed > mac-package/Homebrew-packages.json
         ln -s /Applications mac-package/Applications
         hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-${{ env.ARGONAUT_DEV_VERSION }}-macOS-${{ matrix.label }}.dmg

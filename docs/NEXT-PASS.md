@@ -191,6 +191,13 @@ keeps every successfully copied top-level source and destination item selected
 after copy or drag-and-drop when those folders remain visible. Failed or
 unfinished items are not selected as successful copies.
 
+Section 4 completed its final Linux gate on 2026-09-18 with installed
+Development package `1.7-disk.12` at exact build `b00a692`. All 29 packaged
+checks passed. The shortened save label, Copy/Paste selection, and drag-and-drop
+selection were confirmed in the installed UI. The section is frozen for its
+Windows, Apple Silicon Mac, and Intel Mac build and physical regression gate;
+no application-code changes follow this Linux-accepted build.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
