@@ -203,11 +203,6 @@ def run(package_metadata, report_path):
                      not disk_dialog.save_button.get_sensitive(),
                      'ui.disk_directory',
                      'The staged D64 directory window is incorrect.', checks)
-            disk_dialog.add_file()
-            _require(disk_dialog.chooser.get_select_multiple(),
-                     'ui.disk_multi_add',
-                     'Add file does not permit selecting multiple host files.', checks)
-            disk_dialog.chooser.emit('response', Gtk.ResponseType.CANCEL)
             disk_dialog.session.add_file(b'package', 'SAVE FOLDER', 'PRG')
             disk_dialog.render()
             disk_dialog.save_copy()
