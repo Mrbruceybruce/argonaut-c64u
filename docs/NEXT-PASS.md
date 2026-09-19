@@ -216,6 +216,17 @@ normalized REL fixture mounted on the physical C64U with both `RELTEST` and
 `RELFILE` displayed as normal readable text. The corrected section is frozen
 again for Windows, Apple Silicon Mac, and Intel Mac packaging and regression.
 
+Windows and Apple Silicon physical testing of `1.7-disk.13` passed the disk
+formats and core regressions while identifying a final usability pass. The next
+Linux package makes **Extract selected…** start in the visible local folder,
+then refreshes that folder and selects the extracted file. Closing Preferences
+or a disk-directory window restores focus to the main window. A remote
+D64/G64/D71/G71/D81 context menu can prepare the selected image for Drive A and
+open **Drives**; mounting still uses the existing reviewed confirmation. The
+C64U settings tab is now labeled **Ultimate Menu**. These changes pass all 433
+source tests in normal and optimized modes and all 32 package checks; installed
+Linux acceptance remains.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

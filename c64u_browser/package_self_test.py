@@ -96,7 +96,9 @@ def run(package_metadata, report_path):
                      'The main window did not open.', checks)
             _require(app.quick_connect_button.get_label() == 'Quick Connect' and
                      not app.disconnect_button.get_sensitive() and
-                     app.new_d64_button.get_tooltip_text() == 'New D64 disk…',
+                     app.new_d64_button.get_tooltip_text() == 'New D64 disk…' and
+                     app.tabs.get_tab_label_text(app.settings_tab.box) ==
+                     'Ultimate Menu',
                      'ui.quick_connect',
                      'Main-window connection or disk controls are incorrect.', checks)
             app.populate(app.llist, [
@@ -154,6 +156,19 @@ def run(package_metadata, report_path):
             rel_dialog = DiskImageDialog(app, 'Package REL check', rel_image)
             rel_row = rel_dialog.listing.get_first_child()
             rel_dialog.listing.select_row(rel_row)
+            rel_dialog.extract()
+            extract_folder = rel_dialog.chooser.get_current_folder()
+            deadline = time.monotonic() + 3
+            while extract_folder is None and time.monotonic() < deadline:
+                while GLib.MainContext.default().pending():
+                    GLib.MainContext.default().iteration(False)
+                time.sleep(0.01)
+                extract_folder = rel_dialog.chooser.get_current_folder()
+            _require(extract_folder is not None and
+                     Path(extract_folder.get_path()).resolve() == app.local.resolve(),
+                     'ui.disk_extract_folder',
+                     'Extract selected did not open in the visible local folder.', checks)
+            rel_dialog.chooser.emit('response', Gtk.ResponseType.CANCEL)
             _require(rel_dialog.remove_button.get_sensitive(), 'ui.rel_remove',
                      'A valid unlocked REL file cannot be staged for removal.', checks)
             rel_dialog.dialog.destroy()
@@ -200,6 +215,12 @@ def run(package_metadata, report_path):
                      'ui.disk_name_return',
                      'Return does not activate the disk filename action.', checks)
             disk_dialog.dialog.destroy()
+            app.drives_tab.select_image('/USB2/PACKAGE.D64')
+            _require(app.drives_tab.cards['a']['path'].get_text() ==
+                     '/USB2/PACKAGE.D64' and
+                     'selected for Drive A' in app.drives_tab.message.get_text(),
+                     'ui.disk_mount_selection',
+                     'A C64U disk image could not be prepared for Drive A.', checks)
             d71_data = bytearray(349696)
             d71_data[header_offset:header_offset + 4] = bytes((18, 1, 0x41, 0x80))
             d71_data[header_offset + 0x90:header_offset + 0xa0] = (

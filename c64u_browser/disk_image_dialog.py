@@ -4,7 +4,7 @@
 from pathlib import Path
 import posixpath
 
-from gi.repository import Gio, Gtk
+from gi.repository import Gio, GLib, Gtk
 
 from .disk_image import D64Image, D71Image, D81Image
 from .disk_image_edit import D64EditSession, D71EditSession, D81EditSession
@@ -20,6 +20,7 @@ class DiskImageDialog:
         self.chooser = None
         self.prompt = None
         self.name_entry = None
+        self.restore_focus_on_destroy = False
         directory = image.directory()
         validation = image.validate()
         format_name = image.format_name
@@ -36,6 +37,8 @@ class DiskImageDialog:
         self.dialog.set_default_size(760, 560)
         self.dialog.add_button('Close', Gtk.ResponseType.CLOSE)
         self.dialog.connect('response', self.close)
+        self.dialog.connect('close-request', self.close_request)
+        self.dialog.connect('destroy', self.destroyed)
         box = self.dialog.get_content_area()
         self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.append(self.controls)
@@ -81,6 +84,22 @@ class DiskImageDialog:
             self.status.set_text(
                 'Read-only view. This extended-track image is not a standard 35-track 1541 disk.')
         self.dialog.present()
+
+    def close_request(self, *_):
+        self.close()
+        return True
+
+    def destroyed(self, *_):
+        if getattr(self.app, 'disk_image_dialog', None) is self:
+            self.app.disk_image_dialog = None
+        if self.restore_focus_on_destroy:
+            GLib.idle_add(self.restore_parent_focus)
+
+    def restore_parent_focus(self):
+        window = getattr(self.app, 'window', None)
+        if window is not None:
+            window.present()
+        return False
 
     def render(self):
         image = self.session.image if self.session else self.image
@@ -150,7 +169,13 @@ class DiskImageDialog:
         if self.chooser is not None:
             self.chooser.destroy()
             self.chooser = None
+        self.restore_focus_on_destroy = True
         self.dialog.destroy()
+
+    def refresh_local_destination(self, path):
+        destination = Path(path)
+        if destination.parent.resolve() == self.app.local.resolve():
+            self.app.refresh_local((destination.name,))
 
     def update(self):
         row = self.listing.get_selected_row()
@@ -316,9 +341,7 @@ class DiskImageDialog:
                 if isinstance(result, Exception):
                     self.status.set_text(str(result))
                 else:
-                    destination = Path(result['path'])
-                    if destination.parent.resolve() == self.app.local.resolve():
-                        self.app.refresh_local((destination.name,))
+                    self.refresh_local_destination(result['path'])
                     self.status.set_text(
                         f'Saved validated copy with {result["changes"]} staged change(s) '
                         f'to {result["path"]}. The source image was unchanged.')
@@ -334,6 +357,7 @@ class DiskImageDialog:
             'Extract file from D64', self.dialog, Gtk.FileChooserAction.SAVE,
             'Extract', 'Cancel')
         self.chooser = chooser
+        chooser.set_current_folder(Gio.File.new_for_path(str(self.app.local)))
         chooser.set_current_name(suggested_name(row.entry))
 
         def response(_, code):
@@ -360,6 +384,7 @@ class DiskImageDialog:
                 if isinstance(result, Exception):
                     self.status.set_text(str(result))
                 else:
+                    self.refresh_local_destination(result['path'])
                     self.status.set_text(
                         f'Extracted {result["bytes"]:,} bytes to {result["path"]}. '
                         'The disk image was unchanged.')

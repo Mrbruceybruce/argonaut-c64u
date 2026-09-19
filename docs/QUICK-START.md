@@ -117,7 +117,7 @@ file removal or reuse.
 
 ## 4. Change settings and use Favorites
 
-Open **Settings**. Use the section list or **Search settings…** to find an item.
+Open **Ultimate Menu**. Use the section list or **Search settings…** to find an item.
 Choose **Reload from C64U** when you need fresh device values.
 
 1. Change the settings you want. Edits are staged locally.

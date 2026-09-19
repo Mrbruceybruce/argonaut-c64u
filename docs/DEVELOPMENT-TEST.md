@@ -107,7 +107,7 @@ remaining display, network, media, and C64U hardware behavior.
    line. Video preview is not required.
 9. Run **Run offline checks** in Test Lab and confirm every check passes. Connect
    the C64U, run **Run C64U checks**, and confirm all read-only checks pass.
-10. Check upload/download, Settings, Drives, video/audio preview, screenshot,
+10. Check upload/download, Ultimate Menu, Drives, video/audio preview, screenshot,
    recording, Mount & Run, Preferences persistence, and Quit as core regression
    checks.
 

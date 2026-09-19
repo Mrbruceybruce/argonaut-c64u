@@ -154,7 +154,7 @@ class Browser(Gtk.Application):
         self.lpath, self.llist = self.pane(panes, True)
         self.rpath, self.rlist = self.pane(panes, False)
         self.settings_tab = SettingsTab(self)
-        self.tabs.append_page(self.settings_tab.box, Gtk.Label(label='Settings'))
+        self.tabs.append_page(self.settings_tab.box, Gtk.Label(label='Ultimate Menu'))
         self.drives_tab=DrivesTab(self)
         self.tabs.append_page(self.drives_tab.box,Gtk.Label(label='Drives'))
         self.machine_tab=MachineTab(self)
@@ -429,7 +429,7 @@ class Browser(Gtk.Application):
         self.media_tab.bind(client)
         self.streams_tab.bind(client)
         self.update_connection_header()
-        self.status.set_text('Reconnected to the same C64U. Choose Reload from C64U in Settings to read its current values; retained edits were not sent.')
+        self.status.set_text('Reconnected to the same C64U. Choose Reload from C64U in Ultimate Menu to read its current values; retained edits were not sent.')
 
     def auto_connect(self):
         profile = self.preferences.selected()
@@ -629,6 +629,10 @@ class Browser(Gtk.Application):
             if not multiple and not directory and name.casefold().endswith(('.d64', '.d71', '.d81')):
                 self.button(box, 'Open disk image',
                             lambda: action(lambda: self.open_disk_image(local, name)))
+            if (not multiple and not local and not directory and
+                    name.casefold().endswith(('.d64', '.g64', '.d71', '.g71', '.d81'))):
+                self.button(box, 'Mount…',
+                            lambda: action(lambda: self.open_mount_in_drives(name)))
             if not multiple and not local and not directory and name.lower().endswith('.sid'):
                 client=self.client;path=posixpath.join(self.remote,name)
                 def open_sid():
@@ -646,6 +650,16 @@ class Browser(Gtk.Application):
         self.button(box, 'Paste', lambda: action(lambda: self.paste_files(local)))
         popover.connect('closed', lambda widget: widget.unparent())
         popover.popup()
+
+    def open_mount_in_drives(self, name):
+        """Open Drives with one remote image prepared for Drive A."""
+        if not self.client:
+            raise BrowserError('Connect first.')
+        if not name.casefold().endswith(('.d64', '.g64', '.d71', '.g71', '.d81')):
+            raise BrowserError('Choose a D64, G64, D71, G71 or D81 image.')
+        path = posixpath.join(self.remote, name)
+        self.drives_tab.select_image(path, 'a')
+        self.tabs.set_current_page(self.tabs.page_num(self.drives_tab.box))
 
     def drag_prepare(self, listing, local, x, y):
         self.menu_token = None

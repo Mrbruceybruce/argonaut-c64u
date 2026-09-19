@@ -117,6 +117,16 @@ class DrivesTab:
             self.message.set_text('Select one disk image in the C64U side of Files first.');return
         self.cards[drive]['path'].set_text(posixpath.join(self.app.remote,rows[0].item[0]))
 
+    def select_image(self, path, drive='a'):
+        """Prepare a remote image for the existing reviewed mount flow."""
+        if drive not in self.cards:
+            raise BrowserError('Choose Drive A or Drive B.')
+        self.cards[drive]['path'].set_text(path)
+        self.message.set_text(
+            f'{path} is selected for Drive {drive.upper()}. '
+            'Choose the access mode, then choose Mount… to review and confirm.')
+        self.cards[drive]['path'].grab_focus()
+
     def mount(self, drive):
         card=self.cards[drive];path=card['path'].get_text()
         mode=('readonly','readwrite','unlinked')[card['access'].get_selected()]

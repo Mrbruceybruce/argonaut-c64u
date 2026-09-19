@@ -52,7 +52,7 @@ def scale_control(value,changed=None):
 
 
 def show_preferences(app, page=0):
-    from gi.repository import Gtk,Gio
+    from gi.repository import Gtk,Gio,GLib
     from copy import deepcopy
     from pathlib import Path
     from . import development
@@ -72,9 +72,13 @@ def show_preferences(app, page=0):
             'screenshot_folder':prefs.screenshot_folder,
             'recording_folder':prefs.recording_folder}
     updating=[False]
+    def restore_parent_focus():
+        app.window.present()
+        return False
     def destroy():
         app.preferences_dialog=None
         dialog.destroy()
+        GLib.idle_add(restore_parent_focus)
     pages=Gtk.Notebook(vexpand=True);dialog.pages=pages;dialog.get_content_area().append(pages)
     box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
     general_scroll=Gtk.ScrolledWindow(vexpand=True);general_scroll.set_child(box)
