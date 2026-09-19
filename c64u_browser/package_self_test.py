@@ -167,7 +167,7 @@ def run(package_metadata, report_path):
             image_data[header_offset + 0xa5:header_offset + 0xa7] = b'2A'
             image_data[directory_offset:directory_offset + 2] = bytes((0, 255))
             disk_dialog = DiskImageDialog(
-                app, 'Package D64 check', D64Image(image_data))
+                app, 'Package D64 check', D64Image(blank.source_bytes))
             _require(disk_dialog.listing.get_first_child() is None and
                      disk_dialog.status.get_text().startswith('Source image is unchanged.') and
                      disk_dialog.add_button.get_sensitive() and
