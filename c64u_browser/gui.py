@@ -160,8 +160,8 @@ class Browser(Gtk.Application):
         css.load_from_data(
             b'.argonaut-file-pane { border: 2px solid transparent; border-radius: 6px; padding: 4px; }\n'
             b'.argonaut-file-pane-active { border-color: #3584e4; }\n'
-            b'.argonaut-file-pane-inactive row:selected { background-color: alpha(@window_fg_color, 0.14); }\n'
-            b'.argonaut-file-pane-inactive row:selected label { color: @window_fg_color; }')
+            b'.argonaut-file-pane-inactive row:selected { background-color: #5e5c64; color: #ffffff; }\n'
+            b'.argonaut-file-pane-inactive row:selected label { color: #ffffff; }')
         Gtk.StyleContext.add_provider_for_display(
             self.window.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.file_pane_css = css
