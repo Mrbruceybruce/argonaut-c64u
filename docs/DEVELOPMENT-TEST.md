@@ -142,6 +142,11 @@ remaining display, network, media, and C64U hardware behavior.
 The attached ODS checklist contains the same numbered tasks and provides a
 result selector plus a comments field for every item. Record the exact message
 and attach a task-numbered screenshot for any failure or unexpected result.
+Complete the Tester, Platform, OS version, Test date, and package fields, then
+return the filled sheet as
+`Argonaut-1.7-disk.16-testing-results-PLATFORM-TESTER.ods`. For example, use
+`Windows-Bruce`, `macOS-AppleSilicon-Bruce`, or `macOS-Intel-OldMan2525` for the
+final two filename fields.
 
 Operations still affect the connected real C64U and its files. The hardware
 suite itself is read-only. Mount & Run requires the DMA network service. The

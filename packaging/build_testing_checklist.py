@@ -9,6 +9,8 @@ import zipfile
 
 TEMPLATE_VERSION = '1.7-disk.14'
 TEMPLATE_COMMIT = 'b15f6ab8d64796692dbcdca3ef6bf788b0528300'
+TEMPLATE_INSTRUCTIONS = ('Complete every numbered task. Select a result and '
+                         'record observations in the Comments box on the same row.')
 TEMPLATE_TASKS = (
     'Confirm About shows 1.7-disk.14 and the source commit shown for this release.',
     'Confirm the settings tab is labeled Ultimate Menu. Close Preferences and confirm keyboard focus returns to the main Argonaut window.',
@@ -64,6 +66,10 @@ def build(template, output, version, commit):
             f'Argonaut {version} testing checklist',
         TEMPLATE_VERSION: version,
         TEMPLATE_COMMIT: commit,
+        TEMPLATE_INSTRUCTIONS:
+            ('Complete every numbered task. Select a result and record observations '
+             'in the Comments box on the same row. Save and return the completed ODS '
+             f'as Argonaut-{version}-testing-results-PLATFORM-TESTER.ods.'),
     })
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)

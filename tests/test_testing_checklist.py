@@ -25,6 +25,9 @@ class TestingChecklistTests(unittest.TestCase):
             self.assertIn('source commit abc123', content)
             self.assertIn('New D64 disk on C64U…', content)
             self.assertIn('Save image as…', content)
+            self.assertIn('Save and return the completed ODS', content)
+            self.assertIn(
+                'Argonaut-9.8-test.7-testing-results-PLATFORM-TESTER.ods', content)
             self.assertIn('table:content-validation-name="val1"', content)
             self.assertIn('COUNTIF', content)
             self.assertNotIn('1.7-disk.14', content)
