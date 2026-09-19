@@ -140,14 +140,20 @@ packaged checks passed at build `8b6a334`. VICE `c1541` independently listed and
 validated the image; the physical C64U displayed `ARGONAUT BLANK`, ID `A8`, DOS
 `2A`, and `664 BLOCKS FREE`.
 
-Safe D64 REL removal now validates the directory record length, the complete
-side-sector chain and group, and every indexed data-sector pointer before it can
-be staged. Removal releases both the data and side sectors while preserving the
-source image. A VICE `c1541` fixture with five data sectors and one side sector
-passes Argonaut validation; Argonaut and VICE then produce byte-identical images
-after removing it, each reporting an empty disk with 664 blocks free. Installed
-Linux UI and physical C64U acceptance are next. REL creation remains deferred
-until its record behavior can be implemented and independently exercised.
+Safe D64 REL removal passed installed Linux and physical C64U acceptance on
+2026-09-18. It validates the directory record length, the complete side-sector
+chain and group, and every indexed data-sector pointer before staging. Removal
+releases both data and side sectors while preserving the source image. A VICE
+`c1541` fixture with five data sectors and one side sector produced byte-identical
+VICE and Argonaut results. All 28 packaged checks passed at build `4d559ac`; the
+physical C64U displayed `RELTEST`, ID `RT`, no files, and `664 BLOCKS FREE`.
+
+REL creation was evaluated separately. A raw host file does not carry the record
+length and record-oriented meaning required by CBM DOS, and current VICE tooling
+also cannot round-trip an image REL file as an ordinary host binary without
+losing essential semantics. Argonaut therefore keeps authentic REL validation,
+raw extraction, rename, and safe removal, but does not present arbitrary host
+bytes as a newly created REL file. This avoids producing a misleading disk file.
 
 ## Current milestone: Linux hardening
 
