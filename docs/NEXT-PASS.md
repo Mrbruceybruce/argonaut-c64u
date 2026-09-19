@@ -155,6 +155,13 @@ losing essential semantics. Argonaut therefore keeps authentic REL validation,
 raw extraction, rename, and safe removal, but does not present arbitrary host
 bytes as a newly created REL file. This avoids producing a misleading disk file.
 
+Staged D71 editing is now implemented for standard 70-track images. Rename,
+safe removal, and PRG/SEQ/USR addition retain the authentic flat 1571 directory,
+update the side-one BAM, side-two bitmap and side-two free counts, and preserve
+an optional error table. The existing VICE fixture removed and replaced its
+670-block cross-side file; VICE validated the result and extracted all 170,000
+bytes exactly. Installed Linux UI and physical C64U acceptance are next.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

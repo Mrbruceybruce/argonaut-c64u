@@ -105,12 +105,17 @@ def read_remote_disk_image(client, path):
 
 def read_host_file_for_d64(path):
     """Read one bounded regular host file for a staged D64 import."""
+    return read_host_file_for_disk(path, 174848)
+
+
+def read_host_file_for_disk(path, maximum_size):
+    """Read one bounded regular host file for a staged disk-image import."""
     with operation_event('disk_image', 'import_host_file', 'file'):
         path = Path(path)
         if path.is_symlink() or not path.is_file():
             raise BrowserError('Choose a regular local file to add to the disk copy.')
-        if path.stat().st_size > 174848:
-            raise BrowserError('The selected file is too large for a standard D64 disk.')
+        if path.stat().st_size > maximum_size:
+            raise BrowserError('The selected file is too large for this disk image.')
         return path.read_bytes()
 
 
@@ -157,14 +162,15 @@ def _extract_new(image, entry, destination):
 def save_edited_copy(session, destination):
     """Validate and atomically publish a staged image under a new local name."""
     from .disk_image_edit import D64EditSession
-    with operation_event('disk_image', 'save_copy', 'd64'):
-        if not isinstance(session, D64EditSession):
-            raise TypeError('session must be a D64EditSession')
+    if not isinstance(session, D64EditSession):
+        raise TypeError('session must be a supported disk edit session')
+    with operation_event('disk_image', 'save_copy', session.format_name.casefold()):
         if not session.dirty:
             raise BrowserError('Stage at least one disk change before saving a copy.')
         destination = Path(destination).absolute()
-        if destination.suffix.casefold() != '.d64':
-            raise BrowserError('Save the edited disk copy with a .d64 filename.')
+        if destination.suffix.casefold() != session.extension:
+            raise BrowserError(
+                f'Save the edited disk copy with a {session.extension} filename.')
         if not destination.parent.is_dir():
             raise BrowserError('Choose an existing destination folder.')
         data = session.validated_bytes()

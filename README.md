@@ -69,11 +69,12 @@ Open a D64, D71, or D81 to view its authentic Commodore directory. Standard
 additions. Argonaut validates the complete result and saves it as a new local
 D64; it never rewrites the source image or replaces an existing destination.
 REL removal includes its indexed data and side sectors; creating new REL files
-is not yet supported.
+is not supported. Standard D71 images use the same staged rename, removal, and
+PRG/SEQ/USR addition workflow while validating both 1571 BAM regions.
 Use **New D64 disk…** in the local Files toolbar to create a validated blank
 35-track image with a C64 disk label and two-character ID. The new image starts
 with 664 blocks free and is opened immediately for file additions.
-D71 and D81 images are currently read-only and validate both BAM regions.
+D81 images are currently read-only and validate both BAM regions.
 Authentic 1581 CBM partitions are labeled as disk partitions and are never
 presented as ordinary host folders or extractable chained files.
 

@@ -184,10 +184,11 @@ def run(package_metadata, report_path):
                 app, 'Package D71 check', D71Image(d71_data))
             _require(d71_dialog.dialog.get_title() == 'D71 disk directory' and
                      d71_dialog.listing.get_first_child() is None and
-                     d71_dialog.status.get_text().startswith('Read-only D71') and
-                     not d71_dialog.add_button.get_sensitive(),
+                     d71_dialog.status.get_text().startswith('Source image is unchanged.') and
+                     d71_dialog.add_button.get_sensitive() and
+                     d71_dialog.session.format_name == 'D71',
                      'ui.d71_directory',
-                     'The read-only D71 directory window is incorrect.', checks)
+                     'The staged D71 directory window is incorrect.', checks)
             d71_dialog.dialog.destroy()
             d81_data = bytearray(819200)
             d81_header = (40 - 1) * 40 * 256

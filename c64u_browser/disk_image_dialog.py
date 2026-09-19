@@ -6,9 +6,10 @@ import posixpath
 
 from gi.repository import Gtk
 
-from .disk_image_edit import D64EditSession
+from .disk_image import D64Image, D71Image
+from .disk_image_edit import D64EditSession, D71EditSession
 from .disk_image_io import (
-    extract_new, read_host_file_for_d64, save_edited_copy, suggested_name)
+    extract_new, read_host_file_for_disk, save_edited_copy, suggested_name)
 
 
 class DiskImageDialog:
@@ -23,8 +24,10 @@ class DiskImageDialog:
         validation = image.validate()
         format_name = image.format_name
         drive_model = image.drive_model
+        session_type = ({D64Image: D64EditSession, D71Image: D71EditSession}
+                        .get(type(image)))
         try:
-            self.session = D64EditSession(image)
+            self.session = session_type(image) if session_type else None
         except Exception:
             self.session = None
         self.dialog = Gtk.Dialog(
@@ -237,7 +240,8 @@ class DiskImageDialog:
         if self.app.busy or not self.session:
             return
         chooser = Gtk.FileChooserNative.new(
-            'Choose file to add to D64 copy', self.dialog, Gtk.FileChooserAction.OPEN,
+            f'Choose file to add to {self.image.format_name} copy',
+            self.dialog, Gtk.FileChooserAction.OPEN,
             'Choose', 'Cancel')
         self.chooser = chooser
         def response(_, code):
@@ -268,7 +272,8 @@ class DiskImageDialog:
                                   apply, file_type)
             def caught():
                 try:
-                    return read_host_file_for_d64(path)
+                    return read_host_file_for_disk(
+                        path, self.image.geometry.sectors * 254)
                 except Exception as exc:
                     return exc
             self.app.run(caught, loaded)
@@ -279,12 +284,15 @@ class DiskImageDialog:
         if self.app.busy or not self.session or not self.session.dirty:
             return
         chooser = Gtk.FileChooserNative.new(
-            'Save edited D64 copy', self.dialog, Gtk.FileChooserAction.SAVE,
+            f'Save edited {self.image.format_name} copy',
+            self.dialog, Gtk.FileChooserAction.SAVE,
             'Save copy', 'Cancel')
         self.chooser = chooser
         source_leaf = posixpath.basename(str(self.source).replace('\\', '/'))
-        stem = source_leaf[:-4] if source_leaf.casefold().endswith('.d64') else 'disk'
-        chooser.set_current_name(stem + '-edited.d64')
+        extension = self.session.extension
+        stem = (source_leaf[:-len(extension)]
+                if source_leaf.casefold().endswith(extension) else 'disk')
+        chooser.set_current_name(stem + '-edited' + extension)
         def response(_, code):
             file = chooser.get_file()
             chooser.destroy()

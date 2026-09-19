@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
-"""Staged, hardware-compatible edits for standard 1541 D64 images."""
+"""Staged, hardware-compatible edits for standard 1541 and 1571 images."""
 from dataclasses import dataclass
 
-from .disk_image import D64Image, DiskDirectoryEntry, DiskImageError, sectors_on_track
+from .disk_image import (
+    D64Image, D71Image, DiskDirectoryEntry, DiskImageError,
+    sectors_on_d71_track, sectors_on_track)
 from .diagnostics import operation_event
 
 
@@ -104,14 +106,21 @@ class D64Edit:
 class D64EditSession:
     """Keep D64 changes staged in memory until a new image is explicitly saved."""
 
+    image_type = D64Image
+    format_name = 'D64'
+    extension = '.d64'
+
     def __init__(self, image):
-        if type(image) is not D64Image:
-            raise TypeError('image must be a D64Image')
+        if type(image) is not self.image_type:
+            raise TypeError(f'image must be a {self.image_type.__name__}')
         if not image.geometry.standard:
-            raise DiskImageError('Editing requires a standard 35-track D64 image.')
+            raise DiskImageError(
+                f'Editing requires a standard {image.geometry.tracks}-track '
+                f'{self.format_name} image.')
         validation = image.validate()
         if not validation.standard_compatible:
-            raise DiskImageError('Repair the D64 structure before editing it.')
+            raise DiskImageError(
+                f'Repair the {self.format_name} structure before editing it.')
         self._original = image.source_bytes
         self._data = bytearray(self._original)
         self._changes = []
@@ -119,7 +128,7 @@ class D64EditSession:
 
     @property
     def image(self):
-        return D64Image(self._data)
+        return self.image_type(self._data)
 
     @property
     def changes(self):
@@ -141,9 +150,11 @@ class D64EditSession:
         self._changes.clear()
         self._saved_change_count = 0
 
-    @staticmethod
-    def _sector_number(track, sector):
-        return sum(sectors_on_track(value) for value in range(1, track)) + sector
+    def _track_sectors(self, track):
+        return sectors_on_track(track)
+
+    def _sector_number(self, track, sector):
+        return sum(self._track_sectors(value) for value in range(1, track)) + sector
 
     def _offset(self, track, sector):
         return self._sector_number(track, sector) * 256
@@ -253,7 +264,7 @@ class D64EditSession:
             if block[0] == 0:
                 break
             previous = (block[0], block[1])
-        for sector in range(1, sectors_on_track(18)):
+        for sector in range(1, self._track_sectors(18)):
             if self._is_free(18, sector):
                 self._set_free(18, sector, False)
                 new_block = bytearray(256)
@@ -279,8 +290,10 @@ class D64EditSession:
                     raise DiskImageError('That disk filename is already in use.')
                 data = bytes(data)
                 needed = max(1, (len(data) + 253) // 254)
-                available = [(track, sector) for track in range(1, 36) if track != 18
-                             for sector in range(sectors_on_track(track))
+                available = [(track, sector)
+                             for track in range(1, self.image.geometry.tracks + 1)
+                             if track != 18
+                             for sector in range(self._track_sectors(track))
                              if self._is_free(track, sector)]
                 if len(available) < needed:
                     raise DiskImageError(f'The disk needs {needed} free block(s) for this file.')
@@ -314,9 +327,49 @@ class D64EditSession:
                 raise
 
     def validated_bytes(self):
-        with operation_event('disk_image', 'validate_edits', 'd64'):
+        with operation_event(
+                'disk_image', 'validate_edits', self.format_name.casefold()):
             image = self.image
             validation = image.validate()
             if not validation.standard_compatible:
                 raise DiskImageError('The staged disk image did not pass complete validation.')
             return image.source_bytes
+
+
+class D71EditSession(D64EditSession):
+    """Keep authentic 1571 D71 edits staged until a new image is saved."""
+
+    image_type = D71Image
+    format_name = 'D71'
+    extension = '.d71'
+
+    def _track_sectors(self, track):
+        return sectors_on_d71_track(track)
+
+    def _is_free(self, track, sector):
+        if track <= 35:
+            return super()._is_free(track, sector)
+        second_bam = self._offset(53, 0)
+        location = second_bam + (track - 36) * 3
+        return bool(self._data[location + sector // 8] & (1 << (sector % 8)))
+
+    def _set_free(self, track, sector, free):
+        if track <= 35:
+            super()._set_free(track, sector, free)
+            return
+        bitmap = self._offset(53, 0) + (track - 36) * 3 + sector // 8
+        count = self._offset(18, 0) + 0xdd + track - 36
+        mask = 1 << (sector % 8)
+        current = bool(self._data[bitmap] & mask)
+        if current == free:
+            return
+        if free:
+            self._data[bitmap] |= mask
+            self._data[count] += 1
+        else:
+            self._data[bitmap] &= ~mask
+            if self._data[count] == 0:
+                raise DiskImageError(f'D71 BAM free count underflow on track {track}.')
+            self._data[count] -= 1
+        self._mark_sector_okay(18, 0)
+        self._mark_sector_okay(53, 0)

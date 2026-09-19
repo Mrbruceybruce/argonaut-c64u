@@ -496,17 +496,21 @@ class D71Image(D64Image):
                 checked += 1
                 try:
                     _, sectors = self._file_chain(entry)
+                    side_sectors = self._rel_side_chain(entry)
                 except DiskImageError:
                     issues.append(f'entry.{index}.chain')
                     continue
-                if len(sectors) != entry.blocks:
+                all_sectors = (*sectors, *side_sectors)
+                if len(all_sectors) != entry.blocks:
                     issues.append(f'entry.{index}.block_count')
-                if occupied.intersection(sectors):
+                if len(set(all_sectors)) != len(all_sectors):
+                    issues.append(f'entry.{index}.cross_link')
+                elif occupied.intersection(all_sectors):
                     issues.append(f'entry.{index}.cross_link')
                 if any(self._bam_is_free(header, second_bam, *location)
-                       for location in sectors):
+                       for location in all_sectors):
                     issues.append(f'entry.{index}.marked_free')
-                occupied.update(sectors)
+                occupied.update(all_sectors)
             return D64Validation(
                 standard_compatible=not issues,
                 entries_checked=checked,
