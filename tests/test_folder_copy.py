@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch, Mock
 from types import SimpleNamespace
-from c64u_browser.folder_copy import build_plan, execute_plan
+from c64u_browser.folder_copy import build_plan, execute_plan, completed_roots
 from c64u_browser.api import BrowserError
 
 class FolderTests(unittest.TestCase):
@@ -16,6 +16,12 @@ class FolderTests(unittest.TestCase):
         (self.src/'folder'/'nested'/'a').write_text('new')
         (self.src/'folder'/'b').write_text('second')
     def plan(self): return build_plan(None,True,self.src,['folder'],True,self.dst)
+    def test_completed_roots_preserve_requested_order_and_exclude_failures(self):
+        self.assertEqual(
+            completed_roots(
+                ('SECOND', 'folder', 'failed'),
+                ['folder/', 'folder/nested/', 'folder/nested/a', 'SECOND']),
+            ('SECOND', 'folder'))
     def test_nested_copy_empty_folder_and_merge_skip(self):
         report=execute_plan(None,self.plan(),True,True)
         self.assertFalse(report.error)

@@ -18,7 +18,7 @@ from .navigation import History
 from .storage import storage_root, discover, initial_directory
 from .storage_ui import DriveButtons
 from .deletion import prepare as prepare_deletion, delete_reviewed
-from .folder_copy import build_plan, execute_plan
+from .folder_copy import build_plan, execute_plan, completed_roots
 from .profiles import Preferences
 from .credentials import Credentials
 from .connection_dialog import ConnectionDialog
@@ -253,7 +253,18 @@ class Browser(Gtk.Application):
             row.set_child(label)
             listing.append(row)
 
-    def refresh_local(self):
+    def select_names(self, listing, names):
+        wanted = set(names)
+        listing.unselect_all()
+        if not wanted:
+            return
+        row = listing.get_first_child()
+        while row is not None:
+            if row.item[0] in wanted:
+                listing.select_row(row)
+            row = row.get_next_sibling()
+
+    def refresh_local(self, select=()):
         try:
             entries = []
             show_hidden = bool(self.preferences.app_options.get(
@@ -271,6 +282,7 @@ class Browser(Gtk.Application):
                 except OSError:
                     entries.append((p.name, False, 0))
             self.populate(self.llist, sorted(entries, key=lambda e: (not e[1], e[0].casefold())))
+            Browser.select_names(self, self.llist, select)
             self.lpath.set_text(str(self.local))
             self.drive_bars[True].refresh()
             return True
@@ -430,7 +442,7 @@ class Browser(Gtk.Application):
         self.run(task, lambda result: self.activate_connection(*result))
         return False
 
-    def show_remote(self, result):
+    def show_remote(self, result, select=()):
         self.remote, entries = result
         if self.active_profile and self.preferences.app_options['remember_folders']:
             self.preferences.app_options['remote_folders'][self.active_profile.id]=self.remote;self.save_app_preferences()
@@ -438,6 +450,7 @@ class Browser(Gtk.Application):
         self.drive_bars[False].refresh()
         self.rpath.set_text(self.remote)
         self.populate(self.rlist, [(e.name, e.kind == 'dir', e.size or 0) for e in entries])
+        Browser.select_names(self, self.rlist, select)
         self.status.set_text('Connected · ' + self.remote)
         self.update_history_buttons()
 
@@ -706,11 +719,17 @@ class Browser(Gtk.Application):
             def finished(result):
                 self.end_copy_cancel()
                 message, partial = result.message, result.partial
+                copied = completed_roots(names, result.completed)
                 if result.error: self.copy_report(result)
                 if partial:
                     self.partial_upload = (client, partial)
                     self.partial_button.set_sensitive(True)
-                self.refresh_local()
+                local_selection = ()
+                if source_local and Path(parent).resolve() == self.local.resolve():
+                    local_selection = copied
+                if local and Path(destination).resolve() == self.local.resolve():
+                    local_selection = tuple(dict.fromkeys(local_selection + copied))
+                self.refresh_local(local_selection)
                 if not self.client:
                     self.status.set_text(message); return
                 current = self.client
@@ -720,7 +739,16 @@ class Browser(Gtk.Application):
                     except Exception as exc: return None, str(exc)
                 def refreshed(result):
                     listing, error = result
-                    if listing is not None and self.client is current: self.show_remote(listing)
+                    remote_selection = ()
+                    if (not source_local and
+                            posixpath.normpath(str(parent)) == posixpath.normpath(folder)):
+                        remote_selection = copied
+                    if (not local and
+                            posixpath.normpath(str(destination)) == posixpath.normpath(folder)):
+                        remote_selection = tuple(dict.fromkeys(
+                            remote_selection + copied))
+                    if listing is not None and self.client is current:
+                        self.show_remote(listing, remote_selection)
                     self.status.set_text(message + (' · Could not refresh C64U: ' + error if error else ''))
                 self.run(refresh, refreshed)
             self.run(lambda: execute_plan(client, plan, source_local, local, progress), finished)

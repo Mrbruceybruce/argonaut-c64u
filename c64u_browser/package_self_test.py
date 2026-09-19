@@ -98,6 +98,16 @@ def run(package_metadata, report_path):
                      app.new_d64_button.get_tooltip_text() == 'New D64 disk…',
                      'ui.quick_connect',
                      'Main-window connection or disk controls are incorrect.', checks)
+            app.populate(app.llist, [
+                ('SOURCE COPY', False, 1), ('DESTINATION COPY', False, 1)])
+            app.select_names(
+                app.llist, ('SOURCE COPY', 'DESTINATION COPY', 'NOT PRESENT'))
+            _require(
+                tuple(row.item[0] for row in app.llist.get_selected_rows()) ==
+                ('SOURCE COPY', 'DESTINATION COPY'),
+                'ui.copy_selection',
+                'Completed copy items could not be selected after refresh.', checks)
+            app.refresh_local()
             blank = create_blank_d64_image('PACKAGE BLANK', 'P1')
             _require(blank.directory().blocks_free == 664 and
                      not blank.directory().entries and
@@ -161,6 +171,7 @@ def run(package_metadata, report_path):
             _require(disk_dialog.listing.get_first_child() is None and
                      disk_dialog.status.get_text().startswith('Source image is unchanged.') and
                      disk_dialog.add_button.get_sensitive() and
+                     disk_dialog.save_button.get_label() == 'Save as…' and
                      not disk_dialog.save_button.get_sensitive(),
                      'ui.disk_directory',
                      'The staged D64 directory window is incorrect.', checks)

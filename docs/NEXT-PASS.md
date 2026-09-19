@@ -169,7 +169,27 @@ extend the root directory only on track 40, preserve optional error tables, and
 keep every validated CBM partition sector allocated. The VICE fixture removed
 and replaced its 1,615-block cross-BAM file without changing its protected
 partition; VICE validated the image and extracted all 410,000 bytes exactly.
-Installed Linux UI and physical C64U acceptance are next.
+Installed Linux and physical C64U acceptance passed on 2026-09-18. All 28
+packaged checks passed at build `d7ca5c9`. The C64U's emulated 1581 displayed
+the edited `NEW CROSS81` file at 1,615 blocks, retained the 10-block
+`SMALLPART` CBM partition, and reported `1534 BLOCKS FREE`.
+
+D80 and D82 were evaluated against the documented VICE 8050/8250 layouts.
+They target 77-track and 154-track IEEE-drive media, while the C64 Ultimate
+drive interface and Argonaut's connected-drive controls expose 1541, 1571, and
+1581 operation. D80/D82 parsing and editing therefore remain outside the C64U
+disk editor instead of presenting media the connected hardware cannot mount as
+the corresponding drive type.
+
+G64 remains a preservation image handled as an opaque whole file. Argonaut can
+copy it and the C64U can mount it through the existing drive API, but Argonaut
+does not interpret its bitstream tracks as a normal CBM DOS directory or offer
+file-level editing that could discard protection or mastering details.
+
+The final Linux polish pass renames **Save edited copy…** to **Save as…** and
+keeps every successfully copied top-level source and destination item selected
+after copy or drag-and-drop when those folders remain visible. Failed or
+unfinished items are not selected as successful copies.
 
 ## Current milestone: Linux hardening
 

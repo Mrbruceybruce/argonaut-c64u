@@ -58,7 +58,7 @@ class DiskImageDialog:
         edit_actions = Gtk.Box(spacing=8)
         self.controls.append(edit_actions)
         self.discard_button = app.button(edit_actions, 'Discard staged changes', self.discard)
-        self.save_button = app.button(edit_actions, 'Save edited copy…', self.save_copy)
+        self.save_button = app.button(edit_actions, 'Save as…', self.save_copy)
         self.listing = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self.listing.connect('row-selected', lambda *_: self.update())
         scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
