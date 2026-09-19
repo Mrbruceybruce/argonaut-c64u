@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import time
 
 
 class PackageSelfTestFailure(RuntimeError):
@@ -50,7 +51,7 @@ def run(package_metadata, report_path):
         import gi
         gi.require_version('Gtk', '4.0')
         gi.require_version('Gst', '1.0')
-        from gi.repository import Gio, Gst, Gtk
+        from gi.repository import Gio, GLib, Gst, Gtk
 
         from .about import show_about
         from .credentials import Credentials
@@ -179,6 +180,12 @@ def run(package_metadata, report_path):
             disk_dialog.render()
             disk_dialog.save_copy()
             save_folder = disk_dialog.chooser.get_current_folder()
+            deadline = time.monotonic() + 3
+            while save_folder is None and time.monotonic() < deadline:
+                while GLib.MainContext.default().pending():
+                    GLib.MainContext.default().iteration(False)
+                time.sleep(0.01)
+                save_folder = disk_dialog.chooser.get_current_folder()
             _require(save_folder is not None and
                      Path(save_folder.get_path()).resolve() == app.local.resolve(),
                      'ui.disk_save_folder',
