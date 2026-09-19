@@ -201,6 +201,11 @@ class Browser(Gtk.Application):
 
     def pane(self, panes, local):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        pane_click = Gtk.GestureClick(button=1)
+        pane_click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        pane_click.connect(
+            'pressed', lambda *_: self.set_active_file_pane(local))
+        box.add_controller(pane_click)
         label = Gtk.Label(label='Local files' if local else 'C64 Ultimate files', xalign=0)
         box.add_css_class('argonaut-file-pane')
         self.file_pane_boxes[local] = box
