@@ -260,12 +260,13 @@ their complete control areas; local D64 creation selects without opening; and
 the disk editor uses **Save image as…** and **Discard changes**. All reported
 physical checks passed with no additional issue.
 
-The final queued usability pass is `1.7-disk.16`: Add File opens in the visible
-local folder and reviews single or multiple selections in one table. C64 names
-and PRG/SEQ/USR types remain editable, the complete batch stages atomically,
-text `.bas` source defaults to SEQ, tokenized `$0801` BASIC defaults to PRG, and
-Rename uses a clear standard edit icon. This pass remains Linux-only until its
-installed acceptance completes.
+The final queued usability pass, `1.7-disk.16+linux.1`, passed installed Linux
+acceptance on 2026-09-19 at exact build `df40074`. All 36 packaged checks passed.
+Add File opened in the visible local folder and reviewed multiple selections in
+one table. C64 names and PRG/SEQ/USR types remained editable, text `.bas` source
+defaulted to SEQ, tokenized `$0801` BASIC defaulted to PRG, the complete batch
+staged atomically, and Rename displayed a clear standard edit icon. The accepted
+disk-image implementation remains Linux-first until the planned release gate.
 
 ## Current milestone: Linux hardening
 
