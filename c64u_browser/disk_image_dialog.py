@@ -6,8 +6,8 @@ import posixpath
 
 from gi.repository import Gtk
 
-from .disk_image import D64Image, D71Image
-from .disk_image_edit import D64EditSession, D71EditSession
+from .disk_image import D64Image, D71Image, D81Image
+from .disk_image_edit import D64EditSession, D71EditSession, D81EditSession
 from .disk_image_io import (
     extract_new, read_host_file_for_disk, save_edited_copy, suggested_name)
 
@@ -24,7 +24,8 @@ class DiskImageDialog:
         validation = image.validate()
         format_name = image.format_name
         drive_model = image.drive_model
-        session_type = ({D64Image: D64EditSession, D71Image: D71EditSession}
+        session_type = ({D64Image: D64EditSession, D71Image: D71EditSession,
+                         D81Image: D81EditSession}
                         .get(type(image)))
         try:
             self.session = session_type(image) if session_type else None
@@ -160,8 +161,7 @@ class DiskImageDialog:
         self.add_button.set_sensitive(editable)
         self.rename_button.set_sensitive(editable and selected)
         self.remove_button.set_sensitive(
-            editable and selected and row.entry.file_type in ('PRG', 'SEQ', 'USR', 'REL')
-            and row.entry.closed and not row.entry.locked)
+            editable and selected and self.session.can_remove(row.entry))
         dirty = editable and self.session.dirty
         self.discard_button.set_sensitive(dirty)
         self.save_button.set_sensitive(editable and self.session.has_unsaved_changes)

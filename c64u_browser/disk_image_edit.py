@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from .disk_image import (
-    D64Image, D71Image, DiskDirectoryEntry, DiskImageError,
+    D64Image, D71Image, D81Image, DiskDirectoryEntry, DiskImageError,
     sectors_on_d71_track, sectors_on_track)
 from .diagnostics import operation_event
 
@@ -109,6 +109,9 @@ class D64EditSession:
     image_type = D64Image
     format_name = 'D64'
     extension = '.d64'
+    directory_track = 18
+    directory_first_sector = 1
+    removable_types = ('PRG', 'SEQ', 'USR', 'REL')
 
     def __init__(self, image):
         if type(image) is not self.image_type:
@@ -203,6 +206,11 @@ class D64EditSession:
                 return current
         raise DiskImageError('The selected disk entry changed; select it again.')
 
+    def can_remove(self, entry):
+        return (isinstance(entry, DiskDirectoryEntry)
+                and entry.file_type in self.removable_types
+                and entry.closed and not entry.locked)
+
     def rename(self, entry, name):
         with operation_event('disk_image', 'stage_rename', 'entry'):
             before = self._data[:]
@@ -233,7 +241,7 @@ class D64EditSession:
                     raise DiskImageError('This disk file is locked and was not removed.')
                 if not current.closed:
                     raise DiskImageError('This disk file is open or incomplete and was not removed.')
-                if current.file_type not in (*_TYPE_CODES, 'REL'):
+                if current.file_type not in self.removable_types:
                     raise DiskImageError('This disk file type cannot be removed safely.')
                 _, sectors = self.image._file_chain(current)
                 side_sectors = self.image._rel_side_chain(current)
@@ -249,8 +257,8 @@ class D64EditSession:
 
     def _directory_slot(self):
         image = self.image
-        block = image.sector(18, 1)
-        previous = (18, 1)
+        block = image.sector(self.directory_track, self.directory_first_sector)
+        previous = (self.directory_track, self.directory_first_sector)
         seen = set()
         while True:
             track, sector = previous
@@ -264,17 +272,18 @@ class D64EditSession:
             if block[0] == 0:
                 break
             previous = (block[0], block[1])
-        for sector in range(1, self._track_sectors(18)):
-            if self._is_free(18, sector):
-                self._set_free(18, sector, False)
+        for sector in range(
+                self.directory_first_sector, self._track_sectors(self.directory_track)):
+            if self._is_free(self.directory_track, sector):
+                self._set_free(self.directory_track, sector, False)
                 new_block = bytearray(256)
                 new_block[:2] = bytes((0, 255))
-                self._write_sector(18, sector, new_block)
+                self._write_sector(self.directory_track, sector, new_block)
                 old = bytearray(image.sector(*previous))
-                old[:2] = bytes((18, sector))
+                old[:2] = bytes((self.directory_track, sector))
                 self._write_sector(*previous, old)
-                return 18, sector, 0
-        raise DiskImageError('The 1541 directory track is full.')
+                return self.directory_track, sector, 0
+        raise DiskImageError(f'The {self.image.drive_model} directory track is full.')
 
     def add_file(self, data, name, file_type='PRG'):
         with operation_event('disk_image', 'stage_add', 'file'):
@@ -292,7 +301,7 @@ class D64EditSession:
                 needed = max(1, (len(data) + 253) // 254)
                 available = [(track, sector)
                              for track in range(1, self.image.geometry.tracks + 1)
-                             if track != 18
+                             if track != self.directory_track
                              for sector in range(self._track_sectors(track))
                              if self._is_free(track, sector)]
                 if len(available) < needed:
@@ -373,3 +382,46 @@ class D71EditSession(D64EditSession):
             self._data[count] -= 1
         self._mark_sector_okay(18, 0)
         self._mark_sector_okay(53, 0)
+
+
+class D81EditSession(D64EditSession):
+    """Keep authentic 1581 D81 edits staged while protecting CBM partitions."""
+
+    image_type = D81Image
+    format_name = 'D81'
+    extension = '.d81'
+    directory_track = 40
+    directory_first_sector = 3
+    # D81 REL files use super side sectors, which require a separate editor.
+    removable_types = ('PRG', 'SEQ', 'USR')
+
+    def _track_sectors(self, track):
+        if not 1 <= track <= 80:
+            raise DiskImageError(f'Invalid D81 track {track}.')
+        return 40
+
+    def _bam_details(self, track, sector):
+        bam_sector = 1 if track <= 40 else 2
+        bam_offset = self._offset(40, bam_sector)
+        entry = 0x10 + ((track - 1) % 40) * 6
+        return bam_sector, bam_offset + entry, bam_offset + entry + 1 + sector // 8
+
+    def _is_free(self, track, sector):
+        _, _, bitmap = self._bam_details(track, sector)
+        return bool(self._data[bitmap] & (1 << (sector % 8)))
+
+    def _set_free(self, track, sector, free):
+        bam_sector, count, bitmap = self._bam_details(track, sector)
+        mask = 1 << (sector % 8)
+        current = bool(self._data[bitmap] & mask)
+        if current == free:
+            return
+        if free:
+            self._data[bitmap] |= mask
+            self._data[count] += 1
+        else:
+            self._data[bitmap] &= ~mask
+            if self._data[count] == 0:
+                raise DiskImageError(f'D81 BAM free count underflow on track {track}.')
+            self._data[count] -= 1
+        self._mark_sector_okay(40, bam_sector)

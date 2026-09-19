@@ -111,8 +111,9 @@ PRG, SEQ, USR, or structurally valid REL files, or add local PRG, SEQ, and USR
 files. Choose the save action to publish the complete edited image under a new
 local filename. Argonaut does not rewrite the source image or replace an
 existing destination. Standard D71
-images use the same staged workflow and a new `.d71` destination. D81 images
-remain read-only in this release.
+images use the same staged workflow and a new `.d71` destination. Standard D81
+images use a new `.d81` destination and protect CBM partition allocations from
+file removal or reuse.
 
 ## 4. Change settings and use Favorites
 

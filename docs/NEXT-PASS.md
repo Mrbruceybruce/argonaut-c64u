@@ -155,12 +155,21 @@ losing essential semantics. Argonaut therefore keeps authentic REL validation,
 raw extraction, rename, and safe removal, but does not present arbitrary host
 bytes as a newly created REL file. This avoids producing a misleading disk file.
 
-Staged D71 editing is now implemented for standard 70-track images. Rename,
-safe removal, and PRG/SEQ/USR addition retain the authentic flat 1571 directory,
-update the side-one BAM, side-two bitmap and side-two free counts, and preserve
-an optional error table. The existing VICE fixture removed and replaced its
-670-block cross-side file; VICE validated the result and extracted all 170,000
-bytes exactly. Installed Linux UI and physical C64U acceptance are next.
+Staged D71 editing passed installed Linux and physical C64U acceptance on
+2026-09-18. Rename, safe removal, and PRG/SEQ/USR addition retain the authentic
+flat 1571 directory, update the side-one BAM, side-two bitmap and side-two free
+counts, and preserve an optional error table. All 28 packaged checks passed at
+build `f2c6c00`. The physical C64U mounted the edited image in 1571 mode and
+displayed `HELLO` at 1 block, `NEW CROSSSIDE` at 670 blocks, and `657 BLOCKS
+FREE`. VICE independently extracted all 170,000 replacement bytes exactly.
+
+Staged D81 editing is now implemented for standard 80-track images. Rename,
+ordinary-file removal, and PRG/SEQ/USR addition update the correct 1581 BAM half,
+extend the root directory only on track 40, preserve optional error tables, and
+keep every validated CBM partition sector allocated. The VICE fixture removed
+and replaced its 1,615-block cross-BAM file without changing its protected
+partition; VICE validated the image and extracted all 410,000 bytes exactly.
+Installed Linux UI and physical C64U acceptance are next.
 
 ## Current milestone: Linux hardening
 

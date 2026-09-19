@@ -74,9 +74,11 @@ PRG/SEQ/USR addition workflow while validating both 1571 BAM regions.
 Use **New D64 disk…** in the local Files toolbar to create a validated blank
 35-track image with a C64 disk label and two-character ID. The new image starts
 with 664 blocks free and is opened immediately for file additions.
-D81 images are currently read-only and validate both BAM regions.
+Standard D81 images also support staged rename, ordinary-file removal, and
+PRG/SEQ/USR addition while validating both BAM regions.
 Authentic 1581 CBM partitions are labeled as disk partitions and are never
-presented as ordinary host folders or extractable chained files.
+presented as ordinary host folders or extractable chained files. Their allocated
+sectors remain protected during editing.
 
 ![Mac Files tab showing local folders and a selected C64U disk image](docs/images/macos-files.png)
 

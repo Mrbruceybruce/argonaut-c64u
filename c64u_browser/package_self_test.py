@@ -215,10 +215,12 @@ def run(package_metadata, report_path):
             _require(d81_dialog.dialog.get_title() == 'D81 disk directory' and
                      'CBM partition' in d81_row.get_child().get_text() and
                      not d81_dialog.extract_button.get_sensitive() and
-                     d81_dialog.status.get_text().startswith('Read-only D81') and
-                     not d81_dialog.add_button.get_sensitive(),
+                     not d81_dialog.remove_button.get_sensitive() and
+                     d81_dialog.status.get_text().startswith('Source image is unchanged.') and
+                     d81_dialog.add_button.get_sensitive() and
+                     d81_dialog.session.format_name == 'D81',
                      'ui.d81_directory',
-                     'The read-only D81 directory window is incorrect.', checks)
+                     'The staged D81 directory window is incorrect.', checks)
             d81_dialog.dialog.destroy()
             _require(bool(local_roots()), 'filesystem.local_roots',
                      'No local file roots were found.', checks)
