@@ -289,8 +289,9 @@ extending the completed disk-image roadmap:
 3. Show ordinary C64-visible letters as uppercase while typing disk filenames,
    disk labels and Streams commands, matching the bytes Argonaut already writes
    or sends.
-4. Keep a failed native C64U D64 creation dialog open and show a clear red,
-   enlarged message when the requested filename already exists.
+4. Validate a native C64U D64 filename against the visible directory while the
+   user types. Disable creation and show a clear red, enlarged conflict message
+   before submission; retain the server-side no-replace check for stale lists.
 5. Present invalid General-preference folder messages one point larger and in
    red while leaving successful save messages neutral.
 

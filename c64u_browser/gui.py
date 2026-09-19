@@ -999,17 +999,34 @@ class Browser(Gtk.Application):
         content.append(feedback)
         dialog.get_content_area().append(content)
 
+        existing_names = set()
+        row = self.rlist.get_first_child()
+        while row is not None:
+            if row.item[0] != '..':
+                existing_names.add(row.item[0].casefold())
+            row = row.get_next_sibling()
+
         def validate(*_):
             leaf = filename.get_text().strip()
             label = disk_name.get_text().strip()
-            okay = (bool(leaf and label) and leaf not in ('.', '..')
+            ordinary = (bool(leaf and label) and leaf not in ('.', '..')
                     and '/' not in leaf and '\\' not in leaf
                     and not any(ord(character) < 32 or ord(character) == 127
                                 for character in leaf + label))
+            candidate = (leaf if leaf.casefold().endswith('.d64')
+                         else leaf + '.d64')
+            conflict = ordinary and candidate.casefold() in existing_names
+            okay = ordinary and not conflict
             create.set_sensitive(okay)
-            feedback.remove_css_class('argonaut-error-message')
-            feedback.set_text('' if okay else
-                              'Enter one ordinary filename and a disk name.')
+            if conflict:
+                feedback.add_css_class('argonaut-error-message')
+                feedback.set_text(
+                    'That filename already exists on the C64U. '
+                    'Choose another filename; nothing will be overwritten.')
+            else:
+                feedback.remove_css_class('argonaut-error-message')
+                feedback.set_text('' if okay else
+                                  'Enter one ordinary filename and a disk name.')
             return okay
 
         filename.connect('changed', validate)
