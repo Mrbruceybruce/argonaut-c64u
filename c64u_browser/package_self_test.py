@@ -349,7 +349,11 @@ def run(package_metadata, report_path):
                          'development.preferences_ui',
                          'Development Preferences layout is incorrect.', checks)
                 _require(app.streams_tab.text_return.get_active() and
-                         isinstance(app.streams_tab.zoom, Gtk.Label),
+                         isinstance(app.streams_tab.zoom, Gtk.Label) and
+                         not app.preferences.app_options['replay_enabled'] and
+                         app.streams_tab.replay_button.get_label() ==
+                         'Save recent 30 seconds…' and
+                         not app.streams_tab.replay_button.get_sensitive(),
                          'development.streams_ui',
                          'Development Streams controls are incorrect.', checks)
                 app.streams_tab.text_input.set_text('print "hello"')

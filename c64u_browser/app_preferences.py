@@ -2,7 +2,7 @@
 """Validated desktop preferences, separate from machine configuration."""
 DEFAULTS={'remember_window':True,'width':1200,'height':850,'preview_scale':150,
           'preview_audio':True,'remember_folders':True,'show_hidden_local':False,
-          'developer_mode':False,
+          'replay_enabled':False,'replay_seconds':30,'developer_mode':False,
           'local_folder':'','remote_folders':{}}
 
 def defaults():
@@ -12,7 +12,7 @@ def validate(options):
     result=defaults()
     if not isinstance(options,dict):raise ValueError('Invalid application preferences')
     for key in ('remember_window','preview_audio','remember_folders','show_hidden_local',
-                'developer_mode'):
+                'replay_enabled','developer_mode'):
         value=options.get(key,result[key])
         if type(value) is not bool:raise ValueError('Invalid preference: '+key)
         result[key]=value
@@ -20,6 +20,10 @@ def validate(options):
         value=options.get(key,result[key])
         if type(value) is not int or not low<=value<=high:raise ValueError('Invalid preference: '+key)
         result[key]=value
+    replay_seconds=options.get('replay_seconds',result['replay_seconds'])
+    if type(replay_seconds) is not int or not 5<=replay_seconds<=300:
+        raise ValueError('Invalid preference: replay_seconds')
+    result['replay_seconds']=replay_seconds
     result['preview_scale']=normalize_scale(result['preview_scale'])
     local=options.get('local_folder','');remote=options.get('remote_folders',{})
     if not isinstance(local,str) or not isinstance(remote,dict) or any(not isinstance(k,str) or not isinstance(v,str) for k,v in remote.items()):
@@ -85,7 +89,7 @@ def show_preferences(app, page=0):
     pages.append_page(general_scroll,Gtk.Label(label='General'))
     for side in ('top','bottom','start','end'):getattr(box,'set_margin_'+side)(16)
     checks={}
-    for key,label in [('remember_window','Remember window size'),('preview_audio','Play preview audio by default'),('remember_folders','Remember last-used file folders'),('show_hidden_local','Show hidden local files and folders')]:
+    for key,label in [('remember_window','Remember window size'),('preview_audio','Play preview audio by default'),('replay_enabled','Keep a 30-second instant replay while previewing'),('remember_folders','Remember last-used file folders'),('show_hidden_local','Show hidden local files and folders')]:
         control=Gtk.CheckButton(label=label,active=prefs.app_options[key],halign=Gtk.Align.START);box.append(control);checks[key]=control
     if not development.enabled():
         developer_mode=Gtk.CheckButton(
@@ -171,6 +175,7 @@ def show_preferences(app, page=0):
             general_message('Could not save preferences: '+str(exc),True);return False
         tab=app.streams_tab;tab.set_zoom(prefs.app_options['preview_scale']);tab.apply_scale()
         tab.audio.set_active(prefs.app_options['preview_audio'])
+        tab.set_replay_enabled(prefs.app_options['replay_enabled'])
         show_general(prefs.app_options,
                      {key:getattr(prefs,key) for key in folders})
         developer_is_enabled=prefs.app_options['developer_mode']

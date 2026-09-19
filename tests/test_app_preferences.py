@@ -37,6 +37,17 @@ class AppPreferencesTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate({'show_hidden_local': value})
 
+    def test_replay_is_opt_in_with_a_bounded_default_duration(self):
+        self.assertFalse(validate({})['replay_enabled'])
+        self.assertEqual(validate({})['replay_seconds'],30)
+        self.assertTrue(validate({'replay_enabled':True})['replay_enabled'])
+        for value in (1,'true',None):
+            with self.assertRaises(ValueError):
+                validate({'replay_enabled':value})
+        for value in (4,301,True,'30'):
+            with self.assertRaises(ValueError):
+                validate({'replay_seconds':value})
+
     def test_missing_remote_folder_falls_back_to_drive(self):
         client=Mock();client.list_directory.side_effect=[('/',[Entry('USB2','dir',0)]),BrowserError('Gone'),('/USB2',[])]
         self.assertEqual(initial_directory(client,'/USB2/Gone'),('/USB2',[]))

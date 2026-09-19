@@ -34,6 +34,12 @@ class StreamsTab:
         from .app_preferences import scale_control
         control,self.zoom,self.set_zoom=scale_control(self.preview_percent,self.apply_scale)
         zoomrow.append(control)
+        replayrow=Gtk.Box(spacing=8);self.box.append(replayrow)
+        self.replay_button=Gtk.Button(label='Save recent 30 seconds…',sensitive=False)
+        replayrow.append(self.replay_button);self.replay_button.connect('clicked',self.save_replay)
+        self.replay_status=Gtk.Label(xalign=0,wrap=True,hexpand=True);replayrow.append(self.replay_status)
+        self.replay=None;self.replay_chooser=None;self.replay_exporting=False
+        self.replay_error='';self.replay_notice=''
         self.preview_height=240
         self.picture=Gtk.Picture(can_shrink=True,halign=Gtk.Align.CENTER,valign=Gtk.Align.CENTER)
         self.preview_scroll=Gtk.ScrolledWindow(hexpand=True,vexpand=True,min_content_height=200)
@@ -70,11 +76,44 @@ class StreamsTab:
         self.start_button.set_sensitive(self.client is not None and not running)
         self.stop_button.set_sensitive(running)
         self.audio.set_sensitive(not running)
+        self.update_replay_status()
+
+    def set_replay_enabled(self,enabled):
+        """Apply the opt-in preference without interrupting normal preview."""
+        if not enabled and self.replay:
+            self.replay.close();self.replay=None
+        self.replay_error='';self.replay_notice=''
+        self.update_replay_status()
+
+    def update_replay_status(self):
+        enabled=self.app.preferences.app_options.get('replay_enabled',False)
+        if not enabled:
+            message='Instant replay is off. Enable it in Preferences.'
+        elif self.replay_error:
+            message='Instant replay stopped: '+self.replay_error
+        elif self.replay_exporting:
+            message='Saving recent replay… Live preview and recording continue.'
+        elif self.replay_notice:
+            retained=self.replay.retained_seconds if self.replay else 0
+            message=(self.replay_notice+f' · Buffer now retains {retained:.1f} of '
+                     f"{self.app.preferences.app_options.get('replay_seconds',30)} seconds")
+        elif self.replay:
+            retained=self.replay.retained_seconds
+            message=(f'Instant replay ready · {retained:.1f} of '
+                     f'{self.replay.seconds} seconds retained · '+
+                     ('With audio' if self.replay.audio else 'Video only'))
+        else:
+            message='Instant replay enabled · Start preview to build history.'
+        self.replay_status.set_text(message)
+        self.replay_button.set_sensitive(
+            bool(enabled and self.replay and self.replay.retained_seconds>0
+                 and not self.replay_chooser and not self.replay_exporting))
 
     def start(self,*_):
         if not self.client or (self.session and self.session.thread.is_alive()):return
         self.app.preferences.app_options['preview_audio']=self.audio.get_active();self.app.save_app_preferences()
         self.picture.set_paintable(None);self.capture_button.set_sensitive(False)
+        self.replay_error='';self.replay_notice='';self.update_replay_status()
         try:self.output=AudioOutput() if self.audio.get_active() else None
         except Exception as exc:
             self.status.set_text('Audio could not start: '+str(exc)+'. Turn off audio to preview video only.');return
@@ -85,11 +124,13 @@ class StreamsTab:
 
     def stop(self,*_):
         if self.recorder:self.recorder.stop()
+        if self.replay:self.replay.close();self.replay=None
         self.record_button.set_sensitive(False)
         if self.session and self.session.thread.is_alive():
             self.session.stop();self.status.set_text('Stopping preview…')
         if self.output:self.output.close();self.output=None
         self.picture.set_paintable(None);self.capture_button.set_sensitive(False)
+        self.update_replay_status()
 
     def tick(self):
         session=self.session
@@ -105,6 +146,21 @@ class StreamsTab:
                 if height!=self.preview_height:
                     self.preview_height=height;self.scale_preview()
                 self.capture_button.set_sensitive(self.capture_chooser is None)
+            replay_frame=(height,rgb) if frame else None
+            if self.app.preferences.app_options.get('replay_enabled',False):
+                try:
+                    if replay_frame and (not self.replay or self.replay.height!=height):
+                        if self.replay:self.replay.close()
+                        from .replay_buffer import ReplayBuffer
+                        self.replay=ReplayBuffer(
+                            height,session.with_audio,
+                            self.app.preferences.app_options.get('replay_seconds',30))
+                        self.replay_error='';self.replay_notice=''
+                    if self.replay:self.replay.feed(replay_frame,samples)
+                except Exception as exc:
+                    if self.replay:self.replay.close();self.replay=None
+                    self.replay_error=str(exc)
+                self.update_replay_status()
             if self.recorder and not self.recorder.finishing:
                 try:self.recorder.feed((height,rgb) if frame else None,samples)
                 except Exception as exc:self.recorder.stop(str(exc))
@@ -132,6 +188,46 @@ class StreamsTab:
             self.picture.set_paintable(None);self.capture_button.set_sensitive(False);self.status.set_text(session.message)
             self.session=None;self.timer=None;self.update_buttons();return False
         return True
+
+    def save_replay(self,*_):
+        replay=self.replay
+        if not replay or self.replay_chooser or self.replay_exporting:return
+        chooser=Gtk.FileChooserNative.new(
+            'Save recent replay',self.app.window if self.app else None,
+            Gtk.FileChooserAction.SAVE,'Save','Cancel')
+        self.replay_chooser=chooser;self.update_replay_status()
+        folder=self.app.preferences.recording_folder if self.app else ''
+        if folder and Path(folder).is_dir():
+            chooser.set_current_folder(Gio.File.new_for_path(folder))
+        chooser.set_current_name(datetime.now().strftime('c64u-replay-%Y%m%d-%H%M%S.webm'))
+        def response(_,code):
+            file=chooser.get_file();chooser.destroy();self.replay_chooser=None
+            if code!=Gtk.ResponseType.ACCEPT or not file:
+                self.update_replay_status();return
+            path=file.get_path()
+            if not path:
+                self.replay_notice='Choose a local file for the replay.'
+                self.update_replay_status();return
+            self.replay_exporting=True;self.replay_notice='';self.update_replay_status()
+            def task():
+                try:return replay.export(path)
+                except Exception as exc:return exc
+            def done(result):
+                self.replay_exporting=False
+                if isinstance(result,Exception):
+                    self.replay_notice='Replay could not be saved: '+str(result)
+                else:
+                    self.replay_notice=(
+                        f"Replay saved: {result['path']} · "
+                        f"{result['seconds']:.1f} seconds")
+                    if self.app:
+                        self.app.preferences.recording_folder=str(Path(path).parent)
+                        try:self.app.preferences.save()
+                        except Exception:self.replay_notice+=' · Could not remember the folder.'
+                self.update_replay_status()
+            self.app.run(task,done)
+        chooser.connect('response',response);chooser.show()
+        return chooser
 
     def record(self,*_):
         if self.recorder:
@@ -203,6 +299,7 @@ class StreamsTab:
     def close(self):
         if self.record_chooser:self.record_chooser.destroy();self.record_chooser=None
         if self.capture_chooser:self.capture_chooser.destroy();self.capture_chooser=None
+        if self.replay_chooser:self.replay_chooser.destroy();self.replay_chooser=None
         self.stop()
         if self.timer is not None:GLib.source_remove(self.timer);self.timer=None
 

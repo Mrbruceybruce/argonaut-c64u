@@ -282,27 +282,30 @@ when native C64U D64 creation encounters an existing filename.
 Section 5 opens with the accepted cross-platform cleanup findings rather than
 extending the completed disk-image roadmap:
 
-1. Activate either Files pane from its complete visible area without forcing
+1. **Complete:** Activate either Files pane from its complete visible area without forcing
    list focus or changing a long C64U directory's viewport.
-2. Keep the local blank-D64 disk ID optional: blank by default to match the
+2. **Complete:** Keep the local blank-D64 disk ID optional: blank by default to match the
    C64U's native formatter, while retaining a valid two-character custom ID.
-3. Show ordinary C64-visible letters as uppercase while typing disk filenames,
+3. **Complete:** Show ordinary C64-visible letters as uppercase while typing disk filenames,
    disk labels and Streams commands, matching the bytes Argonaut already writes
    or sends.
-4. Validate local and native C64U D64 filenames against their visible directory
+4. **Complete:** Validate local and native C64U D64 filenames against their visible directory
    while the user types. Disable creation and show a clear red, enlarged
    conflict message before submission; retain both no-replace checks for stale
    lists.
-5. Present invalid General-preference folder messages one point larger and in
+5. **Complete:** Present invalid General-preference folder messages one point larger and in
    red while leaving successful save messages neutral.
 
-After this cleanup passes installed Linux acceptance, implement the opt-in
-replay buffer on the existing recording pipeline. Keep a bounded rolling encoded
-video/audio history, defaulting to 30 seconds, and expose the actual retained
-duration. Saving the recent segment must produce a playable WebM without raw RGB
-retention, must preserve ordinary preview, screenshots and recording, and must
-clean up bounded fragments on failure and quit. Ordinary deterministic tests
-cover export timing, simultaneous recording, low-space and cleanup behavior.
+The installed Linux cleanup passed acceptance at `1.8-replay.1+linux.3`. The
+replay implementation is now active in source behind a default-off General
+preference. It keeps a bounded rolling VP8/Vorbis fragment history, defaults to
+30 seconds, reports the actual retained duration, and remuxes an immutable
+snapshot into a playable WebM while preview and ordinary recording continue.
+Raw RGB history is not retained. Temporary ring and export fragments are
+cleaned after stop, failure, export, and quit. Deterministic tests cover bounded
+export duration, simultaneous recording input, low-space rejection, preference
+validation, and cleanup. Installed Linux acceptance remains before Section 5 is
+complete; cross-platform packages wait for that acceptance.
 Cross-platform packages wait until the complete section passes Linux acceptance.
 
 ## Current milestone: Linux hardening

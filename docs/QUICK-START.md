@@ -178,7 +178,15 @@ Reboot the C64 when needed. Argonaut does not include ROM images.
    for a WebM recording. Enable audio before starting preview to include sound.
 5. Stop recording and preview when finished.
 
-Screenshot and recording dialogs remember their chosen folders when those
+Instant replay is opt-in. Enable **Keep a 30-second instant replay while
+previewing** under Preferences → General before starting preview. Streams then
+shows the actual encoded history retained. Choose **Save recent 30 seconds…**
+to write that history as a WebM while preview and an ordinary recording keep
+running. Argonaut stores bounded encoded fragments rather than a raw RGB frame
+history and removes its temporary fragments when preview stops or Argonaut
+closes.
+
+Screenshot, recording, and replay dialogs remember their chosen folders when those
 folders remain available. Starting preview can replace existing C64U video/debug
 and audio streams.
 

@@ -93,6 +93,47 @@ class PreferencesUI(unittest.TestCase):
         self.assertIsNone(self.app.preferences_dialog)
         self.assertEqual(Preferences(self.app.preferences.path).load().app_options['preview_scale'],175)
 
+    def test_instant_replay_is_an_explicit_saved_opt_in(self):
+        from c64u_browser.app_preferences import show_preferences
+        from c64u_browser.profiles import Preferences
+        dialog=show_preferences(self.app);self.pump()
+        general=dialog.pages.get_nth_page(0)
+        replay=next(w for w in self.walk(general)
+                    if isinstance(w,self.Gtk.CheckButton) and
+                    w.get_label()=='Keep a 30-second instant replay while previewing')
+        self.assertFalse(replay.get_active())
+        self.assertIn('off',self.app.streams_tab.replay_status.get_text())
+        replay.set_active(True);self.pump()
+        self.assertTrue(Preferences(self.app.preferences.path).load().app_options[
+            'replay_enabled'])
+        self.assertIn('enabled',self.app.streams_tab.replay_status.get_text())
+        dialog.response(self.Gtk.ResponseType.CLOSE)
+
+    def test_preview_feeds_replay_and_normal_recording_together(self):
+        import threading
+        from unittest.mock import Mock
+        tab=self.app.streams_tab
+        self.app.preferences.app_options['replay_enabled']=True
+        receiver=Mock()
+        packed=bytes(384*240//2);samples=[bytes(768)]
+        receiver.take.return_value=((240,packed),samples)
+        receiver.frames=1;receiver.last_audio=time.monotonic()
+        receiver.last_video=time.monotonic();receiver.started=time.monotonic()
+        session=Mock(receiver=receiver,stopping=threading.Event(),with_audio=True)
+        session.thread.is_alive.return_value=True
+        tab.session=session
+        recorder=Mock(finishing=False);tab.recorder=recorder
+        replay=Mock(height=240,seconds=30,audio=True,retained_seconds=1.0)
+        with patch('c64u_browser.replay_buffer.ReplayBuffer',return_value=replay):
+            self.assertTrue(tab.tick())
+        recorder.feed.assert_called_once()
+        replay.feed.assert_called_once()
+        self.assertEqual(recorder.feed.call_args.args[1],samples)
+        self.assertEqual(replay.feed.call_args.args[1],samples)
+        self.assertEqual(recorder.feed.call_args.args[0][0],240)
+        self.assertEqual(replay.feed.call_args.args[0],recorder.feed.call_args.args[0])
+        tab.recorder=None;tab.replay=None;tab.session=None
+
     def test_unchanged_missing_legacy_folder_does_not_trap_preferences(self):
         from c64u_browser.app_preferences import show_preferences
         missing=str(Path(self.temp.name)/'removed-screenshot-folder')
