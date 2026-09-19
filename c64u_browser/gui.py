@@ -159,8 +159,9 @@ class Browser(Gtk.Application):
         css = Gtk.CssProvider()
         css.load_from_data(
             b'.argonaut-file-pane { border: 2px solid transparent; border-radius: 6px; padding: 4px; }\n'
-            b'.argonaut-file-pane-active { border-color: @accent_bg_color; }\n'
-            b'.argonaut-file-pane-inactive row:selected { background-color: alpha(@accent_bg_color, 0.30); color: @window_fg_color; }')
+            b'.argonaut-file-pane-active { border-color: #3584e4; }\n'
+            b'.argonaut-file-pane-inactive row:selected { background-color: alpha(@window_fg_color, 0.14); }\n'
+            b'.argonaut-file-pane-inactive row:selected label { color: @window_fg_color; }')
         Gtk.StyleContext.add_provider_for_display(
             self.window.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.file_pane_css = css
@@ -241,6 +242,12 @@ class Browser(Gtk.Application):
         listing.set_activate_on_single_click(False)
         listing.connect('row-activated', lambda _, row: self.activate_row(local, row))
         scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
+        activate_pane = Gtk.GestureClick(button=1)
+        activate_pane.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        activate_pane.connect(
+            'pressed', lambda *_: (self.set_active_file_pane(local),
+                                   listing.grab_focus()))
+        scroll.add_controller(activate_pane)
         listing.set_vexpand(True)
         click = Gtk.GestureClick(button=3)
         click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
