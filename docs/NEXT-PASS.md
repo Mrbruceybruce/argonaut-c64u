@@ -224,8 +224,12 @@ or a disk-directory window restores focus to the main window. A remote
 D64/G64/D71/G71/D81 context menu can prepare the selected image for Drive A and
 open **Drives**; mounting still uses the existing reviewed confirmation. The
 C64U settings tab is now labeled **Ultimate Menu**. These changes pass all 433
-source tests in normal and optimized modes and all 32 package checks; installed
-Linux acceptance remains.
+source tests in normal and optimized modes. Installed Development package
+`1.7-disk.14+linux.1` at exact build `593e0b7` passed all 32 package checks on
+2026-09-19. Extraction folder/refresh/selection, both focus restorations,
+right-click mount preparation and confirmation, and the **Ultimate Menu** label
+all passed physical Linux acceptance. The section is frozen for the final
+Windows, Apple Silicon Mac, and Intel Mac package and physical regression gate.
 
 ## Current milestone: Linux hardening
 

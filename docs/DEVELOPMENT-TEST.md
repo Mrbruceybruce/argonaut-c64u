@@ -1,4 +1,4 @@
-# Argonaut 1.7-disk.13 — Section 4 cross-platform testing
+# Argonaut 1.7-disk.14 — Section 4 cross-platform testing
 
 This build completes the authentic disk-image management roadmap section. It
 keeps Development profiles, preferences, reports, and build identity separate
@@ -15,8 +15,12 @@ Section 4 adds:
 - validated D64 REL removal that reclaims both data and side sectors;
 - protected D81 CBM partitions that remain allocated and cannot be removed;
 - **Save as…** publication to a new validated local image without replacement;
+- extraction into the visible local folder with automatic refresh and selection;
+- right-click **Mount…** preparation for remote D64/G64/D71/G71/D81 images;
 - source and destination selection after successful copy/paste or drag-and-drop;
 - a local-files preference that hides hidden entries by default;
+- the C64U settings tab labeled **Ultimate Menu**, with main-window focus
+  restored after closing Preferences or a disk directory;
 - Return-to-send Streams input that clears after success and remains ready for
   the next command.
 
@@ -79,39 +83,48 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows `1.7-disk.13` and the source commit shown for this release.
-2. Open the supplied **Test Disk Images** D64, D71, and D81 fixtures. Confirm
+1. Confirm About shows `1.7-disk.14` and the source commit shown for this release.
+2. Confirm the settings tab is labeled **Ultimate Menu**. Close Preferences and
+   confirm keyboard focus returns to the main Argonaut window.
+3. Open a supplied disk fixture and choose **Extract selected…**. Confirm the
+   chooser opens in the folder shown in the local Files pane. Complete the
+   extraction and confirm the new file appears selected without a manual
+   refresh. Close the disk directory and confirm focus returns to Argonaut.
+4. On the C64U side of Files, right-click a D64, G64, D71, G71, or D81 and
+   choose **Mount…**. Confirm Drives opens with the complete image path prepared
+   for Drive A. Confirm no mount occurs until the existing review is accepted.
+5. Open the supplied **Test Disk Images** D64, D71, and D81 fixtures. Confirm
    each directory opens, validates, reports free blocks, and extracts its large
    test file. Confirm the D81 CBM entry is labeled as a partition and cannot be
    opened as a folder.
-3. On copied standard D64, D71, and D81 images, stage a rename and add a small
+6. On copied standard D64, D71, and D81 images, stage a rename and add a small
    PRG. Use **Save as…** for each and confirm the chooser opens in the folder
    currently shown in the local Files pane. Reopen each output and confirm both
    changes. Cancel another staged edit and confirm the source remains unchanged.
    Confirm the D81 CBM partition cannot be removed.
-4. Create a blank D64 with a chosen label and two-character ID. Reopen it and
+7. Create a blank D64 with a chosen label and two-character ID. Reopen it and
    confirm it validates, has no files, and reports 664 blocks free.
-5. Open the supplied REL D64 fixture, remove its REL entry, save it under a new
+8. Open the supplied REL D64 fixture, remove its REL entry, save it under a new
    name, and confirm the result validates and reports 664 blocks free. On a
    C64U directory listing, confirm the fixture's `RELTEST` label and `RELFILE`
    entry use normal readable characters.
-6. Copy one item between the local and C64U panes with Copy/Paste, then another
+9. Copy one item between the local and C64U panes with Copy/Paste, then another
    with drag-and-drop. After each success, confirm both the source item and new
    destination copy remain selected.
-7. In the local Files pane, confirm hidden files are initially absent. Enable
+10. In the local Files pane, confirm hidden files are initially absent. Enable
    **Preferences → General → Show hidden local files and folders**, confirm they
    appear, then disable it and confirm they disappear.
-8. Connect to a C64U at BASIC READY. In Streams, enter `PRINT "ONE"` and press
+11. Connect to a C64U at BASIC READY. In Streams, enter `PRINT "ONE"` and press
    Return, then enter `PRINT "TWO"` without clicking the input again. Confirm
    each command sends, the field clears, and focus remains ready for the next
    line. Video preview is not required.
-9. Run **Run offline checks** in Test Lab and confirm every check passes. Connect
+12. Run **Run offline checks** in Test Lab and confirm every check passes. Connect
    the C64U, run **Run C64U checks**, and confirm all read-only checks pass.
-10. Check upload/download, Ultimate Menu, Drives, video/audio preview, screenshot,
+13. Check upload/download, Ultimate Menu, Drives, video/audio preview, screenshot,
    recording, Mount & Run, Preferences persistence, and Quit as core regression
    checks.
 
-The release's source commit differs from Linux-accepted build `9976230` only in
+The release's source commit differs from Linux-accepted build `593e0b7` only in
 this cross-platform checklist, bundle metadata, and fixture packaging. No
 application code changed after Linux acceptance.
 

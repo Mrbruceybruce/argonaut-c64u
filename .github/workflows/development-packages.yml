@@ -1,6 +1,6 @@
 name: Development Windows and Mac packages
 env:
-  ARGONAUT_DEV_VERSION: 1.7-disk.13
+  ARGONAUT_DEV_VERSION: 1.7-disk.14
 'on':
   workflow_dispatch:
     inputs:
