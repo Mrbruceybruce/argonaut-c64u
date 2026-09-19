@@ -231,6 +231,26 @@ right-click mount preparation and confirmation, and the **Ultimate Menu** label
 all passed physical Linux acceptance. The section is frozen for the final
 Windows, Apple Silicon Mac, and Intel Mac package and physical regression gate.
 
+### Section 4 follow-up: create a D64 directly on the C64U
+
+Add **New D64 disk…** to the remote Files pane when the current C64U folder is
+writable. The action creates a formatted standard 35-track D64 in that folder,
+without requiring the user to create it locally and upload it afterward.
+
+1. Ask for the `.d64` filename and Commodore disk label before creating it.
+2. Refuse an invalid name, a read-only destination, or an existing remote file;
+   never replace a file implicitly.
+3. Use the C64U's native `create_d64` operation only after confirming that the
+   connected firmware supports it, and report unsupported firmware clearly.
+4. Refresh the current remote folder and select the new image after success.
+5. Read the completed image back, validate its size, header, directory, BAM, and
+   free-block count with Argonaut's existing D64 parser, and keep the ordinary
+   code-determined verdict separate from any AI diagnosis.
+6. Record a sanitized structured operation result and add deterministic API,
+   conflict, validation, and UI tests.
+7. Complete installed Linux and physical C64U acceptance before including the
+   feature in the next Section 4 package gate.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
