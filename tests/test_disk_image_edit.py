@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from c64u_browser.api import BrowserError
-from c64u_browser.disk_image import D64Image, DiskImageError
+from c64u_browser.disk_image import D64Image, DiskImageError, sectors_on_track
 from c64u_browser.disk_image_edit import (
     D64EditSession, create_blank_d64_image, encode_disk_id,
     encode_petscii_name)
@@ -11,6 +11,7 @@ from c64u_browser.disk_image_io import save_edited_copy
 
 
 FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-authentic.d64'
+REL_FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-rel.d64'
 
 
 class D64EditTests(unittest.TestCase):
@@ -37,6 +38,24 @@ class D64EditTests(unittest.TestCase):
         self.session.discard()
         self.assertFalse(self.session.dirty)
         self.assertEqual(self.session.image.source_bytes, self.original)
+
+    def test_remove_rel_releases_data_and_side_sectors(self):
+        original = REL_FIXTURE.read_bytes()
+        session = D64EditSession(D64Image(original))
+        before = session.image.directory()
+        self.assertEqual(before.blocks_free, 658)
+        session.remove(before.entries[0])
+        changed = session.image.directory()
+        self.assertEqual((changed.entries, changed.blocks_free), ((), 664))
+        self.assertTrue(session.image.validate().standard_compatible)
+        self.assertEqual(REL_FIXTURE.read_bytes(), original)
+
+    def test_remove_rel_rejects_damaged_side_sector_without_changes(self):
+        damaged = bytearray(REL_FIXTURE.read_bytes())
+        side = (sum(sectors_on_track(track) for track in range(1, 17)) + 10) * 256
+        damaged[side + 3] = 41
+        with self.assertRaisesRegex(DiskImageError, 'Repair the D64 structure'):
+            D64EditSession(D64Image(damaged))
 
     def test_adds_multisector_file_with_authentic_chain_and_bam(self):
         payload = bytes((index * 13) % 256 for index in range(700))

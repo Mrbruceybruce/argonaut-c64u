@@ -36,6 +36,9 @@ class DiskDirectoryEntry:
     directory_track: int
     directory_sector: int
     directory_slot: int
+    side_track: int = 0
+    side_sector: int = 0
+    record_length: int = 0
     partition_kind: str = ''
 
 
@@ -191,6 +194,9 @@ class D64Image:
                     directory_track=track,
                     directory_sector=sector,
                     directory_slot=index,
+                    side_track=block[start + 19],
+                    side_sector=block[start + 20],
+                    record_length=block[start + 21],
                 ))
             track, sector = block[0], block[1]
 
@@ -224,11 +230,13 @@ class D64Image:
 
         result = bytearray()
         seen = set()
+        locations = []
         while track:
             location = (track, sector)
             if location in seen:
                 raise DiskImageError(f'{entry.name} contains a loop in its file chain.')
             seen.add(location)
+            locations.append(location)
             block = self.sector(track, sector)
             next_track, next_sector = block[0], block[1]
             if next_track == 0:
@@ -242,7 +250,78 @@ class D64Image:
             track, sector = next_track, next_sector
             if len(seen) > self.geometry.sectors:
                 raise DiskImageError(f'{entry.name} file chain is longer than the disk.')
-        return bytes(result), tuple(seen)
+        return bytes(result), tuple(locations)
+
+    def _rel_side_chain(self, entry):
+        """Validate a 1541 REL side-sector chain and return its occupied sectors."""
+        if not isinstance(entry, DiskDirectoryEntry):
+            raise TypeError('entry must be a DiskDirectoryEntry')
+        if entry.file_type != 'REL':
+            return ()
+        if not 1 <= entry.record_length <= 254:
+            raise DiskImageError(f'{entry.name} has an invalid REL record length.')
+        if entry.side_track == 0:
+            raise DiskImageError(f'{entry.name} has no REL side-sector chain.')
+
+        locations = []
+        data_locations = []
+        groups = []
+        seen = set()
+        track, sector = entry.side_track, entry.side_sector
+        while track:
+            location = (track, sector)
+            if location in seen:
+                raise DiskImageError(f'{entry.name} contains a loop in its REL side sectors.')
+            if len(locations) >= 6:
+                raise DiskImageError(f'{entry.name} has too many 1541 REL side sectors.')
+            seen.add(location)
+            locations.append(location)
+            block = self.sector(track, sector)
+            if block[2] != len(locations) - 1:
+                raise DiskImageError(f'{entry.name} has an invalid REL side-sector number.')
+            if block[3] != entry.record_length:
+                raise DiskImageError(f'{entry.name} has inconsistent REL record lengths.')
+            groups.append(bytes(block[4:16]))
+            ended = False
+            for offset in range(16, 256, 2):
+                data_track, data_sector = block[offset], block[offset + 1]
+                if data_track == 0:
+                    if data_sector != 0:
+                        raise DiskImageError(
+                            f'{entry.name} has an invalid REL data-sector pointer.')
+                    ended = True
+                    continue
+                if ended:
+                    raise DiskImageError(
+                        f'{entry.name} has a gap in its REL data-sector index.')
+                # Reading validates the track and sector against this image geometry.
+                self.sector(data_track, data_sector)
+                data_locations.append((data_track, data_sector))
+            track, sector = block[0], block[1]
+
+        if any(group != groups[0] for group in groups[1:]):
+            raise DiskImageError(f'{entry.name} has inconsistent REL side-sector groups.')
+        group_locations = []
+        ended = False
+        for offset in range(0, 12, 2):
+            group_track, group_sector = groups[0][offset], groups[0][offset + 1]
+            if group_track == 0:
+                if group_sector != 0:
+                    raise DiskImageError(
+                        f'{entry.name} has an invalid REL side-sector group pointer.')
+                ended = True
+                continue
+            if ended:
+                raise DiskImageError(f'{entry.name} has a gap in its REL side-sector group.')
+            group_locations.append((group_track, group_sector))
+        if tuple(group_locations) != tuple(locations):
+            raise DiskImageError(f'{entry.name} REL side-sector group does not match its chain.')
+        if len(set(data_locations)) != len(data_locations):
+            raise DiskImageError(f'{entry.name} repeats a REL data-sector pointer.')
+        _, file_locations = self._file_chain(entry)
+        if tuple(data_locations) != tuple(file_locations):
+            raise DiskImageError(f'{entry.name} REL index does not match its file chain.')
+        return tuple(locations)
 
     def validate(self):
         """Report standard directory/file-chain issues without rejecting the image."""
@@ -282,19 +361,23 @@ class D64Image:
                 checked += 1
                 try:
                     _, sectors = self._file_chain(entry)
+                    side_sectors = self._rel_side_chain(entry)
                 except DiskImageError:
                     issues.append(f'entry.{index}.chain')
                     continue
-                if len(sectors) != entry.blocks:
+                all_sectors = (*sectors, *side_sectors)
+                if len(all_sectors) != entry.blocks:
                     issues.append(f'entry.{index}.block_count')
-                if occupied.intersection(sectors):
+                if len(set(all_sectors)) != len(all_sectors):
                     issues.append(f'entry.{index}.cross_link')
-                for track, sector in sectors:
+                elif occupied.intersection(all_sectors):
+                    issues.append(f'entry.{index}.cross_link')
+                for track, sector in all_sectors:
                     location = 4 + (track - 1) * 4
                     if header[location + 1 + sector // 8] & (1 << (sector % 8)):
                         issues.append(f'entry.{index}.marked_free')
                         break
-                occupied.update(sectors)
+                occupied.update(all_sectors)
             return D64Validation(
                 standard_compatible=not issues,
                 entries_checked=checked,

@@ -6,6 +6,7 @@ from c64u_browser.disk_image import D64Image, DiskImageError, sectors_on_track
 
 
 FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-authentic.d64'
+REL_FIXTURE = Path(__file__).with_name('fixtures') / 'vice-1541-rel.d64'
 
 
 class D64ImageTests(unittest.TestCase):
@@ -42,6 +43,26 @@ class D64ImageTests(unittest.TestCase):
         self.assertTrue(validation.standard_compatible)
         self.assertEqual(validation.entries_checked, 2)
         self.assertEqual(validation.issues, ())
+
+    def test_validates_vice_rel_data_and_side_sector_chains(self):
+        image = D64Image.from_path(REL_FIXTURE)
+        entry = image.directory().entries[0]
+        self.assertEqual(
+            (entry.name, entry.file_type, entry.blocks, entry.side_track,
+             entry.side_sector, entry.record_length),
+            ('RELFILE', 'REL', 6, 17, 10, 40))
+        self.assertEqual(image._rel_side_chain(entry), ((17, 10),))
+        self.assertEqual(image._file_chain(entry)[1],
+                         ((17, 0), (17, 11), (17, 1), (17, 12), (17, 2)))
+        self.assertTrue(image.validate().standard_compatible)
+
+    def test_rejects_damaged_rel_side_sector_index(self):
+        data = bytearray(REL_FIXTURE.read_bytes())
+        side = (sum(sectors_on_track(track) for track in range(1, 17)) + 10) * 256
+        data[side + 3] = 41
+        validation = D64Image(data).validate()
+        self.assertFalse(validation.standard_compatible)
+        self.assertEqual(validation.issues, ('entry.1.chain',))
 
     def test_parsing_does_not_change_any_source_byte(self):
         before = hashlib.sha256(self.data).digest()

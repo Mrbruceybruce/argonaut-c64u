@@ -157,7 +157,7 @@ class DiskImageDialog:
         self.add_button.set_sensitive(editable)
         self.rename_button.set_sensitive(editable and selected)
         self.remove_button.set_sensitive(
-            editable and selected and row.entry.file_type in ('PRG', 'SEQ', 'USR')
+            editable and selected and row.entry.file_type in ('PRG', 'SEQ', 'USR', 'REL')
             and row.entry.closed and not row.entry.locked)
         dirty = editable and self.session.dirty
         self.discard_button.set_sensitive(dirty)

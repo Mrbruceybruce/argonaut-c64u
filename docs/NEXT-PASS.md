@@ -132,12 +132,22 @@ Section 4 continues on Linux before another cross-platform release gate:
    or an explicit read-only scope over pretending copy-protected tracks are a
    normal CBM DOS directory.
 
-Blank D64 creation now has deterministic source coverage. The generated image
-is exactly 174,848 bytes, reserves the BAM and first directory sector, reports
-664 blocks free, uses hardware-readable PETSCII for its label and ID, and accepts
-the existing staged PRG/SEQ/USR editor. VICE `c1541` independently lists and
-validates the generated image. Installed Linux and physical C64U acceptance are
-next.
+Blank D64 creation passed installed Linux and physical C64U acceptance on
+2026-09-18. The generated image is exactly 174,848 bytes, reserves the BAM and
+first directory sector, reports 664 blocks free, uses hardware-readable PETSCII
+for its label and ID, and accepts the existing staged PRG/SEQ/USR editor. All 26
+packaged checks passed at build `8b6a334`. VICE `c1541` independently listed and
+validated the image; the physical C64U displayed `ARGONAUT BLANK`, ID `A8`, DOS
+`2A`, and `664 BLOCKS FREE`.
+
+Safe D64 REL removal now validates the directory record length, the complete
+side-sector chain and group, and every indexed data-sector pointer before it can
+be staged. Removal releases both the data and side sectors while preserving the
+source image. A VICE `c1541` fixture with five data sectors and one side sector
+passes Argonaut validation; Argonaut and VICE then produce byte-identical images
+after removing it, each reporting an empty disk with 664 blocks free. Installed
+Linux UI and physical C64U acceptance are next. REL creation remains deferred
+until its record behavior can be implemented and independently exercised.
 
 ## Current milestone: Linux hardening
 

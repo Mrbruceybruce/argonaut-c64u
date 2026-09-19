@@ -68,6 +68,8 @@ Open a D64, D71, or D81 to view its authentic Commodore directory. Standard
 35-track D64 images can stage filename changes, file removal, and PRG/SEQ/USR
 additions. Argonaut validates the complete result and saves it as a new local
 D64; it never rewrites the source image or replaces an existing destination.
+REL removal includes its indexed data and side sectors; creating new REL files
+is not yet supported.
 Use **New D64 disk…** in the local Files toolbar to create a validated blank
 35-track image with a C64 disk label and two-character ID. The new image starts
 with 664 blocks free and is opened immediately for file additions.

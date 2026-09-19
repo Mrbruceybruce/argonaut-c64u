@@ -55,7 +55,7 @@ def run(package_metadata, report_path):
         from .about import show_about
         from .credentials import Credentials
         from .disk_image import D64Image, D71Image, D81Image, sectors_on_track
-        from .disk_image_edit import create_blank_d64_image
+        from .disk_image_edit import D64EditSession, create_blank_d64_image
         from .disk_image_dialog import DiskImageDialog
         from .gui import Browser
         from .platform_support import local_roots, portable_root, publish_new
@@ -104,6 +104,34 @@ def run(package_metadata, report_path):
                      blank.validate().standard_compatible,
                      'disk.blank_d64',
                      'Blank D64 creation is not structurally valid.', checks)
+            rel_data = bytearray(blank.source_bytes)
+            sector_number = lambda track, sector: sum(
+                sectors_on_track(value) for value in range(1, track)) + sector
+            rel_data_offset = sector_number(17, 0) * 256
+            rel_side_offset = sector_number(17, 10) * 256
+            rel_bam = sector_number(18, 0) * 256 + 4 + 16 * 4
+            for sector in (0, 10):
+                rel_data[rel_bam] -= 1
+                rel_data[rel_bam + 1 + sector // 8] &= ~(1 << (sector % 8))
+            rel_data[rel_data_offset:rel_data_offset + 3] = bytes((0, 2, 0x41))
+            rel_data[rel_side_offset:rel_side_offset + 18] = bytes(
+                (0, 17, 0, 40, 17, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 0))
+            rel_directory = sector_number(18, 1) * 256 + 2
+            rel_data[rel_directory:rel_directory + 30] = bytes(30)
+            rel_data[rel_directory:rel_directory + 3] = bytes((0x84, 17, 0))
+            rel_data[rel_directory + 3:rel_directory + 19] = (
+                b'PACKAGE REL' + b'\xa0' * 5)
+            rel_data[rel_directory + 19:rel_directory + 22] = bytes((17, 10, 40))
+            rel_data[rel_directory + 28:rel_directory + 30] = bytes((2, 0))
+            rel_image = D64Image(rel_data)
+            rel_session = D64EditSession(rel_image)
+            rel_entry = rel_session.image.directory().entries[0]
+            rel_session.remove(rel_entry)
+            _require(rel_image.validate().standard_compatible and
+                     rel_session.image.directory().blocks_free == 664 and
+                     not rel_session.image.directory().entries,
+                     'disk.rel_remove',
+                     'REL data and side sectors were not removed safely.', checks)
             create_dialog = app.new_d64()
             create_entries = app.d64_create_entries
             _require(create_dialog.get_title() == 'Create blank D64 disk' and
@@ -112,6 +140,12 @@ def run(package_metadata, report_path):
                      'ui.blank_d64',
                      'Blank D64 creation controls are incorrect.', checks)
             create_dialog.response(Gtk.ResponseType.CANCEL)
+            rel_dialog = DiskImageDialog(app, 'Package REL check', rel_image)
+            rel_row = rel_dialog.listing.get_first_child()
+            rel_dialog.listing.select_row(rel_row)
+            _require(rel_dialog.remove_button.get_sensitive(), 'ui.rel_remove',
+                     'A valid unlocked REL file cannot be staged for removal.', checks)
+            rel_dialog.dialog.destroy()
             image_data = bytearray(174848)
             header_offset = sum(sectors_on_track(track)
                                 for track in range(1, 18)) * 256

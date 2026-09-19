@@ -107,8 +107,9 @@ exactly two-character disk ID. Argonaut creates a standard blank 35-track D64,
 validates it, and opens its flat Commodore directory with 664 blocks free.
 
 In a standard D64 directory window, you can stage filename changes, scratch
-supported files, or add local PRG, SEQ, and USR files. Choose the save action to
-publish the complete edited image under a new local filename. Argonaut does not
+PRG, SEQ, USR, or structurally valid REL files, or add local PRG, SEQ, and USR
+files. Choose the save action to publish the complete edited image under a new
+local filename. Argonaut does not
 rewrite the source image or replace an existing destination. D71 and D81 images
 remain read-only in this release.
 

@@ -218,17 +218,15 @@ class D64EditSession:
             before = self._data[:]
             try:
                 current = self._current_entry(entry)
-                if current.file_type == 'REL':
-                    raise DiskImageError(
-                        'REL files need side-sector support before they can be removed safely.')
                 if current.locked:
                     raise DiskImageError('This disk file is locked and was not removed.')
                 if not current.closed:
                     raise DiskImageError('This disk file is open or incomplete and was not removed.')
-                if current.file_type not in _TYPE_CODES:
+                if current.file_type not in (*_TYPE_CODES, 'REL'):
                     raise DiskImageError('This disk file type cannot be removed safely.')
                 _, sectors = self.image._file_chain(current)
-                for track, sector in sectors:
+                side_sectors = self.image._rel_side_chain(current)
+                for track, sector in (*sectors, *side_sectors):
                     self._set_free(track, sector, True)
                 offset = (self._offset(current.directory_track, current.directory_sector)
                           + 2 + current.directory_slot * 32)
