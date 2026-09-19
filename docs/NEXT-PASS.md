@@ -198,6 +198,15 @@ selection were confirmed in the installed UI. The section is frozen for its
 Windows, Apple Silicon Mac, and Intel Mac build and physical regression gate;
 no application-code changes follow this Linux-accepted build.
 
+Windows physical testing of `1.7-disk.12` found two follow-ups. The supplied
+VICE REL fixture retained VICE's high-bit host-text encoding in its original
+disk label and REL filename, which rendered those original characters as
+graphic/reverse-video text on the C64U even though newly edited names were
+hardware-readable. The fixture is normalized to the same `$41-$5A` PETSCII
+range already required by Argonaut's editor without changing any REL, BAM, or
+sector-chain structure. **Save as…** also refreshes the visible local directory
+and selects the newly published image, removing the need for a manual refresh.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

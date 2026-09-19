@@ -315,6 +315,9 @@ class DiskImageDialog:
                 if isinstance(result, Exception):
                     self.status.set_text(str(result))
                 else:
+                    destination = Path(result['path'])
+                    if destination.parent.resolve() == self.app.local.resolve():
+                        self.app.refresh_local((destination.name,))
                     self.status.set_text(
                         f'Saved validated copy with {result["changes"]} staged change(s) '
                         f'to {result["path"]}. The source image was unchanged.')

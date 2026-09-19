@@ -43,6 +43,8 @@ class D64EditTests(unittest.TestCase):
         original = REL_FIXTURE.read_bytes()
         session = D64EditSession(D64Image(original))
         before = session.image.directory()
+        self.assertEqual(before.raw_disk_name[:7], b'RELTEST')
+        self.assertEqual(before.entries[0].raw_name[:7], b'RELFILE')
         self.assertEqual(before.blocks_free, 658)
         session.remove(before.entries[0])
         changed = session.image.directory()
