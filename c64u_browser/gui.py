@@ -160,6 +160,10 @@ class Browser(Gtk.Application):
         css.load_from_data(
             b'.argonaut-file-pane { border: 2px solid transparent; border-radius: 6px; padding: 4px; }\n'
             b'.argonaut-file-pane-active { border-color: #3584e4; }\n'
+            b'.argonaut-file-pane-inactive button { opacity: 0.78; }\n'
+            b'.argonaut-file-pane-inactive button:disabled { opacity: 0.45; }\n'
+            b'.argonaut-file-pane-inactive button.suggested-action { background-image: none; background-color: #77767b; color: #ffffff; }\n'
+            b'.argonaut-file-pane-inactive entry { background-color: alpha(@window_fg_color, 0.06); }\n'
             b'.argonaut-file-pane-inactive row:selected { background-color: #5e5c64; color: #ffffff; }\n'
             b'.argonaut-file-pane-inactive row:selected label { color: #ffffff; }')
         Gtk.StyleContext.add_provider_for_display(
