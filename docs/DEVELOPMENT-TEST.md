@@ -1,4 +1,4 @@
-# Argonaut 1.7-disk.12 — Section 4 cross-platform testing
+# Argonaut 1.7-disk.13 — Section 4 cross-platform testing
 
 This build completes the authentic disk-image management roadmap section. It
 keeps Development profiles, preferences, reports, and build identity separate
@@ -79,19 +79,22 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows `1.7-disk.12` and the source commit shown for this release.
+1. Confirm About shows `1.7-disk.13` and the source commit shown for this release.
 2. Open the supplied **Test Disk Images** D64, D71, and D81 fixtures. Confirm
    each directory opens, validates, reports free blocks, and extracts its large
    test file. Confirm the D81 CBM entry is labeled as a partition and cannot be
    opened as a folder.
 3. On copied standard D64, D71, and D81 images, stage a rename and add a small
-   PRG. Use **Save as…** for each, reopen each output, and confirm both changes.
-   Cancel another staged edit and confirm the source remains unchanged. Confirm
-   the D81 CBM partition cannot be removed.
+   PRG. Use **Save as…** for each and confirm the chooser opens in the folder
+   currently shown in the local Files pane. Reopen each output and confirm both
+   changes. Cancel another staged edit and confirm the source remains unchanged.
+   Confirm the D81 CBM partition cannot be removed.
 4. Create a blank D64 with a chosen label and two-character ID. Reopen it and
    confirm it validates, has no files, and reports 664 blocks free.
 5. Open the supplied REL D64 fixture, remove its REL entry, save it under a new
-   name, and confirm the result validates and reports 664 blocks free.
+   name, and confirm the result validates and reports 664 blocks free. On a
+   C64U directory listing, confirm the fixture's `RELTEST` label and `RELFILE`
+   entry use normal readable characters.
 6. Copy one item between the local and C64U panes with Copy/Paste, then another
    with drag-and-drop. After each success, confirm both the source item and new
    destination copy remain selected.
@@ -108,7 +111,7 @@ remaining display, network, media, and C64U hardware behavior.
    recording, Mount & Run, Preferences persistence, and Quit as core regression
    checks.
 
-The release's source commit differs from Linux-accepted build `b00a692` only in
+The release's source commit differs from Linux-accepted build `9976230` only in
 this cross-platform checklist, bundle metadata, and fixture packaging. No
 application code changed after Linux acceptance.
 

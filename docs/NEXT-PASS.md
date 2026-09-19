@@ -209,6 +209,13 @@ and selects the newly published image, removing the need for a manual refresh.
 Its file browser opens in the folder currently shown in Argonaut's local Files
 pane so the save destination and subsequent selection are clear.
 
+The `1.7-disk.13` correction passed installed Linux acceptance on 2026-09-18 at
+exact build `9976230`. All 30 packaged checks passed. **Save as…** opened in the
+visible local folder, refreshed it, and selected the published image. The
+normalized REL fixture mounted on the physical C64U with both `RELTEST` and
+`RELFILE` displayed as normal readable text. The corrected section is frozen
+again for Windows, Apple Silicon Mac, and Intel Mac packaging and regression.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
