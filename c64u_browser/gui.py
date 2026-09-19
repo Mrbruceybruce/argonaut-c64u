@@ -165,7 +165,8 @@ class Browser(Gtk.Application):
             b'.argonaut-file-pane-inactive button.suggested-action { background-image: none; background-color: #77767b; color: #ffffff; }\n'
             b'.argonaut-file-pane-inactive entry { background-color: alpha(@window_fg_color, 0.06); }\n'
             b'.argonaut-file-pane-inactive row:selected { background-color: #5e5c64; color: #ffffff; }\n'
-            b'.argonaut-file-pane-inactive row:selected label { color: #ffffff; }')
+            b'.argonaut-file-pane-inactive row:selected label { color: #ffffff; }\n'
+            b'.argonaut-error-message { color: #c01c28; font-size: 1.083333em; }')
         Gtk.StyleContext.add_provider_for_display(
             self.window.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.file_pane_css = css
@@ -254,8 +255,7 @@ class Browser(Gtk.Application):
         activate_pane = Gtk.GestureClick(button=1)
         activate_pane.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         activate_pane.connect(
-            'pressed', lambda *_: (self.set_active_file_pane(local),
-                                   listing.grab_focus()))
+            'pressed', lambda *_: self.activate_file_pane_pointer(local))
         scroll.add_controller(activate_pane)
         listing.set_vexpand(True)
         click = Gtk.GestureClick(button=3)
@@ -291,6 +291,10 @@ class Browser(Gtk.Application):
             base = 'Local files' if pane_local else 'C64 Ultimate files'
             self.file_pane_labels[pane_local].set_text(
                 base + (' · Active' if active else ''))
+
+    def activate_file_pane_pointer(self, local):
+        """Activate a pane without focusing a list row and moving its viewport."""
+        self.set_active_file_pane(local)
 
     def populate(self, listing, entries):
         while listing.get_first_child(): listing.remove(listing.get_first_child())
@@ -898,12 +902,15 @@ class Browser(Gtk.Application):
             xalign=0, wrap=True, selectable=True))
         filename = Gtk.Entry(text='new-disk.d64', hexpand=True)
         disk_name = Gtk.Entry(text='UNTITLED', max_length=16, hexpand=True)
-        disk_id = Gtk.Entry(text='64', max_length=2, hexpand=True)
+        disk_id = Gtk.Entry(max_length=2, hexpand=True)
+        from .text_input import uppercase_entry
+        disk_name.connect('changed', uppercase_entry)
+        disk_id.connect('changed', uppercase_entry)
         self.d64_create_entries = (filename, disk_name, disk_id)
         for label, entry in (
                 ('Local filename:', filename),
                 ('C64 disk name (up to 16 characters):', disk_name),
-                ('C64 disk ID (exactly 2 characters):', disk_id)):
+                ('C64 disk ID (exactly 2 characters or none):', disk_id)):
             content.append(Gtk.Label(label=label, xalign=0))
             content.append(entry)
         feedback = Gtk.Label(xalign=0, wrap=True)
@@ -912,13 +919,15 @@ class Browser(Gtk.Application):
 
         def validate(*_):
             leaf = filename.get_text().strip()
+            identifier = disk_id.get_text().strip()
             okay = (bool(leaf and disk_name.get_text().strip())
-                    and len(disk_id.get_text().strip()) == 2
+                    and len(identifier) in (0, 2)
                     and leaf not in ('.', '..')
                     and '/' not in leaf and '\\' not in leaf)
             create.set_sensitive(okay)
             feedback.set_text('' if okay else
-                              'Enter one local filename, a disk name, and a 2-character ID.')
+                              'Enter one local filename and a disk name. '
+                              'Leave the disk ID blank or enter exactly 2 characters.')
             return okay
 
         for entry in self.d64_create_entries:
@@ -979,6 +988,8 @@ class Browser(Gtk.Application):
             xalign=0, wrap=True))
         filename = Gtk.Entry(text='new-disk.d64', hexpand=True)
         disk_name = Gtk.Entry(text='UNTITLED', max_length=16, hexpand=True)
+        from .text_input import uppercase_entry
+        disk_name.connect('changed', uppercase_entry)
         content.append(Gtk.Label(label='C64U filename:', xalign=0))
         content.append(filename)
         content.append(Gtk.Label(
@@ -996,6 +1007,7 @@ class Browser(Gtk.Application):
                     and not any(ord(character) < 32 or ord(character) == 127
                                 for character in leaf + label))
             create.set_sensitive(okay)
+            feedback.remove_css_class('argonaut-error-message')
             feedback.set_text('' if okay else
                               'Enter one ordinary filename and a disk name.')
             return okay
@@ -1014,24 +1026,41 @@ class Browser(Gtk.Application):
             label = disk_name.get_text().strip()
             if code == Gtk.ResponseType.OK and not validate():
                 return
-            dialog.destroy()
-            self.remote_d64_create_prompt = None
             if code != Gtk.ResponseType.OK:
+                dialog.destroy()
+                self.remote_d64_create_prompt = None
                 return
             if not leaf.casefold().endswith('.d64'):
                 leaf += '.d64'
             try:
                 destination = child(folder, leaf)
             except BrowserError as exc:
-                self.status.set_text(str(exc))
+                feedback.add_css_class('argonaut-error-message')
+                feedback.set_text(str(exc))
                 return
+
+            content.set_sensitive(False)
+            create.set_sensitive(False)
+            feedback.remove_css_class('argonaut-error-message')
+            feedback.set_text('Creating and validating the disk image…')
 
             def task():
                 from .disk_image_io import create_remote_blank_d64
-                create_remote_blank_d64(client, destination, label)
-                return client.list_directory(folder), leaf
+                try:
+                    create_remote_blank_d64(client, destination, label)
+                    return client.list_directory(folder), leaf
+                except Exception as exc:
+                    return exc
 
             def done(result):
+                if isinstance(result, Exception):
+                    content.set_sensitive(True)
+                    create.set_sensitive(True)
+                    feedback.add_css_class('argonaut-error-message')
+                    feedback.set_text(str(result))
+                    return
+                dialog.destroy()
+                self.remote_d64_create_prompt = None
                 if self.client is not client:
                     self.status.set_text(
                         'Connection changed after D64 creation; refresh the C64U folder.')

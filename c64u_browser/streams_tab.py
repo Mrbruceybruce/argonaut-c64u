@@ -47,6 +47,8 @@ class StreamsTab:
         self.recorder=None;self.record_chooser=None
         keyboard=Gtk.Box(spacing=8);self.box.append(keyboard)
         self.text_input=Gtk.Entry(placeholder_text='Text for the C64 BASIC READY prompt',hexpand=True,max_length=160)
+        from .text_input import uppercase_entry
+        self.text_input.connect('changed', uppercase_entry)
         keyboard.append(self.text_input)
         self.text_return=Gtk.CheckButton(label='Append Return',active=True);keyboard.append(self.text_return)
         self.text_send=Gtk.Button(label='Send text',sensitive=False);keyboard.append(self.text_send)

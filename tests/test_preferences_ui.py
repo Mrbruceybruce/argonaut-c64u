@@ -111,6 +111,46 @@ class PreferencesUI(unittest.TestCase):
         dialog.response(self.Gtk.ResponseType.CLOSE);self.pump()
         self.assertIs(self.app.preferences_dialog,dialog)
         self.assertEqual(dialog.pages.get_current_page(),0)
+
+    def test_invalid_folder_message_is_visibly_marked_as_an_error(self):
+        from c64u_browser.app_preferences import show_preferences
+        dialog=show_preferences(self.app);self.pump()
+        general=dialog.pages.get_nth_page(0)
+        entries=[w for w in self.walk(general) if isinstance(w,self.Gtk.Entry)]
+        entries[0].set_text(str(Path(self.temp.name)/'does-not-exist'))
+        entries[0].emit('activate');self.pump()
+        self.assertIn('Choose an existing folder',dialog.general_message.get_text())
+        self.assertTrue(dialog.general_message.has_css_class(
+            'argonaut-error-message'))
+
+    def test_c64_visible_text_entries_show_uppercase_before_submission(self):
+        tab=self.app.streams_tab
+        tab.text_input.set_text('print "hello"')
+        self.assertEqual(tab.text_input.get_text(),'PRINT "HELLO"')
+        dialog=self.app.new_d64()
+        _,disk_name,disk_id=self.app.d64_create_entries
+        self.assertEqual(disk_id.get_text(),'')
+        disk_name.set_text('new disk');disk_id.set_text('a1')
+        self.assertEqual((disk_name.get_text(),disk_id.get_text()),
+                         ('NEW DISK','A1'))
+        dialog.response(self.Gtk.ResponseType.CANCEL)
+
+    def test_remote_d64_conflict_stays_in_dialog_with_clear_feedback(self):
+        from unittest.mock import Mock
+        from c64u_browser.api import BrowserError
+        self.app.client=Mock();self.app.remote='/USB2'
+        self.app.run=lambda task,done:done(task())
+        with patch('c64u_browser.disk_image_io.create_remote_blank_d64',
+                   side_effect=BrowserError(
+                       'That filename already exists on the C64U; choose another name.')):
+            dialog=self.app.new_remote_d64()
+            dialog.response(self.Gtk.ResponseType.OK);self.pump()
+        self.assertIs(self.app.remote_d64_create_prompt,dialog)
+        messages=[w for w in self.walk(dialog)
+                  if isinstance(w,self.Gtk.Label) and 'already exists' in w.get_text()]
+        self.assertEqual(len(messages),1)
+        self.assertTrue(messages[0].has_css_class('argonaut-error-message'))
+        dialog.response(self.Gtk.ResponseType.CANCEL)
     def test_device_details_follow_profile_and_save_box_model(self):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Profile,Preferences

@@ -118,7 +118,7 @@ def show_preferences(app, page=0):
                 path=selected.get_path()
                 if path:
                     entry.set_text(path);auto_save_general()
-                else:error.set_text('Choose a local folder.')
+                else:general_message('Choose a local folder.',True)
         chooser.connect('response',chosen);chooser.show()
     for key,label in [('screenshot_folder','Screenshot folder'),('recording_folder','Recording folder')]:
         box.append(Gtk.Label(label=label,xalign=0))
@@ -128,6 +128,11 @@ def show_preferences(app, page=0):
         button.connect('clicked',browse,entry,label)
     note=Gtk.Label(label='General settings save automatically. Undo restores the values from when Preferences opened. Restore defaults keeps connection profiles and C64U settings.',wrap=True,xalign=0);box.append(note)
     error=Gtk.Label(wrap=True,xalign=0);box.append(error)
+    dialog.general_message=error
+    def general_message(message,failed=False):
+        if failed:error.add_css_class('argonaut-error-message')
+        else:error.remove_css_class('argonaut-error-message')
+        error.set_text(message)
     actions=Gtk.Box(spacing=8);box.append(actions)
     undo=Gtk.Button(label='Undo');actions.append(undo)
     restore=Gtk.Button(label='Restore defaults…');actions.append(restore)
@@ -151,7 +156,7 @@ def show_preferences(app, page=0):
             # it; only newly edited folder values must exist before saving.
             if (value != oldfolders[key] and value
                     and not Path(value).expanduser().is_dir()):
-                error.set_text('Choose an existing folder for '+key.replace('_',' ')+'.');return False
+                general_message('Choose an existing folder for '+key.replace('_',' ')+'.',True);return False
         old=deepcopy(prefs.app_options)
         developer_was_enabled=old['developer_mode']
         prefs.app_options=validate(old)
@@ -163,7 +168,7 @@ def show_preferences(app, page=0):
             prefs.app_options=old
             for key,value in oldfolders.items():setattr(prefs,key,value)
             show_general(old,oldfolders)
-            error.set_text('Could not save preferences: '+str(exc));return False
+            general_message('Could not save preferences: '+str(exc),True);return False
         tab=app.streams_tab;tab.set_zoom(prefs.app_options['preview_scale']);tab.apply_scale()
         tab.audio.set_active(prefs.app_options['preview_audio'])
         show_general(prefs.app_options,
@@ -172,7 +177,7 @@ def show_preferences(app, page=0):
         if old['show_hidden_local'] != prefs.app_options['show_hidden_local']:
             app.refresh_local()
         if developer_was_enabled != developer_is_enabled:
-            error.set_text(
+            general_message(
                 'Preferences saved automatically. Restart Argonaut to apply Developer Mode.')
             if developer_was_enabled and not developer_is_enabled:
                 def stopped(result):
@@ -181,7 +186,7 @@ def show_preferences(app, page=0):
                         if result else
                         'Developer Mode is off. Some background tests could not be stopped.')
                 app.run(stop_background, stopped)
-        elif message:error.set_text(message)
+        elif message:general_message(message)
         return True
 
     for control in checks.values():

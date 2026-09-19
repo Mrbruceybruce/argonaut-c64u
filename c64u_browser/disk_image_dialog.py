@@ -199,6 +199,7 @@ class DiskImageDialog:
 
     def _name_prompt(self, title, name, accept, callback, file_type=None,
                      cancelled=None):
+        from .text_input import uppercase_entry
         prompt = Gtk.Dialog(title=title, transient_for=self.dialog, modal=True)
         self.prompt = prompt
         prompt.add_button('Cancel', Gtk.ResponseType.CANCEL)
@@ -207,8 +208,11 @@ class DiskImageDialog:
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
                           margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
         entry = Gtk.Entry(text=name, max_length=16, hexpand=True)
+        entry.connect('changed', uppercase_entry)
+        uppercase_entry(entry)
         self.name_entry = entry
-        content.append(Gtk.Label(label='C64 disk filename (up to 16 characters):', xalign=0))
+        content.append(Gtk.Label(
+            label='C64 filename (up to 16 PETSCII characters):', xalign=0))
         content.append(entry)
         types = None
         if file_type is not None:
@@ -315,6 +319,7 @@ class DiskImageDialog:
 
     def _batch_add_review(self, items):
         """Review and validate one or many imports before staging the batch."""
+        from .text_input import uppercase_entry
         prompt = Gtk.Dialog(
             title='Review files to add', transient_for=self.dialog, modal=True)
         self.prompt = prompt
@@ -341,6 +346,8 @@ class DiskImageDialog:
             source = Gtk.Label(label=Path(path).name, xalign=0,
                                hexpand=True, tooltip_text=str(path))
             entry = Gtk.Entry(text=name, max_length=16, hexpand=True)
+            entry.connect('changed', uppercase_entry)
+            uppercase_entry(entry)
             entry.set_activates_default(True)
             types = Gtk.ComboBoxText()
             for value in ('PRG', 'SEQ', 'USR'):

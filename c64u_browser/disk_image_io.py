@@ -42,7 +42,8 @@ def create_remote_blank_d64(client, path, disk_name):
     from .files import inspect
     if inspect(client, path) is not None:
         raise BrowserError(
-            'That filename already exists on the C64U; nothing was overwritten.')
+            'That filename already exists on the C64U. Choose another filename; '
+            'nothing was overwritten.')
     client.create_d64(path, disk_name)
     try:
         image = read_remote_d64(client, path)

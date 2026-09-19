@@ -34,12 +34,15 @@ def encode_petscii_name(name):
 
 
 def encode_disk_id(disk_id):
-    """Encode the two hardware-readable characters stored in a 1541 header."""
+    """Encode an optional two-character ID stored in a 1541 header."""
     if not isinstance(disk_id, str):
         raise TypeError('disk_id must be text')
     disk_id = disk_id.strip().upper()
+    if not disk_id:
+        return b'\xa0\xa0'
     if len(disk_id) != 2:
-        raise DiskImageError('A 1541 disk ID must contain exactly 2 characters.')
+        raise DiskImageError(
+            'A 1541 disk ID must be blank or contain exactly 2 characters.')
     try:
         value = disk_id.encode('ascii')
     except UnicodeEncodeError as exc:

@@ -128,6 +128,11 @@ def run(package_metadata, report_path):
                      blank.validate().standard_compatible,
                      'disk.blank_d64',
                      'Blank D64 creation is not structurally valid.', checks)
+            blank_id = create_blank_d64_image('C64U STYLE', '')
+            _require(blank_id.directory().disk_id == '' and
+                     blank_id.validate().standard_compatible,
+                     'disk.blank_d64_optional_id',
+                     'A C64U-style blank disk ID is not structurally valid.', checks)
             rel_data = bytearray(blank.source_bytes)
             sector_number = lambda track, sector: sum(
                 sectors_on_track(value) for value in range(1, track)) + sector
@@ -160,9 +165,15 @@ def run(package_metadata, report_path):
             create_entries = app.d64_create_entries
             _require(create_dialog.get_title() == 'Create blank D64 disk' and
                      tuple(entry.get_text() for entry in create_entries) ==
-                     ('new-disk.d64', 'UNTITLED', '64'),
+                     ('new-disk.d64', 'UNTITLED', ''),
                      'ui.blank_d64',
                      'Blank D64 creation controls are incorrect.', checks)
+            create_entries[1].set_text('new disk')
+            create_entries[2].set_text('a1')
+            _require(tuple(entry.get_text() for entry in create_entries[1:]) ==
+                     ('NEW DISK', 'A1'),
+                     'ui.c64_name_uppercase',
+                     'C64-visible disk text did not show its transmitted case.', checks)
             create_dialog.response(Gtk.ResponseType.CANCEL)
             rel_dialog = DiskImageDialog(app, 'Package REL check', rel_image)
             rel_row = rel_dialog.listing.get_first_child()
@@ -341,6 +352,11 @@ def run(package_metadata, report_path):
                          isinstance(app.streams_tab.zoom, Gtk.Label),
                          'development.streams_ui',
                          'Development Streams controls are incorrect.', checks)
+                app.streams_tab.text_input.set_text('print "hello"')
+                _require(app.streams_tab.text_input.get_text() == 'PRINT "HELLO"',
+                         'development.streams_uppercase',
+                         'Streams does not preview the uppercase text sent to the C64.',
+                         checks)
                 _require(app.test_lab_tab.health_button.get_label() ==
                          'Enable alerts' and
                          app.test_lab_tab.ai_test_result_button.get_label() ==

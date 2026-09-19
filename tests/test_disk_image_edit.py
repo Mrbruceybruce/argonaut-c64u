@@ -160,13 +160,25 @@ class D64EditTests(unittest.TestCase):
         self.assertEqual(session.image.directory().blocks_free, 663)
         self.assertTrue(session.image.validate().standard_compatible)
 
+        c64u_style = create_blank_d64_image('NEW DISK', '')
+        blank_directory = c64u_style.directory()
+        self.assertEqual((blank_directory.disk_name, blank_directory.disk_id,
+                          blank_directory.dos_type), ('NEW DISK', '', '2A'))
+        self.assertEqual(c64u_style.source_bytes[
+            sum(sectors_on_track(track) for track in range(1, 18)) * 256
+            + 0xa2:
+            sum(sectors_on_track(track) for track in range(1, 18)) * 256
+            + 0xa4], b'\xa0\xa0')
+        self.assertTrue(c64u_style.validate().standard_compatible)
+
     def test_blank_d64_rejects_invalid_label_and_id(self):
         for name, disk_id in (('', '64'), ('x' * 17, '64'), ('bad/name', '64'),
-                              ('GOOD', ''), ('GOOD', '1'), ('GOOD', '123'),
+                              ('GOOD', '1'), ('GOOD', '123'),
                               ('GOOD', '\u2603!')):
             with self.subTest(name=name, disk_id=disk_id), self.assertRaises(DiskImageError):
                 create_blank_d64_image(name, disk_id)
         self.assertEqual(encode_disk_id('a1'), b'A1')
+        self.assertEqual(encode_disk_id(''), b'\xa0\xa0')
 
     def test_suggests_authentic_types_for_basic_source_and_programs(self):
         self.assertEqual(suggested_import_type('listing.bas', b'10 print "hi"\n'),

@@ -15,6 +15,12 @@ except ImportError:
 
 @unittest.skipIf(Browser is None, 'GTK runtime unavailable')
 class DiskImageNavigationTests(unittest.TestCase):
+    def test_pointer_activates_remote_pane_without_focusing_and_scrolling_list(self):
+        app = SimpleNamespace(set_active_file_pane=Mock(), rlist=Mock())
+        Browser.activate_file_pane_pointer(app, False)
+        app.set_active_file_pane.assert_called_once_with(False)
+        app.rlist.grab_focus.assert_not_called()
+
     def test_double_click_opens_d64_instead_of_treating_it_as_folder(self):
         app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock())
         row = SimpleNamespace(item=('GAME.D64', False))

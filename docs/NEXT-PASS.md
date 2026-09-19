@@ -268,6 +268,41 @@ defaulted to SEQ, tokenized `$0801` BASIC defaulted to PRG, the complete batch
 staged atomically, and Rename displayed a clear standard edit icon. The accepted
 disk-image implementation remains Linux-first until the planned release gate.
 
+The published `1.7-disk.16` Windows portable package passed all 13 checklist
+tasks. Apple Silicon passed 12 and initially reported one Files regression;
+follow-up reproduced the same behavior on Windows. In a long C64U listing, the
+pane-wide pointer handler forced focus onto the list while GTK was deciding
+whether two clicks formed a double-click. A fast double-click opened the folder,
+while slower clicks could pull the viewport back to its first row. The local
+pane was unaffected. Both platforms also requested clearer in-dialog feedback
+when native C64U D64 creation encounters an existing filename.
+
+## Active Section 5: replay buffer
+
+Section 5 opens with the accepted cross-platform cleanup findings rather than
+extending the completed disk-image roadmap:
+
+1. Activate either Files pane from its complete visible area without forcing
+   list focus or changing a long C64U directory's viewport.
+2. Keep the local blank-D64 disk ID optional: blank by default to match the
+   C64U's native formatter, while retaining a valid two-character custom ID.
+3. Show ordinary C64-visible letters as uppercase while typing disk filenames,
+   disk labels and Streams commands, matching the bytes Argonaut already writes
+   or sends.
+4. Keep a failed native C64U D64 creation dialog open and show a clear red,
+   enlarged message when the requested filename already exists.
+5. Present invalid General-preference folder messages one point larger and in
+   red while leaving successful save messages neutral.
+
+After this cleanup passes installed Linux acceptance, implement the opt-in
+replay buffer on the existing recording pipeline. Keep a bounded rolling encoded
+video/audio history, defaulting to 30 seconds, and expose the actual retained
+duration. Saving the recent segment must produce a playable WebM without raw RGB
+retention, must preserve ordinary preview, screenshots and recording, and must
+clean up bounded fragments on failure and quit. Ordinary deterministic tests
+cover export timing, simultaneous recording, low-space and cleanup behavior.
+Cross-platform packages wait until the complete section passes Linux acceptance.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
