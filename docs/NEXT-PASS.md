@@ -5,7 +5,9 @@ C64 Ultimates, Ollama, the local AI bridge, health alerts, and unattended fleet
 checks on one machine. Complete every item and Linux acceptance gate in one
 roadmap section before building and validating Windows, Apple Silicon Mac, and
 Intel Mac packages. Begin the next roadmap section only after that cross-platform
-release gate passes.
+release gate passes. When physical access to a platform is unavailable, its
+native hosted build, relocated packaged-app launch, and packaged GTK self-test
+may satisfy the gate; retain physical testing as a deferred confidence check.
 
 ## Active Section 4: authentic disk-image management
 
@@ -330,8 +332,10 @@ Apple Silicon physical testing of `1.8-replay.2` confirmed that pointer movement
 over the disk-directory dialog no longer changes hover highlighting in the
 underlying Files panes and that Files resumes normal interaction after Close.
 Windows physical testing remains a complete 13-of-13 pass from `1.8-replay.1`;
-the correction did not change its passing presentation path. Intel Mac physical
-validation remains the final Section 5 platform gate.
+the correction did not change its passing presentation path. The Intel Mac
+package passed its native hosted build, relocated-app launch, and packaged GTK
+self-test at the exact release commit. Physical Intel testing remains desirable
+when a tester is available, but it is deferred and does not block development.
 
 Development release `1.8-replay.3` makes Debian a required release platform.
 GitHub now builds and installs the exact-commit `.deb`, runs the source suite in
@@ -339,6 +343,11 @@ normal and optimized modes, runs the installed GTK package self-test, retains
 the JSON evidence, and blocks publication if Debian fails. The published Debian
 asset and checksum were verified after download, and the same package installed
 locally with all 40 packaged checks passing at exact build `4bf09c3`.
+
+**Section 5 complete:** Linux physical replay acceptance, Apple Silicon physical
+acceptance of the only reported cross-platform correction, Windows 13-of-13
+physical regression results, and native hosted Intel package validation all
+passed. Development may proceed without waiting for an Intel Mac tester.
 
 ## Current milestone: Linux hardening
 
@@ -432,8 +441,10 @@ bridge report with its resolved `bridge.end_to_end` comparison in Test Lab.
 Implement and physically validate an entire roadmap section on Linux. When the
 section is complete, build all desktop packages and run a focused Windows and Mac
 regression covering package launch, build identity, that section's changes, and
-core file/media operations. Do not begin implementation of the next roadmap
-section until this cross-platform release gate passes.
+core file/media operations. A platform without an available physical tester may
+pass through a native hosted build, relocated packaged-app launch, and packaged
+GTK self-test; record its physical pass as deferred. Do not begin implementation
+of the next roadmap section until this cross-platform release gate passes.
 
 Stable promotion will use an opt-in **Developer Mode and Test Lab** preference.
 The ordinary stable interface remains unchanged while the switch is off.
