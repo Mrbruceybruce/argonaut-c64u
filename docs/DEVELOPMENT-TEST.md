@@ -1,4 +1,4 @@
-# Argonaut 1.8-replay.2 — Section 5 cross-platform testing
+# Argonaut 1.8-replay.3 — Section 5 cross-platform testing
 
 This build completes the instant-replay roadmap section and carries forward the
 authentic disk-image management section. It keeps Development profiles,
@@ -9,6 +9,10 @@ This correction build also prevents pointer hover from leaking through an open
 disk-directory dialog into the underlying Files panes on macOS. The parent
 window remains inactive until the dialog closes, while its previous interaction
 state is restored immediately afterward.
+
+The development release now publishes its verified Debian package alongside
+Windows and both Mac packages. GitHub installs the Debian artifact on a clean
+Ubuntu runner and runs the same packaged GTK self-test before publication.
 
 Section 5 adds an explicit, default-off 30-second instant replay. While preview
 is running, Argonaut keeps a bounded rolling history of encoded VP8 video and
@@ -88,6 +92,8 @@ model, and the narrow TCP 6464 firewall rules for paired C64U addresses remain
 explicit prerequisites. The pairing token and saved diagnostic material stay
 private and are not committed.
 
+Debian: download the `.deb` and install it with
+`sudo apt install ./argonaut-c64u-development_VERSION_all.deb`.
 Windows: extract the portable ZIP to a writable folder and run `Argonaut.exe`.
 Mac: open the DMG and copy Argonaut Development.app to Applications, or extract
 the ZIP. Apple Silicon and Intel packages require macOS 15 or newer. The Mac app
@@ -97,22 +103,23 @@ will report unavailable on other platforms.
 
 ## Automated package evidence
 
-Every Windows and Mac build runs the packaged application from its final bundle
-before the installer archive is retained. The package self-test uses explicit
+Every Debian, Windows, and Mac build runs the packaged application from its
+final installed package or bundle before the release artifact is retained. The
+package self-test uses explicit
 ordinary-code checks in normal and optimized Python modes. It records a structured
 JSON report with stable check IDs for the bundled GTK and media runtime, build
 identity, Development settings isolation, Preferences, Streams and Test Lab
 controls, local network enumeration, About and Quit behavior, and local file
 publication. A failed check exits unsuccessfully and blocks publication.
 
-GitHub retains separate reports for Windows, Apple Silicon Mac, and Intel Mac with
-the build artifacts. These checks do not contact a C64U, alter its files, or ask an
+GitHub retains separate reports for Debian, Windows, Apple Silicon Mac, and Intel
+Mac with the build artifacts. These checks do not contact a C64U, alter its files, or ask an
 AI model to decide the result. The physical-machine checklist below verifies the
 remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows `1.8-replay.2` and the source commit shown for this release.
+1. Confirm About shows `1.8-replay.3` and the source commit shown for this release.
 2. Open Preferences with a previously saved screenshot or recording folder
    unavailable. Confirm **Close** and the window close button work immediately
    without using Restore defaults. Confirm a newly entered nonexistent folder
@@ -165,7 +172,7 @@ result selector plus a comments field for every item. Record the exact message
 and attach a task-numbered screenshot for any failure or unexpected result.
 Complete the Tester, Platform, OS version, Test date, and package fields, then
 return the filled sheet as
-`Argonaut-1.8-replay.2-testing-results-PLATFORM-TESTER.ods`. For example, use
+`Argonaut-1.8-replay.3-testing-results-PLATFORM-TESTER.ods`. For example, use
 `Windows-Bruce`, `macOS-AppleSilicon-Bruce`, or `macOS-Intel-OldMan2525` for the
 final two filename fields.
 
