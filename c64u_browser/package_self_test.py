@@ -194,7 +194,7 @@ def run(package_metadata, report_path):
             rel_dialog.chooser.emit('response', Gtk.ResponseType.CANCEL)
             _require(rel_dialog.remove_button.get_sensitive(), 'ui.rel_remove',
                      'A valid unlocked REL file cannot be staged for removal.', checks)
-            rel_dialog.dialog.destroy()
+            rel_dialog.close()
             image_data = bytearray(174848)
             header_offset = sum(sectors_on_track(track)
                                 for track in range(1, 18)) * 256
@@ -207,7 +207,8 @@ def run(package_metadata, report_path):
             image_data[directory_offset:directory_offset + 2] = bytes((0, 255))
             disk_dialog = DiskImageDialog(
                 app, 'Package D64 check', D64Image(blank.source_bytes))
-            _require(disk_dialog.listing.get_first_child() is None and
+            _require(not app.controls.get_sensitive() and
+                     disk_dialog.listing.get_first_child() is None and
                      disk_dialog.status.get_text().startswith('Source image is unchanged.') and
                      disk_dialog.add_button.get_sensitive() and
                      disk_dialog.rename_button.get_icon_name() ==
@@ -216,7 +217,8 @@ def run(package_metadata, report_path):
                      disk_dialog.discard_button.get_label() == 'Discard changes' and
                      not disk_dialog.save_button.get_sensitive(),
                      'ui.disk_directory',
-                     'The staged D64 directory window is incorrect.', checks)
+                     'The staged D64 directory window or parent interaction lock is incorrect.',
+                     checks)
             disk_dialog.add_file()
             add_folder = disk_dialog.chooser.get_current_folder()
             deadline = time.monotonic() + 3
@@ -266,7 +268,11 @@ def run(package_metadata, report_path):
             _require(activated == [('TEST', 'PRG')] and disk_dialog.prompt is None,
                      'ui.disk_name_return',
                      'Return does not activate the disk filename action.', checks)
-            disk_dialog.dialog.destroy()
+            disk_dialog.session.discard()
+            disk_dialog.close()
+            _require(app.controls.get_sensitive(),
+                     'ui.disk_parent_restore',
+                     'Closing the disk directory did not restore the main window.', checks)
             app.drives_tab.select_image('/USB2/PACKAGE.D64')
             _require(app.drives_tab.cards['a']['path'].get_text() ==
                      '/USB2/PACKAGE.D64' and
@@ -289,7 +295,7 @@ def run(package_metadata, report_path):
                      d71_dialog.session.format_name == 'D71',
                      'ui.d71_directory',
                      'The staged D71 directory window is incorrect.', checks)
-            d71_dialog.dialog.destroy()
+            d71_dialog.close()
             d81_data = bytearray(819200)
             d81_header = (40 - 1) * 40 * 256
             d81_directory = d81_header + 3 * 256
@@ -321,7 +327,7 @@ def run(package_metadata, report_path):
                      d81_dialog.session.format_name == 'D81',
                      'ui.d81_directory',
                      'The staged D81 directory window is incorrect.', checks)
-            d81_dialog.dialog.destroy()
+            d81_dialog.close()
             _require(bool(local_roots()), 'filesystem.local_roots',
                      'No local file roots were found.', checks)
             _require((ASSETS / 'about-background.png').is_file() and

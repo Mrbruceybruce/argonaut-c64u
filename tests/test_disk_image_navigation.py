@@ -81,6 +81,18 @@ class DiskImageNavigationTests(unittest.TestCase):
         path.grab_focus.assert_called_once_with()
         self.assertIn('selected for Drive A', message.set_text.call_args.args[0])
 
+    def test_disk_close_restores_previous_parent_sensitivity(self):
+        window = Mock()
+        controls = Mock()
+        dialog = SimpleNamespace(
+            app=SimpleNamespace(window=window, disk_image_dialog=None),
+            parent_controls=controls,
+            parent_controls_were_sensitive=False,
+            restore_focus_on_destroy=False)
+        DiskImageDialog.release_parent_controls(dialog)
+        controls.set_sensitive.assert_called_once_with(False)
+        self.assertIsNone(dialog.parent_controls_were_sensitive)
+
     def test_disk_close_focuses_parent_on_the_next_ui_turn(self):
         window = Mock()
         dialog = SimpleNamespace(app=SimpleNamespace(window=window))

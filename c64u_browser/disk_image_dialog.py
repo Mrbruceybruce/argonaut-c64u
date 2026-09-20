@@ -22,6 +22,8 @@ class DiskImageDialog:
         self.prompt = None
         self.name_entry = None
         self.restore_focus_on_destroy = False
+        self.parent_controls = getattr(app, 'controls', None)
+        self.parent_controls_were_sensitive = None
         directory = image.directory()
         validation = image.validate()
         format_name = image.format_name
@@ -89,6 +91,13 @@ class DiskImageDialog:
         if not directory.geometry.standard:
             self.status.set_text(
                 'Read-only view. This extended-track image is not a standard 35-track 1541 disk.')
+        # macOS correctly blocks clicks for a modal GTK dialog but can still
+        # update hover state in the transient parent. Make the parent content
+        # explicitly insensitive for this dialog's lifetime so pointer motion
+        # cannot visually leak into the Files panes.
+        if self.parent_controls is not None:
+            self.parent_controls_were_sensitive = self.parent_controls.get_sensitive()
+            self.parent_controls.set_sensitive(False)
         self.dialog.present()
 
     def close_request(self, *_):
@@ -96,10 +105,19 @@ class DiskImageDialog:
         return True
 
     def destroyed(self, *_):
+        self.release_parent_controls()
         if getattr(self.app, 'disk_image_dialog', None) is self:
             self.app.disk_image_dialog = None
         if self.restore_focus_on_destroy:
             GLib.idle_add(self.restore_parent_focus)
+
+    def release_parent_controls(self):
+        """Restore the exact parent state once the modal interaction ends."""
+        if (self.parent_controls is not None and
+                self.parent_controls_were_sensitive is not None):
+            self.parent_controls.set_sensitive(
+                self.parent_controls_were_sensitive)
+            self.parent_controls_were_sensitive = None
 
     def restore_parent_focus(self):
         window = getattr(self.app, 'window', None)
@@ -176,6 +194,7 @@ class DiskImageDialog:
             self.chooser.destroy()
             self.chooser = None
         self.restore_focus_on_destroy = True
+        self.release_parent_controls()
         self.dialog.destroy()
 
     def refresh_local_destination(self, path):

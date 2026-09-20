@@ -310,6 +310,22 @@ while an ordinary recording continued, and both WebM files played correctly.
 Section 5 is complete on Linux; cross-platform package validation follows.
 Cross-platform packages wait until the complete section passes Linux acceptance.
 
+The returned Apple Silicon `1.8-replay.1` checklist records 12 passed, 1 failed,
+0 blocked, and 0 untested tasks. Its sole failure is a cross-platform UI
+follow-up: while the **D64 disk directory** dialog is open, pointer movement over
+the dialog can update hover highlighting in the underlying **C64 Ultimate files**
+list. The supplied screen recording confirms visual pointer-event leakage through
+the overlaid dialog. Separate click testing confirmed that underlying items cannot
+be activated, so the defect is limited to hover presentation. Prevent the parent
+Files window from updating hover state until the disk-directory dialog closes.
+The returned Windows portable checklist records 13 passed, 0 failed, 0 blocked,
+and 0 untested tasks. Its disk-directory control test passed, so the observed
+hover leak is specific to the Mac presentation path in this release.
+The `1.8-replay.2` correction explicitly makes the parent content insensitive
+for the disk-directory dialog's lifetime and restores its exact previous state
+on Close, with source and packaged-GTK checks covering both transitions. Apple
+Silicon physical confirmation remains the release gate for this correction.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and

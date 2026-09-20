@@ -1,9 +1,14 @@
-# Argonaut 1.8-replay.1 — Section 5 cross-platform testing
+# Argonaut 1.8-replay.2 — Section 5 cross-platform testing
 
 This build completes the instant-replay roadmap section and carries forward the
 authentic disk-image management section. It keeps Development profiles,
 preferences, reports, and build identity separate from the installed stable
 app.
+
+This correction build also prevents pointer hover from leaking through an open
+disk-directory dialog into the underlying Files panes on macOS. The parent
+window remains inactive until the dialog closes, while its previous interaction
+state is restored immediately afterward.
 
 Section 5 adds an explicit, default-off 30-second instant replay. While preview
 is running, Argonaut keeps a bounded rolling history of encoded VP8 video and
@@ -107,7 +112,7 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows `1.8-replay.1` and the source commit shown for this release.
+1. Confirm About shows `1.8-replay.2` and the source commit shown for this release.
 2. Open Preferences with a previously saved screenshot or recording folder
    unavailable. Confirm **Close** and the window close button work immediately
    without using Restore defaults. Confirm a newly entered nonexistent folder
@@ -119,7 +124,9 @@ remaining display, network, media, and C64U hardware behavior.
 4. Open a D64 directory. Confirm Extract, Add, Rename, and Remove show clear
    icons with identifying tooltips; **Discard changes** and **Save image as…**
    are separated at the right; the title does not show an I-beam; and closing
-   staged edits still asks for confirmation.
+   staged edits still asks for confirmation. Move the pointer over the dialog
+   above rows in the underlying Files panes and confirm those rows do not show
+   hover highlighting. Close the dialog and confirm Files responds normally.
 5. Choose **Add file…** and confirm the chooser starts in the folder shown in
    the local Files pane. Select at least two small host files and confirm one
    review table shows every host file with an editable C64 filename and type.
@@ -158,7 +165,7 @@ result selector plus a comments field for every item. Record the exact message
 and attach a task-numbered screenshot for any failure or unexpected result.
 Complete the Tester, Platform, OS version, Test date, and package fields, then
 return the filled sheet as
-`Argonaut-1.8-replay.1-testing-results-PLATFORM-TESTER.ods`. For example, use
+`Argonaut-1.8-replay.2-testing-results-PLATFORM-TESTER.ods`. For example, use
 `Windows-Bruce`, `macOS-AppleSilicon-Bruce`, or `macOS-Intel-OldMan2525` for the
 final two filename fields.
 
