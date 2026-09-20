@@ -17,6 +17,7 @@ from .storage import storage_root, discover
 from .storage_ui import DriveButtons
 from .folder_copy import completed_roots
 from .file_service import FileLocation, CopyRequest
+from .usb_backup import BackupRequest
 from .core import ArgonautCore
 from .connection_dialog import ConnectionDialog
 from .settings_tab import SettingsTab
@@ -143,6 +144,11 @@ class Browser(Gtk.Application):
         self.partial_upload=None
         self.partial_button=self.button(actions,'Delete partial upload…',self.delete_partial)
         self.partial_button.set_sensitive(False)
+        usb_actions=Gtk.Box(spacing=8);files.append(usb_actions)
+        self.usb_backup_button=self.button(usb_actions,'Back up USB/SD…',self.backup_usb)
+        self.usb_restore_button=self.button(usb_actions,'Restore USB/SD…',self.restore_usb)
+        self.usb_backup_button.set_tooltip_text('Create a verified manifest-backed backup of selected C64U items, or the whole current volume.')
+        self.usb_restore_button.set_tooltip_text('Review and restore an Argonaut USB backup without deleting extra C64U files.')
         panes = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         panes.set_position(490)
         panes.set_shrink_start_child(False)
@@ -188,7 +194,7 @@ class Browser(Gtk.Application):
         self.cancel_button.set_sensitive(False)
         self.cancel_button.set_halign(Gtk.Align.START)
         # Keep the Files action row reachable while a transfer is running.
-        self.busy_controls = [connection, panes, self.partial_button,
+        self.busy_controls = [connection, panes, usb_actions, self.partial_button,
             self.settings_tab.box, self.drives_tab.box, self.machine_tab.box,
             self.media_tab.box, self.streams_tab.box]
         if hasattr(self, 'test_lab_tab'):
@@ -384,6 +390,9 @@ class Browser(Gtk.Application):
         else:
             text = 'Disconnected' + (f' · Selected: {selected.name}' if selected else ' · No device selected')
         self.connection_label.set_text(text)
+        if hasattr(self,'usb_backup_button'):
+            self.usb_backup_button.set_sensitive(self.client is not None)
+            self.usb_restore_button.set_sensitive(self.client is not None)
         self.quick_connect_button.set_sensitive(self.active_profile is None)
         self.disconnect_button.set_sensitive(self.active_profile is not None)
         if hasattr(self, 'remote_new_d64_button'):
@@ -607,7 +616,9 @@ class Browser(Gtk.Application):
 
     def cancel_transfer(self):
         if self.transfer_job:
-            self.core.files.cancel(self.transfer_job.id)
+            service=(self.core.usb if self.transfer_job.operation.startswith('usb.')
+                     else self.core.files)
+            service.cancel(self.transfer_job.id)
             self.cancel_button.set_sensitive(False)
             self.status.set_text('Cancelling transfer… waiting for the current network operation to return.')
 
@@ -773,6 +784,140 @@ class Browser(Gtk.Application):
         self.file_clipboard = (local, self.local if local else self.remote,
                                tuple(r.item[0] for r in rows), None if local else self.client)
         self.status.set_text(f'{len(rows)} item(s) ready to copy. Open a destination folder and choose Paste.')
+
+    def backup_usb(self):
+        if self.busy or not self.client:return
+        volume=storage_root(self.remote)
+        if not volume:
+            self.status.set_text('Open a USB or SD volume before starting a backup.');return
+        rows=self.rlist.get_selected_rows()
+        names=tuple(row.item[0] for row in rows if row.item[0]!='..')
+        paths=tuple(posixpath.join(self.remote,name) for name in names)
+        source_text=(', '.join(paths) if paths else 'all children of '+volume)
+        chooser=Gtk.FileChooserNative.new('Create USB/SD backup folder',self.window,
+            Gtk.FileChooserAction.SAVE,'Choose','Cancel')
+        chooser.set_current_name('Argonaut-'+volume.lstrip('/')+'-backup')
+        def response(_,code):
+            file=chooser.get_file();chooser.destroy()
+            if code!=Gtk.ResponseType.ACCEPT or not file:return
+            destination=file.get_path()
+            if not destination:self.status.set_text('Choose a local backup destination.');return
+            request=BackupRequest(FileLocation.c64u(volume),paths,
+                                  FileLocation.core_host(destination))
+            try:job=self.core.usb.prepare_backup(request)
+            except BrowserError as exc:self.status.set_text(str(exc));return
+            def prepared(snapshot):
+                if snapshot.state!='succeeded':
+                    self.status.set_text(snapshot.error.message);return
+                preview=snapshot.result
+                dialog=Gtk.Dialog(title='Confirm USB/SD backup',transient_for=self.window,modal=True)
+                dialog.add_button('Cancel',Gtk.ResponseType.CANCEL)
+                dialog.add_button('Start backup',Gtk.ResponseType.OK)
+                text=(f'Source: {source_text}\nDestination: {preview.destination.path}\n\n'
+                      f'{preview.files} file(s), {preview.directories} folder(s), '
+                      f'{preview.bytes:,} bytes.\nPlanning, backup, and verification '
+                      f'read about {preview.estimated_c64u_read_bytes:,} bytes from the C64U.\n\n'
+                      +preview.warning)
+                dialog.get_content_area().append(Gtk.Label(label=text,wrap=True,
+                    selectable=True,xalign=0,margin_top=12,margin_bottom=12,
+                    margin_start=12,margin_end=12))
+                def confirmed(widget,answer):
+                    widget.destroy()
+                    if answer!=Gtk.ResponseType.OK:
+                        self.core.usb.discard_plan(preview.plan_id)
+                        self.status.set_text('USB backup cancelled before copying.');return
+                    try:execution=self.core.usb.execute_backup(preview.plan_id)
+                    except BrowserError as exc:self.status.set_text(str(exc));return
+                    self.run_file_job(execution,self.usb_backup_finished)
+                dialog.connect('response',confirmed);dialog.present()
+            self.run_file_job(job,prepared)
+        chooser.connect('response',response);chooser.show()
+
+    def usb_backup_finished(self,snapshot):
+        result=snapshot.result
+        if result is None:
+            self.status.set_text(snapshot.error.message if snapshot.error else 'USB backup did not complete.');return
+        self.status.set_text(result.message)
+        if Path(result.backup_folder.path).parent==self.local:self.refresh_local()
+        details=('Backup folder:\n'+result.backup_folder.path+'\n\nCompleted files:\n'+
+                 ('\n'.join(result.completed_files) or '(none)')+'\n\nRemaining:\n'+
+                 ('\n'.join(result.remaining) or '(none)'))
+        self.usb_report('USB backup complete' if snapshot.state=='succeeded'
+                        else 'USB backup stopped',result.message,details)
+
+    def restore_usb(self):
+        if self.busy or not self.client:return
+        volume=storage_root(self.remote)
+        if not volume:
+            self.status.set_text('Open the destination USB or SD volume first.');return
+        chooser=Gtk.FileChooserNative.new('Choose Argonaut USB backup folder',self.window,
+            Gtk.FileChooserAction.SELECT_FOLDER,'Open','Cancel')
+        def response(_,code):
+            file=chooser.get_file();chooser.destroy()
+            if code!=Gtk.ResponseType.ACCEPT or not file:return
+            folder=file.get_path()
+            if not folder:self.status.set_text('Choose a local backup folder.');return
+            try:job=self.core.usb.prepare_restore(FileLocation.core_host(folder),
+                                                   FileLocation.c64u(volume))
+            except BrowserError as exc:self.status.set_text(str(exc));return
+            self.run_file_job(job,self.restore_preview)
+        chooser.connect('response',response);chooser.show()
+
+    def restore_preview(self,snapshot):
+        if snapshot.state!='succeeded':self.status.set_text(snapshot.error.message);return
+        preview=snapshot.result
+        dialog=Gtk.Dialog(title='Review USB/SD restore',transient_for=self.window,modal=True)
+        dialog.set_default_size(680,500);dialog.add_button('Cancel',Gtk.ResponseType.CANCEL)
+        additions=dialog.add_button('Restore additions',Gtk.ResponseType.OK)
+        replacements=dialog.add_button('Restore additions and replace files',Gtk.ResponseType.APPLY)
+        additions.set_sensitive(preview.can_restore and bool(preview.additions))
+        replacements.set_sensitive(preview.can_restore and bool(preview.additions or preview.replacements))
+        sections=[
+            ('Additions',preview.additions),('Replacements',preview.replacements),
+            ('Unchanged',preview.unchanged),('Conflicts (skipped)',preview.conflicts),
+            ('Missing or invalid backup data',tuple(issue.path+': '+issue.reason for issue in preview.missing))]
+        lines=[f'Backup: {preview.backup_folder.path}',f'Destination: {preview.target_volume}',
+               f'Data to write: {preview.bytes:,} bytes',
+               'Extra destination files will not be deleted.']
+        for title,items in sections:
+            lines.extend(('',f'{title} ({len(items)}):',*items))
+        text=Gtk.TextView(editable=False,cursor_visible=False,wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        text.get_buffer().set_text('\n'.join(lines))
+        scroll=Gtk.ScrolledWindow(vexpand=True,hexpand=True);scroll.set_child(text)
+        dialog.get_content_area().append(scroll)
+        def confirmed(widget,answer):
+            widget.destroy()
+            if answer not in (Gtk.ResponseType.OK,Gtk.ResponseType.APPLY):
+                self.core.usb.discard_plan(preview.plan_id)
+                self.status.set_text('USB restore cancelled before writing.');return
+            try:job=self.core.usb.execute_restore(
+                preview.plan_id,replace=answer==Gtk.ResponseType.APPLY)
+            except BrowserError as exc:self.status.set_text(str(exc));return
+            self.run_file_job(job,self.usb_restore_finished)
+        dialog.connect('response',confirmed);dialog.present()
+
+    def usb_restore_finished(self,snapshot):
+        result=snapshot.result
+        if result is None:
+            self.status.set_text(snapshot.error.message if snapshot.error else 'USB restore did not complete.');return
+        self.status.set_text(result.message)
+        if self.client:self.refresh_remote()
+        details=('Added:\n'+('\n'.join(result.added) or '(none)')+
+                 '\n\nReplaced:\n'+('\n'.join(result.replaced) or '(none)')+
+                 '\n\nSkipped/conflicts:\n'+
+                 ('\n'.join(result.skipped+result.conflicts) or '(none)')+
+                 '\n\nUnfinished:\n'+('\n'.join(result.remaining) or '(none)'))
+        self.usb_report('USB restore complete' if snapshot.state=='succeeded'
+                        else 'USB restore stopped',result.message,details)
+
+    def usb_report(self,title,summary,details):
+        dialog=Gtk.Dialog(title=title,transient_for=self.window,modal=True)
+        dialog.set_default_size(650,420);dialog.add_button('Close',Gtk.ResponseType.CLOSE)
+        text=Gtk.TextView(editable=False,cursor_visible=False,wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        text.get_buffer().set_text(summary+'\n\n'+details)
+        scroll=Gtk.ScrolledWindow(vexpand=True,hexpand=True);scroll.set_child(text)
+        dialog.get_content_area().append(scroll)
+        dialog.connect('response',lambda widget,_:widget.destroy());dialog.present()
 
     def paste_files(self, local):
         if self.busy: return

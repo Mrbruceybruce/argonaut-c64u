@@ -23,6 +23,7 @@ from .file_service import FileService
 from .profiles import Preferences, Profile
 from .scheduler import CoreScheduler, DeviceSession
 from .storage import initial_directory
+from .usb_backup import UsbBackupService
 
 
 @dataclass(frozen=True)
@@ -199,6 +200,9 @@ class ArgonautCore:
         self.files = FileService(self._require_client,
                                  self.device_session,
                                  scheduler=self.scheduler)
+        self.usb = UsbBackupService(self._require_client,
+                                    self.device_session,
+                                    self.scheduler)
 
     def load(self):
         try:

@@ -99,6 +99,22 @@ backup paths; inspect those paths before retrying.
 After inserting or moving a thumb drive, use **Refresh** to discover it.
 Use your computer's normal eject/unmount controls for local removable media.
 
+### Back up or restore a C64U USB/SD volume
+
+Open the USB or SD volume in the C64U side of **Files**. Select files or folders
+to back up, or leave the selection empty to back up every child of that volume.
+Choose **Back up USB/SD…**, select a new local backup-folder name, review the
+file, folder, byte, and verification totals, then choose **Start backup**. Keep
+the volume quiet while Argonaut reads and verifies it. An interrupted backup
+folder remains marked incomplete for inspection and cannot be restored.
+
+Choose **Restore USB/SD…** while the intended destination volume is open, then
+select an Argonaut backup folder. Review additions, replacements, unchanged
+files, conflicts, and missing data. **Restore additions** preserves differing
+existing files. **Restore additions and replace files** explicitly authorizes
+the listed regular-file replacements. Restore never deletes extra destination
+files and never applies firmware or C64U configuration.
+
 ### Create and edit a D64 disk image
 
 Open the local folder where the image should be saved and choose **New D64

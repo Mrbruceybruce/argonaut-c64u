@@ -13,6 +13,17 @@ Every new roadmap section is implemented first as an Argonaut Core capability
 with a headless contract. Client work then exposes that capability without
 duplicating its rules.
 
+## Server-first milestone: USB/SD backup and restore
+
+Manifest-backed USB/SD backup and restore is implemented as a headless Core
+capability and exposed by the GTK Files tab. Automated acceptance covers verified
+backup, empty folders and files, restore additions and reviewed replacements,
+unchanged/conflicting paths, changed source or destination state, device-session
+changes, queued and running cancellation, partial results, recovery, plan
+serialization, and headless imports. Restore never deletes destination extras.
+The Core contract and remaining physical-media qualification are documented in
+[USB-BACKUP.md](USB-BACKUP.md).
+
 ## Active Section 4: authentic disk-image management
 
 Disk images must remain compatible with Commodore hardware and CBM DOS. D64
