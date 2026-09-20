@@ -11,7 +11,7 @@ from threading import Event
 import unittest
 
 from c64u_browser.api import BrowserError, Entry
-from c64u_browser.file_service import FileLocation
+from c64u_browser.file_service import FileLocation, FileService
 from c64u_browser.jobs import CoreJob
 from c64u_browser.scheduler import CoreScheduler, DeviceSession, JobBinding
 from c64u_browser.usb_backup import (
@@ -88,6 +88,8 @@ class UsbBackupTests(unittest.TestCase):
         self.scheduler=CoreScheduler(lambda:self.session)
         self.addCleanup(self.scheduler.close)
         self.service=UsbBackupService(lambda:self.client,lambda:self.session,self.scheduler)
+        self.files=FileService(lambda:self.client,lambda:self.session,
+                               scheduler=self.scheduler)
 
     def backup_request(self,name='backup',paths=()):
         return BackupRequest(FileLocation.c64u('/USB2'),tuple(paths),
@@ -274,7 +276,32 @@ class UsbBackupTests(unittest.TestCase):
         self.assertTrue(self.client.store_started.wait(1));self.service.cancel(running.id)
         self.client.store_release.set();cancelled=running.wait(5)
         self.assertEqual('cancelled',cancelled.state)
-        self.assertIsNotNone(cancelled.result)
+        partial=cancelled.result.partial_upload
+        self.assertIsNotNone(partial)
+        self.assertEqual(self.session.device_id,partial.device_id)
+        self.assertEqual(self.session.session_id,partial.session_id)
+        self.assertIn(partial.location.path,self.client.files)
+        reviewed=self.files.prepare_partial_delete(partial).wait(5)
+        self.assertEqual('succeeded',reviewed.state)
+        deleted=self.files.execute_delete(reviewed.result.plan_id).wait(5)
+        self.assertEqual('succeeded',deleted.state)
+        self.assertNotIn(partial.location.path,self.client.files)
+
+    def test_partial_restore_cleanup_rejects_filename_only_and_changed_session(self):
+        from c64u_browser.file_service import PartialUpload
+        arbitrary=FileLocation.c64u('/USB2/c64u-part-arbitrary')
+        with self.assertRaisesRegex(BrowserError,'did not identify'):
+            self.files.prepare_partial_delete(arbitrary)
+        claim=PartialUpload(arbitrary,self.session.device_id,self.session.session_id)
+        self.client.add_file(arbitrary.path,b'partial')
+        reviewed=self.files.prepare_partial_delete(claim).wait(5).result
+        self.session=DeviceSession(self.session.device_id,'session-2')
+        changed=self.files.execute_delete(reviewed.plan_id).wait(5)
+        self.assertEqual('failed',changed.state)
+        self.assertEqual('session',changed.error.code)
+        self.assertIn(arbitrary.path,self.client.files)
+        with self.assertRaisesRegex(BrowserError,'connection changed'):
+            self.files.prepare_partial_delete(claim)
 
     def test_client_upload_is_rejected_and_import_is_headless(self):
         request=BackupRequest(FileLocation.c64u('/USB2'),(),

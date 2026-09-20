@@ -42,6 +42,14 @@ class FileLocation:
 
 
 @dataclass(frozen=True)
+class PartialUpload:
+    """A Core-observed staged upload bound to its originating session."""
+    location: FileLocation
+    device_id: str
+    session_id: str
+
+
+@dataclass(frozen=True)
 class CopyRequest:
     source: FileLocation
     names: tuple[str, ...]
@@ -67,6 +75,7 @@ class CopyResult:
     remaining: tuple[str, ...]
     partial_path: str | None = None
     failure: str = ''
+    partial_upload: PartialUpload | None = None
 
     @property
     def message(self):
@@ -275,8 +284,11 @@ class FileService:
             report=execute_plan(client,plan,request.source.scope==CORE_HOST,
                                 request.destination.scope==CORE_HOST,
                                 job.byte_progress())
+            partial=(PartialUpload(FileLocation.c64u(report.partial),
+                        stored.session.device_id,stored.session.session_id)
+                     if report.partial and stored.session else None)
             result=CopyResult(tuple(report.completed),tuple(report.skipped),
-                tuple(report.remaining),report.partial,report.error)
+                tuple(report.remaining),report.partial,report.error,partial)
             if getattr(report,'cancelled',False):raise JobCancelled(result=result)
             if report.error:
                 raise FileJobFailure('partial-upload' if report.partial else 'transfer',
@@ -285,13 +297,24 @@ class FileService:
         return self._job('file.copy.execute',task,session=stored.session)
 
     def prepare_delete(self, locations):
+        return self._prepare_delete(tuple(locations))
+
+    def prepare_partial_delete(self, partial):
+        if not isinstance(partial,PartialUpload) or partial.location.scope!=C64U:
+            raise BrowserError('Core did not identify this as a partial C64U upload.')
+        expected=DeviceSession(partial.device_id,partial.session_id)
+        self._check_session(expected)
+        return self._prepare_delete((partial.location,),expected)
+
+    def _prepare_delete(self, locations, expected_session=None):
         locations=tuple(locations)
         if not locations:raise BrowserError('Choose at least one item to delete.')
         scopes={item.scope for item in locations}
         if len(scopes)!=1:raise BrowserError('One deletion plan cannot mix filesystems.')
         local=self._local(locations[0])
         if any(self._local(item)!=local for item in locations):raise BrowserError('Deletion targets must share one filesystem.')
-        targets=tuple(item.path for item in locations);session=self._session(locations)
+        targets=tuple(item.path for item in locations)
+        session=expected_session or self._session(locations)
         def task(job):
             client=self._client(locations,session);job.check_cancel()
             items=prepare_deletion(client,local,targets,job.check_cancel)

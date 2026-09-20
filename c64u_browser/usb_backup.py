@@ -14,7 +14,8 @@ import uuid
 from threading import Lock
 
 from .api import BrowserError
-from .file_service import C64U, CORE_HOST, CLIENT_UPLOAD, FileLocation
+from .file_service import (C64U, CORE_HOST, CLIENT_UPLOAD, FileLocation,
+                           PartialUpload)
 from .folder_copy import Plan, Step, execute_plan
 from .jobs import CoreJob, JobCancelled, JobProgress
 from .replacement import signature
@@ -110,6 +111,7 @@ class RestoreResult:
     bytes: int
     partial_path: str | None = None
     failure: str = ''
+    partial_upload: PartialUpload | None = None
 
     @property
     def message(self):
@@ -644,10 +646,13 @@ class UsbBackupService:
             replaced=tuple(path for path in replacement_set if path in completed)
             added=tuple(path for path in stored.classification.additions if path.rstrip('/') in completed)
             skipped=tuple(path for path in stored.classification.replacements if path not in replacement_set)
+            partial=(PartialUpload(FileLocation.c64u(report.partial),
+                        stored.session.device_id,stored.session.session_id)
+                     if report.partial else None)
             result=RestoreResult(added,replaced,stored.classification.unchanged,skipped,
                 stored.classification.conflicts,tuple(report.remaining),
                 sum(file_map[path].size for path in completed if path in file_map),
-                report.partial,report.error)
+                report.partial,report.error,partial)
             if report.cancelled:raise JobCancelled(result=result)
             if report.error:raise UsbBackupFailure('restore',report.error,result)
             return result

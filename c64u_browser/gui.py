@@ -901,12 +901,17 @@ class Browser(Gtk.Application):
         if result is None:
             self.status.set_text(snapshot.error.message if snapshot.error else 'USB restore did not complete.');return
         self.status.set_text(result.message)
+        if result.partial_upload:
+            self.partial_upload=result.partial_upload
+            self.partial_button.set_sensitive(True)
         if self.client:self.refresh_remote()
         details=('Added:\n'+('\n'.join(result.added) or '(none)')+
                  '\n\nReplaced:\n'+('\n'.join(result.replaced) or '(none)')+
                  '\n\nSkipped/conflicts:\n'+
                  ('\n'.join(result.skipped+result.conflicts) or '(none)')+
-                 '\n\nUnfinished:\n'+('\n'.join(result.remaining) or '(none)'))
+                 '\n\nUnfinished:\n'+('\n'.join(result.remaining) or '(none)')+
+                 (('\n\nPartial upload:\n'+result.partial_path)
+                  if result.partial_path else ''))
         self.usb_report('USB restore complete' if snapshot.state=='succeeded'
                         else 'USB restore stopped',result.message,details)
 
@@ -947,11 +952,11 @@ class Browser(Gtk.Application):
                 if result is None:
                     self.status.set_text(snapshot.error.message if snapshot.error else 'Copy did not complete.')
                     return
-                message, partial = result.message, result.partial_path
+                message, partial = result.message, result.partial_upload
                 copied = completed_roots(names, result.completed)
                 if snapshot.state=='failed': self.copy_report(result)
                 if partial:
-                    self.partial_upload = (self.active_profile.id, partial)
+                    self.partial_upload = partial
                     self.partial_button.set_sensitive(True)
                 local_selection = ()
                 if source_local and Path(parent).resolve() == self.local.resolve():
@@ -1313,10 +1318,10 @@ class Browser(Gtk.Application):
 
     def delete_partial(self):
         if self.busy or not self.partial_upload:return
-        profile_id,path=self.partial_upload
-        if not self.client or not self.active_profile or self.active_profile.id!=profile_id:
-            self.status.set_text('Connect to the original C64U profile before deleting this partial upload.');return
-        return self.delete_dialog(False,[path],self.client,partial=True)
+        if not self.client:
+            self.status.set_text('Connect to the original C64U session before deleting this partial upload.');return
+        return self.delete_dialog(False,[self.partial_upload.location.path],self.client,
+                                  partial=self.partial_upload)
 
     def delete_dialog(self,local,targets,client,partial=False):
         if self.busy or (not local and not client):return
@@ -1372,7 +1377,13 @@ class Browser(Gtk.Application):
             label.set_text(device+'\n\nDelete permanently: '+str(len(preview.items))+' items, including folder contents?\n\n'+'\n'.join(i.path+('/' if i.kind=='dir' else '') for i in preview.items))
             button.set_sensitive(bool(preview.items))
         locations=tuple(FileLocation.core_host(path) if local else FileLocation.c64u(path) for path in targets)
-        self.run_file_job(self.core.files.prepare_delete(locations),prepared)
+        try:
+            job=(self.core.files.prepare_partial_delete(partial) if partial else
+                 self.core.files.prepare_delete(locations))
+        except BrowserError as exc:
+            label.set_text('Could not prepare deletion: '+str(exc)+'\n\nNothing was deleted. Close this dialog and try again.')
+            return dialog
+        self.run_file_job(job,prepared)
         return dialog
 
     def prompt(self, title, text, callback, initial='', exact_confirmation=None, action_label='OK'):
