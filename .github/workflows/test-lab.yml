@@ -16,13 +16,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
+      - name: Install replay test runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
       - name: Run deterministic Test Lab checks
-        run: python -m c64u_browser.test_lab --suite offline > test-lab-report.json
+        run: /usr/bin/python3 -m c64u_browser.test_lab --suite offline > test-lab-report.json
       - name: Run unit tests
-        run: python -m unittest discover -s tests -p 'test_*.py'
+        run: |
+          /usr/bin/python3 -m unittest discover -s tests -p 'test_*.py'
+          /usr/bin/python3 -O -m unittest discover -s tests -p 'test_*.py'
       - name: Keep the Test Lab report
         if: always()
         uses: actions/upload-artifact@v7
