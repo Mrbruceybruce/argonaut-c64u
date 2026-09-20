@@ -1,26 +1,25 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Read-only health checks and bounded reconnect backoff for one active profile."""
-from .storage import initial_directory
 import time
 from gi.repository import GLib
-from .api import UltimateClient, ConnectionFailure
+from .core import CoreError
 
 
 class Recovery:
     def __init__(self, app):
-        self.app=app;self.generation=0;self.profile=None;self.client=None
-        self.info=None;self.offline=False;self.paused=False;self.inflight=False
+        self.app=app;self.generation=0;self.profile=None
+        self.offline=False;self.paused=False;self.inflight=False
         self.next_check=0;self.delay=5
         self.timer=GLib.timeout_add_seconds(5,self.tick)
 
-    def watch(self, profile, client, info):
+    def watch(self):
         self.cancel()
-        self.profile=profile;self.client=client;self.info=info
+        self.profile=self.app.core.active_profile
         self.next_check=time.monotonic()+5
 
     def cancel(self):
-        self.generation+=1;self.profile=None;self.client=None;self.info=None
+        self.generation+=1;self.profile=None
         self.offline=False;self.paused=False;self.delay=5
 
     def close(self):
@@ -35,22 +34,15 @@ class Recovery:
     def tick(self):
         if not self.profile or self.paused or self.inflight or self.app.busy or time.monotonic()<self.next_check:return True
         generation=self.generation;was_offline=self.offline
-        recovering_client=self.client;preferred=getattr(self.app,"remote_root","/USB2")
-        client=UltimateClient(self.client.host,self.client.password,port=self.client.port,http_port=self.client.http_port,timeout=3)
+        preferred=getattr(self.app,"remote_root","/USB2")
         self.inflight=True
         def task():
             try:
-                info=client.test_connection()
-                if self.profile.device_id or self.profile.device_mac:
-                    self.profile.verify_identity(info)
-                expected=self.info['info'].get('unique_id')
-                if not (self.profile.device_id or self.profile.device_mac) and expected and info['info'].get('unique_id')!=expected:
-                    raise ConnectionFailure('identity','A different device answered at this address. Connect manually.')
-                if was_offline and not expected and not self.profile.device_mac:
-                    raise ConnectionFailure('identity','No device ID was available to verify reconnection. Connect manually.')
-                listing=initial_directory(client,preferred) if was_offline else None
-                if was_offline:recovering_client.storage_roots=client.storage_roots
-                return info,listing
+                if was_offline:return self.app.core.reconnect(preferred)
+                # A connected health check uses the same identity rules but
+                # does not replace the active session unless recovery is needed.
+                self.app.core.check_health()
+                return None
             except Exception as exc:return exc
         future=self.app.pool.submit(task)
         def finish():
@@ -67,15 +59,14 @@ class Recovery:
     def accept(self, result, was_offline):
         if isinstance(result,Exception):
             self.lost(str(result))
-            if isinstance(result,ConnectionFailure) and result.kind in ('authentication','identity'):
+            if isinstance(result,CoreError) and result.code in ('authentication','identity'):
                 self.paused=True
                 self.app.connection_lost(str(result)+' Automatic retries stopped; use Connections.')
             else:
                 self.next_check=time.monotonic()+self.delay
                 self.delay=min(self.delay*2,30)
             return
-        info,listing=result
         self.delay=5;self.next_check=time.monotonic()+5
         if was_offline:
             self.offline=False
-            self.app.connection_restored(self.client,info,listing)
+            self.app.connection_restored(result)

@@ -2,12 +2,11 @@ import sys
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Connection UI delegates transport, discovery and persistence to shared components."""
-from .storage import initial_directory
-from dataclasses import replace
 from gi.repository import Gtk, GLib
-from .api import BrowserError, ConnectionFailure
+from .api import BrowserError
+from .core import CoreError
 from .profiles import Profile
-from .discovery import standard_scan, subnet_scan, local_networks, preferred_subnet
+from .discovery import preferred_subnet
 
 class ConnectionDialog:
     def __init__(self, app, window=None):
@@ -61,7 +60,7 @@ class ConnectionDialog:
         self.password = Gtk.PasswordEntry(show_peek_icon=True,placeholder_text='Network password (blank: use saved password)')
         self.controls.append(self.password)
         self.remember = Gtk.CheckButton(label='Store entered password in '+('Windows Credential Manager' if sys.platform=='win32' else 'macOS Keychain' if sys.platform=='darwin' else 'GNOME keyring'))
-        if getattr(app.credentials,"session_only",False) is True:
+        if app.core.credentials_session_only:
             self.remember.set_label("Portable mode: passwords stay in this session only")
             self.remember.set_sensitive(False)
         self.remember.set_halign(Gtk.Align.START)
@@ -83,21 +82,18 @@ class ConnectionDialog:
         try:p=self.profile()
         except BrowserError as exc:self.status.set_text(str(exc));return
         entered=self.password.get_text()
-        def task():
-            client=p.client(self.credential(p,entered));p.verify_identity(client.test_connection())
-            from .configuration import Configuration
-            return next((row.current for row in Configuration(client).settings('U64 Specific Settings') if row.name=='C64U Model'),'Not reported')
         def done(value):self.model.set_text(value);self.status.set_text('Model is read-only and reported by this C64U.')
-        self.submit(task,done)
+        self.submit(lambda:self.app.core.read_model(p,entered),done)
 
     def reload(self):
         self.saved.remove_all()
-        for profile in self.app.preferences.profiles: self.saved.append(profile.id,profile.name)
-        self.saved.set_active_id(self.app.preferences.selected_id or '')
+        for profile in self.app.core.profiles(): self.saved.append(profile.id,profile.name)
+        selected=self.app.core.selected_profile()
+        self.saved.set_active_id(selected.id if selected else '')
         if self.saved.get_active_id() is None: self.new()
 
     def selected(self, combo):
-        profile = next((p for p in self.app.preferences.profiles if p.id == combo.get_active_id()),None)
+        profile = next((p for p in self.app.core.profiles() if p.id == combo.get_active_id()),None)
         if not profile: return
         self.current_id = profile.id
         for key,value in [('name',profile.name),('host',profile.host),('http',profile.http_port),('ftp',profile.ftp_port)]: self.fields[key].set_text(str(value))
@@ -133,7 +129,7 @@ class ConnectionDialog:
                             **{key:self.fields[key].get_text() for key in ('serial_number','case_edition','notes')})
             if self.current_id:
                 p.id = self.current_id
-                old=next((item for item in self.app.preferences.profiles if item.id==p.id),None)
+                old=next((item for item in self.app.core.profiles() if item.id==p.id),None)
                 if old:p.device_id=old.device_id;p.device_mac=old.device_mac
             return p.validate()
         except (ValueError, BrowserError) as exc: raise BrowserError(str(exc)) from exc
@@ -153,43 +149,23 @@ class ConnectionDialog:
         self.app.run(caught,finish)
 
     def credential(self, profile, entered):
-        if entered: return entered
-        # Never reuse a profile credential if its destination has been edited.
-        old = next((p for p in self.app.preferences.profiles if p.id == profile.id),None)
-        if old and (old.host,old.http_port,old.ftp_port)==(profile.host,profile.http_port,profile.ftp_port):
-            return self.app.session_passwords.get(profile.id) or self.app.credentials.get(profile.id)
-        return ''
+        return self.app.core.credential_for(profile,entered)
 
     def test(self):
         try: p = self.profile()
         except BrowserError as exc: self.status.set_text(str(exc)); return
         entered = self.password.get_text()
         def task():
-            client = p.client(self.credential(p,entered))
-            try: data = client.test_connection()
-            except ConnectionFailure as exc: return f'{exc.kind.capitalize()} failure: {exc}'
-            p.verify_identity(data)
-            info = data['info']
+            try:result=self.app.core.test_profile(p,entered)
+            except CoreError as exc:
+                code=getattr(exc,'code','connection')
+                return f'{code.capitalize()} failure: {exc}'
+            data=result.device_info;info=data['info']
             return f"Success · {info['product']} · Firmware {info['firmware_version']} · API {data['version']['version']} · Hostname {info.get('hostname','unavailable')} · ID {info.get('unique_id','unavailable')}"
         self.submit(task, self.status.set_text)
 
     def persist(self, p, entered, remember):
-        prefs = self.app.preferences
-        old = next((x for x in prefs.profiles if x.id == p.id),None)
-        changed = old and (old.host,old.http_port,old.ftp_port)!=(p.host,p.http_port,p.ftp_port)
-        # Give a changed destination a fresh credential identity; never forward old secrets.
-        if changed: p = replace(p,id=Profile.new(p.name,p.host).id)
-        if remember and entered: self.app.credentials.set(p.id,entered)
-        before, selected = prefs.profiles, prefs.selected_id
-        prefs.profiles = [p if x.id == (old.id if old else p.id) else x for x in before]
-        if not old: prefs.profiles.append(p)
-        prefs.selected_id = p.id
-        try: prefs.save()
-        except Exception:
-            prefs.profiles, prefs.selected_id = before, selected
-            raise
-        if entered: self.app.session_passwords[p.id] = entered
-        return p
+        return self.app.core.save_profile(p,entered,remember)
 
     def save(self, after=None):
         try: p = self.profile()
@@ -206,25 +182,18 @@ class ConnectionDialog:
         try: p = self.profile()
         except BrowserError as exc: self.status.set_text(str(exc)); return
         entered, remember = self.password.get_text(), self.remember.get_active()
-        def task():
-            client=p.client(self.credential(p,entered))
-            info=client.test_connection()
-            reported=p.verify_identity(info)
-            return client,info,reported
+        def task():return self.app.core.test_profile(p,entered)
         def done(result):
-            client,info,reported=result
+            info=result.device_info;reported=result.reported_device_id
             def finish_connection():
                 def finish_task():
-                    # Recheck after review before accessing files or saving the identity.
-                    current=client.test_connection()
-                    candidate=replace(p,device_id=reported or p.device_id,device_mac=info.get('network_mac','') or p.device_mac)
-                    candidate.verify_identity(current)
-                    listing=initial_directory(client,self.app.preferences.app_options['remote_folders'].get(p.id,'/USB2') if self.app.preferences.app_options['remember_folders'] else '/USB2')
-                    saved=self.persist(candidate,entered,remember)
-                    return saved,client,current,listing
+                    folder=self.app.preferences.app_options['remote_folders'].get(p.id,'/USB2') if self.app.preferences.app_options['remember_folders'] else '/USB2'
+                    return self.app.core.connect(p,entered_password=entered,
+                        remember=remember,bind_identity=True,persist=True,
+                        remote_folder=folder)
                 def connected(result):
-                    self.app.activate_connection(*result)
-                    self.current_id=result[0].id;self.reload()
+                    self.app.activate_connection(result)
+                    self.current_id=result.profile.id;self.reload()
                     if hasattr(self.window,'pages'):self.status.set_text('Connected · Profile saved.')
                     else:self.window.destroy()
                 self.submit(finish_task,connected)
@@ -246,10 +215,7 @@ class ConnectionDialog:
         if fallback and not subnet:
             self.status.set_text('Enter one connected local subnet. At most 1024 addresses, eight probes at a time.'); return
         def task():
-            if fallback: return subnet_scan(subnet), ['Controlled LAN scan complete.'], []
-            known=[(p.host,p.http_port) for p in self.app.preferences.profiles]
-            candidates, notes = standard_scan(known_hosts=known)
-            return candidates, notes, local_networks()
+            return self.app.core.discover(subnet=subnet if fallback else '')
         def done(result):
             candidates,notes,networks=result
             if not self.subnet.get_text():
@@ -273,22 +239,13 @@ class ConnectionDialog:
         if not self.current_id:return
         profile_id=self.current_id
         def task():
-            self.app.credentials.delete(profile_id); self.app.session_passwords.pop(profile_id,None)
+            self.app.core.forget_credential(profile_id)
         self.submit(task,lambda _:self.status.set_text('Saved password removed. The current connection remains active until you disconnect.'))
 
     def delete(self):
         if not self.current_id:return
         profile_id=self.current_id
-        def task():
-            self.app.credentials.delete(profile_id)
-            prefs=self.app.preferences
-            before,selected=prefs.profiles,prefs.selected_id
-            prefs.profiles=[p for p in before if p.id!=profile_id]
-            if prefs.selected_id==profile_id:prefs.selected_id=None
-            try:prefs.save()
-            except Exception:
-                prefs.profiles,prefs.selected_id=before,selected;raise
-            self.app.session_passwords.pop(profile_id,None)
+        def task():self.app.core.delete_profile(profile_id)
         def done(_):
             if self.app.active_profile and self.app.active_profile.id==profile_id:self.app.disconnect_device()
             self.reload();self.status.set_text('Profile deleted.');self.app.update_connection_header()

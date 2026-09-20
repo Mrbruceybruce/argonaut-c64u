@@ -1,5 +1,10 @@
 # Local development
 
+Argonaut follows the [server-first development policy](SERVER-FIRST.md):
+Argonaut Core is the product, and every user interface is a client. This file
+covers local checkout and release practices; architectural ownership and
+boundaries are defined in that policy.
+
 Use `./run-development` from this checkout on Debian. The launcher uses system
 Python and the GTK/media dependencies already installed with stable Argonaut.
 

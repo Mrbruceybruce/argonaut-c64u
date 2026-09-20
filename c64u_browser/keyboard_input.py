@@ -28,11 +28,14 @@ def buffer_count(client):
 
 
 def _buffer_count(client):
-    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
-    request=urllib.request.Request(f'http://{client.host}:{client.http_port}/v1/machine:readmem?address=00C6&length=1',
-        headers={'X-Password':client.password,'Accept':'application/octet-stream'})
-    with opener.open(request,timeout=client.timeout) as response:
-        data=response.read(2)
+    if getattr(client,'credentials_encapsulated',False) is True:
+        data=client.read_memory(0x00C6,1)
+    else:
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+        request=urllib.request.Request(f'http://{client.host}:{client.http_port}/v1/machine:readmem?address=00C6&length=1',
+            headers={'X-Password':client.password,'Accept':'application/octet-stream'})
+        with opener.open(request,timeout=client.timeout) as response:
+            data=response.read(2)
     if len(data)!=1 or data[0]>10:
         raise BrowserError('Standard keyboard buffer is unavailable. Use Send Text at the BASIC READY prompt.')
     return data[0]
@@ -79,15 +82,17 @@ def _send_text(client, text, enter=False):
         # fail over before any text is queued instead of leaving the UI waiting
         # for the client's longer general network timeout.
         try:
-            connection=socket.create_connection(
-                (client.host,64),timeout=min(client.timeout,3))
+            protected=getattr(client,'credentials_encapsulated',False) is True
+            connection=(client.open_dma(timeout=min(client.timeout,3)) if protected else
+                socket.create_connection((client.host,64),timeout=min(client.timeout,3)))
         except OSError:
             return _send_text_rest(client,data)
         with connection:
-            password=client.password.encode('utf-8')
-            if len(password)>65535:raise BrowserError('Network password is too long.')
-            connection.sendall(struct.pack('<HH',0xff1f,len(password))+password)
-            if receive_exact(connection,1)!=b'\1':raise BrowserError('DMA authentication failed.')
+            if not protected:
+                password=client.password.encode('utf-8')
+                if len(password)>65535:raise BrowserError('Network password is too long.')
+                connection.sendall(struct.pack('<HH',0xff1f,len(password))+password)
+                if receive_exact(connection,1)!=b'\1':raise BrowserError('DMA authentication failed.')
             for offset in range(0,len(data),10):
                 wait_empty(client)
                 chunk=data[offset:offset+10]

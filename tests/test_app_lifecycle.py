@@ -1,7 +1,7 @@
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from c64u_browser.api import BrowserError
 
 # Importing GTK types does not create windows or connect to a device.
@@ -48,31 +48,26 @@ class Lifecycle(unittest.TestCase):
 
     def test_quick_connect_uses_last_profile_and_checks_identity(self):
         profile=Mock(id='profile-id')
-        client=Mock();profile.client.return_value=client
-        info={'info':{'unique_id':'ABC'}};client.test_connection.return_value=info
         preferences=SimpleNamespace(
             selected=lambda:profile,
             app_options={'remember_folders':True,
                          'remote_folders':{'profile-id':'/USB1'}})
+        result=Mock()
+        core=Mock();core.connect_selected.return_value=result
         app=SimpleNamespace(
             busy=False,active_profile=None,preferences_error=None,
-            preferences=preferences,session_passwords={'profile-id':'session-secret'},
-            credentials=Mock(),status=Mock(),activate_connection=Mock(),
+            preferences=preferences,core=core,status=Mock(),activate_connection=Mock(),
             open_connections=Mock())
         app.run=lambda task,done:done(task())
-        listing=('/USB1',[])
-        with patch('c64u_browser.gui.initial_directory',return_value=listing) as initial:
-            Browser.quick_connect(app)
-        profile.client.assert_called_once_with('session-secret')
-        profile.verify_identity.assert_called_once_with(info,require_bound=True)
-        initial.assert_called_once_with(client,'/USB1')
-        app.activate_connection.assert_called_once_with(profile,client,info,listing)
+        Browser.quick_connect(app)
+        core.connect_selected.assert_called_once_with(require_bound=True)
+        app.activate_connection.assert_called_once_with(result)
         app.open_connections.assert_not_called()
 
     def test_quick_connect_without_profile_opens_device_details(self):
         app=SimpleNamespace(
             busy=False,active_profile=None,preferences_error=None,
-            preferences=SimpleNamespace(selected=lambda:None),status=Mock(),
+            core=SimpleNamespace(selected_profile=lambda:None),status=Mock(),
             open_connections=Mock())
         Browser.quick_connect(app)
         app.open_connections.assert_called_once_with()

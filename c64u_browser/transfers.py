@@ -27,6 +27,8 @@ def remote_file(path):
 
 
 def connect(client):
+    if getattr(client, 'credentials_encapsulated', False) is True:
+        return client.open_ftp()
     ftp = ftplib.FTP(timeout=client.timeout, encoding=client.encoding)
     try:
         ftp.connect(client.host, client.port)

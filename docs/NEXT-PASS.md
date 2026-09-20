@@ -9,6 +9,10 @@ release gate passes. When physical access to a platform is unavailable, its
 native hosted build, relocated packaged-app launch, and packaged GTK self-test
 may satisfy the gate; retain physical testing as a deferred confidence check.
 
+Every new roadmap section is implemented first as an Argonaut Core capability
+with a headless contract. Client work then exposes that capability without
+duplicating its rules.
+
 ## Active Section 4: authentic disk-image management
 
 Disk images must remain compatible with Commodore hardware and CBM DOS. D64

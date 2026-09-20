@@ -12,15 +12,14 @@ from threading import Event
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib, Gdk, Gio, Graphene
-from .api import UltimateClient, BrowserError, ConnectionFailure
+from .api import BrowserError, ConnectionFailure
 from .files import operate, child
 from .navigation import History
-from .storage import storage_root, discover, initial_directory
+from .storage import storage_root, discover
 from .storage_ui import DriveButtons
 from .deletion import prepare as prepare_deletion, delete_reviewed
 from .folder_copy import build_plan, execute_plan, completed_roots
-from .profiles import Preferences
-from .credentials import Credentials
+from .core import ArgonautCore
 from .connection_dialog import ConnectionDialog
 from .settings_tab import SettingsTab
 from .drives_tab import DrivesTab
@@ -52,10 +51,11 @@ class Browser(Gtk.Application):
         self.file_pane_boxes = {}
         self.file_pane_labels = {}
         self.active_file_pane = True
-        self.preferences = Preferences()
-        self.preferences_error = None
-        try: self.preferences.load()
-        except (BrowserError, OSError) as exc: self.preferences_error = str(exc)
+        self.core = ArgonautCore().load()
+        # Transitional aliases keep presentation-only preferences and existing
+        # widgets stable while Core becomes the sole owner of connection state.
+        self.preferences = self.core.preferences
+        self.preferences_error = self.core.preferences_error
         self.operation_log = None
         self.operation_log_error = None
         if test_lab_enabled(self.preferences):
@@ -66,8 +66,6 @@ class Browser(Gtk.Application):
         remembered=self.preferences.app_options['local_folder']
         self.local=Path(remembered) if self.preferences.app_options['remember_folders'] and remembered and Path(remembered).is_dir() else Path.home()
         self.histories[True]=History(self.local)
-        self.credentials = Credentials()
-        self.session_passwords = {}
         self.active_profile = None
         self.device_info = None
         self.recovery=None
@@ -379,7 +377,7 @@ class Browser(Gtk.Application):
         show_preferences(self,page=1)
 
     def update_connection_header(self):
-        selected = self.preferences.selected()
+        selected = self.core.selected_profile()
         if self.active_profile:
             info = self.device_info['info']
             text = f"Connected · {self.active_profile.name} · {self.active_profile.host}:{self.active_profile.http_port} · Firmware {info['firmware_version']} · API {self.device_info['version']['version']}"
@@ -402,38 +400,32 @@ class Browser(Gtk.Application):
         if self.preferences_error:
             self.status.set_text(self.preferences_error)
             return
-        profile = self.preferences.selected()
+        profile = self.core.selected_profile()
         if not profile:
             self.status.set_text(
                 'Choose or create a device profile before using Quick Connect.')
             self.open_connections()
             return
-        password = (self.session_passwords.get(profile.id) or
-                    self.credentials.get(profile.id))
-        def task():
-            client = profile.client(password)
-            info = client.test_connection()
-            profile.verify_identity(info, require_bound=True)
-            folder = (self.preferences.app_options['remote_folders'].get(
-                profile.id, '/USB2')
-                if self.preferences.app_options['remember_folders'] else '/USB2')
-            return profile, client, info, initial_directory(client, folder)
-        self.run(task, lambda result: self.activate_connection(*result))
+        self.run(lambda: self.core.connect_selected(require_bound=True),
+                 self.activate_connection)
 
-    def activate_connection(self, profile, client, info, listing):
+    def activate_connection(self, result):
         self.offline_message=None
-        self.client, self.active_profile, self.device_info = client, profile, info
+        client = self.core.device_operations
+        self.client = client
+        self.active_profile = result.profile
+        self.device_info = result.device_info
         self.drag_payload = None
         self.file_clipboard = None
-        self.histories[False] = History(listing[0])
-        self.show_remote(listing)
+        self.histories[False] = History(result.remote_path)
+        self.show_remote(result.listing)
         self.settings_tab.bind(client)
         self.settings_tab.box.set_sensitive(True)
         self.drives_tab.bind(client)
         self.machine_tab.bind(client)
         self.media_tab.bind(client)
         self.streams_tab.bind(client)
-        if self.recovery:self.recovery.watch(profile,client,info)
+        if self.recovery:self.recovery.watch()
         if self.tabs.get_current_page() == 1: self.settings_tab.load_if_needed()
         if self.tabs.get_current_page() == 2: self.drives_tab.load_if_needed()
         self.update_connection_header()
@@ -441,6 +433,7 @@ class Browser(Gtk.Application):
     def disconnect_device(self):
         if self.busy: return
         if self.recovery:self.recovery.cancel()
+        self.core.disconnect()
         self.offline_message=None
         self.client = self.active_profile = self.device_info = None
         self.drive_bars[False].refresh()
@@ -459,6 +452,7 @@ class Browser(Gtk.Application):
 
     def connection_lost(self, message):
         if not self.active_profile:return
+        self.core.mark_connection_lost(message)
         self.offline_message=message;self.client=None;self.drag_payload=None
         while self.rlist.get_first_child():self.rlist.remove(self.rlist.get_first_child())
         self.rpath.set_text('')
@@ -473,11 +467,12 @@ class Browser(Gtk.Application):
         self.drive_bars[False].refresh()
         self.update_connection_header()
 
-    def connection_restored(self, client, info, listing):
-        self.client=client;self.device_info=info;self.offline_message=None
+    def connection_restored(self, result):
+        client=self.core.device_operations
+        self.client=client;self.device_info=result.device_info;self.offline_message=None
         self.file_clipboard = None
-        self.histories[False] = History(listing[0])
-        self.show_remote(listing)
+        self.histories[False] = History(result.remote_path)
+        self.show_remote(result.listing)
         self.settings_tab.client=client;self.settings_tab.loaded=False
         self.settings_tab.box.set_sensitive(True);self.settings_tab.update_edit_buttons()
         self.settings_tab.heading.set_text('Reconnected. '+('Discard retained edits, then reload settings.' if self.settings_tab.pending or self.settings_tab.drafts else 'Reload settings before editing or saving.'))
@@ -488,14 +483,10 @@ class Browser(Gtk.Application):
         self.status.set_text('Reconnected to the same C64U. Choose Reload from C64U in Ultimate Menu to read its current values; retained edits were not sent.')
 
     def auto_connect(self):
-        profile = self.preferences.selected()
+        profile = self.core.selected_profile()
         if not profile or not profile.auto_connect: return False
-        def task():
-            client = profile.client(self.credentials.get(profile.id))
-            info=client.test_connection()
-            profile.verify_identity(info,require_bound=True)
-            return profile, client, info, initial_directory(client,self.preferences.app_options['remote_folders'].get(profile.id,'/USB2') if self.preferences.app_options['remember_folders'] else '/USB2')
-        self.run(task, lambda result: self.activate_connection(*result))
+        self.run(lambda: self.core.connect_selected(require_bound=True),
+                 self.activate_connection)
         return False
 
     def show_remote(self, result, select=()):

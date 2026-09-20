@@ -49,12 +49,16 @@ def _mount_and_run(client, path):
         if len(image)!=size or ftp.size(path)!=size:
             raise BrowserError('Incomplete or changed image; nothing was started.')
         ftp.close();ftp=None
-        with socket.create_connection((client.host,64),timeout=client.timeout) as connection:
-            password=client.password.encode('utf-8')
-            if len(password)>65535:raise BrowserError('Network password is too long.')
-            connection.sendall(struct.pack('<HH',0xff1f,len(password))+password)
-            if receive_exact(connection,1)!=b'\x01':
-                raise BrowserError('DMA authentication failed; check the network password.')
+        protected=getattr(client,'credentials_encapsulated',False) is True
+        connection=(client.open_dma() if protected else
+                    socket.create_connection((client.host,64),timeout=client.timeout))
+        with connection:
+            if not protected:
+                password=client.password.encode('utf-8')
+                if len(password)>65535:raise BrowserError('Network password is too long.')
+                connection.sendall(struct.pack('<HH',0xff1f,len(password))+password)
+                if receive_exact(connection,1)!=b'\x01':
+                    raise BrowserError('DMA authentication failed; check the network password.')
             # RUN_IMG has a three-byte little-endian length, unlike AUTH/IDENTIFY.
             sent=True
             connection.sendall(b'\x0b\xff'+size.to_bytes(3,'little')+image)
