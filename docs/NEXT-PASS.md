@@ -326,6 +326,13 @@ for the disk-directory dialog's lifetime and restores its exact previous state
 on Close, with source and packaged-GTK checks covering both transitions. Apple
 Silicon physical confirmation remains the release gate for this correction.
 
+Apple Silicon physical testing of `1.8-replay.2` confirmed that pointer movement
+over the disk-directory dialog no longer changes hover highlighting in the
+underlying Files panes and that Files resumes normal interaction after Close.
+Windows physical testing remains a complete 13-of-13 pass from `1.8-replay.1`;
+the correction did not change its passing presentation path. Intel Mac physical
+validation remains the final Section 5 platform gate.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
