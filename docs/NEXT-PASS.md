@@ -333,6 +333,13 @@ Windows physical testing remains a complete 13-of-13 pass from `1.8-replay.1`;
 the correction did not change its passing presentation path. Intel Mac physical
 validation remains the final Section 5 platform gate.
 
+Development release `1.8-replay.3` makes Debian a required release platform.
+GitHub now builds and installs the exact-commit `.deb`, runs the source suite in
+normal and optimized modes, runs the installed GTK package self-test, retains
+the JSON evidence, and blocks publication if Debian fails. The published Debian
+asset and checksum were verified after download, and the same package installed
+locally with all 40 packaged checks passing at exact build `4bf09c3`.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
