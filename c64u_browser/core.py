@@ -7,6 +7,7 @@ clients must call the same application operations instead of owning an
 ``UltimateClient`` themselves.
 """
 from dataclasses import dataclass, replace
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Mapping
 import copy
@@ -19,7 +20,7 @@ import uuid
 from .api import BrowserError, ConnectionFailure, UltimateClient
 from .credentials import Credentials
 from .discovery import local_networks, standard_scan, subnet_scan
-from .file_service import FileService
+from .file_service import FileLocation, FileService
 from .profiles import Preferences, Profile
 from .scheduler import CoreScheduler, DeviceSession
 from .storage import initial_directory
@@ -210,6 +211,16 @@ class ArgonautCore:
         except (BrowserError, OSError) as exc:
             self.preferences_error = str(exc)
         return self
+
+    def usb_backup_root(self):
+        """Return the configured Core-host backup parent, if one is set."""
+        value=self.preferences.usb_backup_root.strip()
+        if not value:return None
+        path=Path(value).expanduser().absolute()
+        if not path.is_dir():
+            raise CoreError('storage',
+                'The configured USB/SD backup root is unavailable. Choose an existing folder in Preferences.')
+        return FileLocation.core_host(path)
 
     @property
     def active_profile(self): return self._active_profile

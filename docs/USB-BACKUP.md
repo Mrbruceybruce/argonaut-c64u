@@ -25,6 +25,23 @@ Both operations use the Core scheduler, structured job progress, cooperative
 cancellation, categorized failures, and structured partial results. Paths use
 the existing `core-host` and `c64u` scopes. `client-upload` remains unsupported.
 
+## Backup root preference
+
+**Preferences → General → USB/SD backup root** stores an optional Core setting
+for the parent folder that contains individual backups. It is a `core-host`
+path on the machine running Argonaut Core, rather than a path owned by a future
+remote client. Stable and Development store it in their separate configuration
+files.
+
+When the setting is blank, the native destination chooser keeps its normal
+starting location. When it names an existing folder, **Back up USB/SD…** starts
+the same Save chooser in that folder and retains the editable individual backup
+directory name. Argonaut does not create the root, add another directory level,
+or automatically choose a timestamp. An unavailable configured root stops the
+workflow with a clear error and must be corrected or cleared in Preferences.
+Changing the root does not move, rename, convert, or invalidate existing backup
+directories.
+
 ## Backup format and verification
 
 Each backup is a new folder containing the original volume-relative directory
@@ -65,13 +82,22 @@ with the C64U device/session binding. Physical testing should still include USB
 removal and replacement because two byte-for-byte-equivalent media cannot be
 distinguished through the available interface.
 
-## Recommended physical qualification
+## Physical acceptance
 
-Use disposable test media and keep a separate known-good copy. On Linux with a
-real C64U, verify a mixed tree containing an empty folder, zero-byte file, and a
-large file; compare the completed backup against its manifest. Restore first to
-an empty test volume, then test an explicitly reviewed replacement while an
-unrelated extra file remains untouched. Separately exercise cancellation during
-a large transfer, disconnect/reconnect after preview, and swapping the removable
-medium after preview. Confirm that each interrupted backup remains incomplete and
-that every changed-session or changed-volume restore requires a fresh preview.
+Linux physical USB/SD backup and restore acceptance passed on 2026-09-20. The
+accepted scenarios covered:
+
+- normal backup, including preservation of an empty folder and a zero-byte file;
+- normal restore;
+- replacement detection and explicit replacement authorization;
+- preservation of unrelated destination files;
+- restore cancellation, partial-upload reporting, and reviewed cleanup;
+- backup cancellation and rejection of incomplete backups;
+- stale connection/session rejection after preview; and
+- physical USB media-swap rejection after preview.
+
+Physical testing found that a cancelled restore reported its unfinished file
+but did not enable cleanup for the staged remote upload. Commit
+`b340fd3146b3920a65b5323b9af2701e948bf6eb` corrected the Core-to-GTK cleanup
+handoff, bound cleanup to the originating device session, and was physically
+retested successfully.

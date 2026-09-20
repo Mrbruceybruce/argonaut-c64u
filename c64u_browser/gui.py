@@ -31,6 +31,13 @@ from .test_lab_access import enabled as test_lab_enabled
 from .platform_support import local_hidden
 
 
+def configure_backup_destination_chooser(chooser,backup_root,volume,
+                                         file_factory=Gio.File.new_for_path):
+    """Apply Core-host defaults without choosing the backup folder for GTK."""
+    if backup_root:chooser.set_current_folder(file_factory(backup_root.path))
+    chooser.set_current_name('Argonaut-'+volume.lstrip('/')+'-backup')
+
+
 class Browser(Gtk.Application):
     def __init__(self):
         super().__init__(application_id='org.local.Argonaut.Development' if development.enabled() else 'org.local.Argonaut')
@@ -794,9 +801,11 @@ class Browser(Gtk.Application):
         names=tuple(row.item[0] for row in rows if row.item[0]!='..')
         paths=tuple(posixpath.join(self.remote,name) for name in names)
         source_text=(', '.join(paths) if paths else 'all children of '+volume)
+        try:backup_root=self.core.usb_backup_root()
+        except BrowserError as exc:self.status.set_text(str(exc));return
         chooser=Gtk.FileChooserNative.new('Create USB/SD backup folder',self.window,
             Gtk.FileChooserAction.SAVE,'Choose','Cancel')
-        chooser.set_current_name('Argonaut-'+volume.lstrip('/')+'-backup')
+        configure_backup_destination_chooser(chooser,backup_root,volume)
         def response(_,code):
             file=chooser.get_file();chooser.destroy()
             if code!=Gtk.ResponseType.ACCEPT or not file:return

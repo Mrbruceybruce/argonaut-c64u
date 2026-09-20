@@ -74,7 +74,8 @@ def show_preferences(app, page=0):
     dialog.set_default_size(740,680)
     opened={'app_options':deepcopy(prefs.app_options),
             'screenshot_folder':prefs.screenshot_folder,
-            'recording_folder':prefs.recording_folder}
+            'recording_folder':prefs.recording_folder,
+            'usb_backup_root':prefs.usb_backup_root}
     updating=[False]
     def restore_parent_focus():
         app.window.present()
@@ -124,12 +125,20 @@ def show_preferences(app, page=0):
                     entry.set_text(path);auto_save_general()
                 else:general_message('Choose a local folder.',True)
         chooser.connect('response',chosen);chooser.show()
-    for key,label in [('screenshot_folder','Screenshot folder'),('recording_folder','Recording folder')]:
+    for key,label in [('screenshot_folder','Screenshot folder'),
+                      ('recording_folder','Recording folder'),
+                      ('usb_backup_root','USB/SD backup root')]:
         box.append(Gtk.Label(label=label,xalign=0))
         folderrow=Gtk.Box(spacing=8);box.append(folderrow)
-        entry=Gtk.Entry(text=getattr(prefs,key),placeholder_text='Last used, or home if blank',hexpand=True);folderrow.append(entry);folders[key]=entry
+        placeholder=('Native chooser default if blank' if key=='usb_backup_root'
+                     else 'Last used, or home if blank')
+        entry=Gtk.Entry(text=getattr(prefs,key),placeholder_text=placeholder,hexpand=True);folderrow.append(entry);folders[key]=entry
         button=Gtk.Button(label='Browse…');folderrow.append(button)
         button.connect('clicked',browse,entry,label)
+        if key=='usb_backup_root':
+            box.append(Gtk.Label(
+                label='Core-host parent folder for individual self-contained USB/SD backups.',
+                wrap=True,xalign=0))
     note=Gtk.Label(label='General settings save automatically. Undo restores the values from when Preferences opened. Restore defaults keeps connection profiles and C64U settings.',wrap=True,xalign=0);box.append(note)
     error=Gtk.Label(wrap=True,xalign=0);box.append(error)
     dialog.general_message=error

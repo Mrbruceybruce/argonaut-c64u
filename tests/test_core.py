@@ -10,6 +10,7 @@ import unittest
 from c64u_browser.api import ConnectionFailure, Entry, UltimateClient
 from c64u_browser.core import ArgonautCore, CoreError
 from c64u_browser.discovery import Candidate
+from c64u_browser.file_service import CORE_HOST
 from c64u_browser.profiles import Preferences, Profile
 
 
@@ -118,6 +119,18 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(('done',), notes)
         self.assertEqual(('192.0.2.0/24',), networks)
         self.assertEqual((candidate,), core.discover(subnet='192.0.2.0/24')[0])
+
+    def test_usb_backup_root_is_core_host_configuration(self):
+        self.assertIsNone(self.core.usb_backup_root())
+        root=Path(self.temp.name)/'backups';root.mkdir()
+        self.prefs.usb_backup_root=str(root)
+        location=self.core.usb_backup_root()
+        self.assertEqual(CORE_HOST,location.scope)
+        self.assertEqual(str(root.absolute()),location.path)
+        self.prefs.usb_backup_root=str(root/'unavailable')
+        with self.assertRaises(CoreError) as caught:self.core.usb_backup_root()
+        self.assertEqual('storage',caught.exception.code)
+        self.assertIn('unavailable',str(caught.exception))
 
     def test_core_module_imports_with_no_display_and_without_gtk(self):
         root = str(Path(__file__).resolve().parents[1])

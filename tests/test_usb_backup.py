@@ -13,6 +13,7 @@ import unittest
 from c64u_browser.api import BrowserError, Entry
 from c64u_browser.file_service import FileLocation, FileService
 from c64u_browser.jobs import CoreJob
+from c64u_browser.profiles import Preferences
 from c64u_browser.scheduler import CoreScheduler, DeviceSession, JobBinding
 from c64u_browser.usb_backup import (
     BackupRequest, MANIFEST_NAME, UsbBackupService)
@@ -120,6 +121,24 @@ class UsbBackupTests(unittest.TestCase):
         self.assertEqual('c64u-abc',manifest['source']['device_id'])
         self.assertTrue(any(event.kind=='progress' for event in events))
         self.assertNotIn('MemoryClient',repr(preview));self.assertFalse(hasattr(preview,'client'))
+
+    def test_backup_root_change_does_not_nest_or_invalidate_existing_backup(self):
+        first_root=self.root/'first-root';second_root=self.root/'second-root'
+        first_root.mkdir();second_root.mkdir()
+        preferences=Preferences(self.root/'preferences.json')
+        preferences.usb_backup_root=str(first_root);preferences.save()
+        folder,_=self.create_backup('first-root/backup-one')
+        self.assertTrue((folder/MANIFEST_NAME).is_file())
+        self.assertFalse((folder/'backup-one').exists())
+        preferences.usb_backup_root=str(second_root);preferences.save()
+        loaded=Preferences(preferences.path).load()
+        self.assertEqual(str(second_root),loaded.usb_backup_root)
+        self.client.files.clear();self.client.dirs={'/','/USB2'}
+        preview=self.service.prepare_restore(FileLocation.core_host(folder),
+                    FileLocation.c64u('/USB2')).wait(5).result
+        restored=self.service.execute_restore(preview.plan_id,replace=True).wait(5)
+        self.assertEqual('succeeded',restored.state)
+        self.assertEqual(b'alpha',self.client.files['/USB2/GAMES/A.PRG'])
 
     def test_selected_nested_source_preserves_volume_relative_path(self):
         preview=self.service.prepare_backup(self.backup_request(

@@ -101,6 +101,12 @@ Use your computer's normal eject/unmount controls for local removable media.
 
 ### Back up or restore a C64U USB/SD volume
 
+Optionally choose **Preferences → General → USB/SD backup root** first. This is
+the existing local parent folder in which you keep individual self-contained
+backup directories. Leave it blank to retain the native chooser's normal
+starting location. Argonaut does not move existing backups when this preference
+changes.
+
 Open the USB or SD volume in the C64U side of **Files**. Select files or folders
 to back up, or leave the selection empty to back up every child of that volume.
 Choose **Back up USB/SD…**, select a new local backup-folder name, review the

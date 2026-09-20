@@ -63,6 +63,9 @@ class PreferencesUI(unittest.TestCase):
         self.assertIn('Close',labels);self.assertIn('Undo',labels)
         self.assertIn('Restore defaults…',labels)
         self.assertNotIn('Save preferences',labels)
+        self.assertIn('USB/SD backup root',[
+            w.get_text() for w in self.walk(general)
+            if isinstance(w,self.Gtk.Label)])
         hidden=next(w for w in checks
                     if w.get_label()=='Show hidden local files and folders')
         self.assertFalse(hidden.get_active())

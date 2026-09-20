@@ -21,7 +21,16 @@ backup, empty folders and files, restore additions and reviewed replacements,
 unchanged/conflicting paths, changed source or destination state, device-session
 changes, queued and running cancellation, partial results, recovery, plan
 serialization, and headless imports. Restore never deletes destination extras.
-The Core contract and remaining physical-media qualification are documented in
+The optional Core-owned backup-root preference starts destination selection in
+the configured Core-host parent while preserving one self-contained directory
+per backup and compatibility with every existing backup.
+
+Linux physical USB/SD backup and restore acceptance passed on 2026-09-20,
+including cancellation, incomplete-backup rejection, reviewed partial-upload
+cleanup, stale-session rejection, and physical media-swap rejection. The
+partial-upload cleanup issue found during qualification was corrected and
+physically retested in commit `b340fd3146b3920a65b5323b9af2701e948bf6eb`.
+The completed Core contract and qualification record are documented in
 [USB-BACKUP.md](USB-BACKUP.md).
 
 ## Active Section 4: authentic disk-image management

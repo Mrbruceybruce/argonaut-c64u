@@ -11,12 +11,26 @@ class AppPreferencesTests(unittest.TestCase):
     def test_roundtrip_preserves_profiles_and_options(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'prefs.json';p=Preferences(path)
+            self.assertEqual('',p.usb_backup_root)
             p.profiles=[Profile.new('Test','test')];p.selected_id=p.profiles[0].id
             p.app_options.update(preview_scale=175,preview_audio=False,remote_folders={p.selected_id:'/USB2/Games'})
+            p.usb_backup_root=str(Path(folder)/'backups')
             p.save();loaded=Preferences(path).load()
             self.assertEqual(loaded.app_options,p.app_options)
+            self.assertEqual(p.usb_backup_root,loaded.usb_backup_root)
+            changed=str(Path(folder)/'other-backups')
+            loaded.usb_backup_root=changed;loaded.save()
+            self.assertEqual(changed,Preferences(path).load().usb_backup_root)
             loaded.app_options=defaults();loaded.save()
             self.assertEqual(Preferences(path).load().selected_id,p.selected_id)
+
+    def test_invalid_backup_root_type_is_rejected_without_rewriting_preferences(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'prefs.json'
+            path.write_text('{"schema_version":1,"profiles":[],"usb_backup_root":42}')
+            before=path.read_text()
+            with self.assertRaises(BrowserError):Preferences(path).load()
+            self.assertEqual(before,path.read_text())
 
     def test_invalid_sizes_rejected(self):
         for value in (49,301,True,'150'):
