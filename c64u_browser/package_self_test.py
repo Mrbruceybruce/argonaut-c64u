@@ -80,7 +80,8 @@ def run(package_metadata, report_path):
 
         Gst.init(None)
         plugin_names = ('appsrc', 'audioconvert', 'audioresample', 'autoaudiosink',
-                        'webmmux', 'vp8enc', 'vorbisenc', 'videoconvert')
+                        'webmmux', 'vp8enc', 'vorbisenc', 'videoconvert',
+                        'splitmuxsink', 'splitmuxsrc')
         missing = [name for name in plugin_names if not Gst.ElementFactory.find(name)]
         _require(not missing, 'runtime.gstreamer',
                  'Required media plugins are unavailable.', checks)

@@ -1,8 +1,18 @@
-# Argonaut 1.7-disk.16 — Section 4 Linux follow-up testing
+# Argonaut 1.8-replay.1 — Section 5 cross-platform testing
 
-This build completes the authentic disk-image management roadmap section. It
-keeps Development profiles, preferences, reports, and build identity separate
-from the installed stable app.
+This build completes the instant-replay roadmap section and carries forward the
+authentic disk-image management section. It keeps Development profiles,
+preferences, reports, and build identity separate from the installed stable
+app.
+
+Section 5 adds an explicit, default-off 30-second instant replay. While preview
+is running, Argonaut keeps a bounded rolling history of encoded VP8 video and
+optional Vorbis audio fragments. Streams reports the actual retained duration.
+**Save recent 30 seconds…** writes a playable WebM while live preview and an
+ordinary recording continue. Raw RGB history is not retained, and temporary
+fragments are removed after stop, failure, export, and quit. Linux physical
+testing confirmed that simultaneous replay and ordinary audio/video recording
+both produce playable files.
 
 Section 4 adds:
 
@@ -97,14 +107,15 @@ remaining display, network, media, and C64U hardware behavior.
 
 ## Test checklist
 
-1. Confirm About shows `1.7-disk.16` and the source commit shown for this release.
+1. Confirm About shows `1.8-replay.1` and the source commit shown for this release.
 2. Open Preferences with a previously saved screenshot or recording folder
    unavailable. Confirm **Close** and the window close button work immediately
    without using Restore defaults. Confirm a newly entered nonexistent folder
    is still rejected.
 3. Click each Files pane. Confirm its **Active** label and border follow keyboard
    focus and the inactive selection is subdued. Create a local blank D64 and
-   confirm the new image is selected without opening its directory.
+   confirm the new image is selected without opening its directory. Repeat that
+   filename and confirm Create is disabled with visible red feedback.
 4. Open a D64 directory. Confirm Extract, Add, Rename, and Remove show clear
    icons with identifying tooltips; **Discard changes** and **Save image as…**
    are separated at the right; the title does not show an I-beam; and closing
@@ -130,13 +141,16 @@ remaining display, network, media, and C64U hardware behavior.
 10. Confirm hidden local entries are absent by default. Enable **Preferences →
     General → Show hidden local files and folders**, confirm they appear, then
     disable it and confirm they disappear.
-11. At C64 BASIC READY, use Streams Return-to-send for `PRINT "ONE"` and
-    `PRINT "TWO"`. Confirm each sends, clears, and leaves focus ready for the
-    next line. Video preview is not required.
+11. Confirm instant replay is off by default. Enable **Keep a 30-second instant
+    replay while previewing** in Preferences, start an audio preview, and wait
+    at least 35 seconds. Confirm Streams reports about 30 seconds retained.
+    Start an ordinary recording, save the recent replay while recording
+    continues, then stop recording. Play both WebM files and confirm video and
+    audio. Stop preview and confirm replay history clears.
 12. Run offline checks and connected read-only C64U checks in Test Lab. Confirm
     ordinary-code verdicts complete and optional AI text does not alter them.
 13. Check upload/download, Ultimate Menu, Drives, video/audio preview,
-    screenshot, recording, Mount & Run, Preferences persistence,
+    screenshot, recording, Streams Return-to-send, Mount & Run, Preferences persistence,
     disconnect/reconnect, and Quit.
 
 The attached ODS checklist contains the same numbered tasks and provides a
@@ -144,7 +158,7 @@ result selector plus a comments field for every item. Record the exact message
 and attach a task-numbered screenshot for any failure or unexpected result.
 Complete the Tester, Platform, OS version, Test date, and package fields, then
 return the filled sheet as
-`Argonaut-1.7-disk.16-testing-results-PLATFORM-TESTER.ods`. For example, use
+`Argonaut-1.8-replay.1-testing-results-PLATFORM-TESTER.ods`. For example, use
 `Windows-Bruce`, `macOS-AppleSilicon-Bruce`, or `macOS-Intel-OldMan2525` for the
 final two filename fields.
 

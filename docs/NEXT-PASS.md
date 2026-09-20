@@ -304,8 +304,10 @@ snapshot into a playable WebM while preview and ordinary recording continue.
 Raw RGB history is not retained. Temporary ring and export fragments are
 cleaned after stop, failure, export, and quit. Deterministic tests cover bounded
 export duration, simultaneous recording input, low-space rejection, preference
-validation, and cleanup. Installed Linux acceptance remains before Section 5 is
-complete; cross-platform packages wait for that acceptance.
+validation, and cleanup. Installed `1.8-replay.1+linux.4` then passed the full
+physical acceptance path: a 30-second audio/video replay exported successfully
+while an ordinary recording continued, and both WebM files played correctly.
+Section 5 is complete on Linux; cross-platform package validation follows.
 Cross-platform packages wait until the complete section passes Linux acceptance.
 
 ## Current milestone: Linux hardening

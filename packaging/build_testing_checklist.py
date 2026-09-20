@@ -37,13 +37,13 @@ AREAS = (
     'Build identity', 'Preferences recovery', 'Files focus and local D64',
     'Disk directory controls', 'Multiple file addition', 'C64U D64 creation',
     'Disk format regression', 'Remote mount', 'File copying', 'Hidden files',
-    'Streams input', 'Test Lab', 'Core regression',
+    'Instant replay', 'Test Lab', 'Core regression',
 )
 
 TASKS = (
     'Confirm About shows {version} and source commit {commit}.',
     'Open Preferences with any previously saved screenshot or recording folder unavailable. Confirm Close and the window close button close Preferences immediately without requiring Restore defaults. Enter a new nonexistent folder and confirm Argonaut rejects it.',
-    'In Files, click each pane and confirm its Active label and border move with keyboard focus while the inactive selection becomes subdued. Create a local blank D64 and confirm it refreshes and selects the new image without opening its directory.',
+    'In Files, click each pane and confirm its Active label and border move with keyboard focus while the inactive selection becomes subdued. Create a local blank D64 and confirm it refreshes and selects the new image without opening its directory. Repeat that filename and confirm Create is disabled with visible red feedback.',
     'Open a D64 directory. Confirm Extract, Add, Rename, and Remove show clear icons with identifying tooltips; Discard changes and Save image as… are separate at the right; the title does not show an I-beam; and unsaved staged changes still require confirmation before closing.',
     'Choose Add file… and confirm the chooser starts in the local Files folder. Select at least two small host files at once and confirm one review table shows every file with an editable C64 filename and type. Include text and tokenized $0801 .bas files and confirm they default to SEQ and PRG respectively. Confirm the batch once, save it, reopen it, and verify every file.',
     'In the C64U Files pane, choose New D64 disk on C64U…. Create a unique image and confirm Argonaut refreshes, selects, reads back, and validates an empty standard 35-track D64 with 664 blocks free. Repeat the name and confirm the existing image is protected.',
@@ -51,9 +51,9 @@ TASKS = (
     'On the C64U side of Files, right-click a D64, G64, D71, G71, or D81 and choose Mount…. Confirm Drives opens with the full path prepared for Drive A and no mount occurs before review is accepted.',
     'Copy one item between local and C64U panes with Copy/Paste, then another with drag-and-drop. Confirm source and destination copies remain selected and the destination pane becomes visibly active when focused.',
     'Confirm hidden local entries are absent by default. Enable Preferences → General → Show hidden local files and folders, confirm they appear, then disable it and confirm they disappear.',
-    'At C64 BASIC READY, use Streams Return-to-send for PRINT "ONE" and PRINT "TWO". Confirm each command sends, the field clears, and focus remains ready for the next line. Video preview is not required.',
+    'Confirm instant replay is off by default. Enable the 30-second instant replay in Preferences, start an audio preview, and wait at least 35 seconds. Confirm Streams reports about 30 seconds retained. Start an ordinary recording, save the recent replay while recording continues, then stop recording. Play both WebM files and confirm video and audio. Stop preview and confirm replay history clears.',
     'Run offline checks and connected read-only C64U checks in Test Lab. Confirm ordinary-code verdicts complete and any optional AI text does not change those verdicts.',
-    'Check upload/download, Ultimate Menu, Drives, video/audio preview, screenshot, recording, Mount & Run, Preferences persistence, disconnect/reconnect, and Quit.',
+    'Check upload/download, Ultimate Menu, Drives, video/audio preview, screenshot, recording, Streams Return-to-send, Mount & Run, Preferences persistence, disconnect/reconnect, and Quit.',
 )
 
 
