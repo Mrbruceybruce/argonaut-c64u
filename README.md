@@ -60,9 +60,17 @@ Use **Preferences → About** to check the running version and build identifier.
 
 ## Screenshots
 
-Argonaut 1.5 running on macOS (Apple Silicon), connected to a C64 Ultimate.
+Argonaut 1.8 running on Debian Linux, connected to a C64 Ultimate.
 
 **Files — local and C64U storage side by side.**
+
+![Argonaut 1.8 Files tab showing local and C64U storage](docs/images/linux-files-1.8.png)
+
+**Ultimate Menu — search, review, back up, and safely apply C64U settings.**
+
+![Argonaut 1.8 Ultimate Menu showing searchable C64U settings](docs/images/linux-ultimate-menu-1.8.png)
+
+**Disk-image directory — inspect authentic Commodore media before extracting or editing.**
 
 Open a D64, D71, or D81 to view its authentic Commodore directory. Standard
 35-track D64 images can stage filename changes, file removal, and PRG/SEQ/USR
@@ -80,19 +88,19 @@ Authentic 1581 CBM partitions are labeled as disk partitions and are never
 presented as ordinary host folders or extractable chained files. Their allocated
 sectors remain protected during editing.
 
-![Mac Files tab showing local folders and a selected C64U disk image](docs/images/macos-files.png)
+![Argonaut 1.8 showing an authentic read-only D64 disk directory](docs/images/linux-d64-directory-1.8.png)
 
 **Drives — mount disk images or use Mount & Run.**
 
-![Mac Drives tab showing Drive A controls and Mount & Run](docs/images/macos-drives.png)
+![Argonaut 1.8 Drives tab showing Drive A controls and Mount and Run](docs/images/linux-drives-1.8.png)
 
-**Streams — live C64U screen preview with audio receiving.**
+**Streams — live C64U screen preview, audio, recording, and instant replay.**
 
-![Mac Streams tab displaying a live C64U game screen at 200 percent scale](docs/images/macos-streams.png)
+![Argonaut 1.8 Streams tab displaying a live C64U game screen](docs/images/linux-streams-1.8.png)
 
 **About — version, build, platform, and project links.**
 
-![Mac About tab showing Argonaut version 1.5 and its build identifier](docs/images/macos-about.png)
+![Argonaut About tab showing version 1.8 and its tested build identifier](docs/images/linux-about-1.8.png)
 
 ## Run from source
 
