@@ -5,6 +5,7 @@ from gi.repository import Gtk
 from .configuration import Configuration,display
 from .dependencies import controls_dependencies
 from .backups import snapshot,read_backup,write_backup,differences
+from .settings_safety import warning_for
 
 class BackupActions:
  def __init__(self,tab):self.tab=tab;self.chooser=None
@@ -41,10 +42,15 @@ class BackupActions:
   dialog.set_default_size(750,550);dialog.add_button('Cancel',Gtk.ResponseType.CANCEL)
   stage=dialog.add_button('Stage selected changes',Gtk.ResponseType.OK)
   box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
-  box.append(Gtk.Label(label=f'{len(changes)} differences · {skipped} read-only, sensitive, unavailable or incompatible settings omitted.\nSelect changes to stage, then use Review & Apply. Nothing is saved to flash. Referenced ROM/media files must already be installed. Network changes may disconnect the device.',xalign=0,wrap=True))
+  risky=sum(warning_for(category,setting.name) is not None for category,setting,value in changes)
+  caution=(f' {risky} hardware compatibility change(s) are marked CAUTION and remain unselected until you choose them.' if risky else '')
+  box.append(Gtk.Label(label=f'{len(changes)} differences · {skipped} read-only, sensitive, unavailable or incompatible settings omitted.\nSelect changes to stage, then use Review & Apply. Nothing is saved to flash. Referenced ROM/media files must already be installed. Network changes may disconnect the device.{caution}',xalign=0,wrap=True))
   checks=[]
   for category,setting,value in changes:
-   check=Gtk.CheckButton(label=f'{category} · {setting.name}\n{setting.current} → {display(value)}',active=False)
+   warning=warning_for(category,setting.name)
+   prefix='CAUTION — ' if warning else ''
+   suffix=f'\n{warning}' if warning else ''
+   check=Gtk.CheckButton(label=f'{prefix}{category} · {setting.name}\n{setting.current} → {display(value)}{suffix}',active=False)
    box.append(check);checks.append(check)
   def update(*_):stage.set_sensitive(any(c.get_active() for c in checks))
   for check in checks:check.connect('toggled',update)

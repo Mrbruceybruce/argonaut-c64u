@@ -1,6 +1,14 @@
 name: Development Windows and Mac packages
+env:
+  ARGONAUT_DEV_VERSION: 1.8-replay.3
 'on':
-  workflow_dispatch: null
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified packages as the current development prerelease
+        required: true
+        default: false
+        type: boolean
 permissions:
   contents: read
 jobs:
@@ -11,46 +19,18 @@ jobs:
     steps:
     - uses: actions/checkout@v5
       with:
-        fetch-depth: 0
+        ref: development
     - id: source
-      run: |
-        echo '8753560ea85857fe33c5cca7c0d6badbd6213e528c9c0dc4d2661d359c152a8b  .github/workflows/development-source.bundle' | sha256sum -c -
-        git bundle verify .github/workflows/development-source.bundle
-        echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   windows:
     runs-on: windows-2022
-    env:
-      ARGONAUT_SOURCE_COMMIT: e5bbc79449da767f7b949fe9068a50091dd23823
     timeout-minutes: 40
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
     steps:
     - uses: actions/checkout@v5
       with:
         ref: ${{ needs.source.outputs.sha }}
-        fetch-depth: 0
-    - &id001
-      name: Restore reviewed development source
-      shell: bash
-      run: |
-        git fetch .github/workflows/development-source.bundle development:refs/remotes/import/development
-        test "$(git rev-parse refs/remotes/import/development)" = e5bbc79449da767f7b949fe9068a50091dd23823
-        git checkout --detach refs/remotes/import/development
-        cat > docs/DEVELOPMENT-TEST.md <<'ARGONAUT_NOTES'
-        Argonaut 0.1.4-dev.3 - Development testing
-        
-        Debian testing passed. These Windows portable, Apple Silicon, and Intel Mac packages are for the next test round.
-        
-        Changes: merged scrollable Device details; About inside Preferences; Close with Save/Discard/Keep editing; percentage labels; Enter-to-send; discovery retries and unrelated-server filtering; consistent version and build identification.
-        
-        About must show Version 0.1.4-dev.3 and Build e5bbc79449da767f7b949fe9068a50091dd23823.
-        
-        Windows portable: extract into a new folder and copy your previous Data folder to preserve development profiles. Mac: replace Argonaut Development.app. Stable Argonaut remains separate.
-        
-        Check discovery, connecting and saved profile details; all three Preferences tabs; Save/Discard/Keep editing on Close and window X; preview scaling and scrolling; Enter-to-send at BASIC READY; file copy, screenshots, recording, Mount & Run, and normal Quit (including Cmd-Q on Mac).
-        
-        Mac discovery reliability needs hardware testing. Windows multiple-instance behavior remains a follow-up; avoid simultaneous operations against the same C64U. Mount & Run requires DMA network service and affects the connected C64U.
-        
-        Report platform, About version/build, and observed results. This prerelease does not replace stable 0.1.4.
-        ARGONAUT_NOTES
     - uses: msys2/setup-msys2@v2
       with:
         msystem: UCRT64
@@ -63,7 +43,7 @@ jobs:
     - name: Build portable application
       shell: msys2 {0}
       run: |
-        python packaging/build_metadata.py --version 0.1.4-dev.3 --development
+        python packaging/build_metadata.py --version ${{ env.ARGONAUT_DEV_VERSION }} --development
         python -m PyInstaller --noconfirm --clean packaging/windows/argonaut.spec
         pacman -Q > dist/Argonaut/MSYS2-PACKAGES.txt
         cp LICENSE COPYRIGHT packaging/windows/README.txt dist/Argonaut/
@@ -74,8 +54,10 @@ jobs:
         $exe = Join-Path $env:GITHUB_WORKSPACE 'dist\Argonaut\Argonaut.exe'
         $env:PATH = "$env:SystemRoot\system32;$env:SystemRoot"
         $process = Start-Process -FilePath $exe -ArgumentList @('--self-test', $report) -PassThru
-        if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Startup test timed out' }
+        if (-not $process.WaitForExit(90000)) { $process.Kill(); throw 'Startup test timed out' }
         if ($process.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Packaged startup failed' }
+        $result = Get-Content $report | ConvertFrom-Json
+        if ($result.result -ne 'passed' -or $result.suite -ne 'package' -or $result.build -ne $env:ARGONAUT_SOURCE_COMMIT) { throw 'Package self-test did not pass' }
         Get-Content $report
     - name: Package and test portable development app
       shell: pwsh
@@ -85,14 +67,22 @@ jobs:
         $bundle = Join-Path $env:GITHUB_WORKSPACE 'dist/Argonaut'
         New-Item -ItemType File "$bundle/portable.flag" | Out-Null
         Copy-Item docs/DEVELOPMENT-TEST.md "$bundle/README-DEVELOPMENT.md"
+        New-Item -ItemType Directory -Force "$bundle/Test Disk Images" | Out-Null
+        Copy-Item tests/fixtures/vice-1541-authentic.d64 "$bundle/Test Disk Images/"
+        Copy-Item tests/fixtures/vice-1541-rel.d64 "$bundle/Test Disk Images/"
+        Copy-Item tests/fixtures/vice-1571-authentic.d71 "$bundle/Test Disk Images/"
+        Copy-Item tests/fixtures/vice-1581-authentic.d81 "$bundle/Test Disk Images/"
         $report = Join-Path $env:RUNNER_TEMP 'portable-dev-test.json'
         $p = Start-Process "$bundle/Argonaut.exe" -ArgumentList @('--self-test', $report) -PassThru
         if (-not $p.WaitForExit(90000)) { $p.Kill(); throw 'Portable test timeout' }
         if ($p.ExitCode -ne 0 -or -not (Test-Path $report)) { throw 'Portable test failed' }
+        $result = Get-Content $report | ConvertFrom-Json
+        if ($result.result -ne 'passed' -or $result.suite -ne 'package' -or $result.build -ne $env:ARGONAUT_SOURCE_COMMIT) { throw 'Portable self-test did not pass' }
         if (-not (Test-Path "$bundle/Data/argonaut-development/config.json")) { throw 'Development preferences missing' }
+        Copy-Item $report artifacts/package-self-test-Windows.json
         Remove-Item "$bundle/Data" -Recurse -Force
-        Compress-Archive -Path "$bundle/*" -DestinationPath artifacts/Argonaut-0.1.4-dev.3-Windows-x64-Portable.zip
-    - uses: actions/upload-artifact@v4
+        Compress-Archive -Path "$bundle/*" -DestinationPath "artifacts/Argonaut-${{ env.ARGONAUT_DEV_VERSION }}-Windows-x64-Portable.zip"
+    - uses: actions/upload-artifact@v7
       with:
         name: dev-Windows
         path: artifacts/
@@ -100,15 +90,13 @@ jobs:
     needs: source
   macos:
     runs-on: ${{ matrix.runner }}
-    env:
-      ARGONAUT_SOURCE_COMMIT: e5bbc79449da767f7b949fe9068a50091dd23823
     timeout-minutes: 90
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
     steps:
     - uses: actions/checkout@v5
       with:
         ref: ${{ needs.source.outputs.sha }}
-        fetch-depth: 0
-    - *id001
     - name: Install Mac runtime
       run: |
         test "$(uname -m)" = "${{ matrix.arch }}"
@@ -129,7 +117,7 @@ jobs:
       run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
     - name: Build app
       run: |
-        .venv/bin/python packaging/build_metadata.py --version 0.1.4-dev.3 --development
+        .venv/bin/python packaging/build_metadata.py --version ${{ env.ARGONAUT_DEV_VERSION }} --development
         .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
     - name: Check relocated app with minimal environment
       run: |
@@ -137,15 +125,20 @@ jobs:
         ditto "dist/Argonaut Development.app" "$RUNNER_TEMP/Argonaut App Test/Argonaut Development.app"
         codesign --verify --deep --strict "$RUNNER_TEMP/Argonaut App Test/Argonaut Development.app"
         .venv/bin/python - <<'PYTHON'
-        import os, subprocess
+        import json, os, subprocess
         from pathlib import Path
         folder=Path(os.environ['RUNNER_TEMP'])/'Argonaut App Test'
         report=folder/'self-test.json'
         env=dict(os.environ,PATH='/usr/bin:/bin:/usr/sbin:/sbin')
         for key in ('PYTHONPATH','GI_TYPELIB_PATH','DYLD_LIBRARY_PATH','GST_PLUGIN_PATH'):
             env.pop(key,None)
-        subprocess.run([str(folder/'Argonaut Development.app/Contents/MacOS/Argonaut'),'--self-test',str(report)],env=env,check=True,timeout=90)
-        assert report.is_file()
+        subprocess.run([str(folder/'Argonaut Development.app/Contents/MacOS/Argonaut'),'--self-test',str(report)],env=env,check=True,timeout=180)
+        if not report.is_file():
+            raise SystemExit('Package self-test report is missing')
+        result=json.loads(report.read_text())
+        if (result.get('result')!='passed' or result.get('suite')!='package' or
+                result.get('build')!=os.environ['ARGONAUT_SOURCE_COMMIT']):
+            raise SystemExit('Package self-test did not pass')
         print(report.read_text())
         PYTHON
     - name: Create development DMG and ZIP
@@ -153,11 +146,14 @@ jobs:
         mkdir -p mac-package artifacts
         ditto "dist/Argonaut Development.app" "mac-package/Argonaut Development.app"
         cp docs/DEVELOPMENT-TEST.md LICENSE COPYRIGHT mac-package/
+        mkdir -p 'mac-package/Test Disk Images'
+        cp tests/fixtures/vice-1541-authentic.d64 tests/fixtures/vice-1541-rel.d64 tests/fixtures/vice-1571-authentic.d71 tests/fixtures/vice-1581-authentic.d81 'mac-package/Test Disk Images/'
         brew info --json=v2 --installed > mac-package/Homebrew-packages.json
         ln -s /Applications mac-package/Applications
-        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-0.1.4-dev.3-macOS-${{ matrix.label }}.dmg
-        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-0.1.4-dev.3-macOS-${{ matrix.label }}.zip
-    - uses: actions/upload-artifact@v4
+        hdiutil create -volname 'Argonaut Development' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-${{ env.ARGONAUT_DEV_VERSION }}-macOS-${{ matrix.label }}.dmg
+        ditto -c -k --sequesterRsrc --keepParent mac-package artifacts/Argonaut-${{ env.ARGONAUT_DEV_VERSION }}-macOS-${{ matrix.label }}.zip
+        cp "$RUNNER_TEMP/Argonaut App Test/self-test.json" "artifacts/package-self-test-macOS-${{ matrix.label }}.json"
+    - uses: actions/upload-artifact@v7
       with:
         name: dev-macOS-${{ matrix.label }}
         path: artifacts/
@@ -173,11 +169,60 @@ jobs:
         - runner: macos-15-intel
           arch: x86_64
           label: Intel
+  debian:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: source
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        ref: ${{ needs.source.outputs.sha }}
+    - name: Install package-test tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb dbus-x11
+    - name: Build and install Debian development package
+      run: |
+        mkdir -p artifacts
+        python3 packaging/build_deb.py --version "${ARGONAUT_DEV_VERSION}" --development --output artifacts
+        sudo apt-get install -y "./artifacts/argonaut-c64u-development_${ARGONAUT_DEV_VERSION}_all.deb"
+    - name: Unit tests
+      run: |
+        python3 -m unittest discover -s tests -p 'test_*.py'
+        python3 -O -m unittest discover -s tests -p 'test_*.py'
+    - name: Test installed Debian package
+      run: |
+        report="$RUNNER_TEMP/package-self-test-Debian.json"
+        cd /tmp
+        xvfb-run -a /usr/bin/argonaut-development --self-test "$report"
+        python3 - "$report" <<'PYTHON'
+        import json, os, sys
+        from pathlib import Path
+        report = Path(sys.argv[1])
+        if not report.is_file():
+            raise SystemExit('Package self-test report is missing')
+        result = json.loads(report.read_text())
+        if (result.get('result') != 'passed' or result.get('suite') != 'package' or
+                result.get('version') != os.environ['ARGONAUT_DEV_VERSION'] or
+                result.get('build') != os.environ['ARGONAUT_SOURCE_COMMIT']):
+            raise SystemExit('Installed Debian package self-test did not pass')
+        print(report.read_text())
+        PYTHON
+        cp "$report" "$GITHUB_WORKSPACE/artifacts/package-self-test-Debian.json"
+    - uses: actions/upload-artifact@v7
+      with:
+        name: dev-Debian
+        path: artifacts/
+        if-no-files-found: error
   publish:
+    if: ${{ inputs.publish }}
     needs:
     - source
     - windows
     - macos
+    - debian
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -185,9 +230,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         ref: ${{ needs.source.outputs.sha }}
-        fetch-depth: 0
-    - *id001
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         pattern: dev-*
         path: release-assets
@@ -196,8 +239,8 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        git archive --format=zip --prefix=argonaut-development/ -o release-assets/argonaut-0.1.4-dev.3-source.zip HEAD
-        printf '\nPackages and the attached source ZIP use reviewed development commit e5bbc79449da767f7b949fe9068a50091dd23823. GitHub automatic source archives refer to the build-workflow tag; use argonaut-0.1.4-dev.3-source.zip for the application source.\n' >> docs/DEVELOPMENT-TEST.md
+        git archive --format=zip --prefix=argonaut-development/ -o release-assets/argonaut-${{ env.ARGONAUT_DEV_VERSION }}-source.zip HEAD
+        python packaging/build_testing_checklist.py --version "${{ env.ARGONAUT_DEV_VERSION }}" --commit "${{ needs.source.outputs.sha }}" --output "release-assets/Argonaut-${{ env.ARGONAUT_DEV_VERSION }}-testing-checklist.ods"
         cd release-assets
-        sha256sum *.zip *.dmg > SHA256SUMS
-        gh release create v0.1.4-dev.3 --target "${{ needs.source.outputs.sha }}" --prerelease --latest=false --title 'Argonaut 0.1.4-dev.3 — Development test packages' --notes-file ../docs/DEVELOPMENT-TEST.md *.zip *.dmg SHA256SUMS
+        sha256sum *.deb *.zip *.dmg *.ods > SHA256SUMS
+        gh release create "v${{ env.ARGONAUT_DEV_VERSION }}" --target "${{ needs.source.outputs.sha }}" --prerelease --latest=false --title "Argonaut ${{ env.ARGONAUT_DEV_VERSION }} — Development test packages" --notes-file ../docs/DEVELOPMENT-TEST.md *.deb *.zip *.dmg *.ods SHA256SUMS

@@ -6,6 +6,7 @@ import posixpath
 import uuid
 from .api import BrowserError, safe_argument
 from .transfers import connect, remote_file
+from .diagnostics import operation_event
 
 
 def child(parent, name):
@@ -23,6 +24,12 @@ def inspect(client, path):
 
 
 def operate(client, action, path, new_name=None, confirmation=None):
+    logged_action = action if action in ('mkdir', 'rename', 'delete') else 'unknown'
+    with operation_event('ftp', 'file_' + logged_action, 'entry'):
+        return _operate(client, action, path, new_name, confirmation)
+
+
+def _operate(client, action, path, new_name, confirmation):
     remote_file(path)
     parent, name = posixpath.split(path)
     child(parent, name)

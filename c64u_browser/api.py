@@ -10,6 +10,7 @@ import urllib.error
 from urllib.parse import quote, urlencode
 import socket
 import ipaddress
+from .diagnostics import operation_event, rest_target
 
 class BrowserError(Exception):
     pass
@@ -55,6 +56,10 @@ class UltimateClient:
         self.http_port = http_port
 
     def list_directory(self, path='/'):
+        with operation_event('ftp', 'list_directory', 'directory'):
+            return self._list_directory(path)
+
+    def _list_directory(self, path):
         safe_argument(path)
         if not path.startswith('/'):
             raise BrowserError('Directory path must be absolute, beginning with /.')
@@ -137,6 +142,24 @@ class UltimateClient:
         if mode not in ('readonly','readwrite','unlinked'):raise BrowserError('Unsupported disk write mode.')
         return self._request_json('PUT',self.drive_route(drive,'mount')+'?'+urlencode({'image':path,'mode':mode}))
 
+    def create_d64(self, path, disk_name, tracks=35):
+        """Ask supported C64U firmware to create a standard blank D64."""
+        if not isinstance(path, str) or not isinstance(disk_name, str):
+            raise BrowserError('Choose a C64U filename and disk name.')
+        safe_argument(path)
+        safe_argument(disk_name)
+        parts = path.split('/')
+        if (not path.startswith('/') or any(part in ('', '.', '..') for part in parts[1:])
+                or not path.casefold().endswith('.d64')):
+            raise BrowserError('Use an absolute C64U .d64 path without parent traversal.')
+        if not disk_name.strip() or len(disk_name) > 16:
+            raise BrowserError('Enter a C64 disk name of 1 to 16 characters.')
+        if tracks != 35:
+            raise BrowserError('Argonaut creates standard 35-track D64 images.')
+        route = '/v1/files/' + quote(path.lstrip('/'), safe='/') + ':create_d64'
+        return self._request_json(
+            'PUT', route + '?' + urlencode({'tracks': tracks, 'diskname': disk_name}))
+
     def set_drive_type(self, drive, mode):
         if mode not in ('1541','1571','1581'):raise BrowserError('Unsupported drive type.')
         return self._request_json('PUT',self.drive_route(drive,'set_mode')+'?'+urlencode({'mode':mode}))
@@ -145,6 +168,11 @@ class UltimateClient:
         return self._request_json('GET', path)
 
     def _request_json(self, method, path, payload=None):
+        # Query values and dynamic route segments can contain private names.
+        with operation_event('rest', method, rest_target(path)):
+            return self._request_json_impl(method, path, payload)
+
+    def _request_json_impl(self, method, path, payload=None):
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         body = None if payload is None else json.dumps(payload).encode('utf-8')
         headers = {'X-Password': self.password, 'Accept': 'application/json'}
@@ -194,6 +222,24 @@ class UltimateClient:
     def machine_action(self, action):
         if action not in ('reset','reboot'):raise BrowserError('Unsupported machine action.')
         return self._request_json('PUT','/v1/machine:'+action)
+
+    def run_prg(self, path):
+        safe_argument(path)
+        if (not isinstance(path, str) or not path.startswith('/')
+                or any(part in ('.', '..') for part in path.split('/'))
+                or not path.lower().endswith('.prg')):
+            raise BrowserError('Use an absolute C64U path to a PRG file.')
+        return self._request_json(
+            'PUT', '/v1/runners:run_prg?' + urlencode({'file': path}))
+
+    def write_memory(self, address, data):
+        if (type(address) is not int or not 0 <= address <= 0xffff
+                or not isinstance(data, bytes) or not 1 <= len(data) <= 128
+                or address + len(data) > 0x10000):
+            raise BrowserError('Use a valid C64 memory address and 1 to 128 bytes.')
+        return self._request_json('PUT', '/v1/machine:writemem?' + urlencode({
+            'address': f'{address:04X}', 'data': data.hex().upper(),
+        }))
 
     @staticmethod
     def sid_parameters(path, song=None):

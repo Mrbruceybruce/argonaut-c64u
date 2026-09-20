@@ -2,6 +2,7 @@
 """Small platform boundaries for paths, storage, and atomic file publication."""
 import os
 import posixpath
+import stat
 import sys
 from pathlib import Path
 
@@ -41,3 +42,11 @@ def local_roots():
 def contains_path(root,path):
     try:Path(path).relative_to(root);return True
     except ValueError:return False
+
+def local_hidden(path):
+    """Return whether a local entry is hidden on its host platform."""
+    path=Path(path)
+    if path.name.startswith('.'):return True
+    try:attributes=getattr(path.lstat(),'st_file_attributes',0)
+    except OSError:return False
+    return bool(attributes & getattr(stat,'FILE_ATTRIBUTE_HIDDEN',0))

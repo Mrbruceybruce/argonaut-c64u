@@ -1,0 +1,10 @@
+[Unit]
+Description=Argonaut end-to-end C64 AI test
+ConditionPathExists=%h/.config/@CONFIG_NAME@/test-lab/c64-ai-bridge.json
+
+[Service]
+Type=oneshot
+@DEVELOPMENT_ENV@
+ExecStart=@AI_TEST_EXECUTABLE@
+TimeoutStartSec=90s
+SuccessExitStatus=1 2

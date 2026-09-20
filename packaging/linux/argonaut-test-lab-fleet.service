@@ -1,0 +1,10 @@
+[Unit]
+Description=Argonaut read-only Test Lab checks
+ConditionPathExists=%h/.config/@CONFIG_NAME@/config.json
+
+[Service]
+Type=oneshot
+@DEVELOPMENT_ENV@
+ExecStart=@ALERT_EXECUTABLE@
+TimeoutStartSec=5min
+SuccessExitStatus=2

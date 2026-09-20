@@ -31,7 +31,7 @@ class FlashFiles:
   self.listing=Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
   self.listing.connect('row-selected',lambda *_:self.update())
   scroll=Gtk.ScrolledWindow(vexpand=True,hexpand=True);scroll.set_child(self.listing);self.controls.append(scroll)
-  self.controls.append(Gtk.Label(label='Uploads save files in Flash without selecting a ROM or applying settings. Existing files are not replaced. Select an installed ROM in Settings afterward. For C64U drive files, select one on the C64U side of Files before opening this dialog.',wrap=True,xalign=0))
+  self.controls.append(Gtk.Label(label='Uploads save files in Flash without selecting a ROM or applying settings. Existing files are not replaced. Select an installed ROM in Ultimate Menu afterward. For C64U drive files, select one on the C64U side of Files before opening this dialog.',wrap=True,xalign=0))
   self.status=Gtk.Label(xalign=0,wrap=True,selectable=True);box.append(self.status)
   self.folders.connect('changed',lambda *_:self.refresh())
   self.dialog.present();self.refresh()

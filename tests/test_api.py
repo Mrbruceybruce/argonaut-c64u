@@ -31,3 +31,38 @@ class Tests(unittest.TestCase):
             with self.assertRaises(BrowserError): UltimateClient('device').list_directory()
             ftp.retrlines.assert_not_called()
             ftp.close.assert_called_once()
+    def test_run_prg_validates_and_encodes_path(self):
+        client=UltimateClient('device')
+        with patch.object(client,'_request_json',return_value={'errors':[]}) as request:
+            client.run_prg('/USB2/Argonaut AI.prg')
+        request.assert_called_once_with(
+            'PUT','/v1/runners:run_prg?file=%2FUSB2%2FArgonaut+AI.prg')
+        for path in ('relative.prg','/USB2/../bad.prg','/USB2/readme.txt'):
+            with self.subTest(path=path),self.assertRaises(BrowserError):
+                client.run_prg(path)
+    def test_write_memory_is_bounded_and_encoded(self):
+        client=UltimateClient('device')
+        with patch.object(client,'_request_json',return_value={'errors':[]}) as request:
+            client.write_memory(0x0277,b'A\r')
+        request.assert_called_once_with(
+            'PUT','/v1/machine:writemem?address=0277&data=410D')
+        for address,data in ((-1,b'A'),(0xffff,b'AB'),(0x0277,b''),
+                             (0x0277,b'A'*129),(0x0277,'A')):
+            with self.subTest(address=address,data=data),self.assertRaises(BrowserError):
+                client.write_memory(address,data)
+
+    def test_create_d64_uses_native_encoded_route(self):
+        client=UltimateClient('device')
+        with patch.object(client,'_request_json',return_value={'errors':[]}) as request:
+            client.create_d64('/USB2/My disks/New disk.d64','MY DISK')
+        request.assert_called_once_with(
+            'PUT','/v1/files/USB2/My%20disks/New%20disk.d64:create_d64?tracks=35&diskname=MY+DISK')
+
+    def test_create_d64_rejects_unsafe_or_nonstandard_arguments(self):
+        client=UltimateClient('device')
+        cases=(('relative.d64','DISK',35),('/USB2/../bad.d64','DISK',35),
+               ('/USB2/not-d64.txt','DISK',35),('/USB2/new.d64','',35),
+               ('/USB2/new.d64','X'*17,35),('/USB2/new.d64','DISK',40))
+        for path,name,tracks in cases:
+            with self.subTest(path=path,name=name,tracks=tracks),self.assertRaises(BrowserError):
+                client.create_d64(path,name,tracks)

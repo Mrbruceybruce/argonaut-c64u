@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Argonaut read-only C64U checks every 30 minutes
+
+[Timer]
+OnActiveSec=5min
+OnUnitActiveSec=30min
+Unit=@SERVICE_UNIT@
+
+[Install]
+WantedBy=timers.target

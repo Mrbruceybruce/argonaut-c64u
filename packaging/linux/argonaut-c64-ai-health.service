@@ -1,0 +1,10 @@
+[Unit]
+Description=Argonaut deterministic C64 AI health alert
+ConditionPathExists=%h/.config/@CONFIG_NAME@/test-lab/c64-ai-bridge.json
+
+[Service]
+Type=oneshot
+@DEVELOPMENT_ENV@
+ExecStart=@HEALTH_EXECUTABLE@
+TimeoutStartSec=30s
+SuccessExitStatus=1 2

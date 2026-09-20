@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Validated desktop preferences, separate from machine configuration."""
 DEFAULTS={'remember_window':True,'width':1200,'height':850,'preview_scale':150,
-          'preview_audio':True,'remember_folders':True,'local_folder':'','remote_folders':{}}
+          'preview_audio':True,'remember_folders':True,'show_hidden_local':False,
+          'replay_enabled':False,'replay_seconds':30,'developer_mode':False,
+          'local_folder':'','remote_folders':{}}
 
 def defaults():
     return {**DEFAULTS,'remote_folders':{}}
@@ -9,7 +11,8 @@ def defaults():
 def validate(options):
     result=defaults()
     if not isinstance(options,dict):raise ValueError('Invalid application preferences')
-    for key in ('remember_window','preview_audio','remember_folders'):
+    for key in ('remember_window','preview_audio','remember_folders','show_hidden_local',
+                'replay_enabled','developer_mode'):
         value=options.get(key,result[key])
         if type(value) is not bool:raise ValueError('Invalid preference: '+key)
         result[key]=value
@@ -17,6 +20,10 @@ def validate(options):
         value=options.get(key,result[key])
         if type(value) is not int or not low<=value<=high:raise ValueError('Invalid preference: '+key)
         result[key]=value
+    replay_seconds=options.get('replay_seconds',result['replay_seconds'])
+    if type(replay_seconds) is not int or not 5<=replay_seconds<=300:
+        raise ValueError('Invalid preference: replay_seconds')
+    result['replay_seconds']=replay_seconds
     result['preview_scale']=normalize_scale(result['preview_scale'])
     local=options.get('local_folder','');remote=options.get('remote_folders',{})
     if not isinstance(local,str) or not isinstance(remote,dict) or any(not isinstance(k,str) or not isinstance(v,str) for k,v in remote.items()):
@@ -49,8 +56,11 @@ def scale_control(value,changed=None):
 
 
 def show_preferences(app, page=0):
-    from gi.repository import Gtk,Gio
+    from gi.repository import Gtk,Gio,GLib
+    from copy import deepcopy
     from pathlib import Path
+    from . import development
+    from .test_lab_access import stop_background
     if app.preferences_error:
         app.status.set_text(app.preferences_error);return
     if app.busy:return
@@ -60,22 +70,39 @@ def show_preferences(app, page=0):
     prefs=app.preferences
     dialog=Gtk.Dialog(title='Argonaut Preferences',transient_for=app.window,modal=True)
     dialog.add_button('Close',Gtk.ResponseType.CLOSE)
-    dialog.add_button('Save preferences',Gtk.ResponseType.OK)
     app.preferences_dialog=dialog
     dialog.set_default_size(740,680)
+    opened={'app_options':deepcopy(prefs.app_options),
+            'screenshot_folder':prefs.screenshot_folder,
+            'recording_folder':prefs.recording_folder}
+    updating=[False]
+    def restore_parent_focus():
+        app.window.present()
+        return False
     def destroy():
         app.preferences_dialog=None
         dialog.destroy()
+        GLib.idle_add(restore_parent_focus)
     pages=Gtk.Notebook(vexpand=True);dialog.pages=pages;dialog.get_content_area().append(pages)
     box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
     general_scroll=Gtk.ScrolledWindow(vexpand=True);general_scroll.set_child(box)
     pages.append_page(general_scroll,Gtk.Label(label='General'))
     for side in ('top','bottom','start','end'):getattr(box,'set_margin_'+side)(16)
     checks={}
-    for key,label in [('remember_window','Remember window size'),('preview_audio','Play preview audio by default'),('remember_folders','Remember last-used file folders')]:
+    for key,label in [('remember_window','Remember window size'),('preview_audio','Play preview audio by default'),('replay_enabled','Keep a 30-second instant replay while previewing'),('remember_folders','Remember last-used file folders'),('show_hidden_local','Show hidden local files and folders')]:
         control=Gtk.CheckButton(label=label,active=prefs.app_options[key],halign=Gtk.Align.START);box.append(control);checks[key]=control
+    if not development.enabled():
+        developer_mode=Gtk.CheckButton(
+            label='Enable Developer Mode and Test Lab after restart',
+            active=prefs.app_options['developer_mode'],
+            halign=Gtk.Align.START)
+        developer_mode.set_tooltip_text(
+            'Adds deterministic checks, saved diagnostics, and optional AI analysis. Nothing starts automatically.')
+        box.append(developer_mode)
+        checks['developer_mode']=developer_mode
     row=Gtk.Box(spacing=8);box.append(row);row.append(Gtk.Label(label='Preview scale (%)'))
-    scale_row,scale,set_scale=scale_control(prefs.app_options['preview_scale']);row.append(scale_row)
+    scale_row,scale,set_scale=scale_control(
+        prefs.app_options['preview_scale'],lambda:auto_save_general());row.append(scale_row)
     folders={}
     active_chooser=[None]
     def close_chooser(*_):
@@ -93,8 +120,9 @@ def show_preferences(app, page=0):
             close_chooser()
             if selected:
                 path=selected.get_path()
-                if path:entry.set_text(path)
-                else:error.set_text('Choose a local folder.')
+                if path:
+                    entry.set_text(path);auto_save_general()
+                else:general_message('Choose a local folder.',True)
         chooser.connect('response',chosen);chooser.show()
     for key,label in [('screenshot_folder','Screenshot folder'),('recording_folder','Recording folder')]:
         box.append(Gtk.Label(label=label,xalign=0))
@@ -102,38 +130,109 @@ def show_preferences(app, page=0):
         entry=Gtk.Entry(text=getattr(prefs,key),placeholder_text='Last used, or home if blank',hexpand=True);folderrow.append(entry);folders[key]=entry
         button=Gtk.Button(label='Browse…');folderrow.append(button)
         button.connect('clicked',browse,entry,label)
-    note=Gtk.Label(label='Preview audio applies to the next preview session. Reset keeps connection profiles and C64U settings.',wrap=True,xalign=0);box.append(note)
+    note=Gtk.Label(label='General settings save automatically. Undo restores the values from when Preferences opened. Restore defaults keeps connection profiles and C64U settings.',wrap=True,xalign=0);box.append(note)
     error=Gtk.Label(wrap=True,xalign=0);box.append(error)
-    reset=Gtk.Button(label='Reset preferences');box.append(reset)
-    reset_pending=[False]
-    def reset_fields(*_):
-        reset_pending[0]=True
-        for key,control in checks.items():control.set_active(DEFAULTS[key])
-        set_scale(150)
-        for entry in folders.values():entry.set_text('')
-    reset.connect('clicked',reset_fields)
-    def save_general():
+    dialog.general_message=error
+    def general_message(message,failed=False):
+        if failed:error.add_css_class('argonaut-error-message')
+        else:error.remove_css_class('argonaut-error-message')
+        error.set_text(message)
+    actions=Gtk.Box(spacing=8);box.append(actions)
+    undo=Gtk.Button(label='Undo');actions.append(undo)
+    restore=Gtk.Button(label='Restore defaults…');actions.append(restore)
+
+    def show_general(options,folder_values):
+        updating[0]=True
+        try:
+            for key,control in checks.items():control.set_active(options[key])
+            set_scale(options['preview_scale'])
+            for key,entry in folders.items():entry.set_text(folder_values[key])
+        finally:updating[0]=False
+
+    def auto_save_general(message='Preferences saved automatically.'):
+        if updating[0]:return True
         if app.busy:return False
         values={key:entry.get_text().strip() for key,entry in folders.items()}
+        oldfolders={key:getattr(prefs,key) for key in values}
         for key,value in values.items():
-            if value and not Path(value).expanduser().is_dir():error.set_text('Choose an existing folder for '+key.replace('_',' ')+'.');return
-        old=prefs.app_options;oldfolders={key:getattr(prefs,key) for key in values}
-        prefs.app_options=defaults() if reset_pending[0] else validate(old)
+            # An upgraded installation can retain a folder which no longer exists.
+            # Let that unchanged value survive until the user deliberately replaces
+            # it; only newly edited folder values must exist before saving.
+            if (value != oldfolders[key] and value
+                    and not Path(value).expanduser().is_dir()):
+                general_message('Choose an existing folder for '+key.replace('_',' ')+'.',True);return False
+        old=deepcopy(prefs.app_options)
+        developer_was_enabled=old['developer_mode']
+        prefs.app_options=validate(old)
         prefs.app_options.update({key:control.get_active() for key,control in checks.items()})
         prefs.app_options['preview_scale']=int(scale.get_text().rstrip('%'))
         for key,value in values.items():setattr(prefs,key,str(Path(value).expanduser().absolute()) if value else '')
         try:prefs.save()
-        except OSError as exc:
+        except (OSError,ValueError) as exc:
             prefs.app_options=old
             for key,value in oldfolders.items():setattr(prefs,key,value)
-            error.set_text('Could not save preferences: '+str(exc));return
+            show_general(old,oldfolders)
+            general_message('Could not save preferences: '+str(exc),True);return False
         tab=app.streams_tab;tab.set_zoom(prefs.app_options['preview_scale']);tab.apply_scale()
         tab.audio.set_active(prefs.app_options['preview_audio'])
-        if reset_pending[0]:app.window.set_default_size(1200,850)
-        for key,entry in folders.items():entry.set_text(getattr(prefs,key))
-        reset_pending[0]=False
-        error.set_text('Preferences saved.')
+        tab.set_replay_enabled(prefs.app_options['replay_enabled'])
+        show_general(prefs.app_options,
+                     {key:getattr(prefs,key) for key in folders})
+        developer_is_enabled=prefs.app_options['developer_mode']
+        if old['show_hidden_local'] != prefs.app_options['show_hidden_local']:
+            app.refresh_local()
+        if developer_was_enabled != developer_is_enabled:
+            general_message(
+                'Preferences saved automatically. Restart Argonaut to apply Developer Mode.')
+            if developer_was_enabled and not developer_is_enabled:
+                def stopped(result):
+                    app.status.set_text(
+                        'Developer Mode is off; background tests stopped.'
+                        if result else
+                        'Developer Mode is off. Some background tests could not be stopped.')
+                app.run(stop_background, stopped)
+        elif message:general_message(message)
         return True
+
+    for control in checks.values():
+        control.connect('toggled',lambda *_:auto_save_general())
+    for entry in folders.values():
+        entry.connect('activate',lambda *_:auto_save_general())
+        entry.connect('notify::has-focus',
+                      lambda field,_:None if field.has_focus()
+                      else auto_save_general())
+
+    def undo_general(*_):
+        show_general(opened['app_options'],{
+            key:opened[key] for key in folders})
+        auto_save_general('Changes undone.')
+    undo.connect('clicked',undo_general)
+
+    def restore_defaults(*_):
+        existing=getattr(dialog,'restore_prompt',None)
+        if existing:existing.present();return
+        prompt=Gtk.Dialog(title='Restore default preferences?',
+                          transient_for=dialog,modal=True)
+        dialog.restore_prompt=prompt
+        prompt.add_button('Cancel',Gtk.ResponseType.CANCEL)
+        prompt.add_button('Restore defaults',Gtk.ResponseType.OK)
+        label=Gtk.Label(
+            label='Restore all General settings to their defaults? Device profiles and C64U settings will be kept.',
+            wrap=True,xalign=0)
+        for side in ('top','bottom','start','end'):
+            getattr(label,'set_margin_'+side)(16)
+        prompt.get_content_area().append(label)
+        def decided(_,code):
+            prompt.destroy();dialog.restore_prompt=None
+            if code==Gtk.ResponseType.OK:
+                show_general(defaults(),{key:'' for key in folders})
+                if auto_save_general('Default preferences restored.'):
+                    app.window.set_default_size(1200,850)
+        prompt.connect('response',decided)
+        prompt.connect('close-request',
+                       lambda *_:(prompt.response(Gtk.ResponseType.CANCEL),True)[1])
+        prompt.present()
+    restore.connect('clicked',restore_defaults)
     from .connection_dialog import ConnectionDialog
     connections=ConnectionDialog(app,window=dialog)
     app.connection_dialog=connections
@@ -141,47 +240,35 @@ def show_preferences(app, page=0):
     from .about import about_page
     pages.append_page(about_page(),Gtk.Label(label='About'))
     dialog.connections=connections
-    # Profile operations save explicitly; General preferences remain staged until Save.
-    save_button=dialog.get_widget_for_response(Gtk.ResponseType.OK)
-    def switched(_,child,index):save_button.set_visible(index==0)
-    pages.connect('switch-page',switched)
-    def general_dirty():
-        return (reset_pending[0] or any(control.get_active()!=prefs.app_options[key] for key,control in checks.items())
-                or int(scale.get_text().rstrip('%'))!=prefs.app_options['preview_scale']
-                or any(entry.get_text()!=getattr(prefs,key) for key,entry in folders.items()))
     def request_close():
         if app.busy:return
         close_chooser()
-        if not general_dirty() and not connections.dirty():destroy();return
+        if not auto_save_general(None):
+            pages.set_current_page(0);return
+        if not connections.dirty():destroy();return
         existing=getattr(dialog,'unsaved_prompt',None)
         if existing:existing.present();return
-        prompt=Gtk.Dialog(title='Save changes?',transient_for=dialog,modal=True)
+        prompt=Gtk.Dialog(title='Save device profile?',transient_for=dialog,modal=True)
         dialog.unsaved_prompt=prompt
         prompt.add_button('Keep editing',Gtk.ResponseType.CANCEL)
         prompt.add_button('Discard',Gtk.ResponseType.REJECT)
         prompt.add_button('Save',Gtk.ResponseType.OK)
         prompt.set_default_response(Gtk.ResponseType.CANCEL)
-        label=Gtk.Label(label='Save your preference and profile edits before closing?',wrap=True)
+        label=Gtk.Label(label='Save unfinished device profile edits before closing?',wrap=True)
         for side in ('top','bottom','start','end'):getattr(label,'set_margin_'+side)(16)
         prompt.get_content_area().append(label)
         def decided(_,code):
             prompt.destroy();dialog.unsaved_prompt=None
             if code==Gtk.ResponseType.REJECT:destroy()
             elif code==Gtk.ResponseType.OK:
-                # Validate profile before writing General preferences.
-                if connections.dirty():
-                    try:connections.profile()
-                    except Exception as exc:
-                        pages.set_current_page(1);connections.status.set_text(str(exc));return
-                if general_dirty() and not save_general():pages.set_current_page(0);return
-                if connections.dirty():connections.save(after=destroy)
-                else:destroy()
+                try:connections.profile()
+                except Exception as exc:
+                    pages.set_current_page(1);connections.status.set_text(str(exc));return
+                connections.save(after=destroy)
         prompt.connect('response',decided)
         prompt.connect('close-request',lambda *_:(prompt.response(Gtk.ResponseType.CANCEL),True)[1])
         prompt.present()
-    def response(_,code):
-        if code==Gtk.ResponseType.OK:save_general()
-        else:request_close()
     dialog.connect('close-request',lambda *_:(request_close(),True)[1])
-    dialog.connect('response',response);dialog.present();pages.set_current_page(page)
+    dialog.connect('response',lambda *_:request_close())
+    dialog.present();pages.set_current_page(page)
     return dialog

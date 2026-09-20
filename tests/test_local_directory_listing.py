@@ -28,6 +28,7 @@ class LocalDirectoryListing(unittest.TestCase):
 
             fake = SimpleNamespace(
                 local=tmp,
+                preferences=SimpleNamespace(app_options={'show_hidden_local': True}),
                 llist=Mock(),
                 lpath=Mock(),
                 drive_bars={True: Mock()},
@@ -43,6 +44,28 @@ class LocalDirectoryListing(unittest.TestCase):
             self.assertEqual(by_name['real.txt'], (False, 5))
             self.assertEqual(by_name['.#t.txt'], (False, 0))
 
+    def test_hidden_entries_are_filtered_by_default_and_can_be_shown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / 'ordinary.txt').write_text('visible')
+            (tmp / '.secret').write_text('hidden')
+            (tmp / '.folder').mkdir()
+            fake = SimpleNamespace(
+                local=tmp,
+                preferences=SimpleNamespace(app_options={'show_hidden_local': False}),
+                llist=Mock(), lpath=Mock(), drive_bars={True: Mock()},
+                status=Mock(), populate=Mock())
+
+            self.assertTrue(Browser.refresh_local(fake))
+            entries = fake.populate.call_args.args[1]
+            self.assertEqual([entry[0] for entry in entries], ['ordinary.txt'])
+
+            fake.preferences.app_options['show_hidden_local'] = True
+            self.assertTrue(Browser.refresh_local(fake))
+            entries = fake.populate.call_args.args[1]
+            self.assertEqual({entry[0] for entry in entries},
+                             {'ordinary.txt', '.secret', '.folder'})
+
     def test_directory_itself_unreadable_still_reports_status(self):
         # A genuine directory-level failure (permission denied, the path
         # having been removed out from under us, etc.) is a different
@@ -50,6 +73,7 @@ class LocalDirectoryListing(unittest.TestCase):
         missing = Path('/nonexistent-for-test/definitely-not-real')
         fake = SimpleNamespace(
             local=missing,
+            preferences=SimpleNamespace(app_options={'show_hidden_local': False}),
             llist=Mock(),
             lpath=Mock(),
             drive_bars={True: Mock()},

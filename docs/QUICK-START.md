@@ -12,14 +12,14 @@ Choose the package for your computer from the unified 1.5 release.
 
 | Computer | Download | Install |
 | --- | --- | --- |
-| Debian 13 | [Debian 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Download the `.deb` and run the command below. |
-| Windows 10/11, 64-bit | [Windows 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
-| Apple Silicon or Intel Mac, macOS 15 or newer | [Mac 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
+| Debian 13 | [Debian 1.8](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8) | Download the `.deb` and run the command below. |
+| Windows 10/11, 64-bit | [Windows 1.8](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
+| Apple Silicon or Intel Mac, macOS 15 or newer | [Mac 1.8](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
 
 On Debian, open a terminal in the folder containing the downloaded package:
 
 ```sh
-sudo apt install ./argonaut-c64u_1.5_all.deb
+sudo apt install ./argonaut-c64u_1.8_all.deb
 ```
 
 Windows and Mac packages include Python, GTK, and the media libraries.
@@ -99,9 +99,25 @@ backup paths; inspect those paths before retrying.
 After inserting or moving a thumb drive, use **Refresh** to discover it.
 Use your computer's normal eject/unmount controls for local removable media.
 
+### Create and edit a D64 disk image
+
+Open the local folder where the image should be saved and choose **New D64
+disk…**. Enter a local filename, a C64 disk name of up to 16 characters, and an
+exactly two-character disk ID. Argonaut creates a standard blank 35-track D64,
+validates it, and opens its flat Commodore directory with 664 blocks free.
+
+In a standard D64 directory window, you can stage filename changes, scratch
+PRG, SEQ, USR, or structurally valid REL files, or add local PRG, SEQ, and USR
+files. Choose the save action to publish the complete edited image under a new
+local filename. Argonaut does not rewrite the source image or replace an
+existing destination. Standard D71
+images use the same staged workflow and a new `.d71` destination. Standard D81
+images use a new `.d81` destination and protect CBM partition allocations from
+file removal or reuse.
+
 ## 4. Change settings and use Favorites
 
-Open **Settings**. Use the section list or **Search settings…** to find an item.
+Open **Ultimate Menu**. Use the section list or **Search settings…** to find an item.
 Choose **Reload from C64U** when you need fresh device values.
 
 1. Change the settings you want. Edits are staged locally.
@@ -162,7 +178,15 @@ Reboot the C64 when needed. Argonaut does not include ROM images.
    for a WebM recording. Enable audio before starting preview to include sound.
 5. Stop recording and preview when finished.
 
-Screenshot and recording dialogs remember their chosen folders when those
+Instant replay is opt-in. Enable **Keep a 30-second instant replay while
+previewing** under Preferences → General before starting preview. Streams then
+shows the actual encoded history retained. Choose **Save recent 30 seconds…**
+to write that history as a WebM while preview and an ordinary recording keep
+running. Argonaut stores bounded encoded fragments rather than a raw RGB frame
+history and removes its temporary fragments when preview stops or Argonaut
+closes.
+
+Screenshot, recording, and replay dialogs remember their chosen folders when those
 folders remain available. Starting preview can replace existing C64U video/debug
 and audio streams.
 

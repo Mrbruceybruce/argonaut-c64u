@@ -4,3 +4,11 @@ import os
 
 def enabled():
     return os.environ.get('ARGONAUT_DEVELOPMENT') == '1'
+
+
+def config_name():
+    return 'argonaut-development' if enabled() else 'argonaut'
+
+
+def service_name(suffix):
+    return config_name() + '-' + suffix

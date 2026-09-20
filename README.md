@@ -5,13 +5,17 @@ A GTK desktop application for controlling and managing a Commodore 64 Ultimate.
 Features include connection profiles, local and C64U USB/SD file management,
 settings and favorites, ROM selection, configuration backups and Undo,
 live screen preview, screenshots, and WebM recordings.
+Hidden local files and folders are omitted by default. They can be shown from
+**Preferences → General** without affecting the C64U file listing.
+In Streams, pressing Return sends the current text and leaves an empty focused
+field ready for the next C64 command after a successful send.
 
 Start with the [quick-start guide](docs/QUICK-START.md) for connection setup,
 file transfers, settings, backups, and preview.
 
 ## macOS (Apple Silicon and Intel)
 
-Download the [Mac release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5)
+Download the [Mac release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8)
 for **macOS 15 or newer**. Open the DMG and drag Argonaut into Applications.
 Choose the Apple Silicon or Intel download for your Mac. The ZIP contains the same app. Python, GTK, and media libraries are included.
 Profiles use `~/Library/Application Support/argonaut`; passwords use macOS Keychain.
@@ -21,7 +25,7 @@ This build is ad-hoc signed and has not been Apple-notarized. macOS may require
 
 ## Windows 10/11 (64-bit)
 
-Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5):
+Download the [Windows release](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8):
 
 - **Setup.exe** installs Argonaut for your Windows user, adds a Start menu shortcut,
   and provides an uninstaller. Profiles use AppData; saved passwords use Windows
@@ -36,10 +40,10 @@ in Preferences → Device details. See [Windows instructions](packaging/windows/
 
 ## Debian 13 installation
 
-Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) and install it with:
+Download the Debian package from [Releases](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8) and install it with:
 
 ```sh
-sudo apt install ./argonaut-c64u_1.5_all.deb
+sudo apt install ./argonaut-c64u_1.8_all.deb
 ```
 
 Launch **Argonaut** from the application menu, or run `argonaut`.
@@ -59,6 +63,22 @@ Use **Preferences → About** to check the running version and build identifier.
 Argonaut 1.5 running on macOS (Apple Silicon), connected to a C64 Ultimate.
 
 **Files — local and C64U storage side by side.**
+
+Open a D64, D71, or D81 to view its authentic Commodore directory. Standard
+35-track D64 images can stage filename changes, file removal, and PRG/SEQ/USR
+additions. Argonaut validates the complete result and saves it as a new local
+D64; it never rewrites the source image or replaces an existing destination.
+REL removal includes its indexed data and side sectors; creating new REL files
+is not supported. Standard D71 images use the same staged rename, removal, and
+PRG/SEQ/USR addition workflow while validating both 1571 BAM regions.
+Use **New D64 disk…** in the local Files toolbar to create a validated blank
+35-track image with a C64 disk label and two-character ID. The new image starts
+with 664 blocks free and is opened immediately for file additions.
+Standard D81 images also support staged rename, ordinary-file removal, and
+PRG/SEQ/USR addition while validating both BAM regions.
+Authentic 1581 CBM partitions are labeled as disk partitions and are never
+presented as ordinary host folders or extractable chained files. Their allocated
+sectors remain protected during editing.
 
 ![Mac Files tab showing local folders and a selected C64U disk image](docs/images/macos-files.png)
 
@@ -87,8 +107,14 @@ Run `python3 -m c64u_browser.gui` in a graphical desktop session.
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_*.py'
+python3 -m c64u_browser.test_lab
+python3 -m c64u_browser.test_lab --suite hardware  # optional, read-only C64U checks
 python3 packaging/build_deb.py --output dist
 ```
+
+The Test Lab emits structured results for offline checks and opt-in, read-only
+C64U checks. See [Test Lab foundation](docs/TEST-LAB.md) for reports, credentials,
+and automation exit codes.
 
 See `packaging/RELEASE-NOTES.md` for validation and known limitations.
 The [C64U freeze reported during an Undo test involving SuperCPU Detect](https://github.com/Mrbruceybruce/argonaut-c64u/issues/1) remains unresolved.

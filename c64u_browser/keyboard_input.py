@@ -6,6 +6,7 @@ import time
 import urllib.request
 from .api import BrowserError, NoRedirect
 from .disk_run import receive_exact
+from .diagnostics import operation_event
 
 
 def encode_text(text, enter=False):
@@ -22,6 +23,11 @@ def encode_text(text, enter=False):
 
 
 def buffer_count(client):
+    with operation_event('rest', 'GET', '/v1/machine:readmem'):
+        return _buffer_count(client)
+
+
+def _buffer_count(client):
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
     request=urllib.request.Request(f'http://{client.host}:{client.http_port}/v1/machine:readmem?address=00C6&length=1',
         headers={'X-Password':client.password,'Accept':'application/octet-stream'})
@@ -41,11 +47,43 @@ def wait_empty(client):
 
 
 def send_text(client, text, enter=False):
+    with operation_event('dma', 'send_text', 'keyboard'):
+        return _send_text(client, text, enter)
+
+
+def _send_text_rest(client, data):
+    queued = 0
+    try:
+        wait_empty(client)
+        for offset in range(0, len(data), 10):
+            wait_empty(client)
+            chunk = data[offset:offset + 10]
+            client.write_memory(0x0277, chunk)
+            queued = offset + len(chunk)
+            client.write_memory(0x00C6, bytes((len(chunk),)))
+            wait_empty(client)
+    except (OSError, BrowserError) as exc:
+        raise BrowserError(
+            f'REST Send Text stopped; up to {queued} bytes may have been sent. '
+            f'Check the C64U before retrying. {exc}') from exc
+    return len(data)
+
+
+def _send_text(client, text, enter=False):
     data=encode_text(text,enter)
     queued=0
     try:
         wait_empty(client)
-        with socket.create_connection((client.host,64),timeout=client.timeout) as connection:
+        # A disabled or filtered DMA service can silently drop TCP attempts.
+        # REST has already proved the device and keyboard buffer reachable, so
+        # fail over before any text is queued instead of leaving the UI waiting
+        # for the client's longer general network timeout.
+        try:
+            connection=socket.create_connection(
+                (client.host,64),timeout=min(client.timeout,3))
+        except OSError:
+            return _send_text_rest(client,data)
+        with connection:
             password=client.password.encode('utf-8')
             if len(password)>65535:raise BrowserError('Network password is too long.')
             connection.sendall(struct.pack('<HH',0xff1f,len(password))+password)

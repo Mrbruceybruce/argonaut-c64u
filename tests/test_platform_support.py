@@ -1,7 +1,8 @@
-import unittest,tempfile
+import stat,unittest,tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
-from c64u_browser.platform_support import parents,publish_new,contains_path,config_base
+from c64u_browser.platform_support import parents,publish_new,contains_path,config_base,local_hidden
 class Platform(unittest.TestCase):
  def test_remote_parents(self):self.assertEqual(list(parents('/USB2/folder/file',False)),['/USB2/folder','/USB2'])
  def test_local_parents_terminate(self):
@@ -9,6 +10,13 @@ class Platform(unittest.TestCase):
  def test_contains(self):
   self.assertTrue(contains_path(Path.home(),Path.home()/'folder'))
   self.assertFalse(contains_path(Path.home()/'a',Path.home()/'ab'))
+ def test_dot_names_are_hidden(self):
+  self.assertTrue(local_hidden(Path('/tmp/.secret')))
+  self.assertFalse(local_hidden(Path('/tmp/ordinary')))
+ def test_windows_hidden_attribute_is_recognized(self):
+  hidden=SimpleNamespace(st_file_attributes=stat.FILE_ATTRIBUTE_HIDDEN)
+  with patch.object(Path,'lstat',return_value=hidden):
+   self.assertTrue(local_hidden(Path('/tmp/ordinary')))
  def test_publish_no_overwrite(self):
   with tempfile.TemporaryDirectory() as d:
    source=Path(d)/'source';dest=Path(d)/'dest';source.write_bytes(b'new');dest.write_bytes(b'old')

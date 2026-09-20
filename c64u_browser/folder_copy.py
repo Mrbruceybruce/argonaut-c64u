@@ -43,6 +43,12 @@ class Report:
             [('Completed',self.completed),('Skipped',self.skipped),('Unfinished (first item failed)',self.remaining)] if items) + ('\n\nPartial upload: '+self.partial if self.partial else '')
 
 
+def completed_roots(requested, completed):
+    """Return requested top-level names that have a completed copy step."""
+    roots = {relative.rstrip('/').split('/', 1)[0] for relative in completed}
+    return tuple(name for name in requested if name in roots)
+
+
 def kind(client, local, path):
     if local:
         path = Path(path)

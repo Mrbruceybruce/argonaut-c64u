@@ -5,6 +5,7 @@ import socket
 import struct
 from .api import BrowserError, safe_argument
 from .transfers import connect
+from .diagnostics import operation_event
 
 # Standard 35/40/42-track D64 images, with or without error-byte tables.
 D64_SIZES = frozenset((174848,175531,196608,197376,205312,206114))
@@ -26,6 +27,11 @@ def receive_exact(connection, length):
 
 
 def mount_and_run(client, path):
+    with operation_event('dma', 'mount_and_run', 'disk'):
+        return _mount_and_run(client, path)
+
+
+def _mount_and_run(client, path):
     validate_path(path)
     image=bytearray()
     ftp=None

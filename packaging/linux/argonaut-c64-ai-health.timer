@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Argonaut C64 AI health every 5 minutes
+
+[Timer]
+OnActiveSec=1min
+OnUnitActiveSec=5min
+Unit=@SERVICE_UNIT@
+
+[Install]
+WantedBy=timers.target
