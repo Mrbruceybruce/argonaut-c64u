@@ -94,10 +94,14 @@ class CoreTests(unittest.TestCase):
         events = []
         self.core.add_listener(events.append)
         self.core.connect(self.profile)
+        original_session = self.core.device_session()
         first = self.created[-1]
         self.core.mark_connection_lost('cable unplugged')
         result = self.core.reconnect('/USB2')
         self.assertIsNot(first, self.created[-1])
+        reconnected_session = self.core.device_session()
+        self.assertEqual(original_session.device_id,reconnected_session.device_id)
+        self.assertNotEqual(original_session.session_id,reconnected_session.session_id)
         self.assertEqual('/USB2', result.remote_path)
         self.assertEqual(['connected', 'offline', 'reconnected'],
                          [event.kind for event in events])

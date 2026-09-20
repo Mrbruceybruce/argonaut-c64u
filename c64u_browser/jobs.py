@@ -12,6 +12,7 @@ from .api import BrowserError, ConnectionFailure
 
 class JobState(str, Enum):
     PENDING = 'pending'
+    QUEUED = 'queued'
     RUNNING = 'running'
     CANCEL_REQUESTED = 'cancel-requested'
     SUCCEEDED = 'succeeded'
@@ -45,11 +46,15 @@ class JobSnapshot:
     operation: str
     state: str
     created_at: float
+    queued_at: float | None
     started_at: float | None
     finished_at: float | None
     progress: JobProgress | None
     result: object = None
     error: JobError | None = None
+    lane: str = ''
+    device_id: str = ''
+    session_id: str = ''
 
     def as_dict(self): return _plain(self)
 
@@ -95,19 +100,38 @@ class CoreJob:
         self.id = uuid.uuid4().hex
         self.operation = operation
         self.created_at = time.time()
-        self.started_at = self.finished_at = None
+        self.queued_at = self.started_at = self.finished_at = None
         self.state = JobState.PENDING
         self.progress = self.result = self.error = None
         self._task = task
         self._cancel = Event()
         self._listeners = []
         self._lock = Lock()
+        self._done = Event()
+        self._lane = self._device_id = self._session_id = ''
 
     def snapshot(self):
         with self._lock:
             return JobSnapshot(self.id, self.operation, self.state.value,
-                self.created_at, self.started_at, self.finished_at,
-                self.progress, self.result, self.error)
+                self.created_at, self.queued_at, self.started_at,
+                self.finished_at, self.progress, self.result, self.error,
+                self._lane, self._device_id, self._session_id)
+
+    def wait(self, timeout=None):
+        """Wait for a terminal result without depending on any client toolkit."""
+        if not self._done.wait(timeout):
+            raise TimeoutError('Core job did not finish before the timeout.')
+        return self.snapshot()
+
+    def _queue(self, lane, device_id='', session_id=''):
+        with self._lock:
+            if self.state != JobState.PENDING:
+                raise BrowserError('Only a pending Core job can be queued.')
+            self.queued_at = time.time()
+            self.state = JobState.QUEUED
+            self._lane, self._device_id, self._session_id = (
+                lane, device_id, session_id)
+        self._emit('queued')
 
     def add_listener(self, listener):
         with self._lock:self._listeners.append(listener)
@@ -152,13 +176,15 @@ class CoreJob:
         with self._lock:
             if self.state in TERMINAL_STATES:return False
             self._cancel.set()
-            if self.state in (JobState.PENDING,JobState.RUNNING):
+            if self.state in (JobState.PENDING,JobState.QUEUED,JobState.RUNNING):
                 self.state=JobState.CANCEL_REQUESTED
         self._emit('cancel-requested')
         return True
 
-    def run(self):
+    def run(self, _scheduled=False, preflight=None):
         with self._lock:
+            if self.queued_at is not None and not _scheduled:
+                raise BrowserError('A queued Core job is executed by Core.')
             already_started=self.started_at is not None
             if not already_started:
                 self.started_at=time.time()
@@ -167,6 +193,7 @@ class CoreJob:
         self._emit('started')
         try:
             self.check_cancel()
+            if preflight is not None: preflight()
             result=self._task(self)
             # A late cancellation request does not relabel completed consequential
             # work. Only a check that actually stopped work raises JobCancelled.
@@ -183,5 +210,6 @@ class CoreJob:
                 self.error=categorized_error(exc)
                 self.state=JobState.FAILED
         with self._lock:self.finished_at=time.time()
+        self._done.set()
         self._emit('finished')
         return self.snapshot()

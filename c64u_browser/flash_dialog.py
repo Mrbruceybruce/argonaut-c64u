@@ -56,6 +56,15 @@ class FlashFiles:
    if isinstance(result,Exception):self.status.set_text(str(result))
    else:done(result)
   self.app.run(caught,finish)
+ def run_core_job(self,job,done):
+  if self.app.busy or self.tab.client is not self.client:return
+  self.controls.set_sensitive(False);self.status.set_text('Working…')
+  def finish(snapshot):
+   self.controls.set_sensitive(True)
+   if self.tab.client is not self.client:
+    self.status.set_text('Connection changed. Close and reopen Flash files.');return
+   done(snapshot)
+  self.app.run_file_job(job,finish)
  def refresh(self,after=None):
   if self.app.busy:return
   folder=self.folder()
@@ -111,9 +120,9 @@ class FlashFiles:
     def finished(result):
      if result.state=='succeeded':uploaded(result.result)
      else:self.status.set_text(result.error.message)
-    self.run(upload.run,finished)
+    self.run_core_job(upload,finished)
    dialog.connect('response',response);dialog.present()
-  self.run(job.run,done)
+  self.run_core_job(job,done)
  def save_copy(self):
   row=self.listing.get_selected_row()
   if self.app.busy or row is None:return
@@ -130,7 +139,7 @@ class FlashFiles:
    def done(result):
     if result.state=='succeeded':self.status.set_text('Copy saved: '+result.result['destination'].path)
     else:self.status.set_text(result.error.message)
-   self.run(job.run,done)
+   self.run_core_job(job,done)
   chooser.connect('response',response);chooser.show()
 
  def preview(self):

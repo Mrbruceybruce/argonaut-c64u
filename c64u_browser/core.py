@@ -14,12 +14,14 @@ import ftplib
 import socket
 import struct
 import urllib.request
+import uuid
 
 from .api import BrowserError, ConnectionFailure, UltimateClient
 from .credentials import Credentials
 from .discovery import local_networks, standard_scan, subnet_scan
 from .file_service import FileService
 from .profiles import Preferences, Profile
+from .scheduler import CoreScheduler, DeviceSession
 from .storage import initial_directory
 
 
@@ -189,11 +191,14 @@ class ArgonautCore:
         self._client = None
         self._active_profile = None
         self._device_info = None
-        self._session_generation = 0
+        self._device_identity = ''
+        self._session_id = ''
         self._listeners = []
         self._device_operations = CoreDeviceOperations(self)
+        self.scheduler = CoreScheduler(self.device_session)
         self.files = FileService(self._require_client,
-                                 lambda:self._session_generation)
+                                 self.device_session,
+                                 scheduler=self.scheduler)
 
     def load(self):
         try:
@@ -222,6 +227,30 @@ class ArgonautCore:
         return CoreSession('connected' if self._client else
                            'offline' if self._active_profile else 'disconnected',
                            self._active_profile, self.device_info)
+
+    def device_session(self):
+        """Return identities used to bind queued work to this connection."""
+        return DeviceSession(self._device_identity,self._session_id)
+
+    @staticmethod
+    def _physical_identity(profile, info):
+        reported=(info or {}).get('info',{}).get('unique_id','')
+        mac=(info or {}).get('network_mac','')
+        if profile.device_id:return 'id:'+profile.device_id
+        if reported:return 'id:'+reported
+        if profile.device_mac:return 'mac:'+profile.device_mac.lower()
+        if mac:return 'mac:'+mac.lower()
+        # An unbound profile is still safe because every queued operation is
+        # also tied to one connection session. It is not treated as verified.
+        return 'profile:'+profile.id
+
+    def _begin_session(self, profile, info):
+        self._device_identity=self._physical_identity(profile,info)
+        self._session_id=uuid.uuid4().hex
+
+    def _end_session(self, *, keep_device=True):
+        self._session_id=''
+        if not keep_device:self._device_identity=''
 
     def add_listener(self, listener):
         self._listeners.append(listener)
@@ -351,7 +380,7 @@ class ArgonautCore:
             self._client = client
             self._active_profile = profile
             self._device_info = copy.deepcopy(info)
-            self._session_generation += 1
+            self._begin_session(profile,info)
             result = ConnectionResult(profile, _public_info(info), path,
                                       tuple(entries))
             self._emit('connected', data={'host': profile.host})
@@ -372,7 +401,7 @@ class ArgonautCore:
     def mark_connection_lost(self, message=''):
         if not self._active_profile: return
         self._client = None
-        self._session_generation += 1
+        self._end_session()
         self._emit('offline', message)
 
     def check_health(self):
@@ -423,7 +452,7 @@ class ArgonautCore:
                     'A different device answered at this address. Connect manually.')
         self._client = client
         self._device_info = copy.deepcopy(info)
-        self._session_generation += 1
+        self._begin_session(profile,info)
         result = ConnectionResult(profile, _public_info(info), path,
                                   tuple(entries))
         self._emit('reconnected', data={'host': profile.host})
@@ -432,7 +461,7 @@ class ArgonautCore:
     def disconnect(self):
         profile_id = self._active_profile.id if self._active_profile else ''
         self._client = self._active_profile = self._device_info = None
-        self._session_generation += 1
+        self._end_session(keep_device=False)
         self._emit('disconnected', data={'profile_id': profile_id},
                    profile_id=profile_id)
 
@@ -440,3 +469,7 @@ class ArgonautCore:
         if self._client is None:
             raise CoreError('session', 'Connect to a C64U first.')
         return self._client
+
+    def close(self):
+        """Release Core execution resources; jobs are not persisted."""
+        self.scheduler.close()

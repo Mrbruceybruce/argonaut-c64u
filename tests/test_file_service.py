@@ -27,10 +27,10 @@ class FileServiceTests(unittest.TestCase):
 
     def test_success_and_progress_are_headless(self):
         (self.source/'large.bin').write_bytes(b'x'*(1024*1024+16))
-        prepared=self.service.prepare_copy(self.request('large.bin')).run()
+        prepared=self.service.prepare_copy(self.request('large.bin')).wait(5)
         self.assertEqual('succeeded',prepared.state)
         events=[];job=self.service.execute_copy(prepared.result.plan_id)
-        job.add_listener(events.append);result=job.run()
+        job.add_listener(events.append);result=job.wait(5)
         self.assertEqual('succeeded',result.state)
         self.assertEqual(('large.bin',),result.result.completed)
         self.assertEqual((self.source/'large.bin').read_bytes(),
@@ -40,28 +40,28 @@ class FileServiceTests(unittest.TestCase):
 
     def test_cancel_removes_staging_file_and_does_not_publish(self):
         (self.source/'large.bin').write_bytes(b'x'*(3*1024*1024))
-        preview=self.service.prepare_copy(self.request('large.bin')).run().result
+        preview=self.service.prepare_copy(self.request('large.bin')).wait(5).result
         job=self.service.execute_copy(preview.plan_id)
         def cancel_on_progress(event):
             if event.kind=='progress':self.service.cancel(job.id)
-        job.add_listener(cancel_on_progress);result=job.run()
+        job.add_listener(cancel_on_progress);result=job.wait(5)
         self.assertEqual('cancelled',result.state)
         self.assertFalse((self.destination/'large.bin').exists())
         self.assertEqual((),result.result.completed)
 
     def test_conflict_preview_skip_replace_and_revalidation(self):
         (self.source/'a').write_text('new');(self.destination/'a').write_text('old')
-        preview=self.service.prepare_copy(self.request('a')).run().result
+        preview=self.service.prepare_copy(self.request('a')).wait(5).result
         self.assertEqual(('a',),preview.conflicts)
         self.assertEqual(('a',),preview.replaceable)
-        skipped=self.service.execute_copy(preview.plan_id,'skip').run()
+        skipped=self.service.execute_copy(preview.plan_id,'skip').wait(5)
         self.assertEqual('succeeded',skipped.state)
         self.assertEqual('old',(self.destination/'a').read_text())
         self.assertEqual(('a',),skipped.result.skipped)
 
-        preview=self.service.prepare_copy(self.request('a')).run().result
+        preview=self.service.prepare_copy(self.request('a')).wait(5).result
         (self.destination/'a').write_text('changed after review')
-        failed=self.service.execute_copy(preview.plan_id,'replace').run()
+        failed=self.service.execute_copy(preview.plan_id,'replace').wait(5)
         self.assertEqual('failed',failed.state)
         self.assertEqual('transfer',failed.error.code)
         self.assertIn('changed',failed.result.failure)
@@ -69,16 +69,16 @@ class FileServiceTests(unittest.TestCase):
 
     def test_delete_preview_revalidates_before_consequential_work(self):
         folder=self.destination/'folder';folder.mkdir();(folder/'a').write_text('a')
-        preview=self.service.prepare_delete((FileLocation.core_host(folder),)).run().result
+        preview=self.service.prepare_delete((FileLocation.core_host(folder),)).wait(5).result
         (folder/'new').write_text('new')
-        result=self.service.execute_delete(preview.plan_id).run()
+        result=self.service.execute_delete(preview.plan_id).wait(5)
         self.assertEqual('failed',result.state)
         self.assertEqual('delete',result.error.code)
         self.assertFalse(result.result.removed)
         self.assertTrue((folder/'a').exists())
 
     def test_categorized_failure_and_client_path_semantics(self):
-        failed=self.service.prepare_copy(self.request('missing')).run()
+        failed=self.service.prepare_copy(self.request('missing')).wait(5)
         self.assertEqual('failed',failed.state)
         self.assertEqual('operation',failed.error.code)
         request=CopyRequest(FileLocation.client_upload('future-id','a'),('a',),
@@ -87,7 +87,7 @@ class FileServiceTests(unittest.TestCase):
 
     def test_contract_never_returns_transport_or_secret(self):
         (self.source/'a').write_text('data')
-        preview=self.service.prepare_copy(self.request('a')).run().result
+        preview=self.service.prepare_copy(self.request('a')).wait(5).result
         text=repr(preview)
         self.assertNotIn('UltimateClient',text);self.assertNotIn('password',text)
         self.assertFalse(hasattr(preview,'client'))
@@ -98,9 +98,9 @@ class FileServiceTests(unittest.TestCase):
         service=FileService(lambda:client,lambda:self.session)
         request=CopyRequest(FileLocation.c64u('/USB2'),('a',),
                             FileLocation.core_host(self.destination))
-        preview=service.prepare_copy(request).run().result
+        preview=service.prepare_copy(request).wait(5).result
         self.session+=1
-        result=service.execute_copy(preview.plan_id).run()
+        result=service.execute_copy(preview.plan_id).wait(5)
         self.assertEqual('failed',result.state)
         self.assertEqual('session',result.error.code)
         self.assertFalse((self.destination/'a').exists())
@@ -108,15 +108,31 @@ class FileServiceTests(unittest.TestCase):
     def test_native_upload_uses_private_reviewed_data(self):
         rom=self.source/'kernal.bin';rom.write_bytes(b'rom-data')
         preview=self.service.prepare_native_upload(
-            FileLocation.core_host(rom),'/Flash/roms',rom.name).run().result
+            FileLocation.core_host(rom),'/Flash/roms',rom.name).wait(5).result
         self.assertEqual(8,preview.size)
         self.assertFalse(hasattr(preview,'data'))
         fake=object();self.service._client_provider=lambda:fake
         with patch('c64u_browser.file_service.upload_flash',
                    return_value='/Flash/roms/kernal.bin') as upload:
-            result=self.service.execute_native_upload(preview.plan_id).run()
+            result=self.service.execute_native_upload(preview.plan_id).wait(5)
         self.assertEqual('succeeded',result.state)
         upload.assert_called_once_with(fake,'/Flash/roms','kernal.bin',b'rom-data')
+
+    def test_unused_plan_expires_and_consumed_plan_cannot_be_reused(self):
+        now=[100.0]
+        service=FileService(lambda:None,lambda:self.session,
+                            plan_ttl=5,clock=lambda:now[0])
+        (self.source/'a').write_text('data')
+        expired=service.prepare_copy(self.request('a')).wait(5).result
+        now[0]+=6
+        with self.assertRaisesRegex(BrowserError,'expired'):
+            service.execute_copy(expired.plan_id)
+
+        fresh=service.prepare_copy(self.request('a')).wait(5).result
+        self.assertEqual('succeeded',service.execute_copy(
+            fresh.plan_id,'replace').wait(5).state)
+        with self.assertRaisesRegex(BrowserError,'already used'):
+            service.execute_copy(fresh.plan_id)
 
     def test_import_without_gtk_or_display(self):
         root=str(Path(__file__).resolve().parents[1]);env=dict(os.environ)

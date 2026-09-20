@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
-"""GTK4 presentation; all remote work runs on a single worker thread."""
+"""GTK4 client; presentation work uses its worker and Core schedules its jobs."""
 from . import development
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -612,8 +612,13 @@ class Browser(Gtk.Application):
             self.status.set_text('Cancelling transfer… waiting for the current network operation to return.')
 
     def begin_file_job(self, job):
+        self.busy = True
+        self._file_job_sensitivity = [(widget, widget.get_sensitive())
+                                      for widget in self.busy_controls]
+        for widget, _ in self._file_job_sensitivity:widget.set_sensitive(False)
         self.transfer_job = job
         self.cancel_button.set_sensitive(True)
+        self.status.set_text('Working…')
         def event(update):
             progress=update.job.progress
             if update.kind=='progress' and progress:
@@ -626,13 +631,26 @@ class Browser(Gtk.Application):
 
     def end_file_job(self):
         self.transfer_job = None
+        self.busy = False
+        for widget, sensitive in getattr(self,'_file_job_sensitivity',()):
+            widget.set_sensitive(sensitive)
+        self._file_job_sensitivity = ()
         self.cancel_button.set_sensitive(False)
 
     def run_file_job(self, job, done):
         self.begin_file_job(job)
-        def finished(snapshot):
-            self.end_file_job();done(snapshot)
-        self.run(job.run,finished)
+        def finish(snapshot):
+            if self.transfer_job is not job:return False
+            self.end_file_job()
+            try:done(snapshot)
+            except Exception as exc:self.status.set_text(str(exc))
+            return False
+        def observe(event):
+            if event.kind=='finished':GLib.idle_add(finish,event.job)
+        job.add_listener(observe)
+        snapshot=job.snapshot()
+        if snapshot.state in ('succeeded','failed','cancelled'):
+            GLib.idle_add(finish,snapshot)
 
     def clicked(self, listing, local, gesture, count, x, y):
         if self.busy or count != 1: return
@@ -1262,6 +1280,7 @@ class Browser(Gtk.Application):
         disable_private_log(getattr(self, 'operation_log', None))
         self.operation_log = None
         self.streams_tab.close()
+        if hasattr(self,'core'):self.core.close()
         self.pool.shutdown(wait=False)
         # Child windows must not keep an application with a stopped worker alive.
         self.quit()

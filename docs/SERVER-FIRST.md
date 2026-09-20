@@ -65,6 +65,26 @@ underlying `UltimateClient` or credentials, and it should shrink as dedicated
 Core capabilities replace it. Working features move across this boundary in
 reviewable sections; server-first development does not require a rewrite.
 
+## Device scheduling and job lifecycle
+
+Core, rather than a client worker, decides when device operations execute.
+Operations for one physical C64U use an ordered FIFO lane and are serialized
+unless a capability documents a narrower safe concurrency rule. Different
+physical-device lanes may coexist. Core-host-only file work uses its own ordered
+lane and may coexist because it has no device transport or state.
+Job identity, physical-device identity, and connection-session identity are
+separate. Every device job is bound to both the device and the session captured
+when it was submitted. Reconnecting to the same physical C64U creates a new
+session; queued work from the old session fails safely and must be prepared
+again rather than silently crossing the reconnect.
+
+Completed jobs are retained for a bounded time and count so clients can collect
+their final structured result. Queued and running jobs are never evicted.
+Unused confirmation plans expire and their registries are bounded; consumed,
+expired, or evicted plans cannot be reconstructed by a client and require a new
+preview. Jobs and plans are currently process-local and do not survive a Core
+restart. Persistent job storage remains a later server-hosting decision.
+
 ## Required checks
 
 Each Core capability needs deterministic headless tests for its contract,
