@@ -349,6 +349,15 @@ acceptance of the only reported cross-platform correction, Windows 13-of-13
 physical regression results, and native hosted Intel package validation all
 passed. Development may proceed without waiting for an Intel Mac tester.
 
+Stable Argonaut 1.8 was published on 2026-09-19 from exact tested commit
+`46b0d90`. The required Debian, Windows, Apple Silicon, and Intel jobs all
+passed before publication. Each desktop package completed its packaged-app
+gate; both Mac applications also passed after relocation under a minimal
+environment. The public release contains the Debian package, Windows installer
+and portable ZIP, Apple Silicon and Intel DMG/ZIP pairs, source archive, and a
+checksum manifest covering all eight deliverables. Tag `v1.8` resolves to the
+tested commit. Physical Intel validation remains a deferred confidence check.
+
 ## Current milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
