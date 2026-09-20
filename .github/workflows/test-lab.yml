@@ -19,7 +19,7 @@ jobs:
       - name: Install replay test runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
       - name: Run deterministic Test Lab checks
         run: /usr/bin/python3 -m c64u_browser.test_lab --suite offline > test-lab-report.json
       - name: Run unit tests
