@@ -33,6 +33,7 @@ class Report:
     remaining: list = field(default_factory=list)
     error: str = ''
     partial: str = None
+    cancelled: bool = False
 
     @property
     def message(self):
@@ -145,6 +146,9 @@ def execute_plan(client, plan, source_local, local, progress=lambda n:None):
             report.completed.append(step.relative + ('/' if step.directory else ''))
         except Exception as exc:
             report.error = str(exc)
+            report.cancelled = bool(getattr(exc,'cancelled',False))
+            if report.cancelled:
+                report.partial=getattr(exc,'partial_path',report.partial)
             report.remaining = [s.relative for s in plan.steps[index:]]
             break
     return report

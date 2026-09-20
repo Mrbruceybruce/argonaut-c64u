@@ -48,6 +48,17 @@ same Core operations, results, events, jobs, and errors. The future PWA, CLI,
 automation tools, and PETSCII client will use those adapters without changing
 where device rules or state live.
 
+## Filesystem ownership
+
+Every Core file reference identifies its filesystem explicitly. `core-host`
+paths belong to the machine running Core, `c64u` paths belong to the active C64
+Ultimate, and future `client-upload` references will identify files staged by a
+requesting client rather than paths on that client's machine. An arbitrary path
+sent by a PWA or other remote client must never be interpreted as a Core-host
+path. The in-process GTK client may select `core-host` paths because it currently
+runs on that same machine; this is a deployment fact, not a permanent API
+assumption.
+
 During incremental migration, a narrow in-process compatibility service may
 adapt existing desktop workflows to Core-owned sessions. It must not reveal the
 underlying `UltimateClient` or credentials, and it should shrink as dedicated

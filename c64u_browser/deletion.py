@@ -30,9 +30,10 @@ def snapshot(client, local, path):
     return Item(str(path),kind,signature)
 
 
-def prepare(client,local,targets):
+def prepare(client,local,targets,check=lambda:None):
     items=[];seen=set()
     def visit(path,depth=0):
+        check()
         path=str(path)
         if path in seen:return
         if depth>64 or len(seen)>=10000:raise BrowserError('Select fewer than 10,000 items and 64 folder levels.')
@@ -49,13 +50,15 @@ def prepare(client,local,targets):
     return tuple(items)
 
 
-def delete_reviewed(client,local,targets,items):
+def delete_reviewed(client,local,targets,items,check=lambda:None):
     removed=[]
     try:
-        if prepare(client,local,targets)!=items:
+        check()
+        if prepare(client,local,targets,check)!=items:
             raise BrowserError('Contents changed since review. Review the deletion again.')
         directories={i.path:i for i in items if i.kind=='dir'}
         for item in items:
+            check()
             for parent in parents(item.path,local):
                 if parent in directories and snapshot(client,local,parent)!=directories[parent]:
                     raise BrowserError('Parent folder changed: '+parent)

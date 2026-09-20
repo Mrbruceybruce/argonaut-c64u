@@ -18,6 +18,7 @@ import urllib.request
 from .api import BrowserError, ConnectionFailure, UltimateClient
 from .credentials import Credentials
 from .discovery import local_networks, standard_scan, subnet_scan
+from .file_service import FileService
 from .profiles import Preferences, Profile
 from .storage import initial_directory
 
@@ -188,8 +189,11 @@ class ArgonautCore:
         self._client = None
         self._active_profile = None
         self._device_info = None
+        self._session_generation = 0
         self._listeners = []
         self._device_operations = CoreDeviceOperations(self)
+        self.files = FileService(self._require_client,
+                                 lambda:self._session_generation)
 
     def load(self):
         try:
@@ -347,6 +351,7 @@ class ArgonautCore:
             self._client = client
             self._active_profile = profile
             self._device_info = copy.deepcopy(info)
+            self._session_generation += 1
             result = ConnectionResult(profile, _public_info(info), path,
                                       tuple(entries))
             self._emit('connected', data={'host': profile.host})
@@ -367,6 +372,7 @@ class ArgonautCore:
     def mark_connection_lost(self, message=''):
         if not self._active_profile: return
         self._client = None
+        self._session_generation += 1
         self._emit('offline', message)
 
     def check_health(self):
@@ -417,6 +423,7 @@ class ArgonautCore:
                     'A different device answered at this address. Connect manually.')
         self._client = client
         self._device_info = copy.deepcopy(info)
+        self._session_generation += 1
         result = ConnectionResult(profile, _public_info(info), path,
                                   tuple(entries))
         self._emit('reconnected', data={'host': profile.host})
@@ -425,6 +432,7 @@ class ArgonautCore:
     def disconnect(self):
         profile_id = self._active_profile.id if self._active_profile else ''
         self._client = self._active_profile = self._device_info = None
+        self._session_generation += 1
         self._emit('disconnected', data={'profile_id': profile_id},
                    profile_id=profile_id)
 

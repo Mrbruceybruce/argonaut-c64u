@@ -66,6 +66,7 @@ def _replace_file(client,step,source_local,local,progress):
   ftp.rename(child(folder,name),step.destination)
   ftp.delete(backup);ftp.rmd(folder)
  except Exception as exc:
+  if getattr(exc,'cancelled',False):raise
   raise BrowserError(f'Replacement could not be verified: {exc}. Inspect {step.destination}, staging folder {folder}, and original backup {backup} before retrying. No automatic rollback was attempted.') from exc
  finally:
   if ftp:ftp.close()

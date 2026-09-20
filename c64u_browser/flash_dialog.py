@@ -7,7 +7,8 @@ from gi.repository import Gtk
 from .api import BrowserError
 from .storage import storage_root
 from .configuration import Configuration
-from .native_files import FLASH_FOLDERS,read_local,read_remote,validate_upload,upload_flash,config_backup
+from .native_files import FLASH_FOLDERS,read_remote,config_backup
+from .file_service import FileLocation
 
 class FlashFiles:
  def __init__(self,tab):
@@ -91,22 +92,28 @@ class FlashFiles:
   self.prepare(path,True)
  def prepare(self,path,remote):
   folder=self.folder();name=Path(path).name
-  def task():
-   data=read_remote(self.client,path) if remote else read_local(path)
-   validate_upload(folder,name,data);return data
-  def done(data):
+  source=FileLocation.c64u(path) if remote else FileLocation.core_host(path)
+  job=self.app.core.files.prepare_native_upload(source,folder,name)
+  def done(snapshot):
+   if snapshot.state!='succeeded':self.status.set_text(snapshot.error.message);return
+   preview=snapshot.result
    dialog=Gtk.Dialog(title='Confirm Flash upload',transient_for=self.dialog,modal=True)
    dialog.add_button('Cancel',Gtk.ResponseType.CANCEL);dialog.add_button('Upload',Gtk.ResponseType.OK)
-   dialog.get_content_area().append(Gtk.Label(label=f'Source: {path}\nDestination: {folder}/{name}\nSize: {len(data):,} bytes\n\nSave this file in Flash? No ROM or settings will be activated.',wrap=True,xalign=0))
+   dialog.get_content_area().append(Gtk.Label(label=f'Source: {path}\nDestination: {folder}/{name}\nSize: {preview.size:,} bytes\n\nSave this file in Flash? No ROM or settings will be activated.',wrap=True,xalign=0))
    def response(_,code):
     dialog.destroy()
-    if code!=Gtk.ResponseType.OK:return
+    if code!=Gtk.ResponseType.OK:
+     self.app.core.files.discard_plan(preview.plan_id);return
     def uploaded(destination):
      self.refresh(after=lambda:self.tab.reload() if not self.tab.pending and not self.tab.drafts else None)
-     self.app.status.set_text('Saved and verified: '+destination)
-    self.run(lambda:upload_flash(self.client,folder,name,data),uploaded)
+     self.app.status.set_text('Saved and verified: '+destination.destination.path)
+    upload=self.app.core.files.execute_native_upload(preview.plan_id)
+    def finished(result):
+     if result.state=='succeeded':uploaded(result.result)
+     else:self.status.set_text(result.error.message)
+    self.run(upload.run,finished)
    dialog.connect('response',response);dialog.present()
-  self.run(task,done)
+  self.run(job.run,done)
  def save_copy(self):
   row=self.listing.get_selected_row()
   if self.app.busy or row is None:return
@@ -118,20 +125,12 @@ class FlashFiles:
    if code!=Gtk.ResponseType.ACCEPT or not file:return
    path=file.get_path()
    if not path:self.status.set_text('Choose a local file.');return
-   def task():
-    import os,tempfile
-    data=read_remote(self.client,source)
-    destination=Path(path)
-    # A private staging file avoids leaving a partial backup on failure.
-    with tempfile.NamedTemporaryFile(dir=destination.parent,delete=False) as stream:
-     temporary=stream.name
-     try:stream.write(data);stream.flush();os.fsync(stream.fileno())
-     except BaseException:os.unlink(temporary);raise
-    try:os.replace(temporary,destination)
-    finally:
-     if os.path.exists(temporary):os.unlink(temporary)
-    return path
-   self.run(task,lambda path:self.status.set_text('Copy saved: '+path))
+   job=self.app.core.files.save_native_copy(
+    FileLocation.c64u(source),FileLocation.core_host(path))
+   def done(result):
+    if result.state=='succeeded':self.status.set_text('Copy saved: '+result.result['destination'].path)
+    else:self.status.set_text(result.error.message)
+   self.run(job.run,done)
   chooser.connect('response',response);chooser.show()
 
  def preview(self):

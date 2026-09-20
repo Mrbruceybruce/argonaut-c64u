@@ -6,9 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import posixpath
 import sys
-import time
 import uuid
-from threading import Event
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib, Gdk, Gio, Graphene
@@ -17,8 +15,8 @@ from .files import operate, child
 from .navigation import History
 from .storage import storage_root, discover
 from .storage_ui import DriveButtons
-from .deletion import prepare as prepare_deletion, delete_reviewed
-from .folder_copy import build_plan, execute_plan, completed_roots
+from .folder_copy import completed_roots
+from .file_service import FileLocation, CopyRequest
 from .core import ArgonautCore
 from .connection_dialog import ConnectionDialog
 from .settings_tab import SettingsTab
@@ -43,7 +41,7 @@ class Browser(Gtk.Application):
         self.drive_bars = {}
         self.client = None
         self.busy = False
-        self.copy_cancel = None
+        self.transfer_job = None
         self.drag_payload = None
         self.file_clipboard = None
         self.histories = {True: History(self.local), False: History(self.remote)}
@@ -361,7 +359,7 @@ class Browser(Gtk.Application):
             for widget, sensitive in sensitivity: widget.set_sensitive(sensitive)
             try: done(future.result())
             except Exception as exc:
-                self.end_copy_cancel()
+                self.end_file_job()
                 if isinstance(exc, ConnectionFailure) and exc.kind in ('host', 'network', 'authentication') and self.recovery:
                     self.recovery.lost(str(exc))
                     if exc.kind=='authentication':self.recovery.paused=True
@@ -608,39 +606,33 @@ class Browser(Gtk.Application):
         self.run(lambda: self.client.list_directory(self.remote), refreshed)
 
     def cancel_transfer(self):
-        if self.copy_cancel:
-            self.copy_cancel.set()
+        if self.transfer_job:
+            self.core.files.cancel(self.transfer_job.id)
             self.cancel_button.set_sensitive(False)
             self.status.set_text('Cancelling transfer… waiting for the current network operation to return.')
 
-    def begin_copy_cancel(self):
-        event = Event()
-        self.copy_cancel = event
+    def begin_file_job(self, job):
+        self.transfer_job = job
         self.cancel_button.set_sensitive(True)
-        def check():
-            if event.is_set(): raise BrowserError('Transfer cancelled by user.')
-        return check
+        def event(update):
+            progress=update.job.progress
+            if update.kind=='progress' and progress:
+                def show():
+                    if self.transfer_job is job:self.status.set_text(progress.message)
+                    return False
+                GLib.idle_add(show)
+        job.add_listener(event)
+        return job
 
-    def end_copy_cancel(self):
-        self.copy_cancel = None
+    def end_file_job(self):
+        self.transfer_job = None
         self.cancel_button.set_sensitive(False)
 
-    def progress_callback(self):
-        event = self.copy_cancel
-        def check():
-            if event is not None and event.is_set(): raise BrowserError('Transfer cancelled by user.')
-        last = [0.0]
-        def progress(count):
-            check()
-            now = time.monotonic()
-            if now - last[0] >= 0.15:
-                last[0] = now
-                def update():
-                    self.status.set_text(f'Transferred {count:,} bytes…')
-                    return False
-                GLib.idle_add(update)
-        progress.check = check
-        return progress
+    def run_file_job(self, job, done):
+        self.begin_file_job(job)
+        def finished(snapshot):
+            self.end_file_job();done(snapshot)
+        self.run(job.run,finished)
 
     def clicked(self, listing, local, gesture, count, x, y):
         if self.busy or count != 1: return
@@ -778,17 +770,25 @@ class Browser(Gtk.Application):
 
     def start_copy(self, source_local, parent, names, local, destination, client):
         names = tuple(names)
-        def transfer(plan):
+        source=(FileLocation.core_host(parent) if source_local else
+                FileLocation.c64u(parent))
+        target=(FileLocation.core_host(destination) if local else
+                FileLocation.c64u(destination))
+        request=CopyRequest(source,names,target)
+        def transfer(preview,decision):
             if self.busy or (not (local and source_local) and self.client is not client): return
-            self.begin_copy_cancel()
-            progress = self.progress_callback()
-            def finished(result):
-                self.end_copy_cancel()
-                message, partial = result.message, result.partial
+            try:job=self.core.files.execute_copy(preview.plan_id,decision)
+            except BrowserError as exc:self.status.set_text(str(exc));return
+            def finished(snapshot):
+                result=snapshot.result
+                if result is None:
+                    self.status.set_text(snapshot.error.message if snapshot.error else 'Copy did not complete.')
+                    return
+                message, partial = result.message, result.partial_path
                 copied = completed_roots(names, result.completed)
-                if result.error: self.copy_report(result)
+                if snapshot.state=='failed': self.copy_report(result)
                 if partial:
-                    self.partial_upload = (client, partial)
+                    self.partial_upload = (self.active_profile.id, partial)
                     self.partial_button.set_sensitive(True)
                 local_selection = ()
                 if source_local and Path(parent).resolve() == self.local.resolve():
@@ -817,19 +817,19 @@ class Browser(Gtk.Application):
                         self.show_remote(listing, remote_selection)
                     self.status.set_text(message + (' · Could not refresh C64U: ' + error if error else ''))
                 self.run(refresh, refreshed)
-            self.run(lambda: execute_plan(client, plan, source_local, local, progress), finished)
-        def checked(plan):
-            if self.copy_cancel is not None and self.copy_cancel.is_set():
-                self.end_copy_cancel()
-                self.status.set_text('Transfer cancelled; nothing copied.'); return
-            self.end_copy_cancel()
-            existing = plan.conflicts
-            if not existing: transfer(plan); return
+            self.run_file_job(job,finished)
+        def checked(snapshot):
+            if snapshot.state=='cancelled':
+                self.status.set_text('Transfer cancelled; nothing copied.');return
+            if snapshot.state=='failed':
+                self.status.set_text(snapshot.error.message);return
+            preview=snapshot.result;existing=preview.conflicts
+            if not existing: transfer(preview,'skip'); return
             dialog = Gtk.Dialog(title='Files already exist', transient_for=self.window, modal=True)
             dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
             dialog.add_button('Skip existing', Gtk.ResponseType.OK)
             replace_button=dialog.add_button('Replace', Gtk.ResponseType.APPLY)
-            replace_button.set_sensitive(bool(plan.replacements))
+            replace_button.set_sensitive(bool(preview.replaceable))
             dialog.set_default_response(Gtk.ResponseType.CANCEL)
             label = Gtk.Label(label='These names already exist in the destination:\n\n' + '\n'.join(existing) + '\n\nReplace overwrites matching regular files. Existing folders merge; folder/file conflicts and copies onto themselves are skipped.\nDestination: '+str(destination), wrap=True, selectable=True)
             label.set_margin_top(16); label.set_margin_bottom(16)
@@ -839,17 +839,19 @@ class Browser(Gtk.Application):
             def response(widget, answer):
                 widget.destroy()
                 if answer == Gtk.ResponseType.APPLY:
-                    replaced={step.relative for step in plan.replacements}
-                    plan.conflicts=[name for name in plan.conflicts if name not in replaced]
-                    plan.steps.extend(plan.replacements)
-                    transfer(plan)
+                    transfer(preview,'replace')
                 elif answer == Gtk.ResponseType.OK:
-                    if plan.steps: transfer(plan)
-                    else: self.status.set_text('All files skipped; nothing copied.')
-                else: self.status.set_text('Copy cancelled; nothing copied.')
+                    if preview.operation_count: transfer(preview,'skip')
+                    else:
+                        self.core.files.discard_plan(preview.plan_id)
+                        self.status.set_text('All files skipped; nothing copied.')
+                else:
+                    self.core.files.discard_plan(preview.plan_id)
+                    self.status.set_text('Copy cancelled; nothing copied.')
             dialog.connect('response', response); dialog.present()
-        check = self.begin_copy_cancel()
-        self.run(lambda: build_plan(client, source_local, parent, names, local, destination, check), checked)
+        try:job=self.core.files.prepare_copy(request)
+        except BrowserError as exc:self.status.set_text(str(exc));return
+        self.run_file_job(job,checked)
 
     def copy_report(self, report):
         dialog = Gtk.Dialog(title='Copy stopped', transient_for=self.window, modal=True)
@@ -866,13 +868,12 @@ class Browser(Gtk.Application):
         parent = self.local if local else self.remote
         if not local and not self.client: raise BrowserError('Connect first.')
         def submit(name):
-            child('/USB2', name)  # Validate one filename on either side.
-            target = parent / name if local else child(parent, name)
-            def task():
-                if local: target.mkdir()
-                else: operate(self.client, 'mkdir', target)
-                return str(target)
-            self.run(task, self.completed)
+            location=FileLocation.core_host(parent) if local else FileLocation.c64u(parent)
+            job=self.core.files.create_folder(location,name)
+            def done(snapshot):
+                if snapshot.state=='succeeded':self.completed(snapshot.result.path)
+                else:self.status.set_text(snapshot.error.message)
+            self.run_file_job(job,done)
         self.prompt('New folder', 'Folder name:', submit, action_label='Create folder')
 
     def new_d64(self):
@@ -1149,9 +1150,9 @@ class Browser(Gtk.Application):
 
     def delete_partial(self):
         if self.busy or not self.partial_upload:return
-        original,path=self.partial_upload
-        if not self.client or (self.client.host,self.client.http_port,self.client.port)!=(original.host,original.http_port,original.port):
-            self.status.set_text('Connect to '+original.host+' before deleting this partial upload.');return
+        profile_id,path=self.partial_upload
+        if not self.client or not self.active_profile or self.active_profile.id!=profile_id:
+            self.status.set_text('Connect to the original C64U profile before deleting this partial upload.');return
         return self.delete_dialog(False,[path],self.client,partial=True)
 
     def delete_dialog(self,local,targets,client,partial=False):
@@ -1171,17 +1172,21 @@ class Browser(Gtk.Application):
         def response(_,code):
             closed[0] = True
             dialog.destroy()
-            if code!=Gtk.ResponseType.OK or self.busy or not reviewed:return
+            if code!=Gtk.ResponseType.OK or self.busy or not reviewed:
+                if reviewed:self.core.files.discard_plan(reviewed[0].plan_id)
+                return
             if not local and self.client is not client:
                 self.status.set_text('Connection changed. Review the deletion again.');return
-            items = reviewed[0]
-            def task():
-                return delete_reviewed(client,local,targets,items)
-            def done(result):
-                removed,error=result
-                if partial and not error:
+            preview = reviewed[0]
+            try:job=self.core.files.execute_delete(preview.plan_id)
+            except BrowserError as exc:self.status.set_text(str(exc));return
+            def done(snapshot):
+                result=snapshot.result
+                if result is None:
+                    self.status.set_text(snapshot.error.message);return
+                if partial and snapshot.state=='succeeded':
                     self.partial_upload=None;self.partial_button.set_sensitive(False)
-                message=f'Deleted {len(removed)} of {len(items)} item(s).'+(' Stopped: '+error if error else '')
+                message=result.message
                 self.refresh_local();self.status.set_text(message)
                 if not local and self.client is client:
                     parent=self.remote
@@ -1192,20 +1197,19 @@ class Browser(Gtk.Application):
                         if self.client is client and self.remote==parent and not isinstance(result,Exception):self.show_remote(result)
                         self.status.set_text(message+(' Refresh failed: '+str(result) if isinstance(result,Exception) else ''))
                     self.run(refresh,refreshed)
-            self.run(task,done)
+            self.run_file_job(job,done)
         dialog.connect('response',response);dialog.present()
         def prepared(result):
-            if closed[0]: return
-            items, error = result
-            if error:
-                label.set_text('Could not prepare deletion: '+error+'\n\nNothing was deleted. Close this dialog and try again.'); return
-            reviewed.append(items)
-            label.set_text(device+'\n\nDelete permanently: '+str(len(items))+' items, including folder contents?\n\n'+'\n'.join(i.path+('/' if i.kind=='dir' else '') for i in items))
-            button.set_sensitive(bool(items))
-        def scan():
-            try: return prepare_deletion(client,local,targets), None
-            except Exception as exc: return (), str(exc)
-        self.run(scan,prepared)
+            if closed[0]:
+                if result.result:self.core.files.discard_plan(result.result.plan_id)
+                return
+            if result.state!='succeeded':
+                label.set_text('Could not prepare deletion: '+result.error.message+'\n\nNothing was deleted. Close this dialog and try again.'); return
+            preview=result.result;reviewed.append(preview)
+            label.set_text(device+'\n\nDelete permanently: '+str(len(preview.items))+' items, including folder contents?\n\n'+'\n'.join(i.path+('/' if i.kind=='dir' else '') for i in preview.items))
+            button.set_sensitive(bool(preview.items))
+        locations=tuple(FileLocation.core_host(path) if local else FileLocation.c64u(path) for path in targets)
+        self.run_file_job(self.core.files.prepare_delete(locations),prepared)
         return dialog
 
     def prompt(self, title, text, callback, initial='', exact_confirmation=None, action_label='OK'):

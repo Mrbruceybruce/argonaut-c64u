@@ -125,6 +125,7 @@ def _upload_new_folder(client, source, parent, progress):
                 raise BrowserError('Upload verification failed.')
             return {'path': destination, 'bytes': count, 'sha256': digest.hexdigest(), 'verified': True}
     except (OSError, EOFError, ftplib.Error, ValueError, BrowserError) as exc:
+        if getattr(exc,'cancelled',False):raise
         suffix = f' Inspect {folder!r}; partial files may remain. No automatic retry or deletion.' if folder else ''
         raise BrowserError(f'Upload failed: {exc}.{suffix}') from exc
     finally:
@@ -179,6 +180,9 @@ def _upload(client, source, parent, progress):
             ftp.rename(temporary, destination)
             return {'path': destination, 'bytes': count, 'sha256': digest.hexdigest(), 'verified': True}
     except (OSError, EOFError, ftplib.Error, ValueError, BrowserError) as exc:
+        if getattr(exc,'cancelled',False):
+            if started:setattr(exc,'partial_path',temporary)
+            raise
         recovery = f' Inspect {temporary!r} and {destination!r}; no automatic retry or deletion.' if started else ''
         raise UploadFailure(f'Upload failed: {exc}.{recovery}',temporary if started else None) from exc
     finally:

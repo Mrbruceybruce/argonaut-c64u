@@ -72,6 +72,7 @@ def copy_files(client, source_local, parent, names, local, destination, progress
                     result = upload(client, staged, destination, progress)
             results.append(result['path'])
         except Exception as exc:
+            if getattr(exc,'cancelled',False):raise
             return (f'{len(results)} of {len(names)} copied. Stopped at {name!r}: {exc}. Completed paths: {results}',
                     exc.partial_path if isinstance(exc, UploadFailure) else None)
     return f'Copied {len(results)} file(s): ' + ', '.join(results), None
