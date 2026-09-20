@@ -12,14 +12,14 @@ Choose the package for your computer from the unified 1.5 release.
 
 | Computer | Download | Install |
 | --- | --- | --- |
-| Debian 13 | [Debian 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Download the `.deb` and run the command below. |
-| Windows 10/11, 64-bit | [Windows 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
-| Apple Silicon or Intel Mac, macOS 15 or newer | [Mac 1.5](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.5) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
+| Debian 13 | [Debian 1.8](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8) | Download the `.deb` and run the command below. |
+| Windows 10/11, 64-bit | [Windows 1.8](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8) | Run `Setup.exe`, then launch Argonaut from the Start menu. |
+| Apple Silicon or Intel Mac, macOS 15 or newer | [Mac 1.8](https://github.com/Mrbruceybruce/argonaut-c64u/releases/tag/v1.8) | Open the DMG and drag Argonaut into Applications. Launch it from Applications. |
 
 On Debian, open a terminal in the folder containing the downloaded package:
 
 ```sh
-sudo apt install ./argonaut-c64u_1.5_all.deb
+sudo apt install ./argonaut-c64u_1.8_all.deb
 ```
 
 Windows and Mac packages include Python, GTK, and the media libraries.

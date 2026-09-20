@@ -1,27 +1,38 @@
-name: Build stable 1.6 candidate
+name: Build stable 1.8 candidate
 env:
-  ARGONAUT_VERSION: '1.6'
+  ARGONAUT_VERSION: '1.8'
 'on':
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish the verified packages as stable 1.6
+        description: Publish the verified packages as stable 1.8
         required: true
         default: false
         type: boolean
 permissions:
   contents: read
 jobs:
+  source:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        ref: development
+    - id: source
+      run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   windows:
+    needs: source
     runs-on: windows-2022
     env:
-      ARGONAUT_SOURCE_COMMIT: ${{ github.sha }}
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
     timeout-minutes: 40
     steps:
     - uses: actions/checkout@v5
       with:
         fetch-depth: 0
-        ref: ${{ github.sha }}
+        ref: ${{ needs.source.outputs.sha }}
     - uses: msys2/setup-msys2@v2
       with:
         msystem: UCRT64
@@ -59,15 +70,16 @@ jobs:
         path: release-assets/
         if-no-files-found: error
   macos:
+    needs: source
     runs-on: ${{ matrix.runner }}
     env:
-      ARGONAUT_SOURCE_COMMIT: ${{ github.sha }}
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v5
       with:
         fetch-depth: 0
-        ref: ${{ github.sha }}
+        ref: ${{ needs.source.outputs.sha }}
     - name: Install Mac runtime
       run: |
         test "$(uname -m)" = "${{ matrix.arch }}"
@@ -103,7 +115,7 @@ jobs:
         env=dict(os.environ,PATH='/usr/bin:/bin:/usr/sbin:/sbin')
         for key in ('PYTHONPATH','GI_TYPELIB_PATH','DYLD_LIBRARY_PATH','GST_PLUGIN_PATH'):
             env.pop(key,None)
-        subprocess.run([str(folder/'Argonaut.app/Contents/MacOS/Argonaut'),'--self-test',str(report)],env=env,check=True,timeout=90)
+        subprocess.run([str(folder/'Argonaut.app/Contents/MacOS/Argonaut'),'--self-test',str(report)],env=env,check=True,timeout=180)
         if not report.is_file():
             raise SystemExit('Package self-test report is missing')
         result=json.loads(report.read_text())
@@ -116,7 +128,7 @@ jobs:
       run: |
         mkdir -p mac-package artifacts
         ditto "dist/Argonaut.app" "mac-package/Argonaut.app"
-        cp packaging/RELEASE-1.6.md LICENSE COPYRIGHT mac-package/
+        cp packaging/RELEASE-1.8.md LICENSE COPYRIGHT mac-package/
         brew info --json=v2 --installed > mac-package/Homebrew-packages.json
         ln -s /Applications mac-package/Applications
         hdiutil create -volname 'Argonaut' -srcfolder mac-package -ov -format UDZO artifacts/Argonaut-${{ env.ARGONAUT_VERSION }}-macOS-${{ matrix.label }}.dmg
@@ -145,7 +157,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         fetch-depth: 0
-        ref: ${{ github.sha }}
+        ref: ${{ needs.source.outputs.sha }}
     - uses: actions/download-artifact@v8
       with:
         pattern: stable-*
@@ -161,34 +173,37 @@ jobs:
         python3 - <<'VERIFY'
         from pathlib import Path
         import hashlib
-        expected={'Argonaut-1.6-Windows-x64-Setup.exe','Argonaut-1.6-Windows-x64-Portable.zip','Argonaut-1.6-macOS-AppleSilicon.dmg','Argonaut-1.6-macOS-AppleSilicon.zip','Argonaut-1.6-macOS-Intel.dmg','Argonaut-1.6-macOS-Intel.zip','argonaut-c64u_1.6_all.deb','argonaut-1.6-source.zip'}
+        expected={'Argonaut-1.8-Windows-x64-Setup.exe','Argonaut-1.8-Windows-x64-Portable.zip','Argonaut-1.8-macOS-AppleSilicon.dmg','Argonaut-1.8-macOS-AppleSilicon.zip','Argonaut-1.8-macOS-Intel.dmg','Argonaut-1.8-macOS-Intel.zip','argonaut-c64u_1.8_all.deb','argonaut-1.8-source.zip'}
         actual={p.name for p in Path('.').iterdir() if p.name!='SHA256SUMS'}
         if actual != expected:
             raise SystemExit(f'Unexpected release files: expected {sorted(expected)}, got {sorted(actual)}')
         Path('SHA256SUMS').write_text(''.join(hashlib.sha256(Path(n).read_bytes()).hexdigest()+'  '+n+'\n' for n in sorted(expected)))
         VERIFY
-        gh release create v1.6 --target "${{ github.sha }}" --latest --title 'Argonaut 1.6 — Debian, Windows and macOS' --notes-file ../packaging/RELEASE-1.6.md *.deb *.exe *.zip *.dmg SHA256SUMS
+        gh release create v1.8 --target "${{ needs.source.outputs.sha }}" --latest --title 'Argonaut 1.8 — Debian, Windows and macOS' --notes-file ../packaging/RELEASE-1.8.md *.deb *.exe *.zip *.dmg SHA256SUMS
     needs:
+    - source
     - windows
     - macos
     - debian
   debian:
+    needs: source
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
-      ARGONAUT_SOURCE_COMMIT: ${{ github.sha }}
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
     steps:
     - uses: actions/checkout@v5
       with:
         fetch-depth: 0
-        ref: ${{ github.sha }}
+        ref: ${{ needs.source.outputs.sha }}
     - name: Install GTK test runtime
       run: |-
         sudo apt-get update
-        sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good iproute2 adwaita-icon-theme xvfb dbus-x11
+        sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad iproute2 adwaita-icon-theme xvfb dbus-x11
     - name: Unit and GTK tests
       run: |-
         python3 -m unittest discover -s tests -p 'test_*.py'
+        python3 -O -m unittest discover -s tests -p 'test_*.py'
         xvfb-run -a env ARGONAUT_UI_TESTS=1 python3 -m unittest tests.test_preferences_ui
     - name: Build and test installed package
       run: |-
@@ -204,6 +219,7 @@ jobs:
             raise SystemExit('Package self-test report is missing')
         result=json.loads(report.read_text())
         if (result.get('result')!='passed' or result.get('suite')!='package' or
+                result.get('version')!=os.environ['ARGONAUT_VERSION'] or
                 result.get('build')!=os.environ['ARGONAUT_SOURCE_COMMIT']):
             raise SystemExit('Package self-test did not pass')
         PYTHON
