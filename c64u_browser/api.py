@@ -231,7 +231,7 @@ class UltimateClient:
         except (ValueError, BrowserError) as exc:
             raise ConnectionFailure('api', 'Invalid or unsupported REST response.') from exc
 
-    def _request_binary_json(self, path, data, filename):
+    def _request_binary_json(self, path, data, filename, operation='CRT launch'):
         """POST one bounded binary attachment and validate the JSON response."""
         with operation_event('rest', 'POST', rest_target(path)):
             opener = urllib.request.build_opener(
@@ -257,7 +257,7 @@ class UltimateClient:
             except urllib.error.HTTPError as exc:
                 if exc.code in (404, 405, 501):
                     raise ConnectionFailure(
-                        'api', 'This firmware does not support attached CRT launch '
+                        'api', f'This firmware does not support attached {operation} '
                         f'(HTTP {exc.code}).') from exc
                 kind = 'authentication' if exc.code in (401, 403) else 'api'
                 raise ConnectionFailure(
@@ -267,10 +267,10 @@ class UltimateClient:
                 kind = 'host' if isinstance(exc.reason, socket.gaierror) else 'network'
                 raise ConnectionFailure(
                     kind, 'Hostname could not be resolved.' if kind == 'host'
-                    else 'The CRT launch response was not received.') from exc
+                    else f'The {operation} response was not received.') from exc
             except (OSError, TimeoutError) as exc:
                 raise ConnectionFailure(
-                    'network', 'The CRT launch response was not received.') from exc
+                    'network', f'The {operation} response was not received.') from exc
             except (ValueError, BrowserError) as exc:
                 raise ConnectionFailure(
                     'api', 'Invalid or unsupported REST response.') from exc
@@ -320,6 +320,21 @@ class UltimateClient:
     def play_sid(self, path, song=None):
         parameters=self.sid_parameters(path,song)
         return self._request_json('PUT','/v1/runners:sidplay?'+urlencode(parameters))
+
+    def play_sid_data(self, data, song=None, filename='argonaut.sid'):
+        """Play one supplied SID attachment without storing it on the C64U."""
+        if not isinstance(data, bytes) or not data or len(data) > 128 * 1024:
+            raise BrowserError('Choose non-empty SID data within the supported size bound.')
+        safe_argument(filename)
+        if (not filename or '/' in filename or '\\' in filename
+                or not filename.casefold().endswith('.sid')):
+            raise BrowserError('Use a simple SID attachment filename.')
+        if song is not None and (type(song) is not int or not 1 <= song <= 256):
+            raise BrowserError('SID song number must be from 1 through 256.')
+        route = '/v1/runners:sidplay'
+        if song is not None:route += '?' + urlencode({'songnr': song})
+        return self._request_binary_json(
+            route, data, filename, 'SID playback')
 
     def start_stream(self, stream, address, port):
         if stream not in ('video','audio'):raise BrowserError('Unsupported preview stream.')

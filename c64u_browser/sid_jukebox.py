@@ -567,11 +567,16 @@ class SidCatalogService:
         return data
 
     def _inspect(self, source, job, session=None):
+        inspection, _data = self._inspect_data(source, job, session)
+        return inspection
+
+    def _inspect_data(self, source, job, session=None):
+        """Internal Core handoff; SID bytes never enter public results."""
         data = self._read(source, job, session)
         try:metadata = parse_sid(data)
         except SidFormatError as exc:
             raise SidCatalogError('malformed-sid', str(exc)) from exc
-        return SidInspection(source, metadata)
+        return SidInspection(source, metadata), data
 
     def add(self, source):
         self._ready()
