@@ -25,6 +25,7 @@ from .game_launch import GameLaunchService
 from .game_library import GameLibraryService
 from .profiles import Preferences, Profile
 from .scheduler import CoreScheduler, DeviceSession
+from .sid_jukebox import SidCatalogService
 from .storage import initial_directory
 from .usb_backup import UsbBackupService
 
@@ -215,6 +216,12 @@ class ArgonautCore:
             self.game_library, self._require_client, self.device_session,
             self.scheduler, volume_identity=self._game_volume_identity)
         self.game_library_error = None
+        self.sid_catalog = SidCatalogService(
+            self.preferences.path.parent / 'sid-jukebox.json',
+            remote_reader=self._read_sid_source,
+            session_provider=self.device_session,
+            scheduler=self.scheduler)
+        self.sid_catalog_error = None
 
     def load(self):
         try:
@@ -225,12 +232,23 @@ class ArgonautCore:
             self.game_library.load()
         except (BrowserError, OSError) as exc:
             self.game_library_error = str(exc)
+        try:
+            self.sid_catalog.load()
+        except (BrowserError, OSError) as exc:
+            self.sid_catalog_error = str(exc)
         return self
 
     def _read_game_source(self, source):
         """Read a catalog source without exposing the transport to clients."""
         if source.device_id != self._device_identity:
             raise CoreError('device', 'The source belongs to a different C64U.')
+        from .native_files import read_remote
+        return read_remote(self._require_client(), source.path)
+
+    def _read_sid_source(self, source):
+        """Read a SID catalog source without exposing transport or credentials."""
+        if source.device_id != self._device_identity:
+            raise CoreError('device', 'The SID source belongs to a different C64U.')
         from .native_files import read_remote
         return read_remote(self._require_client(), source.path)
 
