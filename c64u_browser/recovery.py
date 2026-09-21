@@ -10,7 +10,7 @@ class Recovery:
     def __init__(self, app):
         self.app=app;self.generation=0;self.profile=None
         self.offline=False;self.paused=False;self.inflight=False
-        self.next_check=0;self.delay=5
+        self.next_check=0;self.delay=5;self.health_failures=0
         self.timer=GLib.timeout_add_seconds(5,self.tick)
 
     def watch(self):
@@ -21,6 +21,7 @@ class Recovery:
     def cancel(self):
         self.generation+=1;self.profile=None
         self.offline=False;self.paused=False;self.delay=5
+        self.health_failures=0
 
     def close(self):
         self.cancel()
@@ -58,6 +59,18 @@ class Recovery:
 
     def accept(self, result, was_offline):
         if isinstance(result,Exception):
+            # One busy C64U can transiently time out a read-only REST probe
+            # while an FTP-backed Core job is active.  Confirm a retryable
+            # health failure before replacing the transport/session; a real
+            # reconnect still receives a new Core session identity.
+            if (not was_offline and isinstance(result,CoreError) and
+                    result.retryable and self.health_failures == 0):
+                self.health_failures=1
+                self.next_check=time.monotonic()+1
+                self.app.status.set_text(
+                    'C64U health check timed out; confirming the connection…')
+                return
+            self.health_failures=0
             self.lost(str(result))
             if isinstance(result,CoreError) and result.code in ('authentication','identity'):
                 self.paused=True
@@ -66,6 +79,7 @@ class Recovery:
                 self.next_check=time.monotonic()+self.delay
                 self.delay=min(self.delay*2,30)
             return
+        self.health_failures=0
         self.delay=5;self.next_check=time.monotonic()+5
         if was_offline:
             self.offline=False

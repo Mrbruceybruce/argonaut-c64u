@@ -48,6 +48,73 @@ class PreferencesUI(unittest.TestCase):
         v=tab.preview_scroll.get_vadjustment();self.assertGreater(v.get_upper(),v.get_page_size())
         for _ in range(8):minus.emit('clicked')
         self.assertEqual(tab.zoom.get_text(),'100%');self.assertFalse(minus.get_sensitive())
+
+    def test_game_library_tab_constructs_with_useful_empty_state(self):
+        labels=[self.app.tabs.get_tab_label_text(
+            self.app.tabs.get_nth_page(index))
+            for index in range(self.app.tabs.get_n_pages())]
+        self.assertIn('Game Library',labels)
+        tab=self.app.game_library_tab
+        tab.search.set_text('no-match-'+uuid.uuid4().hex);self.pump()
+        self.assertIn('no games match',tab.library_state.get_text().casefold())
+        self.assertFalse(tab.launch_button.get_sensitive())
+        self.assertEqual('Select a game to view its details.',
+                         tab.detail_heading.get_text())
+
+    def test_game_launch_preparation_has_immediate_visible_feedback(self):
+        from unittest.mock import Mock,patch
+        tab=self.app.game_library_tab
+        job=Mock()
+        with patch.object(tab.client,'can_launch',return_value=True), \
+             patch.object(tab.client,'prepare_launch',return_value=job), \
+             patch.object(tab,'_run_job') as run:
+            tab.launch()
+        run.assert_called_once_with(job,tab._launch_prepared)
+        self.assertEqual('Preparing launch preview…',tab.message.get_text())
+        self.assertEqual('Preparing launch preview…',self.app.status.get_text())
+
+    def test_game_library_batch_add_reports_duplicate_core_result(self):
+        from unittest.mock import Mock
+        from c64u_browser.game_library import GameLibraryService
+        from c64u_browser.game_library_client import GameLibraryClient
+        fixture=(Path(__file__).with_name('fixtures')/
+                 'vice-1541-authentic.d64')
+        first=Path(self.temp.name)/'first.d64'
+        duplicate=Path(self.temp.name)/'duplicate.d64'
+        first.write_bytes(fixture.read_bytes());duplicate.write_bytes(first.read_bytes())
+        service=GameLibraryService(Path(self.temp.name)/'batch-library.json').load()
+        self.addCleanup(service.close)
+        tab=self.app.game_library_tab
+        tab.client=GameLibraryClient(service,Mock())
+        tab._add_local_paths((str(first),str(duplicate)))
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline and 'duplicate content' not in tab.message.get_text():
+            self.pump()
+        self.assertEqual(1,len(service.list()))
+        self.assertIn('Added 1 new game record.',tab.message.get_text())
+        self.assertIn('duplicate content',tab.message.get_text())
+
+    def test_game_library_selection_details_and_filters_use_core_catalog(self):
+        from unittest.mock import Mock
+        from c64u_browser.game_library import GameLibraryService,GameSource
+        from c64u_browser.game_library_client import GameLibraryClient
+        fixture=(Path(__file__).with_name('fixtures')/
+                 'vice-1541-authentic.d64')
+        game=Path(self.temp.name)/'ui-game.d64';game.write_bytes(fixture.read_bytes())
+        service=GameLibraryService(Path(self.temp.name)/'library.json').load()
+        self.addCleanup(service.close)
+        record=service.add(GameSource.core_host(game),title='UI Game').wait(5).result.record
+        service.set_notes(record.id,'joystick test')
+        tab=self.app.game_library_tab
+        tab.client=GameLibraryClient(service,Mock());tab.refresh(False);self.pump()
+        tab.list.select_row(tab.rows[record.id]);self.pump()
+        self.assertEqual('UI Game',tab.title.get_text())
+        self.assertIn('This computer',tab.source.get_text())
+        tab.favorite.set_active(True);self.pump()
+        tab.favorites.set_active(True);self.pump()
+        self.assertIn(record.id,tab.rows)
+        tab.search.set_text('no such title');self.pump()
+        self.assertIn('No games match',tab.library_state.get_text())
     def test_preferences_auto_save_undo_close_and_checkbox_extent(self):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Preferences

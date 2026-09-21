@@ -26,6 +26,7 @@ from .machine_tab import MachineTab
 from .recovery import Recovery
 from .media_tab import MediaTab
 from .streams_tab import StreamsTab
+from .game_library_tab import GameLibraryTab
 from .diagnostics import enable_private_log, disable_private_log
 from .test_lab_access import enabled as test_lab_enabled
 from .platform_support import local_hidden
@@ -36,6 +37,12 @@ def configure_backup_destination_chooser(chooser,backup_root,volume,
     """Apply Core-host defaults without choosing the backup folder for GTK."""
     if backup_root:chooser.set_current_folder(file_factory(backup_root.path))
     chooser.set_current_name('Argonaut-'+volume.lstrip('/')+'-backup')
+
+
+def job_progress_message(operation, progress):
+    if operation.startswith('game-library.launch') and progress.phase == 'hash':
+        return 'Validating game before launch…'
+    return progress.message
 
 
 class Browser(Gtk.Application):
@@ -190,6 +197,9 @@ class Browser(Gtk.Application):
         self.tabs.append_page(self.media_tab.box,Gtk.Label(label='SID/Media'))
         self.streams_tab=StreamsTab(self)
         self.tabs.append_page(self.streams_tab.box,Gtk.Label(label='Streams'))
+        self.game_library_tab=GameLibraryTab(self)
+        self.tabs.append_page(
+            self.game_library_tab.box,Gtk.Label(label='Game Library'))
         if test_lab_enabled(self.preferences):
             from .test_lab_tab import TestLabTab
             self.test_lab_tab = TestLabTab(self)
@@ -204,6 +214,7 @@ class Browser(Gtk.Application):
         self.busy_controls = [connection, panes, usb_actions, self.partial_button,
             self.settings_tab.box, self.drives_tab.box, self.machine_tab.box,
             self.media_tab.box, self.streams_tab.box]
+        self.busy_controls.extend(self.game_library_tab.busy_controls)
         if hasattr(self, 'test_lab_tab'):
             self.busy_controls.append(self.test_lab_tab.box)
         self.refresh_local()
@@ -439,6 +450,7 @@ class Browser(Gtk.Application):
         self.machine_tab.bind(client)
         self.media_tab.bind(client)
         self.streams_tab.bind(client)
+        self.game_library_tab.bind(True)
         if self.recovery:self.recovery.watch()
         if self.tabs.get_current_page() == 1: self.settings_tab.load_if_needed()
         if self.tabs.get_current_page() == 2: self.drives_tab.load_if_needed()
@@ -461,6 +473,7 @@ class Browser(Gtk.Application):
         self.machine_tab.bind(None)
         self.media_tab.bind(None)
         self.streams_tab.bind(None)
+        self.game_library_tab.bind(False)
         self.update_connection_header()
         self.status.set_text('Disconnected.')
 
@@ -478,6 +491,7 @@ class Browser(Gtk.Application):
         self.drives_tab.bind(None);self.machine_tab.bind(None)
         self.media_tab.bind(None)
         self.streams_tab.bind(None)
+        self.game_library_tab.bind(False)
         self.drive_bars[False].refresh()
         self.update_connection_header()
 
@@ -493,6 +507,7 @@ class Browser(Gtk.Application):
         self.drives_tab.bind(client);self.machine_tab.bind(client)
         self.media_tab.bind(client)
         self.streams_tab.bind(client)
+        self.game_library_tab.bind(True)
         self.update_connection_header()
         self.status.set_text('Reconnected to the same C64U. Choose Reload from C64U in Ultimate Menu to read its current values; retained edits were not sent.')
 
@@ -623,8 +638,13 @@ class Browser(Gtk.Application):
 
     def cancel_transfer(self):
         if self.transfer_job:
-            service=(self.core.usb if self.transfer_job.operation.startswith('usb.')
-                     else self.core.files)
+            if self.transfer_job.operation.startswith('game-library.launch'):
+                service=self.core.game_launch
+            elif self.transfer_job.operation.startswith('game-library.'):
+                service=self.core.game_library
+            elif self.transfer_job.operation.startswith('usb.'):
+                service=self.core.usb
+            else:service=self.core.files
             service.cancel(self.transfer_job.id)
             self.cancel_button.set_sensitive(False)
             self.status.set_text('Cancelling transfer… waiting for the current network operation to return.')
@@ -641,7 +661,8 @@ class Browser(Gtk.Application):
             progress=update.job.progress
             if update.kind=='progress' and progress:
                 def show():
-                    if self.transfer_job is job:self.status.set_text(progress.message)
+                    message = job_progress_message(job.operation, progress)
+                    if self.transfer_job is job:self.status.set_text(message)
                     return False
                 GLib.idle_add(show)
         job.add_listener(event)

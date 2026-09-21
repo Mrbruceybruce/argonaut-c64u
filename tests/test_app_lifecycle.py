@@ -6,13 +6,22 @@ from c64u_browser.api import BrowserError
 
 # Importing GTK types does not create windows or connect to a device.
 try:
-    from c64u_browser.gui import Browser
+    from c64u_browser.gui import Browser,job_progress_message
     from c64u_browser.connection_dialog import ConnectionDialog
+    from c64u_browser.jobs import JobProgress
 except ImportError:
     Browser = None
 
 @unittest.skipIf(Browser is None, 'GTK runtime unavailable')
 class Lifecycle(unittest.TestCase):
+    def test_game_launch_hash_progress_is_explicit(self):
+        progress=JobProgress('hash',10,20,'bytes','Validating C64U game file…')
+        self.assertEqual('Validating game before launch…',
+                         job_progress_message(
+                             'game-library.launch-preview',progress))
+        self.assertEqual('Validating C64U game file…',
+                         job_progress_message('game-library.validate',progress))
+
     def test_second_activation_presents_existing_window(self):
         window=Mock()
         app=SimpleNamespace(window=window,get_windows=lambda:[window])

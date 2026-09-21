@@ -43,10 +43,15 @@ Locate/Relink behavior. Adding an entry records metadata only: it never moves,
 copies, mounts, uploads, launches, or otherwise modifies the game file.
 
 PRG support is deferred. SID remains part of the later SID Jukebox section.
-The catalog-only Core slice is complete. The headless reviewed launch slice
-supports all four Core-host/C64U and D64/CRT combinations; its contract and
-pending physical acceptance procedure are documented in
-[GAME-LIBRARY.md](GAME-LIBRARY.md). GTK remains a later client slice.
+The catalog, headless reviewed launch service, and thin GTK Game Library client
+are implemented with automated coverage. Linux physical acceptance passed on
+the beige C64U (`C64-Ultimate-7F01C9`) for all four Core-host/C64U and D64/CRT
+launch combinations, catalog persistence and Relink behavior. Temporary CRT
+Reset/Reboot behavior also matched the documented warning. A transient health
+timeout found during acceptance was corrected by confirming retryable failures
+before replacing the Core session; normal launch and real-disconnect stale-plan
+rejection then passed physical retesting. Cross-platform acceptance remains
+open. The record is documented in [GAME-LIBRARY.md](GAME-LIBRARY.md).
 
 ## Active Section 4: authentic disk-image management
 

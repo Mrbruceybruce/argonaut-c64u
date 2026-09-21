@@ -137,7 +137,35 @@ images use the same staged workflow and a new `.d71` destination. Standard D81
 images use a new `.d81` destination and protect CBM partition allocations from
 file removal or reuse.
 
-## 4. Change settings and use Favorites
+## 4. Build and launch a Game Library
+
+Open **Game Library** to keep references to D64 and CRT games without moving the
+original files. Choose **Add local files…** for games on this computer. To add a
+game already on C64U storage, select one D64 or CRT in the C64U side of **Files**,
+then choose **Add selected C64U file** in Game Library.
+
+Search by title, notes, or source path. Mark favorites and use **Favorites only**
+to narrow the list. The details pane edits the title and notes and can reference
+an existing PNG, JPEG, or WebP image on this computer. Argonaut does not copy the
+artwork into managed storage. **Remove from library…** removes only the catalog
+record; it does not delete the game or artwork.
+
+Use **Validate** when a source may have moved or changed. Missing, changed, and
+unavailable games remain listed. **Locate/Relink…** reviews a replacement source;
+if its SHA-256 differs, Argonaut requires explicit approval before adopting the
+different content.
+
+Connect the intended C64U and choose **Review & Launch…**. Read the source,
+target, reset warning, and launch method before approving it. D64 and CRT launch
+resets and interrupts the running C64 program. A launched CRT is temporary:
+Reset starts it again, Reboot returns to the permanently configured cartridge if
+one exists, and launching another CRT replaces it.
+
+**Command accepted** means the C64U processed the launch command. It does not
+prove that the game reached a playable screen. If Argonaut reports **Launch
+outcome unknown**, inspect the C64U before trying again.
+
+## 5. Change settings and use Favorites
 
 Open **Ultimate Menu**. Use the section list or **Search settings…** to find an item.
 Choose **Reload from C64U** when you need fresh device values.
@@ -158,7 +186,7 @@ Changing a controlling setting can discard staged edits to newly inactive fields
 Click **☆** beside a setting to add it to Favorites; **★** removes it.
 Enable **Favorites** to filter the list. Favorites are saved on your computer.
 
-## 5. Back up settings and manage Flash files
+## 6. Back up settings and manage Flash files
 
 Before changing a configuration you want to keep, use **Export backup…** in
 Settings. Apply or discard staged edits first.
@@ -191,7 +219,7 @@ hardware component, then review and apply. The ROM folder can contain Kernal,
 BASIC, character, and drive ROMs; choose a file appropriate to the setting.
 Reboot the C64 when needed. Argonaut does not include ROM images.
 
-## 6. Preview, screenshots, and recordings
+## 7. Preview, screenshots, and recordings
 
 1. Connect the C64U through wired Ethernet.
 2. Open **Streams**.
@@ -212,7 +240,7 @@ Screenshot, recording, and replay dialogs remember their chosen folders when tho
 folders remain available. Starting preview can replace existing C64U video/debug
 and audio streams.
 
-## 7. If something does not work
+## 8. If something does not work
 
 | Symptom | Check |
 | --- | --- |
