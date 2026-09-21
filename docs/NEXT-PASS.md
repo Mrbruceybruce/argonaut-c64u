@@ -33,6 +33,21 @@ physically retested in commit `b340fd3146b3920a65b5323b9af2701e948bf6eb`.
 The completed Core contract and qualification record are documented in
 [USB-BACKUP.md](USB-BACKUP.md).
 
+## Active roadmap section: Cartridge Support / Game Library MVP
+
+The Game Library MVP supports referenced **D64 and CRT** files. Argonaut Core
+owns the versioned catalog, explicit Core-host or physical-C64U source identity,
+validation and SHA-256 content identity, search, favorites, notes, user-associated
+Core-host artwork references, missing/changed/unavailable state, and reviewed
+Locate/Relink behavior. Adding an entry records metadata only: it never moves,
+copies, mounts, uploads, launches, or otherwise modifies the game file.
+
+PRG support is deferred. SID remains part of the later SID Jukebox section.
+The catalog-only Core slice is complete. The headless reviewed launch slice
+supports all four Core-host/C64U and D64/CRT combinations; its contract and
+pending physical acceptance procedure are documented in
+[GAME-LIBRARY.md](GAME-LIBRARY.md). GTK remains a later client slice.
+
 ## Active Section 4: authentic disk-image management
 
 Disk images must remain compatible with Commodore hardware and CBM DOS. D64

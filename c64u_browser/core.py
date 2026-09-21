@@ -21,6 +21,8 @@ from .api import BrowserError, ConnectionFailure, UltimateClient
 from .credentials import Credentials
 from .discovery import local_networks, standard_scan, subnet_scan
 from .file_service import FileLocation, FileService
+from .game_launch import GameLaunchService
+from .game_library import GameLibraryService
 from .profiles import Preferences, Profile
 from .scheduler import CoreScheduler, DeviceSession
 from .storage import initial_directory
@@ -204,13 +206,40 @@ class ArgonautCore:
         self.usb = UsbBackupService(self._require_client,
                                     self.device_session,
                                     self.scheduler)
+        self.game_library = GameLibraryService(
+            self.preferences.path.parent / 'game-library.json',
+            remote_reader=self._read_game_source,
+            session_provider=self.device_session,
+            scheduler=self.scheduler)
+        self.game_launch = GameLaunchService(
+            self.game_library, self._require_client, self.device_session,
+            self.scheduler, volume_identity=self._game_volume_identity)
+        self.game_library_error = None
 
     def load(self):
         try:
             self.preferences.load()
         except (BrowserError, OSError) as exc:
             self.preferences_error = str(exc)
+        try:
+            self.game_library.load()
+        except (BrowserError, OSError) as exc:
+            self.game_library_error = str(exc)
         return self
+
+    def _read_game_source(self, source):
+        """Read a catalog source without exposing the transport to clients."""
+        if source.device_id != self._device_identity:
+            raise CoreError('device', 'The source belongs to a different C64U.')
+        from .native_files import read_remote
+        return read_remote(self._require_client(), source.path)
+
+    def _game_volume_identity(self, source, check):
+        """Fingerprint removable media without exposing the device transport."""
+        if source.device_id != self._device_identity:
+            raise CoreError('device', 'The source belongs to a different C64U.')
+        return UsbBackupService._volume_fingerprint(
+            self._require_client(), source.volume, check)
 
     def usb_backup_root(self):
         """Return the configured Core-host backup parent, if one is set."""

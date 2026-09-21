@@ -160,6 +160,26 @@ class UltimateClient:
         return self._request_json(
             'PUT', route + '?' + urlencode({'tracks': tracks, 'diskname': disk_name}))
 
+    def run_crt(self, path):
+        """Start a CRT already present on C64U storage."""
+        safe_argument(path)
+        if (not path.startswith('/') or '..' in path.split('/')
+                or not path.casefold().endswith('.crt')):
+            raise BrowserError('Use an absolute C64U CRT path without parent traversal.')
+        return self._request_json(
+            'PUT', '/v1/runners:run_crt?' + urlencode({'file': path}))
+
+    def run_crt_data(self, data, filename='game.crt'):
+        """Start a supplied CRT without installing it on C64U storage."""
+        if not isinstance(data, bytes) or not data:
+            raise BrowserError('Choose non-empty CRT data.')
+        safe_argument(filename)
+        if (not filename or '/' in filename or '\\' in filename
+                or not filename.casefold().endswith('.crt')):
+            raise BrowserError('Use a simple CRT attachment filename.')
+        return self._request_binary_json(
+            '/v1/runners:run_crt', data, filename)
+
     def set_drive_type(self, drive, mode):
         if mode not in ('1541','1571','1581'):raise BrowserError('Unsupported drive type.')
         return self._request_json('PUT',self.drive_route(drive,'set_mode')+'?'+urlencode({'mode':mode}))
@@ -210,6 +230,50 @@ class UltimateClient:
             raise ConnectionFailure('network', 'REST connection timed out or failed.') from exc
         except (ValueError, BrowserError) as exc:
             raise ConnectionFailure('api', 'Invalid or unsupported REST response.') from exc
+
+    def _request_binary_json(self, path, data, filename):
+        """POST one bounded binary attachment and validate the JSON response."""
+        with operation_event('rest', 'POST', rest_target(path)):
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({}), NoRedirect())
+            request = urllib.request.Request(
+                f'http://{self.host}:{self.http_port}{path}', data=data,
+                headers={
+                    'X-Password': self.password,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/octet-stream',
+                    'Content-Disposition': f'attachment; filename="{filename}"',
+                }, method='POST')
+            try:
+                with opener.open(request, timeout=self.timeout) as response:
+                    raw = response.read(65537)
+                if len(raw) > 65536:raise ValueError('Response too large')
+                result = json.loads(raw)
+                if (not isinstance(result, dict)
+                        or not isinstance(result.get('errors'), list)):
+                    raise ValueError('Unexpected API response')
+                if result['errors']:raise ValueError('Device reported an API error')
+                return result
+            except urllib.error.HTTPError as exc:
+                if exc.code in (404, 405, 501):
+                    raise ConnectionFailure(
+                        'api', 'This firmware does not support attached CRT launch '
+                        f'(HTTP {exc.code}).') from exc
+                kind = 'authentication' if exc.code in (401, 403) else 'api'
+                raise ConnectionFailure(
+                    kind, 'REST authentication failed.' if kind == 'authentication'
+                    else f'REST request failed (HTTP {exc.code}).') from exc
+            except urllib.error.URLError as exc:
+                kind = 'host' if isinstance(exc.reason, socket.gaierror) else 'network'
+                raise ConnectionFailure(
+                    kind, 'Hostname could not be resolved.' if kind == 'host'
+                    else 'The CRT launch response was not received.') from exc
+            except (OSError, TimeoutError) as exc:
+                raise ConnectionFailure(
+                    'network', 'The CRT launch response was not received.') from exc
+            except (ValueError, BrowserError) as exc:
+                raise ConnectionFailure(
+                    'api', 'Invalid or unsupported REST response.') from exc
 
     def apply_configuration(self, values):
         if not isinstance(values, dict) or not values:

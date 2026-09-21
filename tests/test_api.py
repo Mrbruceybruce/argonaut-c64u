@@ -66,3 +66,21 @@ class Tests(unittest.TestCase):
         for path,name,tracks in cases:
             with self.subTest(path=path,name=name,tracks=tracks),self.assertRaises(BrowserError):
                 client.create_d64(path,name,tracks)
+
+    def test_run_crt_supports_resident_and_attached_routes(self):
+        client=UltimateClient('device')
+        with patch.object(client,'_request_json',return_value={'errors':[]}) as request:
+            client.run_crt('/USB2/Games/My cart.crt')
+        request.assert_called_once_with(
+            'PUT','/v1/runners:run_crt?file=%2FUSB2%2FGames%2FMy+cart.crt')
+        with patch.object(client,'_request_binary_json',return_value={'errors':[]}) as request:
+            client.run_crt_data(b'C64 CARTRIDGE data','My cart.crt')
+        request.assert_called_once_with(
+            '/v1/runners:run_crt',b'C64 CARTRIDGE data','My cart.crt')
+        for path in ('relative.crt','/USB2/../bad.crt','/USB2/game.d64'):
+            with self.subTest(path=path),self.assertRaises(BrowserError):
+                client.run_crt(path)
+        for data,name in ((b'','game.crt'),(b'x','../game.crt'),
+                          (b'x','game.d64')):
+            with self.subTest(name=name),self.assertRaises(BrowserError):
+                client.run_crt_data(data,name)
