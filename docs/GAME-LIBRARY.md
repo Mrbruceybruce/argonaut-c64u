@@ -102,4 +102,37 @@ without any launch activity.
 Automated coverage retains the remaining destructive-boundary cases, including
 source or catalog changes after preview, storage/device/session changes,
 cancellation, malformed structures and uncertain command outcomes. Linux
-acceptance is complete; cross-platform acceptance remains open.
+acceptance is complete at
+`b66faa5da9119417fb7e38b695122c7d39403b54`; cross-platform acceptance remains
+open for the consolidated Stable 1.9 gate. Artwork association and presentation
+have automated coverage, but artwork selection/display was not explicitly
+recorded in the Linux physical-acceptance results. This is an acceptance-record
+gap and does not reopen the completed Game Library implementation.
+
+## Planned Stable 1.9 enhancement: Bulk Import
+
+Game Library Bulk Import follows SID Jukebox Linux acceptance and precedes the
+consolidated Stable 1.9 platform gate. The existing **Add local files…**
+multi-file workflow remains available. The enhancement adds:
+
+- **Scan local folder…**, with an optional bounded recursive scan;
+- adding multiple selected supported files from the C64U Files view where
+  practical; and
+- **Scan C64U folder…**, with an optional bounded recursive scan.
+
+Scanning is limited to the Game Library's current D64 and CRT formats. Core owns
+traversal, validation, hashing, duplicate/content-identity decisions,
+cancellation, and the resulting serializable review. GTK chooses the source and
+options, presents progress and review, and submits the approved Core operation.
+
+Sources remain references. A scan or approved import never copies, moves,
+uploads, mounts, launches, deletes, or otherwise modifies game files. Before
+catalog changes are committed, Core provides a review that distinguishes new
+records, already-cataloged sources, duplicate content, changed existing sources
+where relevant, and invalid or unsupported files. One invalid candidate does
+not unnecessarily abort the rest of the scan.
+
+Recursive traversal must have explicit bounds and cancellation points. C64U
+scans remain tied to physical-device, volume, connection-session, and media
+safety checks through review and commit. This enhancement adds no formats,
+metadata scraping, managed game storage, or automatic source modification.

@@ -101,3 +101,8 @@ but did not enable cleanup for the staged remote upload. Commit
 `b340fd3146b3920a65b5323b9af2701e948bf6eb` corrected the Core-to-GTK cleanup
 handoff, bound cleanup to the originating device session, and was physically
 retested successfully.
+
+USB/SD Backup & Restore is complete and physically accepted on Linux. Its
+Windows, Apple Silicon Mac, and Intel Mac qualification is pending as part of
+the consolidated Stable 1.9 platform gate after SID Jukebox Linux acceptance
+and the Game Library Bulk Import enhancement.

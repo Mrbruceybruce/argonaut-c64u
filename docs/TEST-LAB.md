@@ -193,10 +193,12 @@ each check's report.
 
 The Developer Mode UI displays these reports. Any future hardware checks that
 change device state will need explicit setup and cleanup. An AI analysis
-service can read the same
-report to explain failures, but must never decide whether a check passed. That
-service should sit behind a separate gateway for local or cloud models; a C64
-PETSCII client can use the gateway later without entering the test runner.
+service can read the same report to explain failures, but must never decide
+whether a check passed. That boundary is implemented by the local Ollama and
+OpenAI gateway adapters described below. The paired PETSCII C64 client uses its
+own narrow authenticated bridge and does not enter the deterministic test
+runner. A future persistent AI Gateway will expose and extend these existing
+boundaries rather than introduce them for the first time.
 
 The Test Lab keeps the latest action in one labeled panel with **Action**,
 **Deterministic result**, and **AI analysis** fields. The same three fields are

@@ -1,19 +1,113 @@
-# Linux-first development roadmap
+# Linux-first development roadmap status
 
 Linux is the active development and hardware-validation platform. It has both
 C64 Ultimates, Ollama, the local AI bridge, health alerts, and unattended fleet
-checks on one machine. Complete every item and Linux acceptance gate in one
-roadmap section before building and validating Windows, Apple Silicon Mac, and
-Intel Mac packages. Begin the next roadmap section only after that cross-platform
-release gate passes. When physical access to a platform is unavailable, its
-native hosted build, relocated packaged-app launch, and packaged GTK self-test
-may satisfy the gate; retain physical testing as a deferred confidence check.
+checks on one machine. Feature sections are implemented and physically accepted
+on Linux first. Windows, Apple Silicon Mac, and Intel Mac qualification is
+consolidated at major Stable release boundaries rather than repeated after every
+section. Portable code and automated platform checks remain required throughout.
 
 Every new roadmap section is implemented first as an Argonaut Core capability
 with a headless contract. Client work then exposes that capability without
 duplicating its rules.
 
-## Server-first milestone: USB/SD backup and restore
+The original feature roadmap remains historical context: it was written against
+Stable 1.5 before the server-first architecture and before later feature
+reordering. The implementation and release sequence below describes the current
+Development line; it does not rewrite the older roadmap to imply that today's
+sequence was always planned.
+
+## Authoritative milestone sequence
+
+1. **Complete on Linux:** USB/SD Backup & Restore.
+2. **Complete on Linux:** Game Library MVP for D64 and CRT at
+   `b66faa5da9119417fb7e38b695122c7d39403b54`.
+3. **Active next feature:** SID Jukebox, implemented Core first and then exposed
+   by GTK. Complete its Linux physical acceptance before the next enhancement.
+4. **Stable 1.9 enhancement:** Game Library Bulk Import, implemented Core first
+   with bounded local/C64U scanning, serializable review, and a thin GTK client.
+5. **Stable 1.9 consolidated platform gate:** build and validate Debian,
+   Windows, Apple Silicon Mac, and Intel Mac packages for the server-first Core
+   foundation, USB/SD Backup & Restore, Game Library including Bulk Import, and
+   SID Jukebox.
+6. **Architecture milestone:** persistent Argonaut Core hosting with a versioned
+   API and a CLI/automation proof client.
+7. **Remote-client filesystem milestone:** define and implement client-upload
+   artifact staging, ownership, limits, cleanup, and Core-host versus client
+   filesystem semantics.
+8. **Client milestone:** begin the iPad/browser PWA against the established
+   transport and artifact contracts.
+9. **Media reconciliation:** reuse reviewed components and evidence from
+   `feature/obs-capture` without merging that branch wholesale; place streaming,
+   recording, capture, and diagnostics behind appropriate Core contracts.
+10. **Decision milestone:** make the written direct-YouTube go/no-go assessment
+   only after the OBS/media path is qualified.
+
+Test Lab, structured logging, deterministic checks, local/cloud failure-analysis
+adapters, unattended monitoring, and the paired PETSCII C64 AI bridge are an
+existing foundation. Ordinary code continues to decide pass, fail, and skip;
+AI analyzes bounded sanitized evidence and cannot change a verdict. A future
+persistent AI Gateway is an extension of this foundation, not its beginning.
+
+The clean OBS capture window, independent media worker, specialized stream
+diagnostics, guide, and their development evidence exist on
+`feature/obs-capture`. That branch is not part of current Development and its
+cross-platform qualification was not completed. It is a source of reviewed
+components and evidence for the later media milestone.
+
+## Active feature: SID Jukebox
+
+The MVP supports referenced SID files on the Core host and on an identified
+C64U, subject to confirming the safe documented Core-host playback mechanism
+before implementation. Core owns a versioned, atomically written and
+Stable/Development-isolated store for playlists, favorites, and Jukebox
+metadata. GTK remains a client of that contract.
+
+The Core service will own source validation, SID requirement parsing and
+reporting, playback previews, device/session safety, jobs, cancellation,
+sequencing, and structured outcomes. Initial multi-SID support reports the SID
+requirements and uses firmware-compatible playback; it does not automatically
+reconfigure SID sockets. A lost or ambiguous playback response is never retried
+automatically.
+
+Manual Previous/Next and shuffle are required. Unknown duration always requires
+manual Next. Automatic advance may be offered only when trustworthy duration
+metadata exists, and it is initially opt-in. The existing C64U-resident SID
+runner, explicit one-based subtune selection, takeover warning, Files selection,
+and SID/Media presentation are the starting point rather than a complete
+Jukebox implementation.
+
+The milestone stops after headless Core tests, a thin GTK client, installed
+Linux package validation, and physical C64U acceptance of both supported source
+scopes, subtunes, sequencing, takeover disclosure, disconnect/session safety,
+and known- versus unknown-duration behavior. It does not include socket
+reconfiguration, guessed durations, HTTP/PWA transport, or unrelated media work.
+
+## Planned Stable 1.9 enhancement: Game Library Bulk Import
+
+After SID Jukebox Linux acceptance, add Core-owned bulk discovery and reviewed
+catalog updates for the Game Library before opening the consolidated platform
+gate. Preserve the existing **Add local files…** multi-file action and add
+**Scan local folder…** with optional recursive traversal. Support multiple
+selected C64U files where practical and add **Scan C64U folder…** with optional
+recursive traversal.
+
+Core scans only D64 and CRT candidates, validates and hashes them, and applies
+the existing source and content-identity rules. Sources remain references: bulk
+import never copies, moves, uploads, mounts, launches, deletes, or otherwise
+modifies game files. Large scans produce a serializable review before any
+catalog mutation, distinguishing new records, already-cataloged sources,
+duplicate content, changed existing sources where relevant, and invalid or
+unsupported files. Invalid candidates are reported individually without
+unnecessarily aborting the scan.
+
+Traversal is bounded and cancellation-aware. C64U scans preserve physical
+device, volume, session, and media safety. GTK only chooses the source and
+options, presents progress/review, and submits the approved Core operation. No
+new formats, metadata scraping, managed storage, or automatic source changes
+belong to this enhancement.
+
+## Linux-complete milestone: USB/SD backup and restore
 
 Manifest-backed USB/SD backup and restore is implemented as a headless Core
 capability and exposed by the GTK Files tab. Automated acceptance covers verified
@@ -31,9 +125,10 @@ cleanup, stale-session rejection, and physical media-swap rejection. The
 partial-upload cleanup issue found during qualification was corrected and
 physically retested in commit `b340fd3146b3920a65b5323b9af2701e948bf6eb`.
 The completed Core contract and qualification record are documented in
-[USB-BACKUP.md](USB-BACKUP.md).
+[USB-BACKUP.md](USB-BACKUP.md). Its Windows and Mac qualification is pending as
+part of the consolidated Stable 1.9 gate.
 
-## Active roadmap section: Cartridge Support / Game Library MVP
+## Linux-complete milestone: Cartridge Support / Game Library MVP
 
 The Game Library MVP supports referenced **D64 and CRT** files. Argonaut Core
 owns the versioned catalog, explicit Core-host or physical-C64U source identity,
@@ -42,7 +137,7 @@ Core-host artwork references, missing/changed/unavailable state, and reviewed
 Locate/Relink behavior. Adding an entry records metadata only: it never moves,
 copies, mounts, uploads, launches, or otherwise modifies the game file.
 
-PRG support is deferred. SID remains part of the later SID Jukebox section.
+PRG support is deferred. SID remains part of the active SID Jukebox milestone.
 The catalog, headless reviewed launch service, and thin GTK Game Library client
 are implemented with automated coverage. Linux physical acceptance passed on
 the beige C64U (`C64-Ultimate-7F01C9`) for all four Core-host/C64U and D64/CRT
@@ -51,9 +146,18 @@ Reset/Reboot behavior also matched the documented warning. A transient health
 timeout found during acceptance was corrected by confirming retryable failures
 before replacing the Core session; normal launch and real-disconnect stale-plan
 rejection then passed physical retesting. Cross-platform acceptance remains
-open. The record is documented in [GAME-LIBRARY.md](GAME-LIBRARY.md).
+open for the consolidated Stable 1.9 gate. Artwork selection and display exist
+and have automated coverage, but the Linux physical-acceptance record did not
+explicitly record that presentation check; this documentation gap does not
+reopen the completed implementation. The record is documented in
+[GAME-LIBRARY.md](GAME-LIBRARY.md).
 
-## Active Section 4: authentic disk-image management
+## Completed historical Section 4: authentic disk-image management
+
+This section is retained as a chronological implementation and acceptance
+record. Interim statements below that described work as active, next, or
+awaiting acceptance were resolved by the later completion paragraphs and do
+not describe the current milestone.
 
 Disk images must remain compatible with Commodore hardware and CBM DOS. D64
 and D71 images have one flat directory; Argonaut must not invent folders or a
@@ -323,7 +427,11 @@ while slower clicks could pull the viewport back to its first row. The local
 pane was unaffected. Both platforms also requested clearer in-dialog feedback
 when native C64U D64 creation encounters an existing filename.
 
-## Active Section 5: replay buffer
+## Completed historical Section 5: replay buffer
+
+This section is likewise retained as chronological release evidence. Its
+interim active and pending language is superseded by the Stable 1.8 completion
+record at the end of the section.
 
 Section 5 opens with the accepted cross-platform cleanup findings rather than
 extending the completed disk-image roadmap:
@@ -402,7 +510,7 @@ and portable ZIP, Apple Silicon and Intel DMG/ZIP pairs, source archive, and a
 checksum manifest covering all eight deliverables. Tag `v1.8` resolves to the
 tested commit. Physical Intel validation remains a deferred confidence check.
 
-## Current milestone: Linux hardening
+## Completed historical milestone: Linux hardening
 
 1. Keep the installed Argonaut Development package, bridge, health monitor, and
    fleet timer on the same source build. Stable Argonaut remains separate.
@@ -433,7 +541,7 @@ both Mac architectures passed their source and packaged-app checks. One Windows
 hosted runner exceeded the original 60-second cold-start allowance without a
 failed check; an immediate clean retry passed, and future runs allow 90 seconds.
 
-## Active Linux development
+## Completed Test Lab and AI foundation development
 
 Test Lab now has an explicit end-to-end C64 AI bridge probe. It sends a fixed
 readiness question through the deployed authenticated protocol and uses
@@ -489,15 +597,18 @@ bridge report with its resolved `bridge.end_to_end` comparison in Test Lab.
 - File copy, Settings, Drives, Mount & Run, preview, screenshots, recordings,
   audio, persistence, and Quit regression coverage on physical hardware.
 
-## Roadmap-section release boundary
+## Stable 1.9 consolidated release boundary
 
-Implement and physically validate an entire roadmap section on Linux. When the
-section is complete, build all desktop packages and run a focused Windows and Mac
-regression covering package launch, build identity, that section's changes, and
-core file/media operations. A platform without an available physical tester may
-pass through a native hosted build, relocated packaged-app launch, and packaged
-GTK self-test; record its physical pass as deferred. Do not begin implementation
-of the next roadmap section until this cross-platform release gate passes.
+Complete and physically validate USB/SD Backup & Restore, Game Library, and SID
+Jukebox on Linux, then complete Game Library Bulk Import before running one
+consolidated Stable 1.9 gate. Build all desktop
+packages and run focused Windows and Mac regression covering package launch,
+build identity, these feature areas, Development/Stable isolation, and core
+file/media operations. A platform without an available physical tester may pass
+through a native hosted build, relocated packaged-app launch, and packaged GTK
+self-test; record its physical pass as deferred. The gate blocks declaring and
+publishing Stable 1.9, not implementation of the Linux-first sections leading
+to that release.
 
 Stable promotion will use an opt-in **Developer Mode and Test Lab** preference.
 The ordinary stable interface remains unchanged while the switch is off.

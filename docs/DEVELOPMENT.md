@@ -25,6 +25,15 @@ boundaries. Portable code and platform tests remain required throughout;
 repeated desktop packaging is deferred until a major release is ready for
 consolidated regression testing.
 
+The current boundary is Stable 1.9. Its consolidated platform gate follows SID
+Jukebox Linux acceptance and the Game Library Bulk Import enhancement. The gate
+covers the server-first Core foundation, USB/SD Backup & Restore, Game Library,
+SID Jukebox, and Bulk Import together. Cross-platform
+qualification blocks Stable 1.9 publication; it does not require a separate
+Windows/Mac physical cycle between those Linux-first feature sections. See the
+authoritative sequence and retained implementation history in
+[NEXT-PASS.md](NEXT-PASS.md).
+
 This separates app settings, not the connected C64U hardware or files: operations
 in either app still affect the selected real device. Mount & Run and Send Text have passed initial hardware testing; the
 current prerelease checklist is in DEVELOPMENT-TEST.md.

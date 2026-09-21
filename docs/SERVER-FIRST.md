@@ -6,8 +6,9 @@ programs are clients.**
 Argonaut Core is the headless application layer that owns C64 Ultimate state
 and operations. It includes discovery, connection and authentication, profiles,
 file transfer, machine and settings control, structured logging, deterministic
-Test Lab behavior, and eventually the AI Gateway. A user interface presents
-these capabilities; it does not reimplement their rules.
+Test Lab behavior, and the existing bounded AI analysis adapters and C64 bridge.
+A future persistent AI Gateway extends those existing boundaries. A user
+interface presents these capabilities; it does not reimplement their rules.
 
 ## Core and client boundary
 
@@ -47,6 +48,13 @@ Network transport is not Core. HTTP and WebSocket will be adapters around the
 same Core operations, results, events, jobs, and errors. The future PWA, CLI,
 automation tools, and PETSCII client will use those adapters without changing
 where device rules or state live.
+
+The persistent Core/API milestone follows SID Jukebox and the consolidated
+Stable 1.9 platform gate. Its first client proof is CLI/automation. Remote
+artifact staging and explicit client-versus-Core-host filesystem semantics come
+next; the iPad/browser PWA follows those contracts. This ordering does not make
+network transport part of Core or require existing in-process clients to be
+rewritten before the transport is proven.
 
 ## Filesystem ownership
 
