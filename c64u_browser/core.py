@@ -224,7 +224,7 @@ class ArgonautCore:
             scheduler=self.scheduler)
         self.sid_jukebox = SidJukeboxService(
             self.sid_catalog, self._require_client, self.device_session,
-            self.scheduler, volume_identity=self._sid_volume_identity)
+            self.scheduler)
         self.sid_catalog_error = None
 
     def load(self):
@@ -254,19 +254,13 @@ class ArgonautCore:
         if source.device_id != self._device_identity:
             raise CoreError('device', 'The SID source belongs to a different C64U.')
         from .native_files import read_remote
-        return read_remote(self._require_client(), source.path)
+        from .sid_format import MAX_SID_BYTES
+        return read_remote(self._require_client(), source.path, MAX_SID_BYTES)
 
     def _game_volume_identity(self, source, check):
         """Fingerprint removable media without exposing the device transport."""
         if source.device_id != self._device_identity:
             raise CoreError('device', 'The source belongs to a different C64U.')
-        return UsbBackupService._volume_fingerprint(
-            self._require_client(), source.volume, check)
-
-    def _sid_volume_identity(self, source, check):
-        """Fingerprint SID source media without exposing device transport."""
-        if source.device_id != self._device_identity:
-            raise CoreError('device', 'The SID source belongs to a different C64U.')
         return UsbBackupService._volume_fingerprint(
             self._require_client(), source.volume, check)
 

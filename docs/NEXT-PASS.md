@@ -22,9 +22,9 @@ sequence was always planned.
 1. **Complete on Linux:** USB/SD Backup & Restore.
 2. **Complete on Linux:** Game Library MVP for D64 and CRT at
    `b66faa5da9119417fb7e38b695122c7d39403b54`.
-3. **Active next feature:** SID Jukebox, implemented Core first and then exposed
-   by GTK. Complete its Linux physical acceptance before the next enhancement.
-4. **Stable 1.9 enhancement:** Game Library Bulk Import, implemented Core first
+3. **Complete on Linux:** SID Jukebox, implemented Core first and then exposed
+   by GTK, with Core-host and C64U-resident playback physically accepted.
+4. **Active Stable 1.9 enhancement:** Game Library Bulk Import, implemented Core first
    with bounded local/C64U scanning, serializable review, and a thin GTK client.
 5. **Stable 1.9 consolidated platform gate:** build and validate Debian,
    Windows, Apple Silicon Mac, and Intel Mac packages for the server-first Core
@@ -55,35 +55,82 @@ diagnostics, guide, and their development evidence exist on
 cross-platform qualification was not completed. It is a source of reviewed
 components and evidence for the later media milestone.
 
-## Active feature: SID Jukebox
+## Linux-complete milestone: SID Jukebox
 
 The MVP supports referenced SID files on the Core host and on an identified
-C64U, subject to confirming the safe documented Core-host playback mechanism
-before implementation. Core owns a versioned, atomically written and
+C64U. Core owns a versioned, atomically written and
 Stable/Development-isolated store for playlists, favorites, and Jukebox
 metadata. GTK remains a client of that contract.
 
-The Core service will own source validation, SID requirement parsing and
+The Core service owns source validation, SID requirement parsing and
 reporting, playback previews, device/session safety, jobs, cancellation,
 sequencing, and structured outcomes. Initial multi-SID support reports the SID
 requirements and uses firmware-compatible playback; it does not automatically
 reconfigure SID sockets. A lost or ambiguous playback response is never retried
 automatically.
 
-Manual Previous/Next and shuffle are required. Unknown duration always requires
-manual Next. Automatic advance may be offered only when trustworthy duration
-metadata exists, and it is initially opt-in. The existing C64U-resident SID
-runner, explicit one-based subtune selection, takeover warning, Files selection,
-and SID/Media presentation are the starting point rather than a complete
-Jukebox implementation.
+C64U-resident SID playback uses consequence-specific authorized-content
+identity rather than a recursive removable-volume fingerprint. Core binds the
+operation to the physical C64U and connection session, reads the exact
+volume/path, revalidates the complete SID SHA-256, parser result and subtune,
+then submits those same bytes through attached SID playback. Byte-identical
+content at the expected location remains authorized even when the firmware
+cannot prove that it resides on the same physical medium. This non-destructive
+SID rule does not apply to USB Backup/Restore, Game Library, file replacement
+or deletion. See [SID-JUKEBOX.md](SID-JUKEBOX.md).
 
-The milestone stops after headless Core tests, a thin GTK client, installed
-Linux package validation, and physical C64U acceptance of both supported source
-scopes, subtunes, sequencing, takeover disclosure, disconnect/session safety,
-and known- versus unknown-duration behavior. It does not include socket
+Manual Previous/Next and shuffle are implemented. Unknown duration always
+requires manual Next. Automatic advance may be offered only when trustworthy
+duration metadata exists, and it is initially opt-in. Explicit one-based
+subtune selection, takeover review, Files-pane catalog handoff, playlist-owned
+transport and the compact Now Playing state form the accepted Jukebox client.
+
+Playlist editing selection is client state and may contain multiple rows; the
+logical playback cursor is a single Core-owned playlist item. Turning Shuffle
+off keeps that current item and clears shuffle history/bag state, after which
+ordered Previous/Next continues from the item's actual playlist position.
+Library or playlist row selection never changes that cursor by itself.
+
+Linux physical acceptance passed on 2026-09-21. Core-host and C64U-resident SID
+playback were both audibly verified. Real PSID metadata, real 3SID addresses and
+requested models, explicit subtune playback, playlist persistence and editing,
+Previous/Next, non-repeating Shuffle, Shuffle Previous/forward history,
+Shuffle-off ordered navigation from the actual Core cursor, and playlist
+boundaries all passed. Multi-row editing selection remained independent from
+the Core playback cursor. Reconnection invalidated playlist authorization, and
+a reviewed Play made stale by disconnect/reconnect was rejected before any
+playback request. Command-accepted presentation continued to state that audible
+playback was not verified by Argonaut.
+
+C64U-resident authorized-content playback also passed. Replacing recursive
+full-volume scanning with an exact bounded SID read, SHA-256/parser/subtune
+revalidation, and attached playback improved an observed resident transition
+from approximately 44 seconds to approximately 1.5 seconds. This measurement is
+physical acceptance evidence, not a fixed performance guarantee.
+
+Manual Next remains the Stable 1.9 behavior. The C64U's apparent five-minute
+SID timer is not trustworthy duration metadata: SpaceFight subtune 2 produced
+roughly 30 seconds of meaningful audio followed by silence while playback
+continued, while Astrolabe could become silent briefly and then loop/restart.
+Silence detection and automatic advance therefore remain a future
+investigation. The GTK workflow keeps Library browsing, the active Playlist
+queue, and Core's logical Now Playing snapshot as separate states; only an
+accepted Core playback transition changes Now Playing, and command acceptance
+does not claim audible playback was verified. The Stable 1.9 client follows one
+normal playback path: Library selections are added to the active Playlist, and
+only the Playlist transport requests playback. Library double-click/Enter adds
+rather than plays, multiple catalog selections may be appended together, and a
+compact Library summary plus Details dialog keeps metadata subordinate to the
+two primary scrolling Library and Playlist surfaces.
+
+The completed milestone includes headless Core tests, a thin GTK client,
+installed Linux package validation, and physical C64U acceptance of both
+supported source scopes, subtunes, sequencing, takeover disclosure,
+disconnect/session safety, and known- versus unknown-duration behavior. It does
+not include socket
 reconfiguration, guessed durations, HTTP/PWA transport, or unrelated media work.
 
-## Planned Stable 1.9 enhancement: Game Library Bulk Import
+## Active Stable 1.9 enhancement: Game Library Bulk Import
 
 After SID Jukebox Linux acceptance, add Core-owned bulk discovery and reviewed
 catalog updates for the Game Library before opening the consolidated platform

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import itertools
 import os
+from dataclasses import replace
 from pathlib import Path
 from threading import Event
 import subprocess
@@ -12,7 +13,9 @@ from unittest.mock import Mock
 from c64u_browser.api import BrowserError, ConnectionFailure
 from c64u_browser.jobs import CoreJob
 from c64u_browser.scheduler import CoreScheduler, DeviceSession, JobBinding
-from c64u_browser.sid_jukebox import SidCatalogService, SidSource
+from c64u_browser.sid_jukebox import (
+    SidCatalogError, SidCatalogService, SidInspection, SidSource,
+)
 from c64u_browser.sid_playback import (
     PlaylistContext, SidJukeboxError, SidJukeboxService,
 )
@@ -31,13 +34,13 @@ class SidPlaybackTests(unittest.TestCase):
         self.now = [100.0]
         self.session = [DeviceSession('id:C64-A', 'session-1')]
         self.remote = {}
-        self.media = ['media-1']
+        self.remote_reads = []
         self.scheduler = CoreScheduler(lambda:self.session[0], clock=lambda:self.now[0])
         self.addCleanup(self.scheduler.close)
         ids = itertools.count(1)
         self.catalog = SidCatalogService(
             self.root / 'sid-jukebox.json',
-            remote_reader=lambda source:self.remote[source.path],
+            remote_reader=self.read_remote,
             session_provider=lambda:self.session[0], scheduler=self.scheduler,
             clock=lambda:self.now[0], id_factory=lambda:f'catalog-{next(ids)}')
         self.catalog.load()
@@ -46,13 +49,14 @@ class SidPlaybackTests(unittest.TestCase):
         self.service = SidJukeboxService(
             self.catalog, lambda:self.client, lambda:self.session[0],
             self.scheduler,
-            volume_identity=lambda source, check:(check(), self.media[0])[1],
             attached_runner=lambda client, data, song, source:
-                self.calls.append(('attached', source.path, song, len(data))),
-            resident_runner=lambda client, data, song, source:
-                self.calls.append(('resident', source.path, song, len(data))),
+                self.calls.append(('attached', source.path, song, data)),
             clock=lambda:self.now[0], id_factory=lambda:f'play-{next(ids)}',
             random_source=ReverseRandom())
+
+    def read_remote(self, source):
+        self.remote_reads.append(source.path)
+        return self.remote[source.path]
 
     def local_tune(self, name='tune.sid', **kwargs):
         path = self.root / name; path.write_bytes(sid_bytes(**kwargs))
@@ -111,19 +115,146 @@ class SidPlaybackTests(unittest.TestCase):
         self.assertEqual((3, False),
                          (explicit.selected_subtune, explicit.used_file_default))
 
-    def test_core_host_and_resident_routes_and_results(self):
+    def test_core_host_and_c64u_sources_both_use_attached_validated_bytes(self):
         local, _path = self.local_tune()
         remote = self.remote_tune('/USB2/Music/remote.sid', title='Remote')
         local_result = self.execute(self.preview(local))
         remote_result = self.execute(self.preview(remote, 1))
         self.assertEqual(('attached', str(self.root / 'tune.sid'), None),
                          self.calls[0][:3])
-        self.assertEqual(('resident', '/USB2/Music/remote.sid', 1),
+        self.assertEqual(('attached', '/USB2/Music/remote.sid', 1),
                          self.calls[1][:3])
+        self.assertEqual(self.remote['/USB2/Music/remote.sid'], self.calls[1][3])
         for result in (local_result, remote_result):
             self.assertEqual('command-accepted', result.status)
             self.assertTrue(result.command_accepted)
             self.assertFalse(result.audible_playback_verified)
+
+    def test_resident_preview_execute_and_transition_operation_counts(self):
+        first = self.remote_tune('/USB2/Music/first.sid', title='First')
+        second = self.remote_tune('/USB2/Music/second.sid', title='Second')
+        playlist, items = self.playlist(((first, 1), (second, 1)))
+        self.remote_reads.clear();self.calls.clear()
+        preview = self.preview(
+            first, 1, PlaylistContext(playlist.id, items[0].id))
+        self.assertEqual([first.source.path], self.remote_reads)
+        self.assertEqual('rest-validated-c64u-sid', preview.mechanism)
+        self.execute(preview)
+        self.assertEqual([first.source.path, first.source.path], self.remote_reads)
+        self.assertEqual((1, first.source.path, self.remote[first.source.path]),
+                         (len(self.calls), self.calls[0][1], self.calls[0][3]))
+        self.remote_reads.clear();self.calls.clear()
+        transitioned = self.service.next().wait(5)
+        self.assertEqual('succeeded', transitioned.state, transitioned.error)
+        self.assertEqual([second.source.path], self.remote_reads)
+        self.assertEqual((1, second.source.path, self.remote[second.source.path]),
+                         (len(self.calls), self.calls[0][1], self.calls[0][3]))
+
+    def test_byte_identical_replacement_is_authorized_content(self):
+        tune = self.remote_tune('/USB2/Music/identical.sid')
+        preview = self.preview(tune)
+        original = self.remote[tune.source.path]
+        self.remote[tune.source.path] = memoryview(original).tobytes()
+        result = self.execute(preview)
+        self.assertTrue(result.command_accepted)
+        self.assertEqual(original, self.calls[-1][3])
+
+    def test_missing_different_same_size_and_malformed_sources_never_play(self):
+        cases = (
+            ('missing', None, 'device-unavailable'),
+            ('different', sid_bytes(title='Different'), 'source-changed'),
+            ('same-size', None, 'source-changed'),
+            ('truncated', b'PSID', 'malformed-sid'),
+        )
+        for name, replacement, expected in cases:
+            with self.subTest(name=name):
+                path = f'/USB2/Music/{name}.sid'
+                tune = self.remote_tune(path, title=name)
+                preview = self.preview(tune)
+                original = self.remote[path]
+                if name == 'missing':
+                    self.catalog._remote_reader = lambda _source:(
+                        _ for _ in ()).throw(ConnectionFailure('ftp', 'missing'))
+                elif name == 'same-size':
+                    changed = bytearray(original);changed[-1] ^= 1
+                    self.remote[path] = bytes(changed)
+                else:self.remote[path] = replacement
+                before = len(self.calls)
+                result = self.service.execute_play(preview.plan_id).wait(5)
+                self.assertEqual(('failed', expected),
+                                 (result.state, result.error.code))
+                self.assertEqual(before, len(self.calls))
+                self.catalog._remote_reader = self.read_remote
+
+    def test_unstable_read_and_session_change_during_validation_never_play(self):
+        tune = self.remote_tune('/USB2/Music/unstable.sid')
+        preview = self.preview(tune)
+        self.catalog._remote_reader = lambda _source:(
+            _ for _ in ()).throw(SidCatalogError(
+                'changed-source', 'The SID changed during its complete read.'))
+        result = self.service.execute_play(preview.plan_id).wait(5)
+        self.assertEqual(('failed', 'source-changed'),
+                         (result.state, result.error.code))
+        self.assertFalse(self.calls)
+
+        self.catalog._remote_reader = self.read_remote
+        preview = self.preview(tune)
+        def change_session(source):
+            data = self.read_remote(source)
+            self.session[0] = DeviceSession('id:C64-A', 'session-2')
+            return data
+        self.catalog._remote_reader = change_session
+        result = self.service.execute_play(preview.plan_id).wait(5)
+        self.assertEqual(('failed', 'session-changed'),
+                         (result.state, result.error.code))
+        self.assertFalse(self.calls)
+
+    def test_post_read_path_change_cannot_change_submitted_bytes(self):
+        tune = self.remote_tune('/USB2/Music/post-read.sid')
+        preview = self.preview(tune)
+        original = self.remote[tune.source.path]
+        replacement = sid_bytes(title='After read')
+        def replace_after_read(source):
+            data = self.read_remote(source)
+            self.remote[source.path] = replacement
+            return data
+        self.catalog._remote_reader = replace_after_read
+        result = self.execute(preview)
+        self.assertTrue(result.command_accepted)
+        self.assertEqual(original, self.calls[-1][3])
+        self.assertNotEqual(self.remote[tune.source.path], self.calls[-1][3])
+
+    def test_session_is_rechecked_after_client_lookup_before_submission(self):
+        tune = self.remote_tune('/USB2/Music/final-session.sid')
+        preview = self.preview(tune)
+        def changing_provider():
+            self.session[0] = DeviceSession('id:C64-A', 'session-2')
+            return self.client
+        service = SidJukeboxService(
+            self.catalog, changing_provider, lambda:self.session[0],
+            self.scheduler,
+            attached_runner=lambda *_args:self.calls.append(('unexpected',)))
+        preview = service.prepare_play(tune.id).wait(5).result
+        result = service.execute_play(preview.plan_id).wait(5)
+        self.assertEqual(('failed', 'session-changed'),
+                         (result.state, result.error.code))
+        self.assertFalse(self.calls)
+
+    def test_execution_revalidates_subtune_against_fresh_parse(self):
+        tune = self.remote_tune('/USB2/Music/subtunes.sid', songs=2, start=2)
+        preview = self.preview(tune, 2)
+        original = self.catalog._inspect_data
+        def fewer_songs(source, job, session=None):
+            inspection, data = original(source, job, session)
+            metadata = replace(
+                inspection.metadata, songs=1, start_song=1,
+                song_speeds=inspection.metadata.song_speeds[:1])
+            return SidInspection(source, metadata), data
+        self.catalog._inspect_data = fewer_songs
+        result = self.service.execute_play(preview.plan_id).wait(5)
+        self.assertEqual(('failed', 'subtune'),
+                         (result.state, result.error.code))
+        self.assertFalse(self.calls)
 
     def test_one_two_and_three_sid_requirements_propagate(self):
         cases = (
@@ -184,14 +315,14 @@ class SidPlaybackTests(unittest.TestCase):
                          (result.state, result.error.code))
         self.assertEqual([], self.calls)
 
-    def test_device_session_and_media_change_reject_stale_plan(self):
+    def test_source_device_and_session_change_reject_stale_plan(self):
         tune = self.remote_tune()
         preview = self.preview(tune)
-        self.media[0] = 'media-2'
+        self.remote[tune.source.path] = sid_bytes(title='Replacement')
         result = self.service.execute_play(preview.plan_id).wait(5)
-        self.assertEqual(('failed', 'storage-changed'),
+        self.assertEqual(('failed', 'source-changed'),
                          (result.state, result.error.code))
-        self.media[0] = 'media-1'
+        self.remote[tune.source.path] = sid_bytes()
         preview = self.preview(tune)
         self.session[0] = DeviceSession('id:C64-A', 'session-2')
         with self.assertRaisesRegex(SidJukeboxError, 'connection changed'):
@@ -238,19 +369,32 @@ class SidPlaybackTests(unittest.TestCase):
         self.assertEqual(['block-start', 'block-end'], order)
         self.assertEqual('attached', self.calls[0][0])
 
+    def test_queued_resident_play_does_not_survive_session_change(self):
+        tune = self.remote_tune('/USB2/Music/queued-session.sid')
+        preview = self.preview(tune)
+        entered = Event(); release = Event()
+        blocker = self.scheduler.submit(
+            CoreJob('blocker', lambda _job:(entered.set(), release.wait(5))),
+            JobBinding.device(self.session[0]))
+        self.assertTrue(entered.wait(2))
+        queued = self.service.execute_play(preview.plan_id)
+        self.assertEqual('queued', queued.snapshot().state)
+        self.session[0] = DeviceSession('id:C64-A', 'session-2')
+        release.set();blocker.wait(5)
+        result = queued.wait(5)
+        self.assertEqual('failed', result.state)
+        self.assertIn(result.error.code, ('session', 'session-changed'))
+        self.assertFalse(self.calls)
+
     def test_running_cancellation_before_command(self):
         tune = self.remote_tune()
         entered = Event(); release = Event()
-        def identity(_source, check):
-            entered.set(); release.wait(5); check(); return self.media[0]
-        service = SidJukeboxService(
-            self.catalog, lambda:self.client, lambda:self.session[0],
-            self.scheduler,
-            volume_identity=lambda _source, check:(check(), self.media[0])[1],
-            resident_runner=lambda *args:self.calls.append(('unexpected',)))
-        preview = service.prepare_play(tune.id).wait(5).result
-        service._volume_identity = identity
-        playback_job = service.execute_play(preview.plan_id)
+        preview = self.service.prepare_play(tune.id).wait(5).result
+        original = self.catalog._remote_reader
+        def blocked(source):
+            entered.set(); release.wait(5); return original(source)
+        self.catalog._remote_reader = blocked
+        playback_job = self.service.execute_play(preview.plan_id)
         self.assertTrue(entered.wait(2))
         playback_job.request_cancel(); release.set()
         self.assertEqual('cancelled', playback_job.wait(5).state)
@@ -315,6 +459,12 @@ class SidPlaybackTests(unittest.TestCase):
             self.service.next()
         self.assertFalse(self.service.current_playback().playlist_authorized)
 
+        playlist=self.catalog.get_playlist(playlist.id)
+        self.authorize(playlist,items[0],first)
+        self.catalog.reorder_playlist_items(
+            playlist.id,tuple(reversed(tuple(item.id for item in playlist.items))))
+        self.assertFalse(self.service.current_playback().playlist_authorized)
+
     def test_next_previous_boundaries_and_unavailable_target(self):
         first, _ = self.local_tune('one.sid', title='One')
         second, second_path = self.local_tune('two.sid', title='Two')
@@ -354,6 +504,66 @@ class SidPlaybackTests(unittest.TestCase):
         new_cycle = self.service.next().wait(5).result.playback.tune_id
         self.assertNotEqual(two.id, new_cycle)
 
+    def test_shuffle_off_keeps_core_cursor_and_resumes_ordered_navigation(self):
+        tunes = tuple(self.local_tune(f'off-{index}.sid', title=f'Tune {index}')[0]
+                      for index in range(4))
+        playlist, items = self.playlist(tuple((tune, 1) for tune in tunes))
+        self.authorize(playlist, items[0], tunes[0])
+
+        self.service.set_shuffle(True)
+        shuffled = self.service.next().wait(5).result
+        self.assertEqual(tunes[3].id, shuffled.playback.tune_id)
+        disabled = self.service.set_shuffle(False)
+        self.assertEqual((items[3].id, False),
+                         (disabled.playlist_item_id, disabled.shuffle))
+        self.assertEqual('boundary', self.service.next().wait(5).result.status)
+        previous = self.service.previous().wait(5).result
+        self.assertEqual(tunes[2].id, previous.playback.tune_id)
+
+        # A fresh shuffled history is discarded when shuffle is disabled; the
+        # current item remains authoritative and ordered Next uses its position.
+        self.service.set_shuffle(True)
+        self.service.previous().wait(5)
+        current = self.service.current_playback()
+        self.service.set_shuffle(False)
+        item_ids = tuple(item.id for item in playlist.items)
+        index = item_ids.index(current.playlist_item_id)
+        expected = tunes[index + 1].id if index + 1 < len(tunes) else None
+        result = self.service.next().wait(5).result
+        self.assertEqual('boundary' if expected is None else expected,
+                         result.status if expected is None else result.playback.tune_id)
+
+    def test_playlist_mutation_invalidates_shuffle_and_ordered_navigation(self):
+        one, _ = self.local_tune('mutation-one.sid', title='One')
+        two, _ = self.local_tune('mutation-two.sid', title='Two')
+        three, _ = self.local_tune('mutation-three.sid', title='Three')
+        playlist, items = self.playlist(((one, 1), (two, 1), (three, 1)))
+        self.authorize(playlist, items[0], one)
+        self.service.set_shuffle(True)
+        self.catalog.reorder_playlist_items(
+            playlist.id, (items[1].id, items[0].id, items[2].id))
+        with self.assertRaisesRegex(SidJukeboxError, 'playlist changed'):
+            self.service.next()
+
+        playlist = self.catalog.get_playlist(playlist.id)
+        current = next(item for item in playlist.items if item.id == items[0].id)
+        self.authorize(playlist, current, one)
+        self.service.set_shuffle(True);self.service.set_shuffle(False)
+        self.catalog.remove_playlist_item(playlist.id, items[2].id)
+        with self.assertRaisesRegex(SidJukeboxError, 'playlist changed'):
+            self.service.previous()
+
+    def test_c64u_authorized_content_reports_reading_progress(self):
+        tune = self.remote_tune('/USB2/Music/progress.sid')
+        calls = []
+        job = CoreJob('sid-test', lambda _job:None)
+        job.add_listener(lambda event:calls.append(event.job.progress)
+                         if event.kind == 'progress' else None)
+        data = self.service._validated_data(tune, 1, self.session[0], job)
+        self.assertEqual(self.remote[tune.source.path], data)
+        self.assertEqual('source-validation', calls[0].phase)
+        self.assertIn('Reading and validating SID', calls[0].message)
+
     def test_authorization_is_bounded_and_not_persisted_across_service_restart(self):
         tune, _ = self.local_tune()
         playlist, items = self.playlist(((tune, 1),))
@@ -380,6 +590,9 @@ class SidPlaybackTests(unittest.TestCase):
         result = subprocess.run([sys.executable, '-c', code], cwd=root, env=env,
                                 capture_output=True, text=True)
         self.assertEqual(0, result.returncode, result.stderr)
+        implementation = (Path(root) / 'c64u_browser/sid_playback.py').read_text()
+        self.assertNotIn('_volume_fingerprint', implementation)
+        self.assertNotIn('play_sid(source.path', implementation)
 
 
 if __name__ == '__main__':unittest.main()

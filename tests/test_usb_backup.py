@@ -55,6 +55,7 @@ class MemoryClient:
     credentials_encapsulated=True
     def __init__(self):
         self.dirs={'/','/USB2'};self.files={};self.fail_paths=set()
+        self.list_calls=[]
         self.block_path=None;self.transfer_started=Event();self.transfer_release=Event()
         self.store_count=0;self.fail_store_on=None;self.block_store=False
         self.store_started=Event();self.store_release=Event()
@@ -66,6 +67,7 @@ class MemoryClient:
         parent=posixpath.dirname(path);self.dirs.add(parent);self.dirs.add(path)
     def add_file(self,path,data):self.dirs.add(posixpath.dirname(path));self.files[path]=data
     def list_directory(self,path):
+        self.list_calls.append(path)
         if path not in self.dirs:raise BrowserError('missing directory '+path)
         prefix=path.rstrip('/')+'/' if path!='/' else '/';rows=[]
         for directory in self.dirs:
@@ -121,6 +123,17 @@ class UsbBackupTests(unittest.TestCase):
         self.assertEqual('c64u-abc',manifest['source']['device_id'])
         self.assertTrue(any(event.kind=='progress' for event in events))
         self.assertNotIn('MemoryClient',repr(preview));self.assertFalse(hasattr(preview,'client'))
+
+    def test_backup_retains_recursive_volume_fingerprint_safety(self):
+        preview = self.service.prepare_backup(self.backup_request()).wait(5).result
+        preparation_calls = tuple(self.client.list_calls)
+        self.assertIn('/USB2', preparation_calls)
+        self.assertIn('/USB2/GAMES', preparation_calls)
+        self.client.list_calls.clear()
+        result = self.service.execute_backup(preview.plan_id).wait(5)
+        self.assertEqual('succeeded', result.state, result.error)
+        self.assertIn('/USB2', self.client.list_calls)
+        self.assertIn('/USB2/GAMES', self.client.list_calls)
 
     def test_backup_root_change_does_not_nest_or_invalidate_existing_backup(self):
         first_root=self.root/'first-root';second_root=self.root/'second-root'

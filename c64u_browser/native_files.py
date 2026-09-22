@@ -22,20 +22,23 @@ def flash_path(folder,name):
  if len(name.encode('utf-8'))>64:raise BrowserError('Filename is too long.')
  return folder+'/'+name
 
-def read_remote(client,path):
+def read_remote(client,path,max_bytes=MAX_BYTES):
  with operation_event('ftp','read_remote','file'):
-  return _read_remote(client,path)
+  return _read_remote(client,path,max_bytes)
 
-def _read_remote(client,path):
+def _read_remote(client,path,max_bytes=MAX_BYTES):
  safe_argument(path)
+ if type(max_bytes) is not int or not 1<=max_bytes<=MAX_BYTES:raise BrowserError('Invalid remote file size bound.')
  if not ((storage_root(path) and storage_root(path)!=path) or any(path.startswith(folder+'/') for folder in FLASH_FOLDERS.values())) or any(p in ('','.','..') for p in path.split('/')[1:]):raise BrowserError('Choose a USB/SD or supported Flash file.')
  ftp=connect(client)
  try:
   expected=ftp.size(path)
-  if expected is None or not 0<expected<=MAX_BYTES:raise BrowserError('File must contain between 1 byte and 16 MB.')
+  if expected is None or not 0<expected<=max_bytes:
+   limit='16 MB' if max_bytes==MAX_BYTES else f'{max_bytes:,} bytes'
+   raise BrowserError(f'File must contain between 1 byte and {limit}.')
   data=bytearray()
   def receive(block):
-   if len(data)+len(block)>MAX_BYTES:raise BrowserError('File exceeds 16 MB.')
+   if len(data)+len(block)>max_bytes:raise BrowserError('File exceeds the supported size bound.')
    data.extend(block)
   ftp.retrbinary('RETR '+path,receive)
   if len(data)!=expected or ftp.size(path)!=expected:raise BrowserError('File changed or download was incomplete.')

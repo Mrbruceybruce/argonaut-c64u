@@ -1,7 +1,7 @@
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
 from c64u_browser.api import BrowserError
 
 # Importing GTK types does not create windows or connect to a device.
@@ -21,6 +21,28 @@ class Lifecycle(unittest.TestCase):
                              'game-library.launch-preview',progress))
         self.assertEqual('Validating C64U game file…',
                          job_progress_message('game-library.validate',progress))
+
+    def test_file_job_completion_snapshot_recovers_a_missed_finish_event(self):
+        running=SimpleNamespace(state='running')
+        succeeded=SimpleNamespace(state='succeeded',result='done')
+        job=Mock(operation='sid-jukebox.next',id='job')
+        job.snapshot.side_effect=(running,running,succeeded)
+        job.add_listener=Mock()  # Deliberately never delivers the finish event.
+        control=Mock();control.get_sensitive.return_value=True
+        app=SimpleNamespace(busy=False,busy_controls=[control],status=Mock(),
+                            transfer_job=None,cancel_button=Mock())
+        app.begin_file_job=lambda value:Browser.begin_file_job(app,value)
+        app.end_file_job=lambda:Browser.end_file_job(app)
+        done=Mock();timer=[]
+        with patch('c64u_browser.gui.GLib.timeout_add',
+                   side_effect=lambda _delay,callback:timer.append(callback)), \
+             patch('c64u_browser.gui.GLib.idle_add',
+                   side_effect=lambda callback,*args:callback(*args)):
+            Browser.run_file_job(app,job,done)
+            self.assertTrue(app.busy);self.assertTrue(timer[0]())
+            self.assertFalse(timer[0]())
+        self.assertFalse(app.busy);self.assertIsNone(app.transfer_job)
+        done.assert_called_once_with(succeeded)
 
     def test_second_activation_presents_existing_window(self):
         window=Mock()

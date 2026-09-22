@@ -8,7 +8,7 @@ import time
 import uuid
 
 from .api import BrowserError, ConnectionFailure
-from .jobs import CoreJob, JobCancelled, JobProgress
+from .jobs import CoreJob, JobProgress
 from .scheduler import DeviceSession, JobBinding
 from .sid_jukebox import C64U, CORE_HOST, SidCatalogError
 
@@ -113,7 +113,6 @@ class _PlaybackPlan:
     preview: PlaybackPreview
     tune: object
     session: DeviceSession
-    volume_identity: str
     playlist_signature: tuple[tuple[str, str, int], ...]
     runner_song: int | None
     created_at: float
@@ -137,7 +136,7 @@ class _PlaylistAuthorization:
 class SidJukeboxService:
     """Headless reviewed playback; the catalog remains the source of truth."""
     def __init__(self, catalog, client_provider, session_provider, scheduler, *,
-                 volume_identity=None, attached_runner=None, resident_runner=None,
+                 attached_runner=None,
                  plan_ttl=300, plan_limit=128, authorization_ttl=1800,
                  authorization_transition_limit=256, clock=time.time,
                  id_factory=lambda:uuid.uuid4().hex, random_source=None):
@@ -145,9 +144,7 @@ class SidJukeboxService:
         self._client_provider = client_provider
         self._session_provider = session_provider
         self._scheduler = scheduler
-        self._volume_identity = volume_identity
         self._attached_runner = attached_runner or self._run_attached
-        self._resident_runner = resident_runner or self._run_resident
         self.plan_ttl = max(0, float(plan_ttl))
         self.plan_limit = max(0, int(plan_limit))
         self.authorization_ttl = max(0, float(authorization_ttl))
@@ -166,10 +163,6 @@ class SidJukeboxService:
         return client.play_sid_data(data, song, 'argonaut.sid')
 
     @staticmethod
-    def _run_resident(client, _data, song, source):
-        return client.play_sid(source.path, song)
-
-    @staticmethod
     def _playlist_signature(playlist):
         return tuple((item.id, item.tune_id, item.subtune)
                      for item in playlist.items)
@@ -177,7 +170,7 @@ class SidJukeboxService:
     @staticmethod
     def _mechanism(tune):
         return ('rest-attached-sid' if tune.source.scope == CORE_HOST
-                else 'rest-c64u-sid')
+                else 'rest-validated-c64u-sid')
 
     @staticmethod
     def _warnings(tune):
@@ -196,6 +189,15 @@ class SidJukeboxService:
         return session
 
     def _client(self, expected):
+        self._require_same_session(expected)
+        try:client = self._client_provider()
+        except ConnectionFailure as exc:
+            raise SidJukeboxError('device-unavailable',
+                                  'The target C64U is unavailable.', retryable=True) from exc
+        self._require_same_session(expected)
+        return client
+
+    def _require_same_session(self, expected):
         current = self._session()
         if current.device_id != expected.device_id:
             raise SidJukeboxError('device-changed',
@@ -203,26 +205,47 @@ class SidJukeboxService:
         if current.session_id != expected.session_id:
             raise SidJukeboxError('session-changed',
                                   'The C64U connection changed. Prepare playback again.')
-        try:return self._client_provider()
-        except ConnectionFailure as exc:
-            raise SidJukeboxError('device-unavailable',
-                                  'The target C64U is unavailable.', retryable=True) from exc
+        return current
 
-    def _media_identity(self, source, job):
-        if source.scope != C64U:return ''
-        if self._volume_identity is None:
-            raise SidJukeboxError('storage-unavailable',
-                                  'C64U removable-media identity is unavailable.')
-        try:return self._volume_identity(source, job.check_cancel)
-        except JobCancelled:raise
-        except SidJukeboxError:raise
-        except (ConnectionFailure, OSError) as exc:
-            raise SidJukeboxError('device-unavailable',
-                                  'The source C64U storage is unavailable.',
-                                  retryable=True) from exc
-        except BrowserError as exc:
-            raise SidJukeboxError('storage-changed',
-                                  'The source C64U storage could not be verified.') from exc
+    def _validated_data(self, tune, selected_subtune, session, job):
+        """Return freshly parsed authorized bytes; never a public Core result."""
+        if tune.source.scope == C64U:
+            if (tune.source.device_id != session.device_id
+                    or not tune.source.volume
+                    or not tune.source.path.startswith(tune.source.volume + '/')):
+                raise SidJukeboxError(
+                    'device-changed',
+                    'The SID source no longer matches the reviewed C64U and storage root.')
+            self._require_same_session(session)
+            job.report(JobProgress(
+                'source-validation', 0, tune.metadata.file_size, 'bytes',
+                'Reading and validating SID…'))
+        try:
+            inspection, data = self._catalog._inspect_data(
+                tune.source, job,
+                session if tune.source.scope == C64U else None)
+        except SidCatalogError as exc:
+            code = {
+                'changed-source': 'source-changed',
+                'session': 'session-changed',
+            }.get(exc.code, exc.code)
+            raise SidJukeboxError(code, str(exc), retryable=exc.retryable) from exc
+        if tune.source.scope == C64U:
+            self._require_same_session(session)
+        if inspection.source != tune.source:
+            raise SidJukeboxError('source-changed',
+                                  'The referenced SID source changed during validation.')
+        if inspection.metadata.sha256 != tune.metadata.sha256:
+            raise SidJukeboxError('source-changed',
+                                  'The referenced SID content changed. Validate or Relink it first.')
+        if not 1 <= selected_subtune <= inspection.metadata.songs:
+            raise SidJukeboxError(
+                'subtune',
+                f'Choose a subtune from 1 through {inspection.metadata.songs}.')
+        if inspection.metadata != tune.metadata:
+            raise SidJukeboxError('source-changed',
+                                  'The referenced SID metadata changed. Validate or Relink it first.')
+        return data
 
     @staticmethod
     def _subtune(tune, subtune):
@@ -302,17 +325,7 @@ class SidJukeboxService:
                 if current_signature != signature:
                     raise SidJukeboxError('playlist-changed',
                                           'The playlist changed. Prepare playback again.')
-            before_media = self._media_identity(tune.source, job)
-            inspection = self._catalog._inspect(
-                tune.source, job,
-                session if tune.source.scope == C64U else None)
-            after_media = self._media_identity(tune.source, job)
-            if before_media != after_media:
-                raise SidJukeboxError('storage-changed',
-                                      'C64U removable media changed during playback review.')
-            if inspection.metadata.sha256 != tune.metadata.sha256:
-                raise SidJukeboxError('source-changed',
-                                      'The referenced SID changed. Validate or Relink it first.')
+            self._validated_data(tune, selected_subtune, session, job)
             if self._catalog.get(record_id) != tune:
                 raise SidJukeboxError('record-changed',
                                       'The SID entry changed. Prepare playback again.')
@@ -330,7 +343,7 @@ class SidJukeboxService:
             with self._lock:
                 self._cleanup_locked()
                 self._plans[plan_id] = _PlaybackPlan(
-                    preview, tune, session, after_media, signature, runner_song,
+                    preview, tune, session, signature, runner_song,
                     self._clock())
                 self._cleanup_locked()
             return preview
@@ -338,27 +351,6 @@ class SidJukeboxService:
         return self._scheduler.submit(
             CoreJob('sid-jukebox.playback-preview', task),
             JobBinding.device(session))
-
-    def _inspect_for_execution(self, tune, session, expected_volume, job):
-        before_media = self._media_identity(tune.source, job)
-        if expected_volume is not None and before_media != expected_volume:
-            raise SidJukeboxError('storage-changed',
-                                  'C64U removable media changed after review.')
-        try:
-            inspection, data = self._catalog._inspect_data(
-                tune.source, job,
-                session if tune.source.scope == C64U else None)
-        except SidCatalogError as exc:
-            raise SidJukeboxError(exc.code, str(exc),
-                                  retryable=exc.retryable) from exc
-        after_media = self._media_identity(tune.source, job)
-        if before_media != after_media:
-            raise SidJukeboxError('storage-changed',
-                                  'C64U removable media changed during validation.')
-        if inspection.metadata.sha256 != tune.metadata.sha256:
-            raise SidJukeboxError('source-changed',
-                                  'The referenced SID changed after playback review.')
-        return data
 
     def _accepted_result(self, tune, subtune, session, mechanism):
         return PlaybackResult(
@@ -371,18 +363,15 @@ class SidJukeboxService:
             'The C64U accepted the SID playback command. Audible playback was not verified.')
 
     def _run_command(self, tune, data, runner_song, session, job):
-        client = self._client(session)
         job.report(JobProgress('ready', tune.metadata.file_size,
                                tune.metadata.file_size, 'bytes',
                                'Validated; ready to request SID playback.'))
         # Last cooperative cancellation point. A lost response after this call
         # leaves the playback outcome uncertain and must never be retried.
         job.check_cancel()
+        client = self._client(session)
         try:
-            if tune.source.scope == CORE_HOST:
-                self._attached_runner(client, data, runner_song, tune.source)
-            else:
-                self._resident_runner(client, data, runner_song, tune.source)
+            self._attached_runner(client, data, runner_song, tune.source)
         except ConnectionFailure as exc:
             if exc.kind in ('network', 'host'):
                 self._record_uncertain(tune, session)
@@ -457,8 +446,8 @@ class SidJukeboxService:
                 if signature != plan.playlist_signature:
                     raise SidJukeboxError('playlist-changed',
                                           'The playlist changed after playback review.')
-            data = self._inspect_for_execution(
-                tune, plan.session, plan.volume_identity, job)
+            data = self._validated_data(
+                tune, selected, plan.session, job)
             if self._catalog.get(tune.id) != plan.tune:
                 raise SidJukeboxError('record-changed',
                                       'The SID entry changed after playback review.')
@@ -533,6 +522,9 @@ class SidJukeboxService:
                 authorization, shuffle=True, bag=tuple(bag),
                 history=(authorization.cursor_item_id,), history_position=0)
         else:
+            # Leaving shuffle keeps the authoritative Core cursor on the item
+            # currently represented by playback. Ordered navigation resumes
+            # from that item's real position, independent of client selection.
             updated = replace(
                 authorization, shuffle=False, bag=(),
                 history=(authorization.cursor_item_id,), history_position=0)
@@ -590,6 +582,9 @@ class SidJukeboxService:
         authorization, _playlist, session = self._require_authorization()
 
         def task(job):
+            job.report(JobProgress(
+                'navigation', 0, None, 'items',
+                f'Preparing {direction} SID…'))
             current_auth, playlist, current_session = self._require_authorization()
             if current_auth != authorization:
                 raise SidJukeboxError('authorization',
@@ -603,9 +598,8 @@ class SidJukeboxService:
             tune = self._catalog.get(target.tune_id)
             self._playable(tune)
             selected, runner_song = self._subtune(tune, target.subtune)
-            before_media = self._media_identity(tune.source, job)
-            data = self._inspect_for_execution(
-                tune, current_session, before_media, job)
+            data = self._validated_data(
+                tune, selected, current_session, job)
             if self._catalog.get(tune.id) != tune:
                 raise SidJukeboxError('record-changed',
                                       'The SID entry changed during playlist navigation.')

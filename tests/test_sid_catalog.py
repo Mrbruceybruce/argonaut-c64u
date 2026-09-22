@@ -13,6 +13,7 @@ from c64u_browser.api import ConnectionFailure
 from c64u_browser.core import ArgonautCore
 from c64u_browser.profiles import Preferences
 from c64u_browser.scheduler import DeviceSession
+from c64u_browser.sid_format import MAX_SID_BYTES
 from c64u_browser.sid_jukebox import (
     SidCatalogError, SidCatalogService, SidSource, default_catalog_path,
 )
@@ -107,6 +108,17 @@ class SidCatalogTests(unittest.TestCase):
         unavailable = service.validate_source(tune.id).wait(5).result
         self.assertEqual('unavailable', unavailable.tune.state)
 
+    def test_core_c64u_sid_reader_applies_sid_specific_size_bound(self):
+        core = ArgonautCore(preferences=Preferences(self.root / 'core.json'))
+        self.addCleanup(core.close)
+        core._device_identity = 'id:C64-A'
+        core._client = object()
+        source = SidSource.c64u('id:C64-A', '/USB2/Music/tune.sid')
+        with patch('c64u_browser.native_files.read_remote',
+                   return_value=sid_bytes()) as read:
+            core._read_sid_source(source)
+        read.assert_called_once_with(core._client, source.path, MAX_SID_BYTES)
+
     def test_remote_failure_is_sanitized_unavailable(self):
         session = DeviceSession('id:C64-A', 'session-1')
         service = SidCatalogService(
@@ -197,6 +209,32 @@ class SidCatalogTests(unittest.TestCase):
         self.assertEqual(tune.id, removed.id)
         self.assertTrue(path.exists())
         self.assertEqual((), self.service.get_playlist(playlist.id).items)
+
+    def test_playlist_batch_remove_and_reorder_are_atomic(self):
+        tunes=[self.add(self.local_sid(f'{index}.sid',title=f'Tune {index}')).tune
+               for index in range(4)]
+        playlist=self.service.create_playlist('Editable')
+        items=tuple(self.service.add_playlist_item(playlist.id,tune.id,1)
+                    for tune in tunes)
+        reordered=self.service.reorder_playlist_items(
+            playlist.id,(items[1].id,items[3].id,items[0].id,items[2].id))
+        self.assertEqual((items[1].id,items[3].id,items[0].id,items[2].id),
+                         tuple(item.id for item in reordered.items))
+        before=self.store.read_bytes()
+        with self.assertRaises(SidCatalogError):
+            self.service.reorder_playlist_items(
+                playlist.id,(items[0].id,items[1].id))
+        self.assertEqual(before,self.store.read_bytes())
+        removed=self.service.remove_playlist_items(
+            playlist.id,(items[1].id,items[0].id))
+        self.assertEqual((items[1],items[0]),removed)
+        self.assertEqual((items[3].id,items[2].id),tuple(
+            item.id for item in self.service.get_playlist(playlist.id).items))
+        before=self.store.read_bytes()
+        with self.assertRaises(SidCatalogError):
+            self.service.remove_playlist_items(
+                playlist.id,(items[3].id,'missing'))
+        self.assertEqual(before,self.store.read_bytes())
 
     def test_atomic_store_schema_and_failed_publication(self):
         first = self.add(self.local_sid('first.sid')).tune

@@ -769,16 +769,24 @@ class SidCatalogService:
             lambda:(self._playlists.__setitem__(playlist_id, updated), item)[1])
 
     def remove_playlist_item(self, playlist_id, item_id):
+        return self.remove_playlist_items(playlist_id, (item_id,))[0]
+
+    def remove_playlist_items(self, playlist_id, item_ids):
         playlist = self.get_playlist(playlist_id)
-        item = next((item for item in playlist.items if item.id == item_id), None)
-        if item is None:
+        item_ids = tuple(item_ids)
+        if not item_ids or len(set(item_ids)) != len(item_ids):
+            raise SidCatalogError('playlist', 'Choose distinct playlist items to remove.')
+        by_id = {item.id:item for item in playlist.items}
+        if any(item_id not in by_id for item_id in item_ids):
             raise SidCatalogError('not-found', 'SID playlist item was not found.')
+        removed = tuple(by_id[item_id] for item_id in item_ids)
+        removing = set(item_ids)
         updated = replace(playlist,
                           items=tuple(value for value in playlist.items
-                                      if value.id != item_id),
+                                      if value.id not in removing),
                           updated_at=self._clock())
         return self._mutate(
-            lambda:(self._playlists.__setitem__(playlist_id, updated), item)[1])
+            lambda:(self._playlists.__setitem__(playlist_id, updated), removed)[1])
 
     def reorder_playlist_item(self, playlist_id, item_id, new_index):
         playlist = self.get_playlist(playlist_id)
@@ -790,6 +798,19 @@ class SidCatalogService:
         except StopIteration as exc:
             raise SidCatalogError('not-found', 'SID playlist item was not found.') from exc
         item = items.pop(old_index); items.insert(new_index, item)
+        return self.reorder_playlist_items(
+            playlist_id, tuple(value.id for value in items))
+
+    def reorder_playlist_items(self, playlist_id, ordered_item_ids):
+        playlist = self.get_playlist(playlist_id)
+        ordered_item_ids = tuple(ordered_item_ids)
+        current = {item.id:item for item in playlist.items}
+        if (len(ordered_item_ids) != len(playlist.items)
+                or len(set(ordered_item_ids)) != len(ordered_item_ids)
+                or set(ordered_item_ids) != set(current)):
+            raise SidCatalogError(
+                'playlist', 'Playlist order must contain every item exactly once.')
+        items = tuple(current[item_id] for item_id in ordered_item_ids)
         updated = replace(playlist, items=tuple(items), updated_at=self._clock())
         return self._mutate(
             lambda:(self._playlists.__setitem__(playlist_id, updated), updated)[1])

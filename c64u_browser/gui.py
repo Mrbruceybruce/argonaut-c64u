@@ -24,7 +24,7 @@ from .settings_tab import SettingsTab
 from .drives_tab import DrivesTab
 from .machine_tab import MachineTab
 from .recovery import Recovery
-from .media_tab import MediaTab
+from .sid_jukebox_tab import SidJukeboxTab
 from .streams_tab import StreamsTab
 from .game_library_tab import GameLibraryTab
 from .diagnostics import enable_private_log, disable_private_log
@@ -193,8 +193,9 @@ class Browser(Gtk.Application):
         self.tabs.append_page(self.drives_tab.box,Gtk.Label(label='Drives'))
         self.machine_tab=MachineTab(self)
         self.tabs.append_page(self.machine_tab.box,Gtk.Label(label='Machine'))
-        self.media_tab=MediaTab(self)
-        self.tabs.append_page(self.media_tab.box,Gtk.Label(label='SID/Media'))
+        self.sid_jukebox_tab=SidJukeboxTab(self)
+        self.tabs.append_page(
+            self.sid_jukebox_tab.box,Gtk.Label(label='SID Jukebox'))
         self.streams_tab=StreamsTab(self)
         self.tabs.append_page(self.streams_tab.box,Gtk.Label(label='Streams'))
         self.game_library_tab=GameLibraryTab(self)
@@ -213,7 +214,8 @@ class Browser(Gtk.Application):
         # Keep the Files action row reachable while a transfer is running.
         self.busy_controls = [connection, panes, usb_actions, self.partial_button,
             self.settings_tab.box, self.drives_tab.box, self.machine_tab.box,
-            self.media_tab.box, self.streams_tab.box]
+            self.streams_tab.box]
+        self.busy_controls.extend(self.sid_jukebox_tab.busy_controls)
         self.busy_controls.extend(self.game_library_tab.busy_controls)
         if hasattr(self, 'test_lab_tab'):
             self.busy_controls.append(self.test_lab_tab.box)
@@ -448,7 +450,7 @@ class Browser(Gtk.Application):
         self.settings_tab.box.set_sensitive(True)
         self.drives_tab.bind(client)
         self.machine_tab.bind(client)
-        self.media_tab.bind(client)
+        self.sid_jukebox_tab.bind(True)
         self.streams_tab.bind(client)
         self.game_library_tab.bind(True)
         if self.recovery:self.recovery.watch()
@@ -471,7 +473,7 @@ class Browser(Gtk.Application):
         self.settings_tab.box.set_sensitive(True)
         self.drives_tab.bind(None)
         self.machine_tab.bind(None)
-        self.media_tab.bind(None)
+        self.sid_jukebox_tab.bind(False)
         self.streams_tab.bind(None)
         self.game_library_tab.bind(False)
         self.update_connection_header()
@@ -489,7 +491,7 @@ class Browser(Gtk.Application):
         self.settings_tab.rows.set_sensitive(False)
         self.settings_tab.box.set_sensitive(False)
         self.drives_tab.bind(None);self.machine_tab.bind(None)
-        self.media_tab.bind(None)
+        self.sid_jukebox_tab.bind(False)
         self.streams_tab.bind(None)
         self.game_library_tab.bind(False)
         self.drive_bars[False].refresh()
@@ -505,7 +507,7 @@ class Browser(Gtk.Application):
         self.settings_tab.box.set_sensitive(True);self.settings_tab.update_edit_buttons()
         self.settings_tab.heading.set_text('Reconnected. '+('Discard retained edits, then reload settings.' if self.settings_tab.pending or self.settings_tab.drafts else 'Reload settings before editing or saving.'))
         self.drives_tab.bind(client);self.machine_tab.bind(client)
-        self.media_tab.bind(client)
+        self.sid_jukebox_tab.bind(True)
         self.streams_tab.bind(client)
         self.game_library_tab.bind(True)
         self.update_connection_header()
@@ -642,6 +644,8 @@ class Browser(Gtk.Application):
                 service=self.core.game_launch
             elif self.transfer_job.operation.startswith('game-library.'):
                 service=self.core.game_library
+            elif self.transfer_job.operation.startswith('sid-jukebox.'):
+                service=self.core.sid_jukebox
             elif self.transfer_job.operation.startswith('usb.'):
                 service=self.core.usb
             else:service=self.core.files
@@ -678,8 +682,11 @@ class Browser(Gtk.Application):
 
     def run_file_job(self, job, done):
         self.begin_file_job(job)
+        delivered = [False]
         def finish(snapshot):
+            if delivered[0]:return False
             if self.transfer_job is not job:return False
+            delivered[0] = True
             self.end_file_job()
             try:done(snapshot)
             except Exception as exc:self.status.set_text(str(exc))
@@ -690,6 +697,15 @@ class Browser(Gtk.Application):
         snapshot=job.snapshot()
         if snapshot.state in ('succeeded','failed','cancelled'):
             GLib.idle_add(finish,snapshot)
+        # Core's snapshot is authoritative. Polling it is a completion-event
+        # fallback only; it never retries or times out a consequential command.
+        def observe_snapshot():
+            if delivered[0] or self.transfer_job is not job:return False
+            current=job.snapshot()
+            if current.state in ('succeeded','failed','cancelled'):
+                finish(current);return False
+            return True
+        GLib.timeout_add(250,observe_snapshot)
 
     def clicked(self, listing, local, gesture, count, x, y):
         if self.busy or count != 1: return
@@ -733,9 +749,12 @@ class Browser(Gtk.Application):
             if not multiple and not local and not directory and name.lower().endswith('.sid'):
                 client=self.client;path=posixpath.join(self.remote,name)
                 def open_sid():
-                    if self.client is client and self.media_tab.select_file(path):
-                        self.tabs.set_current_page(self.tabs.page_num(self.media_tab.box))
-                self.button(box,'Open in SID/Media',lambda:action(open_sid))
+                    session=self.core.device_session()
+                    if (self.client is client and session.device_id and
+                            self.sid_jukebox_tab.add_c64u_path(session.device_id,path)):
+                        self.tabs.set_current_page(
+                            self.tabs.page_num(self.sid_jukebox_tab.box))
+                self.button(box,'Add to SID Jukebox',lambda:action(open_sid))
             self.button(box, 'Copy', lambda: action(lambda: self.copy_selection(local)))
             if not multiple:
                 self.button(box, 'Rename…', lambda: action(lambda: self.rename_item(local, name)))
