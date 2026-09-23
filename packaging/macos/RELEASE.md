@@ -1,3 +1,7 @@
+> Historical 0.1.2 release record, including its fixed build run and platform
+> limitations at that time. The one-off publisher has been retired. For current
+> packages and procedures, see [release guidance](../../docs/RELEASING.md).
+
 Argonaut for Apple Silicon Macs running macOS 15 or newer.
 
 - **DMG**: open it and drag Argonaut into Applications.

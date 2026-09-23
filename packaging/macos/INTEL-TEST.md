@@ -1,3 +1,7 @@
+> Historical 0.1.4 Intel test instructions. The test Release was intentionally
+> removed and its dedicated builder/publisher retired. This is not a current
+> download or acceptance request; see [release guidance](../../docs/RELEASING.md).
+
 Experimental **Intel (x86_64) Mac package, macOS 15 or newer**.
 
 Download the DMG, open it, and drag Argonaut into Applications. Python and Homebrew are not required. The ZIP contains the same app.

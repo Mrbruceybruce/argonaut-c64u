@@ -1,5 +1,10 @@
 # Argonaut 1.8-replay.3 — Section 5 cross-platform testing
 
+> Historical 1.8-replay.3 acceptance record. That test Release was intentionally
+> removed during repository cleanup; its tag and retained Actions evidence remain.
+> Version and stable-baseline references below describe that test period, not the
+> current release process or 1.9 gate. See [release guidance](RELEASING.md).
+
 This build completes the instant-replay roadmap section and carries forward the
 authentic disk-image management section. It keeps Development profiles,
 preferences, reports, and build identity separate from the installed stable

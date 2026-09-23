@@ -1,3 +1,7 @@
+> Historical early Windows release record. Validation and platform limitations
+> below describe that release, not current support. The old 0.1.4 builder has
+> been retired; see [release guidance](../../docs/RELEASING.md).
+
 Windows downloads for Argonaut, licensed under GPL-3.0-or-later.
 
 - **Setup.exe**: per-user installation, Start-menu shortcut, optional desktop shortcut, and Windows uninstall support. Profiles use `%APPDATA%\argonaut`; passwords use Windows Credential Manager. Uninstall preserves profiles and saved credentials.
