@@ -22,7 +22,9 @@ consolidated regression testing.
 
 This separates app settings, not the connected C64U hardware or files: operations
 in either app still affect the selected real device. Mount & Run and Send Text have passed initial hardware testing; the
-current prerelease checklist is in DEVELOPMENT-TEST.md.
+historical replay acceptance checklist is in [DEVELOPMENT-TEST.md](DEVELOPMENT-TEST.md).
+It is not the 1.9 platform gate. See [build and release guidance](RELEASING.md)
+for the remaining workflows and the preparation still needed for 1.9.
 
 The Debian development package also includes the per-user C64 AI bridge
 launcher and service unit. Test Lab can create its private pairing, start or

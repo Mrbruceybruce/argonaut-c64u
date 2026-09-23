@@ -1,5 +1,9 @@
 # Argonaut 1.6
 
+> Historical 1.6 candidate-era notes. No stable v1.6 Release is published; the
+> RC Releases were removed during cleanup and the superseded 1.6 workflow retired.
+> See [release guidance](../docs/RELEASING.md); these are not 1.9 release notes.
+
 Argonaut 1.6 adds an optional Developer Mode and Test Lab while preserving the
 ordinary stable experience. Developer Mode is off by default. Enable **Developer
 Mode and Test Lab after restart** in Preferences, then restart Argonaut to show
