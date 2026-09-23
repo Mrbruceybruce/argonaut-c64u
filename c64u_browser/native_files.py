@@ -14,6 +14,7 @@ from .diagnostics import operation_event
 
 FLASH_FOLDERS={'ROMs':'/Flash/roms','Cartridges':'/Flash/carts','Configurations':'/Flash/configs'}
 MAX_BYTES=16*1024*1024
+MAX_GAME_BYTES=64*1024*1024
 
 def flash_path(folder,name):
  if folder not in FLASH_FOLDERS.values():raise BrowserError('Choose a supported Flash folder.')
@@ -24,11 +25,21 @@ def flash_path(folder,name):
 
 def read_remote(client,path,max_bytes=MAX_BYTES):
  with operation_event('ftp','read_remote','file'):
-  return _read_remote(client,path,max_bytes)
+  return _read_remote(client,path,max_bytes,MAX_BYTES)
 
-def _read_remote(client,path,max_bytes=MAX_BYTES):
+def read_remote_game(client,path,max_bytes,progress=None,check=None):
+ """Read one explicitly bounded Game Library source from C64U storage.
+
+ This deliberately separate entry point permits CRT validation up to 64 MiB
+ without increasing the general remote-file limit used by other features.
+ """
+ with operation_event('ftp','read_remote_game','file'):
+  return _read_remote(client,path,max_bytes,MAX_GAME_BYTES,progress,check)
+
+def _read_remote(client,path,max_bytes=MAX_BYTES,absolute_max=MAX_BYTES,
+                 progress=None,check=None):
  safe_argument(path)
- if type(max_bytes) is not int or not 1<=max_bytes<=MAX_BYTES:raise BrowserError('Invalid remote file size bound.')
+ if type(max_bytes) is not int or not 1<=max_bytes<=absolute_max:raise BrowserError('Invalid remote file size bound.')
  if not ((storage_root(path) and storage_root(path)!=path) or any(path.startswith(folder+'/') for folder in FLASH_FOLDERS.values())) or any(p in ('','.','..') for p in path.split('/')[1:]):raise BrowserError('Choose a USB/SD or supported Flash file.')
  ftp=connect(client)
  try:
@@ -38,9 +49,12 @@ def _read_remote(client,path,max_bytes=MAX_BYTES):
    raise BrowserError(f'File must contain between 1 byte and {limit}.')
   data=bytearray()
   def receive(block):
+   if check is not None:check()
    if len(data)+len(block)>max_bytes:raise BrowserError('File exceeds the supported size bound.')
    data.extend(block)
+   if progress is not None:progress(len(data),expected)
   ftp.retrbinary('RETR '+path,receive)
+  if check is not None:check()
   if len(data)!=expected or ftp.size(path)!=expected:raise BrowserError('File changed or download was incomplete.')
   return bytes(data)
  finally:ftp.close()

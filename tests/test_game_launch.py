@@ -15,7 +15,7 @@ from c64u_browser.game_launch import GameLaunchError, GameLaunchService
 from c64u_browser.game_library import (
     GameLibraryError, GameLibraryService, GameSource, inspect_crt,
 )
-from c64u_browser.jobs import CoreJob
+from c64u_browser.jobs import CoreJob, JobProgress
 from c64u_browser.scheduler import CoreScheduler, DeviceSession, JobBinding
 
 
@@ -71,7 +71,8 @@ class GameLaunchTests(unittest.TestCase):
 
     def launch_service(self, **changes):
         values = dict(
-            volume_identity=lambda source, check:(check(), self.media['value'])[1],
+            volume_identity=lambda source, job, stage:
+                (job.check_cancel(), self.media['value'])[1],
             attached_crt_runner=lambda client, data, source:
                 self.calls.append(('host-crt', client, data, source)),
             resident_crt_runner=lambda client, data, source:
@@ -228,6 +229,74 @@ class GameLaunchTests(unittest.TestCase):
         failed = self.execute(preview)
         self.assertEqual(('failed', 'storage-changed'),
                          (failed.state, failed.error.code))
+        self.assertFalse(self.calls)
+
+    def test_unverifiable_storage_is_distinct_and_never_launches(self):
+        def unavailable(_source,_job,_stage):
+            raise BrowserError('private undecodable listing detail')
+        self.service=self.launch_service(volume_identity=unavailable)
+        record=self.add(self.remote_source('/USB2/game.crt',crt_bytes()))
+        failed=self.service.prepare_launch(record.id).wait(5)
+        self.assertEqual(('failed','storage-unverifiable'),
+                         (failed.state,failed.error.code))
+        self.assertIn('complete full C64U storage verification',
+                      failed.error.message)
+        self.assertNotIn('private',failed.error.message)
+        self.assertFalse(self.calls)
+
+        attempts=[0]
+        def fails_during_execution(_source,job,_stage):
+            attempts[0]+=1;job.check_cancel()
+            if attempts[0]>2:raise BrowserError('private execution detail')
+            return 'reviewed'
+        self.service=self.launch_service(volume_identity=fails_during_execution)
+        reviewed=self.preview(record)
+        failed=self.execute(reviewed)
+        self.assertEqual(('failed','storage-unverifiable'),
+                         (failed.state,failed.error.code))
+        self.assertFalse(self.calls)
+
+    def test_complete_but_different_storage_is_storage_changed(self):
+        fingerprints=iter(('reviewed','reviewed','changed'))
+        self.service=self.launch_service(
+            volume_identity=lambda _source,job,_stage:
+            (job.check_cancel(),next(fingerprints))[1])
+        record=self.add(self.remote_source('/USB2/game.crt',crt_bytes()))
+        failed=self.execute(self.preview(record))
+        self.assertEqual(('failed','storage-changed'),
+                         (failed.state,failed.error.code))
+        self.assertFalse(self.calls)
+
+    def test_storage_fingerprint_progress_is_structured(self):
+        entered=Event();release=Event()
+        def fingerprint(_source,job,stage):
+            job.report(JobProgress(
+                'storage-fingerprint',17,None,'directories',
+                'presentation must not be parsed',
+                (('entries_observed',419),('stage',stage))))
+            entered.set();release.wait(2);return 'stable'
+        self.service=self.launch_service(volume_identity=fingerprint)
+        record=self.add(self.remote_source('/USB2/game.crt',crt_bytes()))
+        job=self.service.prepare_launch(record.id)
+        self.assertTrue(entered.wait(1));events=[];job.add_listener(events.append)
+        release.set();finished=job.wait(5)
+        self.assertEqual('succeeded',finished.state,finished.error)
+        progress=[event.job.progress for event in events
+                  if event.kind=='progress' and event.job.progress]
+        self.assertTrue(progress)
+        self.assertEqual('storage-fingerprint',progress[-1].phase)
+        self.assertEqual(17,progress[-1].completed)
+        self.assertEqual(419,dict(progress[-1].details)['entries_observed'])
+
+    def test_cancellation_during_storage_verification_never_launches(self):
+        entered=Event();release=Event()
+        def fingerprint(_source,job,_stage):
+            entered.set();release.wait(2);job.check_cancel();return 'stable'
+        self.service=self.launch_service(volume_identity=fingerprint)
+        record=self.add(self.remote_source('/USB2/game.crt',crt_bytes()))
+        job=self.service.prepare_launch(record.id)
+        self.assertTrue(entered.wait(1));self.assertTrue(self.service.cancel(job.id))
+        release.set();self.assertEqual('cancelled',job.wait(5).state)
         self.assertFalse(self.calls)
 
     def test_expired_and_consumed_plans_fail_safely(self):

@@ -14,6 +14,7 @@ import uuid
 from threading import Lock
 
 from .api import BrowserError
+from .diagnostics import diagnostic_span, operation_context
 from .file_service import (C64U, CORE_HOST, CLIENT_UPLOAD, FileLocation,
                            PartialUpload)
 from .folder_copy import Plan, Step, execute_plan
@@ -284,22 +285,85 @@ class UsbBackupService:
         return self._scheduler.submit(CoreJob(operation,task),JobBinding.device(session))
 
     @staticmethod
-    def _volume_fingerprint(client,volume,check=lambda:None):
-        rows=[]
-        def visit(path,relative='',depth=0):
+    def _volume_fingerprint(client, volume, check=lambda:None, progress=None,
+                            phase='storage-verification'):
+        """Hash the complete bounded tree using reversible filename octets.
+
+        The identity stream is versioned and unambiguous: every entry contains
+        a component count, length-delimited raw path components, a
+        length-delimited entry kind, and a tagged reported size.  Raw names
+        remain inside Core and never become presentation text.
+        """
+        digest=hashlib.sha256();digest.update(b'ARGONAUT-VOLUME-IDENTITY\0\x02')
+        entries_seen=0;directories_seen=0
+
+        def field(value):
+            digest.update(len(value).to_bytes(8,'big'));digest.update(value)
+
+        def listing(path):
+            identity=getattr(client,'list_directory_identity',None)
+            if identity is not None:return identity(path)
+            # Existing in-memory transports used by deterministic tests contain
+            # ordinary text only. Production UltimateClient always supplies the
+            # octet-preserving identity method.
+            actual,entries=client.list_directory(path.decode('utf-8'))
+            from .api import IdentityEntry
+            return actual.encode('utf-8'),tuple(
+                IdentityEntry(entry.name.encode('utf-8'),entry.kind,entry.size)
+                for entry in entries)
+
+        def visit(path,components=(),depth=0):
+            nonlocal entries_seen,directories_seen
             check()
-            if depth>MAX_DEPTH or len(rows)>=MAX_ITEMS:
+            if depth>MAX_DEPTH or entries_seen>=MAX_ITEMS:
                 raise BrowserError('The C64U volume exceeds the 10,000 item or 64 level identity limit.')
-            actual,entries=client.list_directory(path)
-            if posixpath.normpath(actual).casefold()!=posixpath.normpath(path).casefold():
+            actual,entries=listing(path)
+            if posixpath.normpath(actual).lower()!=posixpath.normpath(path).lower():
                 raise BrowserError('The selected C64U storage volume changed.')
-            for entry in sorted(entries,key=lambda row:(row.kind!='dir',row.name.casefold())):
-                item=posixpath.join(relative,entry.name) if relative else entry.name
-                rows.append((item,entry.kind,entry.size))
-                if entry.kind=='dir':visit(posixpath.join(path,entry.name),item,depth+1)
-        visit(volume)
-        payload=json.dumps(rows,separators=(',',':'),ensure_ascii=False).encode('utf-8')
-        return hashlib.sha256(payload).hexdigest()
+            directories_seen+=1
+            children=[]
+            for entry in entries:
+                if (not isinstance(entry.name,bytes) or
+                        not isinstance(entry.kind,str) or
+                        not (entry.size is None or isinstance(entry.size,int))):
+                    raise BrowserError(
+                        'The C64U identity listing returned invalid entry metadata.')
+            for entry in sorted(entries,key=lambda row:(
+                    row.name,row.kind,-1 if row.size is None else row.size)):
+                check()
+                try:kind=entry.kind.encode('ascii')
+                except UnicodeError as exc:
+                    raise BrowserError(
+                        'The C64U identity listing returned invalid entry metadata.') from exc
+                entries_seen+=1
+                if entries_seen>MAX_ITEMS:
+                    raise BrowserError('The C64U volume exceeds the 10,000 item or 64 level identity limit.')
+                item=components+(entry.name,)
+                digest.update(b'E');digest.update(len(item).to_bytes(4,'big'))
+                for component in item:field(component)
+                field(kind)
+                if entry.size is None:digest.update(b'N')
+                else:
+                    digest.update(b'S');field(str(entry.size).encode('ascii'))
+                if entry.kind=='dir':
+                    children.append((path.rstrip(b'/')+b'/'+entry.name,item))
+            if progress is not None:progress(directories_seen,entries_seen)
+            for child,item in children:visit(child,item,depth+1)
+
+        raw_volume=volume.encode('utf-8')
+        with operation_context(phase=phase), \
+                diagnostic_span('core','volume_fingerprint','volume'):
+            visit(raw_volume)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _fingerprint_progress(job,stage):
+        def report(directories,entries):
+            job.report(JobProgress(
+                'storage-fingerprint',directories,None,'directories',
+                f'Verifying C64U storage… {directories:,} directories checked',
+                (('entries_observed',entries),('stage',stage))))
+        return report
 
     @staticmethod
     def _backup_identity(folder):
@@ -384,7 +448,10 @@ class UsbBackupService:
             raise BrowserError('Choose a C64U USB or SD volume root.')
         session=self._session_provider();identity=self._local_destination_identity(request.destination.path)
         def task(job):
-            client=self._client(session);fingerprint=self._volume_fingerprint(client,volume,job.check_cancel)
+            client=self._client(session);fingerprint=self._volume_fingerprint(
+                client,volume,job.check_cancel,
+                self._fingerprint_progress(job,'usb-backup-preparation'),
+                'usb-backup-preparation')
             paths=tuple(request.source_paths)
             if any(not isinstance(path,str) for path in paths):
                 raise BrowserError('Backup source paths must be C64U path strings.')
@@ -433,7 +500,10 @@ class UsbBackupService:
         stored=self._take(self._backups,plan_id,'Backup plan')
         def task(job):
             client=self._client(stored.session);request=stored.request
-            if self._volume_fingerprint(client,request.source_volume.path,job.check_cancel)!=stored.volume_fingerprint:
+            if self._volume_fingerprint(
+                    client,request.source_volume.path,job.check_cancel,
+                    self._fingerprint_progress(job,'usb-backup-execution'),
+                    'usb-backup-execution')!=stored.volume_fingerprint:
                 raise UsbBackupFailure('storage','The C64U volume changed. Create a fresh backup preview.')
             total=sum(item.size for item in stored.items if not item.directory)
             self._check_local_destination(request.destination.path,stored.destination_identity,total)
@@ -596,7 +666,10 @@ class UsbBackupService:
         def task(job):
             manifest=self._load_manifest(folder)
             directories,files,issues=self._verify_manifest(folder,manifest,job)
-            client=self._client(session);fingerprint=self._volume_fingerprint(client,volume,job.check_cancel)
+            client=self._client(session);fingerprint=self._volume_fingerprint(
+                client,volume,job.check_cancel,
+                self._fingerprint_progress(job,'usb-restore-preparation'),
+                'usb-restore-preparation')
             classification=(_Classification((),(),(),(),()) if issues else
                             self._classify(client,volume,folder,directories,files,job))
             plan=_RestorePlan(folder,self._backup_identity(folder),volume,session,fingerprint,manifest,files,
@@ -618,7 +691,10 @@ class UsbBackupService:
             directories,files,issues=self._verify_manifest(stored.backup_folder,stored.manifest,job)
             if issues:raise UsbBackupFailure('backup-invalid','The backup changed or is incomplete. Create a fresh restore preview.')
             client=self._client(stored.session)
-            if self._volume_fingerprint(client,stored.target_volume,job.check_cancel)!=stored.volume_fingerprint:
+            if self._volume_fingerprint(
+                    client,stored.target_volume,job.check_cancel,
+                    self._fingerprint_progress(job,'usb-restore-execution'),
+                    'usb-restore-execution')!=stored.volume_fingerprint:
                 raise UsbBackupFailure('storage','The selected C64U volume changed. Create a fresh restore preview.')
             current=self._classify(client,stored.target_volume,stored.backup_folder,directories,files,job)
             if current!=stored.classification:

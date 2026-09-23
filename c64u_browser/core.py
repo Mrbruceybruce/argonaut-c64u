@@ -211,6 +211,8 @@ class ArgonautCore:
         self.game_library = GameLibraryService(
             self.preferences.path.parent / 'game-library.json',
             remote_reader=self._read_game_source,
+            remote_lister=self._list_game_directory,
+            bulk_remote_reader=self._read_game_bulk_source,
             session_provider=self.device_session,
             scheduler=self.scheduler)
         self.game_launch = GameLaunchService(
@@ -246,8 +248,21 @@ class ArgonautCore:
         """Read a catalog source without exposing the transport to clients."""
         if source.device_id != self._device_identity:
             raise CoreError('device', 'The source belongs to a different C64U.')
-        from .native_files import read_remote
-        return read_remote(self._require_client(), source.path)
+        from .native_files import read_remote_game
+        limit = 206114 if source.path.casefold().endswith('.d64') else 64 * 1024 * 1024
+        return read_remote_game(self._require_client(), source.path, limit)
+
+    def _list_game_directory(self, path):
+        """List one C64U directory for the bounded Game Library scanner."""
+        return self._require_client().list_directory(path)
+
+    def _read_game_bulk_source(self, source, max_bytes, progress, check):
+        """Read a bounded candidate while retaining cancellation/progress in Core."""
+        if source.device_id != self._device_identity:
+            raise CoreError('device', 'The source belongs to a different C64U.')
+        from .native_files import read_remote_game
+        return read_remote_game(self._require_client(), source.path, max_bytes,
+                                progress, check)
 
     def _read_sid_source(self, source):
         """Read a SID catalog source without exposing transport or credentials."""
@@ -257,12 +272,13 @@ class ArgonautCore:
         from .sid_format import MAX_SID_BYTES
         return read_remote(self._require_client(), source.path, MAX_SID_BYTES)
 
-    def _game_volume_identity(self, source, check):
+    def _game_volume_identity(self, source, job, stage):
         """Fingerprint removable media without exposing the device transport."""
         if source.device_id != self._device_identity:
             raise CoreError('device', 'The source belongs to a different C64U.')
         return UsbBackupService._volume_fingerprint(
-            self._require_client(), source.volume, check)
+            self._require_client(), source.volume, job.check_cancel,
+            UsbBackupService._fingerprint_progress(job,stage), stage)
 
     def usb_backup_root(self):
         """Return the configured Core-host backup parent, if one is set."""

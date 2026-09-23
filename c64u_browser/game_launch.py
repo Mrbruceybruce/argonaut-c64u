@@ -9,7 +9,7 @@ import uuid
 from .api import BrowserError, ConnectionFailure
 from .disk_run import DmaLaunchError, run_image_bytes
 from .game_library import C64U, CORE_HOST
-from .jobs import CoreJob, JobProgress
+from .jobs import CoreJob, JobCancelled, JobProgress
 from .scheduler import DeviceSession, JobBinding
 
 
@@ -142,20 +142,20 @@ class GameLaunchService:
             ))
         return tuple(warnings)
 
-    def _media_identity(self, source, job):
+    def _media_identity(self, source, job, stage):
         if source.scope != C64U:return ''
         if self._volume_identity is None:
             raise GameLaunchError('storage-unavailable',
                                   'C64U removable-media identity is unavailable.')
-        try:return self._volume_identity(source, job.check_cancel)
+        try:return self._volume_identity(source, job, stage)
         except GameLaunchError:raise
-        except (ConnectionFailure, OSError) as exc:
-            raise GameLaunchError('device-unavailable',
-                                  'The source C64U storage is unavailable.',
-                                  retryable=True) from exc
-        except BrowserError as exc:
-            raise GameLaunchError('storage-changed',
-                                  'The source C64U storage could not be verified.') from exc
+        except JobCancelled:raise
+        except (ConnectionFailure, OSError, BrowserError) as exc:
+            raise GameLaunchError(
+                'storage-unverifiable',
+                'Argonaut could not complete full C64U storage verification. '
+                'Check that the volume remains available, then review the launch again.',
+                retryable=isinstance(exc,(ConnectionFailure,OSError))) from exc
 
     def _cleanup_locked(self):
         now = self._clock()
@@ -187,11 +187,13 @@ class GameLaunchService:
             if current != record:
                 raise GameLaunchError('record-changed',
                                       'The Game Library entry changed. Prepare launch again.')
-            before_media = self._media_identity(record.source, job)
+            before_media = self._media_identity(
+                record.source,job,'game-launch-preparation-before')
             inspection = self._catalog._inspect(
                 record.source, job,
                 session if record.source.scope == C64U else None)
-            after_media = self._media_identity(record.source, job)
+            after_media = self._media_identity(
+                record.source,job,'game-launch-preparation-after')
             if before_media != after_media:
                 raise GameLaunchError('storage-changed',
                                       'The C64U removable media changed during launch review.')
@@ -239,14 +241,16 @@ class GameLaunchService:
             if record != plan.record:
                 raise GameLaunchError('record-changed',
                                       'The Game Library entry changed after review.')
-            before_media = self._media_identity(record.source, job)
+            before_media = self._media_identity(
+                record.source,job,'game-launch-execution-before')
             if before_media != plan.volume_identity:
                 raise GameLaunchError('storage-changed',
                                       'The C64U removable media changed after review.')
             inspection, data = self._catalog._inspect_data(
                 record.source, job,
                 plan.session if record.source.scope == C64U else None)
-            after_media = self._media_identity(record.source, job)
+            after_media = self._media_identity(
+                record.source,job,'game-launch-execution-after')
             if after_media != plan.volume_identity:
                 raise GameLaunchError('storage-changed',
                                       'The C64U removable media changed after review.')

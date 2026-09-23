@@ -24,9 +24,10 @@ sequence was always planned.
    `b66faa5da9119417fb7e38b695122c7d39403b54`.
 3. **Complete on Linux:** SID Jukebox, implemented Core first and then exposed
    by GTK, with Core-host and C64U-resident playback physically accepted.
-4. **Active Stable 1.9 enhancement:** Game Library Bulk Import, implemented Core first
-   with bounded local/C64U scanning, serializable review, and a thin GTK client.
-5. **Stable 1.9 consolidated platform gate:** build and validate Debian,
+4. **Complete on Linux:** Game Library Bulk Import, including bounded local/C64U
+   scanning, reviewed atomic admission, thin GTK client, large-catalog
+   responsiveness, and the octet-preserving Game Launch/USB fingerprint fix.
+5. **Next — Stable 1.9 consolidated platform gate:** build and validate Debian,
    Windows, Apple Silicon Mac, and Intel Mac packages for the server-first Core
    foundation, USB/SD Backup & Restore, Game Library including Bulk Import, and
    SID Jukebox.
@@ -130,14 +131,13 @@ disconnect/session safety, and known- versus unknown-duration behavior. It does
 not include socket
 reconfiguration, guessed durations, HTTP/PWA transport, or unrelated media work.
 
-## Active Stable 1.9 enhancement: Game Library Bulk Import
+## Linux-complete Stable 1.9 enhancement: Game Library Bulk Import
 
-After SID Jukebox Linux acceptance, add Core-owned bulk discovery and reviewed
-catalog updates for the Game Library before opening the consolidated platform
-gate. Preserve the existing **Add local files…** multi-file action and add
-**Scan local folder…** with optional recursive traversal. Support multiple
-selected C64U files where practical and add **Scan C64U folder…** with optional
-recursive traversal.
+Core-owned bounded discovery, reviewed atomic catalog admission and the thin GTK
+client are implemented with automated coverage and completed Linux physical
+acceptance. The existing
+**Add local files…** workflow remains available alongside **Scan local
+folder…**, multiple selected C64U files and **Scan C64U folder…**.
 
 Core scans only D64 and CRT candidates, validates and hashes them, and applies
 the existing source and content-identity rules. Sources remain references: bulk
@@ -145,14 +145,50 @@ import never copies, moves, uploads, mounts, launches, deletes, or otherwise
 modifies game files. Large scans produce a serializable review before any
 catalog mutation, distinguishing new records, already-cataloged sources,
 duplicate content, changed existing sources where relevant, and invalid or
-unsupported files. Invalid candidates are reported individually without
-unnecessarily aborting the scan.
+unsupported files. The review presents unsupported files in their own summary
+and filter category rather than counting them as invalid/inaccessible. Invalid
+candidates are reported individually without unnecessarily aborting the scan.
 
 Traversal is bounded and cancellation-aware. C64U scans preserve physical
-device, volume, session, and media safety. GTK only chooses the source and
-options, presents progress/review, and submits the approved Core operation. No
-new formats, metadata scraping, managed storage, or automatic source changes
-belong to this enhancement.
+device, volume and session safety and use authorized-content identity for this
+read-only catalog admission. GTK only chooses source/options, presents
+structured progress and review, and submits the approved subset. The Linux
+acceptance checklist is maintained in [GAME-LIBRARY.md](GAME-LIBRARY.md). No new
+formats, metadata scraping, managed storage or automatic source changes belong
+to this enhancement.
+
+Large real-world C64U acceptance reached the original 2,000-candidate ceiling
+and aborted safely. The measured workload held 5,498 files, 3,159 D64/CRT
+candidates, 33 directories and 527.1 MiB of candidate content. The defensive
+defaults are now 10,000 directories, 100,000 total entries, 50,000 D64/CRT
+candidates, depth 32 and 32 cumulative GiB. These stop pathological traversal;
+they are not normal catalog capacity limits. Exceeding a bound still aborts with
+partial diagnostic counts, and scans are never silently truncated. Structural
+image validation establishes format, structure and content identity, not that a
+game boots, is complete, works correctly or uses a CRT type supported by C64U
+firmware.
+
+The final physical scan reviewed 4,797 entries and 2,743 D64/CRT candidates:
+2,606 new game images, 10 duplicates, 0 changed, 128 invalid/inaccessible and
+2,022 unsupported. The reviewed execution added all 2,606 approved games with
+no skipped/reclassified or failed results, leaving 2,616 Development records.
+Persistence across restart, large-library scrolling/filtering and the 300 ms
+search debounce passed. A Bulk-Imported C64U D64 also completed reviewed launch
+and loaded successfully.
+
+The acceptance volume exposed two filenames containing raw byte `0x84`. The
+corrected Core identity listing now fingerprints exact filename octets with a
+deterministic length-delimited representation. Game Launch retains full-volume
+before/after safety, distinguishes `storage-changed` from
+`storage-unverifiable`, and reports structured progress. USB Backup/Restore uses
+the same corrected fingerprint without weakening its conservative policy.
+Final GTK/GNOME use remained responsive during the long verification.
+
+Stable 1.9 has therefore reached feature freeze. The consolidated Debian,
+Windows, Apple Silicon Mac and Intel Mac qualification gate is next and has not
+started. ZIP/7z sources, more Game Library formats, Tested/Playable state, Game
+Launch fingerprint optimization, SID duration/silence/automatic advancement,
+and tape/Datasette support remain deferred beyond this completed milestone.
 
 ## Linux-complete milestone: USB/SD backup and restore
 
@@ -646,9 +682,9 @@ bridge report with its resolved `bridge.end_to_end` comparison in Test Lab.
 
 ## Stable 1.9 consolidated release boundary
 
-Complete and physically validate USB/SD Backup & Restore, Game Library, and SID
-Jukebox on Linux, then complete Game Library Bulk Import before running one
-consolidated Stable 1.9 gate. Build all desktop
+USB/SD Backup & Restore, Game Library, SID Jukebox, and Game Library Bulk Import
+are complete and physically accepted on Linux. Stable 1.9 is now feature-frozen
+for one consolidated platform gate. Build all desktop
 packages and run focused Windows and Mac regression covering package launch,
 build identity, these feature areas, Development/Stable isolation, and core
 file/media operations. A platform without an available physical tester may pass

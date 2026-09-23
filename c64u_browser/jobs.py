@@ -8,6 +8,7 @@ import time
 import uuid
 
 from .api import BrowserError, ConnectionFailure
+from .diagnostics import operation_context
 
 
 class JobState(str, Enum):
@@ -31,6 +32,7 @@ class JobProgress:
     total: int | None = None
     unit: str = 'items'
     message: str = ''
+    details: tuple[tuple[str, object], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -157,6 +159,15 @@ class CoreJob:
         with self._lock:self.progress=progress
         self._emit('progress')
 
+    def report_committed(self, progress):
+        """Report progress after an irreversible atomic publication.
+
+        A cancellation arriving after the consequence cannot relabel that
+        consequence as cancelled.  The task will still finish successfully.
+        """
+        with self._lock:self.progress=progress
+        self._emit('progress')
+
     def byte_progress(self, phase='transfer'):
         last=[0.0]
         def progress(count):
@@ -194,7 +205,8 @@ class CoreJob:
         try:
             self.check_cancel()
             if preflight is not None: preflight()
-            result=self._task(self)
+            with operation_context(job_id=self.id, phase=self.operation):
+                result=self._task(self)
             # A late cancellation request does not relabel completed consequential
             # work. Only a check that actually stopped work raises JobCancelled.
             with self._lock:

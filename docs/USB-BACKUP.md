@@ -82,6 +82,14 @@ with the C64U device/session binding. Physical testing should still include USB
 removal and replacement because two byte-for-byte-equivalent media cannot be
 distinguished through the available interface.
 
+The identity traversal preserves C64U filename octets reversibly and hashes
+exact raw path components, entry type and reported size with a deterministic,
+length-delimited representation. It neither requires UTF-8 filenames nor drops,
+normalizes or substitutes undecodable entries. This correction was physically
+accepted on an unchanged `/USB1` containing two filenames with raw byte `0x84`.
+USB Backup/Restore continues to require its complete bounded before/after volume
+verification; the filename correction does not bypass or weaken that contract.
+
 ## Physical acceptance
 
 Linux physical USB/SD backup and restore acceptance passed on 2026-09-20. The

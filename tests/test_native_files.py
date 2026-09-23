@@ -3,12 +3,29 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 from unittest.mock import Mock,patch
 from c64u_browser.api import BrowserError,Entry
-from c64u_browser.native_files import parse_cfg,config_backup,upload_flash,validate_upload
+from c64u_browser.native_files import (parse_cfg,config_backup,read_remote,
+                                       read_remote_game,upload_flash,
+                                       validate_upload)
 from c64u_browser.configuration import Setting
 from c64u_browser.config_history import history_path,save_before_apply,read_previous
 from c64u_browser.profiles import Preferences,Profile
 
 class NativeTests(unittest.TestCase):
+ def test_game_library_has_scoped_64_mib_remote_read(self):
+  data=b'x'*(16*1024*1024+1);events=[]
+  class FTP:
+   def size(self,path):return len(data)
+   def retrbinary(self,cmd,callback):
+    callback(data[:1024]);callback(data[1024:])
+   def close(self):events.append('closed')
+  with patch('c64u_browser.native_files.connect',return_value=FTP()):
+   with self.assertRaises(BrowserError):
+    read_remote(Mock(),'/USB1/game.crt',17*1024*1024)
+   value=read_remote_game(Mock(),'/USB1/game.crt',64*1024*1024,
+                          lambda completed,total:events.append((completed,total)))
+  self.assertEqual(data,value)
+  self.assertEqual((len(data),len(data)),events[-2])
+  self.assertEqual('closed',events[-1])
  def test_parser_and_conversion(self):
   data=b'[Test]\nNumber=4\nMode= on \nText=001\nPassword=secret\nMissing=x\n'
   settings={'Test':[Setting('Number','3','',value_type=int),Setting('Mode','Off','',choices=('Off','On')),Setting('Text','abc',''),Setting('Password','Hidden','',editable=False)]}

@@ -4,7 +4,7 @@
 from pathlib import Path
 import posixpath
 
-from gi.repository import Gio, Gtk
+from gi.repository import Gio, GLib, Gtk
 
 from .api import BrowserError
 from .game_library import C64U, CORE_HOST
@@ -12,9 +12,12 @@ from .game_library_client import (
     GameLibraryClient, add_results_text, client_error_text, mechanism_text,
     source_text,
 )
+from .game_library_bulk_dialog import BulkImportDialog
 
 
 class GameLibraryTab:
+    SEARCH_DEBOUNCE_MS = 300
+
     def __init__(self, app):
         self.app = app
         self.client = GameLibraryClient(
@@ -23,14 +26,19 @@ class GameLibraryTab:
         self.loading_details = False
         self.job_busy = False
         self.chooser = None
+        self.bulk_dialog = None
         self.rows = {}
+        self._search_source = None
+        self._search_generation = 0
+        self._closed = False
 
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         toolbar = Gtk.Box(spacing=8)
         self.box.append(toolbar)
         self.search = Gtk.SearchEntry(placeholder_text='Search title, notes, or source',
                                       hexpand=True)
-        self.search.connect('search-changed', self._search_changed)
+        self.search.connect('changed', self._search_changed)
+        self.search.connect('activate', self._search_activated)
         toolbar.append(self.search)
         self.favorites = Gtk.CheckButton(label='Favorites only')
         self.favorites.connect('toggled', self._favorites_changed)
@@ -41,7 +49,13 @@ class GameLibraryTab:
         self.add_local_button = app.button(
             actions, 'Add local files…', self.add_local)
         self.add_c64u_button = app.button(
-            actions, 'Add selected C64U file', self.add_c64u)
+            actions, 'Add selected C64U file(s)', self.add_c64u)
+        bulk_actions = Gtk.Box(spacing=8)
+        self.box.append(bulk_actions)
+        self.scan_local_button = app.button(
+            bulk_actions, 'Scan local folder…', self.scan_local_folder)
+        self.scan_c64u_button = app.button(
+            bulk_actions, 'Scan C64U folder…', self.scan_c64u_folder)
         self.validate_button = app.button(actions, 'Validate', self.validate)
         self.relink_button = app.button(actions, 'Locate/Relink…', self.relink)
         self.remove_button = app.button(
@@ -115,7 +129,8 @@ class GameLibraryTab:
         self.box.append(self.message)
         self.busy_controls = (
             self.search, self.favorites, self.add_local_button,
-            self.add_c64u_button, self.validate_button, self.relink_button,
+            self.add_c64u_button, self.scan_local_button,
+            self.scan_c64u_button, self.validate_button, self.relink_button,
             self.remove_button, self.launch_button, pane)
         self.refresh()
 
@@ -128,12 +143,52 @@ class GameLibraryTab:
         self.app.status.set_text(message)
 
     def _search_changed(self, entry):
-        self.client.query = entry.get_text()
+        text = entry.get_text()
+        if not text:
+            self._apply_search_now(text)
+            return
+        self._cancel_pending_search()
+        generation = self._search_generation
+        client = self.client
+        self._search_source = GLib.timeout_add(
+            self.SEARCH_DEBOUNCE_MS, self._debounced_search,
+            generation, client, text)
+
+    def _search_activated(self, entry):
+        self._apply_search_now(entry.get_text())
+
+    def _cancel_pending_search(self):
+        self._search_generation += 1
+        if self._search_source is not None:
+            GLib.source_remove(self._search_source)
+            self._search_source = None
+
+    def _debounced_search(self, generation, client, text):
+        if generation == self._search_generation:
+            self._search_source = None
+        if (self._closed or generation != self._search_generation
+                or self.client is not client):
+            return GLib.SOURCE_REMOVE
+        client.query = text
+        self.refresh(preserve=True)
+        return GLib.SOURCE_REMOVE
+
+    def _apply_search_now(self, text):
+        self._cancel_pending_search()
+        if self._closed:return
+        self.client.query = text
         self.refresh(preserve=True)
 
     def _favorites_changed(self, button):
+        self._cancel_pending_search()
+        if self._closed:return
+        self.client.query = self.search.get_text()
         self.client.favorites_only = button.get_active()
         self.refresh(preserve=True)
+
+    def close(self):
+        self._closed = True
+        self._cancel_pending_search()
 
     def refresh(self, preserve=True):
         wanted = self.client.selected_id if preserve else None
@@ -212,6 +267,8 @@ class GameLibraryTab:
             button.set_sensitive(selected and not self.job_busy)
         self.add_local_button.set_sensitive(not self.job_busy)
         self.add_c64u_button.set_sensitive(self.connected and not self.job_busy)
+        self.scan_local_button.set_sensitive(not self.job_busy)
+        self.scan_c64u_button.set_sensitive(self.connected and not self.job_busy)
         self.launch_button.set_sensitive(
             self.client.can_launch(self.connected) and not self.job_busy)
         self.cancel_button.set_sensitive(self.job_busy)
@@ -306,10 +363,30 @@ class GameLibraryTab:
             raise BrowserError('Connect to the source C64U first.')
         return session.device_id, posixpath.join(self.app.remote, rows[0].item[0])
 
+    def _selected_remote_files(self):
+        rows = self.app.rlist.get_selected_rows()
+        if not rows:
+            raise BrowserError('Select one or more D64 or CRT files in the C64U Files pane.')
+        names = []
+        for row in rows:
+            name, directory = row.item
+            if (name == '..' or directory
+                    or not name.casefold().endswith(('.d64', '.crt'))):
+                raise BrowserError('Select only D64 or CRT files in the C64U Files pane.')
+            names.append(name)
+        session = self.app.core.device_session()
+        if not session.device_id or not session.session_id:
+            raise BrowserError('Connect to the source C64U first.')
+        paths = tuple(posixpath.join(self.app.remote, name) for name in names)
+        return session.device_id, paths
+
     def add_c64u(self):
         try:
-            device_id, path = self._selected_remote_source()
-            job = self.client.add_c64u(device_id, path)
+            device_id, paths = self._selected_remote_files()
+            if len(paths) > 1:
+                job = self.client.scan_c64u_sources(device_id, paths)
+                self._start_bulk_scan(job);return
+            job = self.client.add_c64u(device_id, paths[0])
         except Exception as exc:self._show(str(exc));return
         def finished(snapshot):
             if snapshot.state != 'succeeded':
@@ -317,6 +394,83 @@ class GameLibraryTab:
             self.client.select(snapshot.result.record.id)
             self.refresh(True);self._show('C64U game reference added to the library.')
         self._run_job(job, finished)
+
+    def _scan_options(self, title, description, submit):
+        dialog = Gtk.Dialog(title=title, transient_for=self.app.window, modal=True)
+        dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
+        dialog.add_button('Scan', Gtk.ResponseType.OK)
+        area = dialog.get_content_area();area.set_spacing(8)
+        area.set_margin_top(12);area.set_margin_bottom(12)
+        area.set_margin_start(12);area.set_margin_end(12)
+        area.append(Gtk.Label(label=description, xalign=0, wrap=True,
+                              selectable=True))
+        recursive = Gtk.CheckButton(label='Include subfolders')
+        recursive.set_halign(Gtk.Align.START);area.append(recursive)
+        def response(widget, code):
+            include = recursive.get_active();widget.destroy()
+            if code == Gtk.ResponseType.OK:
+                try:submit(include)
+                except Exception as exc:self._show(str(exc))
+        dialog.connect('response', response);dialog.present()
+        dialog.recursive = recursive
+        return dialog
+
+    def scan_local_folder(self):
+        if self.chooser:return
+        chooser = Gtk.FileChooserNative.new(
+            'Choose Game Library folder', self.app.window,
+            Gtk.FileChooserAction.SELECT_FOLDER, 'Choose', 'Cancel')
+        chooser.set_current_folder(Gio.File.new_for_path(str(self.app.local)))
+        self.chooser = chooser
+        def response(_, code):
+            file = chooser.get_file();chooser.destroy();self.chooser = None
+            if code != Gtk.ResponseType.ACCEPT or not file:return
+            path = file.get_path()
+            if not path:
+                self._show('Choose a folder on the Argonaut Core computer.');return
+            self._scan_options(
+                'Scan local folder for games', path,
+                lambda recursive:self._start_bulk_scan(
+                    self.client.scan_core_host_folder(
+                        path, recursive=recursive)))
+        chooser.connect('response', response);chooser.show()
+
+    def _selected_remote_folder(self):
+        rows = self.app.rlist.get_selected_rows()
+        if len(rows) != 1 or rows[0].item[0] == '..' or not rows[0].item[1]:
+            raise BrowserError('Select one C64U folder to scan for games.')
+        session = self.app.core.device_session()
+        if not session.device_id or not session.session_id:
+            raise BrowserError('Connect to the source C64U first.')
+        return session.device_id, posixpath.join(
+            self.app.remote, rows[0].item[0])
+
+    def scan_c64u_folder(self, path=None):
+        try:
+            session = self.app.core.device_session()
+            if path is None:
+                device_id, path = self._selected_remote_folder()
+            elif not session.device_id or not session.session_id:
+                raise BrowserError('Connect to the source C64U first.')
+            else:device_id = session.device_id
+        except Exception as exc:self._show(str(exc));return
+        return self._scan_options(
+            'Scan C64U folder for games', path,
+            lambda recursive:self._start_bulk_scan(
+                self.client.scan_c64u_folder(
+                    device_id, path, recursive=recursive)))
+
+    def _start_bulk_scan(self, job):
+        self._run_job(job, self._bulk_scanned)
+        self._show('Scanning Game Library candidates…')
+
+    def _bulk_scanned(self, snapshot):
+        if snapshot.state != 'succeeded':
+            message = ('Game Library scan cancelled.' if snapshot.state == 'cancelled'
+                       else client_error_text(snapshot.error))
+            self._show(message);return
+        self.bulk_dialog = BulkImportDialog(self, snapshot.result)
+        self._show('Game Library scan complete. Review the candidates.')
 
     def remove(self):
         record = self.client.selected()

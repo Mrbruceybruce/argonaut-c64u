@@ -10,6 +10,7 @@ from unittest.mock import patch, Mock
 from c64u_browser.api import ConnectionFailure, Entry, UltimateClient, BrowserError
 from c64u_browser.diagnostics import (LOGGER, JsonEventFormatter,
                                       enable_private_log, disable_private_log,
+                                      diagnostic_span, operation_context,
                                       operation_event)
 from c64u_browser.transfers import download, upload
 from c64u_browser.files import operate
@@ -78,6 +79,17 @@ class DiagnosticEventsTest(unittest.TestCase):
             client.list_directory('/private/files')
         self.assertEqual(self.event()['target'], 'directory')
         self.assertNotIn('/private/files', self.stream.getvalue())
+
+    def test_long_operation_span_has_timestamp_job_phase_and_duration(self):
+        with operation_context(job_id='job-123',phase='launch-execution'), \
+                diagnostic_span('core','volume_fingerprint','volume'):
+            pass
+        rows=[json.loads(line) for line in self.stream.getvalue().splitlines()]
+        self.assertEqual(('started','ok'),tuple(row['outcome'] for row in rows))
+        self.assertTrue(all(row['job_id']=='job-123' for row in rows))
+        self.assertTrue(all(row['phase']=='launch-execution' for row in rows))
+        self.assertTrue(all(isinstance(row['timestamp'],float) for row in rows))
+        self.assertGreaterEqual(rows[-1]['duration_ms'],0)
 
     def test_ftp_download_event_redacts_file_paths_and_preserves_failure(self):
         with tempfile.TemporaryDirectory() as directory, patch(

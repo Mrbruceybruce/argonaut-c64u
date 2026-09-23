@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Presentation-only Game Library controller shared by GTK client tests."""
-from .game_library import ArtworkReference, C64U, GameLibraryError, GameSource
+from .game_library import (
+    ArtworkReference, BulkImportRequest, C64U, GameLibraryError, GameSource,
+)
 
 
 MECHANISM_LABELS = {
@@ -23,6 +25,9 @@ ERROR_GUIDANCE = {
     'device-changed': 'The active C64U changed. Review the operation again.',
     'session-changed': 'The C64U connection changed. Review the operation again.',
     'storage-changed': 'The C64U storage changed. Review the operation again.',
+    'storage-unverifiable': (
+        'Argonaut could not complete full C64U storage verification. '
+        'Confirm the volume is available, then review the operation again.'),
     'firmware-rejection': 'The C64U firmware rejected the launch command.',
     'authentication': 'C64U authentication failed. Check the saved network password.',
     'cancelled': 'The operation was cancelled before launch.',
@@ -43,6 +48,31 @@ def client_error_text(error):
     if error is None:return 'The operation did not complete.'
     guidance = ERROR_GUIDANCE.get(error.code)
     return guidance or error.message
+
+
+def bulk_progress_text(progress):
+    """Present structured Bulk Import progress without parsing its prose."""
+    phase = progress.phase
+    if phase == 'discover':
+        return f'Scanning folders… {progress.completed:,} directories scanned'
+    if phase == 'discovered':
+        return f'{progress.completed:,} game candidates found. Starting validation…'
+    if phase == 'validate':
+        total = progress.total if progress.total is not None else 0
+        return f'Validating {progress.completed:,} of {total:,} discovered entries…'
+    if phase in ('hash', 'validate-bytes', 'bounded-reading'):
+        total = progress.total
+        amount = f'{progress.completed:,}' + (
+            f' of {total:,}' if total is not None else '')
+        return f'Reading and validating game data… {amount} bytes'
+    if phase == 'executing':return 'Starting reviewed Bulk Import…'
+    if phase == 'revalidating':
+        total = progress.total if progress.total is not None else 0
+        return f'Revalidating {progress.completed:,} of {total:,} games…'
+    if phase == 'classifying':return 'Checking current Game Library state…'
+    if phase == 'persisting':return 'Saving Game Library…'
+    if phase == 'complete':return 'Bulk Import complete.'
+    return progress.message or 'Working…'
 
 
 def add_results_text(results, failures=()):
@@ -90,6 +120,82 @@ def add_results_text(results, failures=()):
     return ' '.join(messages)
 
 
+BULK_FILTERS = (
+    ('all', 'All'), ('new', 'New'), ('cataloged', 'Already cataloged'),
+    ('duplicates', 'Duplicates'), ('changed', 'Changed'),
+    ('problems', 'Invalid/inaccessible'), ('unsupported', 'Unsupported'),
+)
+
+
+class BulkReviewState:
+    """Presentation-only filtering and selection over a Core preview."""
+    def __init__(self, preview):
+        self.preview = preview
+        self.filter = 'all'
+        self.selected = set(preview.default_selected_candidate_ids)
+        self._eligible = set(preview.eligible_candidate_ids)
+        self._rows = {item.id:item for item in preview.candidates}
+
+    def rows(self):
+        groups = {
+            'new': {'new-valid'},
+            'cataloged': {'already-cataloged-source'},
+            'duplicates': {'duplicate-catalog-content',
+                           'duplicate-scan-content', 'duplicate-scan-path'},
+            'changed': {'changed-existing-source'},
+            'problems': {'invalid-image', 'inaccessible-file'},
+            'unsupported': {'unsupported-file'},
+        }
+        allowed = groups.get(self.filter)
+        return tuple(item for item in self.preview.candidates
+                     if allowed is None or item.classification in allowed)
+
+    def set_filter(self, value):
+        if value not in {key for key, _label in BULK_FILTERS}:
+            raise ValueError('Unknown Bulk Import review filter.')
+        self.filter = value
+        return self.rows()
+
+    def set_selected(self, candidate_id, selected):
+        if candidate_id not in self._rows:
+            raise ValueError('Unknown Bulk Import candidate.')
+        if candidate_id not in self._eligible:
+            if selected:raise ValueError('Only new game images can be imported.')
+            self.selected.discard(candidate_id);return
+        if selected:self.selected.add(candidate_id)
+        else:self.selected.discard(candidate_id)
+
+    def select_all_new(self):self.selected = set(self._eligible)
+    def select_none(self):self.selected.clear()
+
+    def selected_ids(self):
+        return tuple(item.id for item in self.preview.candidates
+                     if item.id in self.selected)
+
+    @property
+    def count(self):return len(self.selected)
+
+    @property
+    def import_label(self):
+        return f'Import {self.count} game' + ('' if self.count == 1 else 's')
+
+    def totals(self):
+        counts = dict(self.preview.classification_counts)
+        return {
+            'entries': self.preview.entries_seen,
+            'candidates': self.preview.supported_candidates,
+            'new': counts.get('new-valid', 0),
+            'cataloged': counts.get('already-cataloged-source', 0),
+            'duplicates': sum(counts.get(value, 0) for value in (
+                'duplicate-catalog-content', 'duplicate-scan-content',
+                'duplicate-scan-path')),
+            'changed': counts.get('changed-existing-source', 0),
+            'problems': sum(counts.get(value, 0) for value in (
+                'invalid-image', 'inaccessible-file', 'branch-unavailable')),
+            'unsupported': counts.get('unsupported-file', 0),
+        }
+
+
 class GameLibraryClient:
     """Client state and direct forwarding to Core-owned services."""
     def __init__(self, library, launcher):
@@ -125,6 +231,29 @@ class GameLibraryClient:
 
     def add_c64u(self, device_id, path):
         return self.library.add(GameSource.c64u(device_id, path))
+
+    def scan_core_host_folder(self, path, *, recursive=False):
+        return self.library.prepare_bulk_import(
+            BulkImportRequest.core_host_folder(path, recursive=recursive))
+
+    def scan_c64u_folder(self, device_id, path, *, recursive=False):
+        return self.library.prepare_bulk_import(
+            BulkImportRequest.c64u_folder(
+                device_id, path, recursive=recursive))
+
+    def scan_c64u_sources(self, device_id, paths):
+        return self.library.prepare_bulk_import(
+            BulkImportRequest.c64u_sources(device_id, paths))
+
+    def select_bulk_candidates(self, preview, candidate_ids):
+        return self.library.select_bulk_candidates(
+            preview.plan_id, candidate_ids)
+
+    def execute_bulk_import(self, selection):
+        return self.library.execute_bulk_import(selection)
+
+    def discard_bulk_import(self, plan_id):
+        return self.library.discard_bulk_plan(plan_id)
 
     def remove(self):return self.library.remove(self.selected_id)
     def validate(self):return self.library.validate_source(self.selected_id)

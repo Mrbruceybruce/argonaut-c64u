@@ -9,10 +9,11 @@ import tempfile
 import shutil
 from threading import Event
 import unittest
+from unittest.mock import patch
 
-from c64u_browser.api import BrowserError, Entry
+from c64u_browser.api import BrowserError, Entry, IdentityEntry
 from c64u_browser.file_service import FileLocation, FileService
-from c64u_browser.jobs import CoreJob
+from c64u_browser.jobs import CoreJob, JobCancelled
 from c64u_browser.profiles import Preferences
 from c64u_browser.scheduler import CoreScheduler, DeviceSession, JobBinding
 from c64u_browser.usb_backup import (
@@ -80,6 +81,15 @@ class MemoryClient:
         return path,sorted(rows,key=lambda row:(row.kind!='dir',row.name.casefold()))
 
 
+class RawIdentityClient:
+    """Minimal byte-path tree used to verify storage identity semantics."""
+    def __init__(self,tree):self.tree=tree;self.calls=[]
+    def list_directory_identity(self,path):
+        self.calls.append(path)
+        if path not in self.tree:raise BrowserError('missing raw directory')
+        return path,tuple(self.tree[path])
+
+
 class UsbBackupTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
@@ -134,6 +144,93 @@ class UsbBackupTests(unittest.TestCase):
         self.assertEqual('succeeded', result.state, result.error)
         self.assertIn('/USB2', self.client.list_calls)
         self.assertIn('/USB2/GAMES', self.client.list_calls)
+
+    def test_raw_filename_fingerprint_is_complete_deterministic_and_order_independent(self):
+        side_1=b'Schatzj\x84ger [Side 1] [Ariolasoft] [TWG].d64'
+        side_2=b'Schatzj\x84ger [Side 2] [Ariolasoft] [TWG].d64'
+        files=(IdentityEntry(side_2,'file',174848),
+               IdentityEntry(side_1,'file',174848))
+        first=RawIdentityClient({
+            b'/USB1':(IdentityEntry(b'games','dir',None),),
+            b'/USB1/games':(IdentityEntry(b's','dir',None),),
+            b'/USB1/games/s':files,
+        })
+        second=RawIdentityClient({
+            b'/USB1':(IdentityEntry(b'games','dir',None),),
+            b'/USB1/games':(IdentityEntry(b's','dir',None),),
+            b'/USB1/games/s':tuple(reversed(files)),
+        })
+        observed=[]
+        digest=UsbBackupService._volume_fingerprint(
+            first,'/USB1',progress=lambda directories,entries:
+            observed.append((directories,entries)))
+        self.assertEqual(digest,UsbBackupService._volume_fingerprint(second,'/USB1'))
+        self.assertEqual((3,4),observed[-1])
+        self.assertIn(b'/USB1/games/s',first.calls)
+        removed=RawIdentityClient({**second.tree,
+            b'/USB1/games/s':(IdentityEntry(side_1,'file',174848),)})
+        self.assertNotEqual(digest,UsbBackupService._volume_fingerprint(removed,'/USB1'))
+
+    def test_raw_identity_digest_changes_for_name_type_size_and_hierarchy(self):
+        def fingerprint(tree):
+            return UsbBackupService._volume_fingerprint(
+                RawIdentityClient(tree),'/USB1')
+        baseline={
+            b'/USB1':(IdentityEntry(b'folder','dir',None),),
+            b'/USB1/folder':(IdentityEntry(b'game\x84.d64','file',10),),
+        }
+        expected=fingerprint(baseline)
+        variants=(
+            {b'/USB1':(IdentityEntry(b'folder','dir',None),),
+             b'/USB1/folder':(IdentityEntry(b'game\x85.d64','file',10),)},
+            {b'/USB1':(IdentityEntry(b'folder','file',None),)},
+            {b'/USB1':(IdentityEntry(b'folder','dir',None),),
+             b'/USB1/folder':(IdentityEntry(b'game\x84.d64','file',11),)},
+            {b'/USB1':(IdentityEntry(b'other','dir',None),),
+             b'/USB1/other':(IdentityEntry(b'game\x84.d64','file',10),)},
+        )
+        for tree in variants:
+            with self.subTest(tree=tree):self.assertNotEqual(expected,fingerprint(tree))
+
+    def test_raw_identity_bounds_and_cancellation_fail_instead_of_truncating(self):
+        items=RawIdentityClient({b'/USB1':(
+            IdentityEntry(b'a','file',1),IdentityEntry(b'b','file',1))})
+        with patch('c64u_browser.usb_backup.MAX_ITEMS',1), \
+                self.assertRaisesRegex(BrowserError,'item'):
+            UsbBackupService._volume_fingerprint(items,'/USB1')
+        deep=RawIdentityClient({
+            b'/USB1':(IdentityEntry(b'a','dir',None),),
+            b'/USB1/a':(IdentityEntry(b'b','dir',None),),
+            b'/USB1/a/b':(),
+        })
+        with patch('c64u_browser.usb_backup.MAX_DEPTH',1), \
+                self.assertRaisesRegex(BrowserError,'level'):
+            UsbBackupService._volume_fingerprint(deep,'/USB1')
+        checks=[0]
+        def cancel():
+            checks[0]+=1
+            if checks[0]>1:raise JobCancelled('cancelled')
+        with self.assertRaises(JobCancelled):
+            UsbBackupService._volume_fingerprint(items,'/USB1',cancel)
+
+    def test_usb_safety_fingerprint_includes_non_utf8_entries(self):
+        raw_size={'value':174848}
+        def raw_listing(path):
+            actual,entries=self.client.list_directory(path.decode('utf-8'))
+            rows=[IdentityEntry(entry.name.encode(),entry.kind,entry.size)
+                  for entry in entries]
+            if path==b'/USB2':
+                rows.append(IdentityEntry(b'Schatzj\x84ger.d64','file',raw_size['value']))
+            return actual.encode(),tuple(rows)
+        self.client.list_directory_identity=raw_listing
+        preview=self.service.prepare_backup(self.backup_request('raw')).wait(5).result
+        result=self.service.execute_backup(preview.plan_id).wait(5)
+        self.assertEqual('succeeded',result.state,result.error)
+        preview=self.service.prepare_backup(self.backup_request('raw-change')).wait(5).result
+        raw_size['value']+=1
+        failed=self.service.execute_backup(preview.plan_id).wait(5)
+        self.assertEqual('failed',failed.state)
+        self.assertEqual('storage',failed.error.code)
 
     def test_backup_root_change_does_not_nest_or_invalidate_existing_backup(self):
         first_root=self.root/'first-root';second_root=self.root/'second-root'

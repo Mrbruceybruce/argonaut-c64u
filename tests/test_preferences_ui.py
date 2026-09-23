@@ -25,11 +25,22 @@ class PreferencesUI(unittest.TestCase):
         for _ in range(20):
             while self.GLib.MainContext.default().pending():self.GLib.MainContext.default().iteration(False)
             time.sleep(.01)
+    def pump_for(self, seconds):
+        deadline=time.monotonic()+seconds
+        while time.monotonic()<deadline:
+            while self.GLib.MainContext.default().pending():
+                self.GLib.MainContext.default().iteration(False)
+            time.sleep(.01)
     def walk(self,widget):
         yield widget
         child=widget.get_first_child()
         while child:
             yield from self.walk(child);child=child.get_next_sibling()
+    @staticmethod
+    def type_text(entry,text):
+        position=len(entry.get_text())
+        entry.insert_text(text,position)
+        entry.set_position(position+len(text))
     def test_scale_bounds_session_only_and_scroll_without_resize(self):
         tab=self.app.streams_tab
         self.assertTrue(tab.text_return.get_active());self.assertIsInstance(tab.zoom,self.Gtk.Label)
@@ -55,11 +66,118 @@ class PreferencesUI(unittest.TestCase):
             for index in range(self.app.tabs.get_n_pages())]
         self.assertIn('Game Library',labels)
         tab=self.app.game_library_tab
-        tab.search.set_text('no-match-'+uuid.uuid4().hex);self.pump()
+        tab.search.set_text('no-match-'+uuid.uuid4().hex)
+        tab.search.emit('activate');self.pump()
         self.assertIn('no games match',tab.library_state.get_text().casefold())
         self.assertFalse(tab.launch_button.get_sensitive())
         self.assertEqual('Select a game to view its details.',
                          tab.detail_heading.get_text())
+
+    def test_game_library_search_debounce_and_immediate_actions(self):
+        tab=self.app.game_library_tab
+        self.pump()
+        with patch.object(tab,'refresh',wraps=tab.refresh) as refresh:
+            self.type_text(tab.search,'a');first=tab._search_source
+            self.pump_for(.06)
+            self.type_text(tab.search,'s');second=tab._search_source
+            self.pump_for(.06)
+            self.type_text(tab.search,'tro');third=tab._search_source
+            self.assertTrue(first and second and third)
+            self.assertNotEqual(first,second);self.assertNotEqual(second,third)
+            self.assertEqual(0,refresh.call_count)
+            self.pump_for(.36)
+            self.assertEqual(1,refresh.call_count)
+
+            self.assertEqual('astro',tab.client.query)
+
+            refresh.reset_mock()
+            self.type_text(tab.search,'l')
+            self.pump_for(.20)
+            self.type_text(tab.search,'abe')
+            self.pump_for(.18)
+            self.assertEqual(0,refresh.call_count)
+            self.pump_for(.16)
+            self.assertEqual(1,refresh.call_count)
+            self.assertEqual('astrolabe',tab.client.query)
+
+            refresh.reset_mock()
+            tab.search.set_text('')
+            refresh.reset_mock()
+            self.type_text(tab.search,'return query')
+            tab.search.emit('activate');self.pump()
+            self.assertEqual(1,refresh.call_count)
+            self.assertEqual('return query',tab.client.query)
+            self.pump_for(.20)
+            self.assertEqual(1,refresh.call_count)
+
+            refresh.reset_mock()
+            tab.search.set_text('')
+            refresh.reset_mock()
+            self.type_text(tab.search,'pending clear')
+            tab.search.set_text('');self.pump()
+            self.assertEqual(1,refresh.call_count)
+            self.assertEqual('',tab.client.query)
+            self.pump_for(.20)
+            self.assertEqual(1,refresh.call_count)
+
+            refresh.reset_mock()
+            self.type_text(tab.search,'favorite query')
+            tab.favorites.set_active(True);self.pump()
+            self.assertEqual(1,refresh.call_count)
+            self.assertEqual('favorite query',tab.client.query)
+            self.assertTrue(tab.client.favorites_only)
+            self.pump_for(.20)
+            self.assertEqual(1,refresh.call_count)
+
+    def test_slow_core_verification_keeps_gtk_heartbeat_responsive(self):
+        from threading import Event
+        from c64u_browser.jobs import CoreJob,JobProgress
+        from c64u_browser.scheduler import CoreScheduler,JobBinding
+        entered=Event();release=Event();finished=[];ticks=[]
+        scheduler=CoreScheduler(lambda:None);self.addCleanup(scheduler.close)
+        def verify(job):
+            entered.set()
+            for count in range(1,5):
+                job.report(JobProgress(
+                    'storage-fingerprint',count,None,'directories','ignored',
+                    (('entries_observed',count*10),)))
+                if release.wait(.08):break
+            release.wait(2);job.check_cancel();return 'verified'
+        job=scheduler.submit(CoreJob('game-library.launch-preview',verify),
+                             JobBinding.core_host())
+        heartbeat=self.GLib.timeout_add(
+            20,lambda:(ticks.append(time.monotonic()) or True))
+        try:
+            self.app.run_file_job(job,finished.append)
+            self.assertTrue(entered.wait(1));self.pump_for(.25)
+            self.assertTrue(self.app.busy)
+            self.assertGreaterEqual(len(ticks),5)
+            self.assertIn('directories checked',self.app.status.get_text())
+            release.set();self.pump_for(.35)
+            self.assertTrue(finished)
+            self.assertFalse(self.app.busy)
+        finally:
+            release.set();self.GLib.source_remove(heartbeat)
+
+    def test_game_library_search_debounce_rejects_stale_client_and_teardown(self):
+        from unittest.mock import Mock
+        tab=self.app.game_library_tab;original=tab.client
+        self.pump()
+        with patch.object(tab,'refresh',wraps=tab.refresh) as refresh:
+            self.type_text(tab.search,'old client query')
+            replacement=Mock();replacement.query='replacement query'
+            tab.client=replacement
+            self.pump_for(.36)
+            self.assertEqual('replacement query',replacement.query)
+            self.assertEqual(0,refresh.call_count)
+            tab.client=original
+
+            self.type_text(tab.search,' teardown query')
+            self.assertIsNotNone(tab._search_source)
+            tab.close()
+            self.assertIsNone(tab._search_source)
+            self.pump_for(.36)
+            self.assertEqual(0,refresh.call_count)
 
     def test_sid_jukebox_tab_constructs_with_empty_state_and_manual_duration(self):
         labels=[self.app.tabs.get_tab_label_text(
@@ -469,8 +587,118 @@ class PreferencesUI(unittest.TestCase):
         tab.favorite.set_active(True);self.pump()
         tab.favorites.set_active(True);self.pump()
         self.assertIn(record.id,tab.rows)
-        tab.search.set_text('no such title');self.pump()
+        tab.search.set_text('no such title');self.pump_for(.36)
         self.assertIn('No games match',tab.library_state.get_text())
+
+    def test_game_library_bulk_actions_and_recursive_options(self):
+        from unittest.mock import Mock,patch
+        from c64u_browser.scheduler import DeviceSession
+        tab=self.app.game_library_tab
+        labels={w.get_label() for w in self.walk(tab.box)
+                if isinstance(w,self.Gtk.Button)}
+        self.assertIn('Scan local folder…',labels)
+        self.assertIn('Scan C64U folder…',labels)
+        self.assertIn('Add selected C64U file(s)',labels)
+
+        submit=Mock();dialog=tab._scan_options(
+            'Test scan','/tmp/games',submit)
+        dialog.recursive.set_active(True);dialog.response(self.Gtk.ResponseType.OK)
+        self.pump();submit.assert_called_once_with(True)
+
+        self.app.remote='/USB2/Games'
+        self.app.populate(self.app.rlist,[('one.d64',False,100),
+                                           ('two.crt',False,200)])
+        row=self.app.rlist.get_first_child().get_next_sibling()
+        self.app.rlist.select_row(row);self.app.rlist.select_row(row.get_next_sibling())
+        job=Mock()
+        with patch.object(self.app.core,'device_session',return_value=DeviceSession(
+                'id:C64-A','session-1')), \
+             patch.object(tab.client,'scan_c64u_sources',return_value=job) as scan, \
+             patch.object(tab,'_start_bulk_scan') as start:
+            tab.add_c64u()
+        scan.assert_called_once_with(
+            'id:C64-A',('/USB2/Games/one.d64','/USB2/Games/two.crt'))
+        start.assert_called_once_with(job)
+        with patch.object(self.app.core,'device_session',return_value=DeviceSession(
+                'id:C64-A','session-1')), \
+             patch.object(tab.client,'scan_c64u_folder',return_value=job) as scan, \
+             patch.object(tab,'_start_bulk_scan') as start:
+            options=tab.scan_c64u_folder('/USB2/Games')
+            options.recursive.set_active(True)
+            options.response(self.Gtk.ResponseType.OK);self.pump()
+        scan.assert_called_once_with(
+            'id:C64-A','/USB2/Games',recursive=True)
+        start.assert_called_once_with(job)
+
+    def test_game_library_bulk_review_selection_filter_and_execution(self):
+        from unittest.mock import Mock,patch
+        from c64u_browser.game_library import GameLibraryService,BulkImportRequest
+        from c64u_browser.game_library_client import GameLibraryClient
+        from c64u_browser.game_library_bulk_dialog import BulkImportDialog
+        fixture=Path(__file__).with_name('fixtures')/'vice-1541-authentic.d64'
+        folder=Path(self.temp.name)/'bulk';folder.mkdir()
+        (folder/'one.d64').write_bytes(fixture.read_bytes())
+        (folder/'two.d64').write_bytes(fixture.read_bytes())
+        (folder/'bad.txt').write_text('unsupported')
+        service=GameLibraryService(Path(self.temp.name)/'bulk-library.json').load()
+        self.addCleanup(service.close)
+        preview=service.prepare_bulk_import(
+            BulkImportRequest.core_host_folder(folder)).wait(5).result
+        tab=self.app.game_library_tab;tab.client=GameLibraryClient(service,Mock())
+        dialog=BulkImportDialog(tab,preview);tab.bulk_dialog=dialog
+        self.pump()
+        self.assertIn('3 entries examined',dialog.summary.get_text())
+        self.assertIn('0 invalid/inaccessible',dialog.summary.get_text())
+        self.assertIn('1 unsupported',dialog.summary.get_text())
+        labels=[widget.get_text() for widget in self.walk(dialog.dialog)
+                if isinstance(widget,self.Gtk.Label)]
+        self.assertTrue(any('New game image' in label for label in labels))
+        self.assertFalse(any('New valid game' in label for label in labels))
+        self.assertEqual(1,dialog.state.count)
+        self.assertEqual('Import 1 game',dialog.import_button.get_label())
+        unsupported=next(item for item in preview.candidates
+                         if item.classification=='unsupported-file')
+        self.assertFalse(dialog.row_checks[unsupported.id].get_sensitive())
+        selected=dialog.state.selected_ids()
+        dialog.filter.set_active_id('problems');self.pump()
+        self.assertEqual(selected,dialog.state.selected_ids())
+        dialog.select_none();self.assertFalse(dialog.import_button.get_sensitive())
+        dialog.select_all_new();self.assertTrue(dialog.import_button.get_sensitive())
+        with patch.object(tab,'refresh',wraps=tab.refresh) as refresh:
+            dialog.dialog.response(self.Gtk.ResponseType.OK)
+            deadline=time.monotonic()+5
+            while time.monotonic()<deadline and not dialog.finished:self.pump()
+            self.assertTrue(dialog.finished)
+            self.assertEqual(1,refresh.call_count)
+        self.assertIn('1 added',dialog.summary.get_text())
+        self.assertEqual(1,len(service.list()))
+        dialog.dialog.response(self.Gtk.ResponseType.CANCEL);self.pump()
+
+    def test_game_library_bulk_immediate_feedback_cancel_and_stale_plan(self):
+        from unittest.mock import Mock,patch
+        from c64u_browser.game_library import GameLibraryError
+        tab=self.app.game_library_tab;job=Mock()
+        with patch.object(tab,'_run_job') as run:
+            tab._start_bulk_scan(job)
+        run.assert_called_once_with(job,tab._bulk_scanned)
+        self.assertEqual('Scanning Game Library candidates…',tab.message.get_text())
+
+        preview=Mock(plan_id='expired',default_selected_candidate_ids=('a',),
+                     eligible_candidate_ids=('a',),candidates=(),issues=(),
+                     classification_counts=(('new-valid',1),),entries_seen=1,
+                     supported_candidates=1,directories_scanned=1)
+        from c64u_browser.game_library_bulk_dialog import BulkImportDialog
+        client=Mock();client.select_bulk_candidates.side_effect=GameLibraryError(
+            'plan','Bulk Import review expired.')
+        old=tab.client;tab.client=client
+        dialog=BulkImportDialog(tab,preview);tab.bulk_dialog=dialog;self.pump()
+        dialog.dialog.response(self.Gtk.ResponseType.OK);self.pump()
+        self.assertIn('Scan the folder or files again',dialog.progress.get_text())
+        dialog.executing=True
+        with patch.object(tab,'cancel_operation') as cancel:
+            dialog.dialog.response(self.Gtk.ResponseType.CANCEL)
+        cancel.assert_called_once_with()
+        dialog.finished=True;dialog.dialog.destroy();tab.client=old
     def test_preferences_auto_save_undo_close_and_checkbox_extent(self):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Preferences

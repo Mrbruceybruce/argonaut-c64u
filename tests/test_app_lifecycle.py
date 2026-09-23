@@ -21,12 +21,19 @@ class Lifecycle(unittest.TestCase):
                              'game-library.launch-preview',progress))
         self.assertEqual('Validating C64U game file…',
                          job_progress_message('game-library.validate',progress))
+        fingerprint=JobProgress(
+            'storage-fingerprint',17,None,'directories','do not parse this',
+            (('entries_observed',419),('stage','game-launch-execution-before')))
+        self.assertEqual(
+            'Verifying C64U storage… 17 directories checked · 419 entries observed',
+            job_progress_message('game-library.launch-execute',fingerprint))
 
     def test_file_job_completion_snapshot_recovers_a_missed_finish_event(self):
         running=SimpleNamespace(state='running')
         succeeded=SimpleNamespace(state='succeeded',result='done')
         job=Mock(operation='sid-jukebox.next',id='job')
         job.snapshot.side_effect=(running,running,succeeded)
+        job.wait.side_effect=AssertionError('GTK must not synchronously wait')
         job.add_listener=Mock()  # Deliberately never delivers the finish event.
         control=Mock();control.get_sensitive.return_value=True
         app=SimpleNamespace(busy=False,busy_controls=[control],status=Mock(),
@@ -42,6 +49,7 @@ class Lifecycle(unittest.TestCase):
             self.assertTrue(app.busy);self.assertTrue(timer[0]())
             self.assertFalse(timer[0]())
         self.assertFalse(app.busy);self.assertIsNone(app.transfer_job)
+        job.wait.assert_not_called()
         done.assert_called_once_with(succeeded)
 
     def test_second_activation_presents_existing_window(self):

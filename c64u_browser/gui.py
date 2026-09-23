@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import posixpath
 import sys
+import time
 import uuid
 import gi
 gi.require_version('Gtk', '4.0')
@@ -27,7 +28,8 @@ from .recovery import Recovery
 from .sid_jukebox_tab import SidJukeboxTab
 from .streams_tab import StreamsTab
 from .game_library_tab import GameLibraryTab
-from .diagnostics import enable_private_log, disable_private_log
+from .diagnostics import (diagnostic_event, enable_private_log,
+                          disable_private_log)
 from .test_lab_access import enabled as test_lab_enabled
 from .platform_support import local_hidden
 
@@ -40,8 +42,18 @@ def configure_backup_destination_chooser(chooser,backup_root,volume,
 
 
 def job_progress_message(operation, progress):
+    if progress.phase == 'storage-fingerprint':
+        details=dict(progress.details)
+        entries=details.get('entries_observed')
+        text=(f'Verifying C64U storage… '
+              f'{progress.completed:,} directories checked')
+        if isinstance(entries,int):text+=f' · {entries:,} entries observed'
+        return text
     if operation.startswith('game-library.launch') and progress.phase == 'hash':
         return 'Validating game before launch…'
+    if operation.startswith('game-library.bulk'):
+        from .game_library_client import bulk_progress_text
+        return bulk_progress_text(progress)
     return progress.message
 
 
@@ -664,7 +676,14 @@ class Browser(Gtk.Application):
         def event(update):
             progress=update.job.progress
             if update.kind=='progress' and progress:
+                queued=time.monotonic()
                 def show():
+                    delay=(time.monotonic()-queued)*1000
+                    diagnostic_event(
+                        'gtk','job_progress_delivery','client',
+                        'delayed' if delay>500 else 'ok',duration_ms=delay,
+                        details=(('delayed',delay>500),),job_id=job.id,
+                        phase=progress.phase)
                     message = job_progress_message(job.operation, progress)
                     if self.transfer_job is job:self.status.set_text(message)
                     return False
@@ -683,16 +702,23 @@ class Browser(Gtk.Application):
     def run_file_job(self, job, done):
         self.begin_file_job(job)
         delivered = [False]
-        def finish(snapshot):
+        def finish(snapshot,queued=None,source='event'):
             if delivered[0]:return False
             if self.transfer_job is not job:return False
+            delay=0 if queued is None else (time.monotonic()-queued)*1000
+            diagnostic_event(
+                'gtk','job_completion_delivery','client',
+                'delayed' if delay>500 else 'ok',duration_ms=delay,
+                details=(('delayed',delay>500),('source',source)),
+                job_id=job.id,phase=job.operation)
             delivered[0] = True
             self.end_file_job()
             try:done(snapshot)
             except Exception as exc:self.status.set_text(str(exc))
             return False
         def observe(event):
-            if event.kind=='finished':GLib.idle_add(finish,event.job)
+            if event.kind=='finished':
+                GLib.idle_add(finish,event.job,time.monotonic(),'event')
         job.add_listener(observe)
         snapshot=job.snapshot()
         if snapshot.state in ('succeeded','failed','cancelled'):
@@ -703,7 +729,7 @@ class Browser(Gtk.Application):
             if delivered[0] or self.transfer_job is not job:return False
             current=job.snapshot()
             if current.state in ('succeeded','failed','cancelled'):
-                finish(current);return False
+                finish(current,None,'snapshot-fallback');return False
             return True
         GLib.timeout_add(250,observe_snapshot)
 
@@ -755,6 +781,21 @@ class Browser(Gtk.Application):
                         self.tabs.set_current_page(
                             self.tabs.page_num(self.sid_jukebox_tab.box))
                 self.button(box,'Add to SID Jukebox',lambda:action(open_sid))
+            if not local and directory and not multiple:
+                path = posixpath.join(self.remote, name)
+                self.button(
+                    box, 'Scan folder for games…',
+                    lambda:action(
+                        lambda:self.game_library_tab.scan_c64u_folder(path)))
+            if not local and not directory:
+                selected = tuple(item.item for item in listing.get_selected_rows())
+                if selected and all(
+                        not is_directory and item_name.casefold().endswith(
+                            ('.d64', '.crt'))
+                        for item_name, is_directory in selected):
+                    self.button(
+                        box, 'Add selected to Game Library',
+                        lambda:action(self.game_library_tab.add_c64u))
             self.button(box, 'Copy', lambda: action(lambda: self.copy_selection(local)))
             if not multiple:
                 self.button(box, 'Rename…', lambda: action(lambda: self.rename_item(local, name)))
@@ -1484,6 +1525,8 @@ class Browser(Gtk.Application):
         if getattr(self, 'test_lab_tab', None): self.test_lab_tab.stop_schedule()
         disable_private_log(getattr(self, 'operation_log', None))
         self.operation_log = None
+        game_library_tab = getattr(self, 'game_library_tab', None)
+        if game_library_tab is not None:game_library_tab.close()
         self.streams_tab.close()
         if hasattr(self,'core'):self.core.close()
         self.pool.shutdown(wait=False)
