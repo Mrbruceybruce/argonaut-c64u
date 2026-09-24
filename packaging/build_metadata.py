@@ -29,8 +29,13 @@ def metadata(source, version, release=False):
         raise ValueError('ARGONAUT_SOURCE_COMMIT must be a full Git commit ID')
     build = ''
     try:
-        root = _git(source, 'rev-parse', '--show-toplevel')
-        if Path(root).resolve() == source:
+        # Ask Git whether -C selected the worktree root. Git may print an
+        # MSYS2 path (/d/...) that native Windows pathlib interprets differently.
+        # An empty prefix inside a worktree proves root membership without
+        # translating paths or relaxing the exact-checkout requirement.
+        inside = _git(source, 'rev-parse', '--is-inside-work-tree')
+        prefix = _git(source, 'rev-parse', '--show-prefix')
+        if inside == 'true' and prefix == '':
             head = _git(source, 'rev-parse', 'HEAD')
             if requested and requested != head:
                 raise ValueError(
@@ -40,6 +45,8 @@ def metadata(source, version, release=False):
             if release and dirty:
                 raise ValueError('Stable release packaging requires a clean checkout')
             build = head + ('-modified' if dirty else '')
+        elif release:
+            raise ValueError('Stable release packaging requires an exact Git checkout root')
     except (OSError, subprocess.CalledProcessError):
         if release:
             raise ValueError('Stable release packaging requires an exact Git checkout')

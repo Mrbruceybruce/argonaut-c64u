@@ -78,6 +78,53 @@ class ReleaseContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'exact Git checkout'):
                 BUILD_METADATA.metadata(source, '1.9', release=True)
 
+    def test_release_root_verification_does_not_depend_on_git_path_spelling(self):
+        root, sha = self._repository()
+        original = BUILD_METADATA._git
+        calls = []
+
+        def msys_git(source, *args):
+            calls.append(args)
+            if args == ('rev-parse', '--show-toplevel'):
+                return '/d/a/checkout with spaces'
+            return original(source, *args)
+
+        with patch.dict(os.environ, {'ARGONAUT_SOURCE_COMMIT': sha}), patch.object(
+                BUILD_METADATA, '_git', side_effect=msys_git):
+            self.assertEqual(sha, BUILD_METADATA.metadata(root, '1.9', release=True)['build'])
+        self.assertNotIn(('rev-parse', '--show-toplevel'), calls)
+        self.assertIn(('rev-parse', '--is-inside-work-tree'), calls)
+        self.assertIn(('rev-parse', '--show-prefix'), calls)
+
+    def test_release_rejects_subdirectory_even_with_matching_commit(self):
+        root, sha = self._repository()
+        with patch.dict(os.environ, {'ARGONAUT_SOURCE_COMMIT': sha}):
+            with self.assertRaisesRegex(ValueError, 'exact Git checkout root'):
+                BUILD_METADATA.metadata(root / 'c64u_browser', '1.9', release=True)
+
+    def test_release_accepts_linked_worktree_root(self):
+        root, sha = self._repository()
+        with tempfile.TemporaryDirectory() as directory:
+            linked = Path(directory) / 'linked checkout'
+            subprocess.run(['git', '-C', str(root), 'worktree', 'add',
+                            '--detach', str(linked), sha], check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                with patch.dict(os.environ, {'ARGONAUT_SOURCE_COMMIT': sha}):
+                    self.assertEqual(sha, BUILD_METADATA.metadata(
+                        linked, '1.9', release=True)['build'])
+            finally:
+                subprocess.run(['git', '-C', str(root), 'worktree', 'remove',
+                                str(linked)], check=True)
+
+    def test_release_rejects_bare_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(['git', 'init', '--bare', '-q', str(root)], check=True)
+            with patch.dict(os.environ, {'ARGONAUT_SOURCE_COMMIT': 'a' * 40}):
+                with self.assertRaisesRegex(ValueError, 'exact Git checkout'):
+                    BUILD_METADATA.metadata(root, '1.9', release=True)
+
     def test_pipeline_is_qualification_only_and_checks_final_payloads(self):
         workflow = (ROOT / '.github/workflows/stable-1.9.yml').read_text(encoding='utf-8')
         self.assertIn('release_commit:', workflow)
