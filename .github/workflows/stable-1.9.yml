@@ -1,0 +1,352 @@
+name: Build Stable 1.9 qualification artifacts
+
+'on':
+  workflow_dispatch:
+    inputs:
+      release_commit:
+        description: Full 40-character commit ID to qualify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.contract.outputs.sha }}
+      version: ${{ steps.contract.outputs.version }}
+      windows_version: ${{ steps.contract.outputs.windows_version }}
+      bundle_version: ${{ steps.contract.outputs.bundle_version }}
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.release_commit }}
+    - id: contract
+      name: Verify immutable source and release contract
+      shell: bash
+      run: |
+        set -euo pipefail
+        requested='${{ inputs.release_commit }}'
+        [[ "$requested" =~ ^[0-9a-f]{40}$ ]]
+        actual="$(git rev-parse HEAD)"
+        test "$actual" = "$requested"
+        test -z "$(git status --porcelain --untracked-files=all)"
+        echo "sha=$actual" >> "$GITHUB_OUTPUT"
+        python3 - <<'PY'
+        import os
+        from pathlib import Path
+        from c64u_browser.release import (MAC_BUNDLE_VERSION, RELEASE_NOTES,
+                                          VERSION, WINDOWS_NUMERIC_VERSION)
+        if not Path(RELEASE_NOTES).is_file():
+            raise SystemExit(f'Missing {RELEASE_NOTES}')
+        with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+            out.write(f"version={VERSION}\n")
+            out.write(f"windows_version={WINDOWS_NUMERIC_VERSION}\n")
+            out.write(f"bundle_version={MAC_BUNDLE_VERSION}\n")
+        PY
+
+  windows:
+    needs: source
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
+      ARGONAUT_VERSION: ${{ needs.source.outputs.version }}
+      ARGONAUT_WINDOWS_VERSION: ${{ needs.source.outputs.windows_version }}
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ needs.source.outputs.sha }}
+    - name: Verify source checkout
+      shell: bash
+      run: test "$(git rev-parse HEAD)" = "$ARGONAUT_SOURCE_COMMIT"
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-python-gobject mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-pyinstaller mingw-w64-ucrt-x86_64-gst-plugins-base mingw-w64-ucrt-x86_64-gst-plugins-good mingw-w64-ucrt-x86_64-gst-plugins-bad mingw-w64-ucrt-x86_64-adwaita-icon-theme
+    - name: Unit tests
+      shell: msys2 {0}
+      run: |
+        python -m unittest discover -s tests -p 'test_*.py'
+        python -O -m unittest discover -s tests -p 'test_*.py'
+    - name: Stamp and build portable application
+      shell: msys2 {0}
+      run: |
+        python packaging/build_metadata.py --release --version "$ARGONAUT_VERSION"
+        python packaging/windows/write_version_info.py
+        python -m PyInstaller --noconfirm --clean packaging/windows/argonaut.spec
+        {
+          uname -a
+          python --version
+          python -m PyInstaller --version
+          pacman -Q
+        } > dist/Argonaut/BUILD-EVIDENCE.txt
+        cp LICENSE COPYRIGHT packaging/windows/README.txt packaging/RELEASE-1.9.md dist/Argonaut/
+    - name: Verify PE version resource
+      shell: pwsh
+      run: |
+        $info = (Get-Item 'dist\Argonaut\Argonaut.exe').VersionInfo
+        if ($info.FileVersion -ne $env:ARGONAUT_WINDOWS_VERSION -or
+            $info.ProductVersion -ne $env:ARGONAUT_VERSION -or
+            $info.ProductName -ne 'Argonaut' -or
+            $info.CompanyName -ne 'Bruce Marcus') { throw 'PE version resource is incorrect' }
+    - name: Intermediate packaged self-test
+      shell: pwsh
+      run: |
+        $report = Join-Path $env:RUNNER_TEMP 'argonaut-self-test.json'
+        $env:PATH = "$env:SystemRoot\system32;$env:SystemRoot"
+        $process = Start-Process 'dist\Argonaut\Argonaut.exe' -ArgumentList @('--self-test', $report) -PassThru
+        if (-not $process.WaitForExit(180000)) { $process.Kill(); throw 'Startup test timed out' }
+        if ($process.ExitCode -ne 0) { throw 'Packaged self-test failed' }
+        $result = Get-Content $report | ConvertFrom-Json
+        if ($result.result -ne 'passed' -or $result.version -ne $env:ARGONAUT_VERSION -or
+            $result.build -ne $env:ARGONAUT_SOURCE_COMMIT) { throw 'Packaged identity is incorrect' }
+    - name: Signing boundary — intentionally unsigned
+      shell: pwsh
+      run: Write-Host 'Stable 1.9 has no Authenticode step. Insert future signing here.'
+    - name: Build and test final Setup and Portable ZIP
+      shell: pwsh
+      run: ./packaging/windows/package.ps1
+    - uses: actions/upload-artifact@v7
+      with:
+        name: stable-1.9-Windows
+        path: |
+          release-assets/Argonaut-${{ env.ARGONAUT_VERSION }}-Windows-x64-Setup.exe
+          release-assets/Argonaut-${{ env.ARGONAUT_VERSION }}-Windows-x64-Portable.zip
+        if-no-files-found: error
+
+  macos:
+    needs: source
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
+      ARGONAUT_VERSION: ${{ needs.source.outputs.version }}
+      ARGONAUT_BUNDLE_VERSION: ${{ needs.source.outputs.bundle_version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - runner: macos-15
+          arch: arm64
+          label: AppleSilicon
+        - runner: macos-15-intel
+          arch: x86_64
+          label: Intel
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ needs.source.outputs.sha }}
+    - name: Verify source and install native runtime
+      run: |
+        set -euo pipefail
+        test "$(git rev-parse HEAD)" = "$ARGONAUT_SOURCE_COMMIT"
+        test "$(uname -m)" = "${{ matrix.arch }}"
+        mkdir -p "$RUNNER_TEMP/python-links"
+        for name in idle3.13 pip3.13 pydoc3.13 python3.13 python3.13-config; do
+          link="/usr/local/bin/$name"
+          if [ -L "$link" ]; then mv "$link" "$RUNNER_TEMP/python-links/$name"; fi
+        done
+        brew install python@3.13 pygobject3 gtk4 gstreamer adwaita-icon-theme
+        "$(brew --prefix python@3.13)/bin/python3.13" -m venv --system-site-packages .venv
+        .venv/bin/python -m pip install pyinstaller keyring
+    - name: Unit tests
+      run: |
+        .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+        .venv/bin/python -O -m unittest discover -s tests -p 'test_*.py'
+    - name: Build and ad-hoc sign application
+      run: |
+        .venv/bin/python packaging/build_metadata.py --release --version "$ARGONAUT_VERSION"
+        .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
+        codesign --force --deep --sign - dist/Argonaut.app
+    - name: Verify and run relocated application
+      run: |
+        mkdir -p "$RUNNER_TEMP/Argonaut App Test"
+        ditto dist/Argonaut.app "$RUNNER_TEMP/Argonaut App Test/Argonaut.app"
+        .venv/bin/python packaging/macos/verify_bundle.py \
+          --app "$RUNNER_TEMP/Argonaut App Test/Argonaut.app" \
+          --version "$ARGONAUT_VERSION" --bundle-version "$ARGONAUT_BUNDLE_VERSION" \
+          --arch "${{ matrix.arch }}" --build "$ARGONAUT_SOURCE_COMMIT"
+        env -u PYTHONPATH -u GI_TYPELIB_PATH -u DYLD_LIBRARY_PATH -u GST_PLUGIN_PATH \
+          PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+          "$RUNNER_TEMP/Argonaut App Test/Argonaut.app/Contents/MacOS/Argonaut" \
+          --self-test "$RUNNER_TEMP/mac-relocated-self-test.json"
+    - name: Record build evidence and create final containers
+      run: |
+        mkdir -p mac-package artifacts
+        ditto dist/Argonaut.app mac-package/Argonaut.app
+        cp packaging/RELEASE-1.9.md LICENSE COPYRIGHT mac-package/
+        if [ "${{ matrix.label }}" = Intel ]; then
+          cp packaging/macos/README-1.9-Intel.txt mac-package/README.txt
+        else
+          cp packaging/macos/README-1.9.txt mac-package/README.txt
+        fi
+        {
+          sw_vers
+          uname -a
+          .venv/bin/python --version
+          .venv/bin/python -m PyInstaller --version
+          .venv/bin/python -m pip show PyGObject pyinstaller keyring
+          brew info --json=v2 --installed
+          xcodebuild -version
+          hdiutil help 2>&1 | head -1
+          codesign -h 2>&1 | head -1
+        } > mac-package/BUILD-EVIDENCE.txt
+        ln -s /Applications mac-package/Applications
+        hdiutil create -volname Argonaut -srcfolder mac-package -ov -format UDZO \
+          "artifacts/Argonaut-${ARGONAUT_VERSION}-macOS-${{ matrix.label }}.dmg"
+        ditto -c -k --sequesterRsrc --keepParent mac-package \
+          "artifacts/Argonaut-${ARGONAUT_VERSION}-macOS-${{ matrix.label }}.zip"
+    - name: Verify final ZIP and DMG applications
+      run: |
+        set -euo pipefail
+        ziproot="$RUNNER_TEMP/final-zip"
+        mkdir -p "$ziproot"
+        ditto -x -k "artifacts/Argonaut-${ARGONAUT_VERSION}-macOS-${{ matrix.label }}.zip" "$ziproot"
+        zipapp="$ziproot/mac-package/Argonaut.app"
+        .venv/bin/python packaging/macos/verify_bundle.py --app "$zipapp" \
+          --version "$ARGONAUT_VERSION" --bundle-version "$ARGONAUT_BUNDLE_VERSION" \
+          --arch "${{ matrix.arch }}" --build "$ARGONAUT_SOURCE_COMMIT"
+        env -u PYTHONPATH -u GI_TYPELIB_PATH -u DYLD_LIBRARY_PATH -u GST_PLUGIN_PATH \
+          PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+          "$zipapp/Contents/MacOS/Argonaut" --self-test "$RUNNER_TEMP/mac-zip-self-test.json"
+        mount="$RUNNER_TEMP/final-dmg"
+        mkdir -p "$mount"
+        hdiutil attach -nobrowse -readonly -mountpoint "$mount" \
+          "artifacts/Argonaut-${ARGONAUT_VERSION}-macOS-${{ matrix.label }}.dmg"
+        .venv/bin/python packaging/macos/verify_bundle.py --app "$mount/Argonaut.app" \
+          --version "$ARGONAUT_VERSION" --bundle-version "$ARGONAUT_BUNDLE_VERSION" \
+          --arch "${{ matrix.arch }}" --build "$ARGONAUT_SOURCE_COMMIT"
+        ditto "$mount/Argonaut.app" "$RUNNER_TEMP/Argonaut DMG Relocated.app"
+        hdiutil detach "$mount"
+        env -u PYTHONPATH -u GI_TYPELIB_PATH -u DYLD_LIBRARY_PATH -u GST_PLUGIN_PATH \
+          PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+          "$RUNNER_TEMP/Argonaut DMG Relocated.app/Contents/MacOS/Argonaut" \
+          --self-test "$RUNNER_TEMP/mac-dmg-self-test.json"
+    - uses: actions/upload-artifact@v7
+      with:
+        name: stable-1.9-macOS-${{ matrix.label }}
+        path: artifacts/
+        if-no-files-found: error
+
+  debian:
+    needs: source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
+      ARGONAUT_VERSION: ${{ needs.source.outputs.version }}
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ needs.source.outputs.sha }}
+    - name: Install package test runtime
+      run: |
+        test "$(git rev-parse HEAD)" = "$ARGONAUT_SOURCE_COMMIT"
+        sudo apt-get update
+        sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad iproute2 adwaita-icon-theme xvfb dbus-x11
+    - name: Unit and GTK tests
+      run: |
+        python3 -m unittest discover -s tests -p 'test_*.py'
+        python3 -O -m unittest discover -s tests -p 'test_*.py'
+        xvfb-run -a env ARGONAUT_UI_TESTS=1 python3 -m unittest tests.test_preferences_ui
+    - name: Record build evidence and build Debian package
+      run: |
+        {
+          cat /etc/os-release
+          uname -a
+          python3 --version
+          dpkg-deb --version | head -1
+          dpkg-query -W 'python3-gi' 'libglib2.0-0t64' 'libgtk-4-1' 'gir1.2-gtk-4.0' 'gir1.2-secret-1' 'gir1.2-gstreamer-1.0' 'gstreamer1.0-*'
+        } > "$RUNNER_TEMP/debian-build-evidence.txt"
+        ARGONAUT_BUILD_EVIDENCE="$RUNNER_TEMP/debian-build-evidence.txt" \
+          python3 packaging/build_deb.py --release --version "$ARGONAUT_VERSION" --output release-assets
+    - name: Inspect final Debian container
+      run: |
+        package="release-assets/argonaut-c64u_${ARGONAUT_VERSION}_all.deb"
+        dpkg-deb --info "$package"
+        dpkg-deb --contents "$package" | tee "$RUNNER_TEMP/debian-contents.txt"
+        python3 - <<'PY'
+        import os
+        from pathlib import Path
+        lines=Path(os.environ['RUNNER_TEMP'],'debian-contents.txt').read_text().splitlines()
+        if not lines or any(' root/root ' not in line for line in lines):
+            raise SystemExit('Debian archive ownership is not root/root')
+        if any(len(line) >= 9 and line[8] == 'w' for line in lines):
+            raise SystemExit('Debian archive contains world-writable entries')
+        PY
+    - name: Install, self-test, reinstall and remove Debian package
+      run: |
+        package="./release-assets/argonaut-c64u_${ARGONAUT_VERSION}_all.deb"
+        sudo apt-get install -y "$package"
+        mkdir -p "$HOME/.config/argonaut"
+        printf 'preserve\n' > "$HOME/.config/argonaut/release-gate-preserve"
+        xvfb-run -a /usr/bin/argonaut --self-test /tmp/debian-test.json
+        python3 - <<'PY'
+        import json, os
+        result=json.load(open('/tmp/debian-test.json', encoding='utf-8'))
+        if (result.get('result'),result.get('version'),result.get('build')) != (
+                'passed',os.environ['ARGONAUT_VERSION'],os.environ['ARGONAUT_SOURCE_COMMIT']):
+            raise SystemExit('Installed Debian self-test identity failed')
+        PY
+        sudo apt-get install --reinstall -y "$package"
+        sudo apt-get remove -y argonaut-c64u
+        test -f "$HOME/.config/argonaut/release-gate-preserve"
+    - uses: actions/upload-artifact@v7
+      with:
+        name: stable-1.9-Debian
+        path: release-assets/argonaut-c64u_${{ env.ARGONAUT_VERSION }}_all.deb
+        if-no-files-found: error
+
+  assemble:
+    needs: [source, windows, macos, debian]
+    runs-on: ubuntu-24.04
+    env:
+      ARGONAUT_SOURCE_COMMIT: ${{ needs.source.outputs.sha }}
+      ARGONAUT_VERSION: ${{ needs.source.outputs.version }}
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        ref: ${{ needs.source.outputs.sha }}
+    - uses: actions/download-artifact@v8
+      with:
+        pattern: stable-1.9-*
+        path: release-assets
+        merge-multiple: true
+    - name: Create source archive and authoritative checksum manifest
+      run: |
+        set -euo pipefail
+        test "$(git rev-parse HEAD)" = "$ARGONAUT_SOURCE_COMMIT"
+        git archive --format=zip --prefix="argonaut-${ARGONAUT_VERSION}/" \
+          -o "release-assets/argonaut-${ARGONAUT_VERSION}-source.zip" "$ARGONAUT_SOURCE_COMMIT"
+        python3 - <<'PY'
+        import hashlib
+        from pathlib import Path
+        from c64u_browser.release import artifact_names
+        root=Path('release-assets')
+        expected=set(artifact_names())
+        actual={path.name for path in root.iterdir() if path.is_file()}
+        if actual != expected:
+            raise SystemExit(f'Expected {sorted(expected)}, got {sorted(actual)}')
+        manifest=''.join(
+            hashlib.sha256((root/name).read_bytes()).hexdigest()+'  '+name+'\n'
+            for name in sorted(expected))
+        (root/'SHA256SUMS').write_text(manifest, encoding='ascii')
+        PY
+    - name: Confirm publishing is disabled
+      run: |
+        test ! -e .git/refs/tags/v1.9
+        echo 'Qualification artifacts only: no tag, release, or upload was created.'
+    - uses: actions/upload-artifact@v7
+      with:
+        name: stable-1.9-final-qualification-set
+        path: release-assets/
+        if-no-files-found: error
