@@ -79,7 +79,7 @@ class ReleaseContractTests(unittest.TestCase):
                 BUILD_METADATA.metadata(source, '1.9', release=True)
 
     def test_pipeline_is_qualification_only_and_checks_final_payloads(self):
-        workflow = (ROOT / '.github/workflows/stable-1.9.yml').read_text()
+        workflow = (ROOT / '.github/workflows/stable-1.9.yml').read_text(encoding='utf-8')
         self.assertIn('release_commit:', workflow)
         self.assertIn('build_metadata.py --release', workflow)
         self.assertIn('artifact_names()', workflow)
@@ -89,25 +89,27 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertNotIn('contents: write', workflow)
         self.assertNotIn('notarytool', workflow)
         self.assertNotIn('signtool', workflow)
+        self.assertIn('install: git mingw-w64-ucrt-x86_64-python', workflow)
+        self.assertIn("shutil.which('git')", workflow)
 
     def test_stable_mac_packages_use_current_readmes_without_repurposing_history(self):
-        workflow = (ROOT / '.github/workflows/stable-1.9.yml').read_text()
+        workflow = (ROOT / '.github/workflows/stable-1.9.yml').read_text(encoding='utf-8')
         self.assertIn('packaging/macos/README-1.9.txt', workflow)
         self.assertIn('packaging/macos/README-1.9-Intel.txt', workflow)
         self.assertNotIn('cp packaging/macos/README.txt mac-package/README.txt', workflow)
         self.assertNotIn('cp packaging/macos/README-Intel.txt mac-package/README.txt', workflow)
         for name in ('README.txt', 'README-Intel.txt'):
-            historical = (ROOT / 'packaging/macos' / name).read_text()
+            historical = (ROOT / 'packaging/macos' / name).read_text(encoding='utf-8')
             self.assertTrue(historical.startswith('HISTORICAL:'))
         for name in ('README-1.9.txt', 'README-1.9-Intel.txt'):
-            current = (ROOT / 'packaging/macos' / name).read_text()
+            current = (ROOT / 'packaging/macos' / name).read_text(encoding='utf-8')
             self.assertIn('Stable 1.9 platform qualification', current)
             self.assertIn('not Apple Developer ID signed or notarized', current)
 
     def test_windows_and_mac_specs_consume_release_resources(self):
-        windows = (ROOT / 'packaging/windows/argonaut.spec').read_text()
-        installer = (ROOT / 'packaging/windows/installer.iss').read_text()
-        mac = (ROOT / 'packaging/macos/argonaut.spec').read_text()
+        windows = (ROOT / 'packaging/windows/argonaut.spec').read_text(encoding='utf-8')
+        installer = (ROOT / 'packaging/windows/installer.iss').read_text(encoding='utf-8')
+        mac = (ROOT / 'packaging/macos/argonaut.spec').read_text(encoding='utf-8')
         self.assertIn("version=str(version_file)", windows)
         self.assertIn('#error AppVersion must be defined', installer)
         self.assertIn('VersionInfoVersion={#AppNumericVersion}', installer)

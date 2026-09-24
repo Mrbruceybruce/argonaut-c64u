@@ -186,13 +186,13 @@ class SidJukeboxClientTests(unittest.TestCase):
 
     def test_gtk_client_has_no_transport_credentials_or_playback_rules(self):
         root=Path(__file__).resolve().parents[1]/'c64u_browser'
-        text=(root/'sid_jukebox_tab.py').read_text()+(root/'sid_jukebox_client.py').read_text()
+        text=(root/'sid_jukebox_tab.py').read_text(encoding='utf-8')+(root/'sid_jukebox_client.py').read_text(encoding='utf-8')
         for forbidden in ('UltimateClient','play_sid(', 'play_sid_data(',
                           '.password','_request_json','urllib','ftplib'):
             self.assertNotIn(forbidden,text)
         self.assertNotIn('Play now…',text)
         self.assertNotIn('prepare_library_play',text)
-        gui=(root/'gui.py').read_text()
+        gui=(root/'gui.py').read_text(encoding='utf-8')
         self.assertNotIn('media_tab.select_file',gui)
         self.assertIn('Add to SID Jukebox',gui)
 

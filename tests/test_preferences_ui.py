@@ -14,7 +14,16 @@ class PreferencesUI(unittest.TestCase):
         self.Gtk=Gtk;self.GLib=GLib;self.Gio=Gio
         self.env=patch.dict(os.environ,{'ARGONAUT_DEVELOPMENT':'1'});self.env.start()
         self.temp=tempfile.TemporaryDirectory()
-        self.app=Browser();self.app.preferences=Preferences(Path(self.temp.name)/'config.json')
+        from c64u_browser.c64_ai_bridge_control import HealthMonitorStatus
+        health=patch('c64u_browser.test_lab_tab.health_monitor_status',
+                     return_value=HealthMonitorStatus(
+                         'disabled', 'Off · no health alerts are scheduled'))
+        health.start();self.addCleanup(health.stop)
+        from c64u_browser.core import ArgonautCore
+        core=ArgonautCore(preferences=Preferences(Path(self.temp.name)/'config.json'))
+        with patch('c64u_browser.gui.ArgonautCore', return_value=core):
+            self.app=Browser()
+        self.assertIs(self.app.preferences, self.app.core.preferences)
         self.app.set_application_id('org.local.Argonaut.Test'+uuid.uuid4().hex)
         self.app.set_flags(Gio.ApplicationFlags.NON_UNIQUE);self.app.register(None);self.app.activate()
     def tearDown(self):
@@ -986,7 +995,7 @@ class PreferencesUI(unittest.TestCase):
         self.assertIn('PASS', tab.latest_deterministic.get_text())
         self.assertIn('UNAVAILABLE', tab.latest_ai.get_text())
         self.assertTrue(tab.latest_status_path.is_file())
-        self.app.tabs.set_current_page(6);self.pump()
+        self.app.tabs.set_current_page(self.app.tabs.page_num(tab.box));self.pump()
         for check in (tab.schedule_check,tab.auto_analyze,tab.unattended_ai):
             self.assertEqual(check.get_halign(),self.Gtk.Align.START)
             self.assertLess(check.get_width(),tab.content.get_width()-80)
@@ -1030,12 +1039,13 @@ class PreferencesUI(unittest.TestCase):
     def test_stable_developer_mode_is_opt_in_and_builds_test_lab_after_restart(self):
         from c64u_browser.gui import Browser
         from c64u_browser.profiles import Preferences
-        from unittest.mock import patch
+        from c64u_browser.core import ArgonautCore
         prefs = Preferences(Path(self.temp.name) / 'stable/config.json')
         prefs.app_options['developer_mode'] = True
         prefs.save()
         with patch.dict(os.environ, {'ARGONAUT_DEVELOPMENT': '0'}), patch(
-                'c64u_browser.gui.Preferences', return_value=prefs):
+                'c64u_browser.gui.ArgonautCore',
+                return_value=ArgonautCore(preferences=prefs)):
             stable = Browser()
             stable.set_application_id('org.local.Argonaut.StableTest' + uuid.uuid4().hex)
             stable.set_flags(self.Gio.ApplicationFlags.NON_UNIQUE)

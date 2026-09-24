@@ -160,7 +160,7 @@ class GameLibraryClientTests(unittest.TestCase):
 
     def test_gtk_client_source_contains_no_direct_transport_or_runner_calls(self):
         root = Path(__file__).resolve().parents[1] / 'c64u_browser'
-        source = ''.join((root / name).read_text() for name in (
+        source = ''.join((root / name).read_text(encoding='utf-8') for name in (
             'game_library_client.py', 'game_library_tab.py',
             'game_library_bulk_dialog.py'))
         for forbidden in ('UltimateClient', 'run_crt(', 'run_crt_data(',
