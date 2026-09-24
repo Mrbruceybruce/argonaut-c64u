@@ -1,5 +1,8 @@
 $ErrorActionPreference = 'Stop'
-$version = if ($env:ARGONAUT_VERSION) { $env:ARGONAUT_VERSION } else { '1.5' }
+if (-not $env:ARGONAUT_VERSION) { throw 'ARGONAUT_VERSION is required' }
+if (-not $env:ARGONAUT_WINDOWS_VERSION) { throw 'ARGONAUT_WINDOWS_VERSION is required' }
+if (-not $env:ARGONAUT_SOURCE_COMMIT) { throw 'ARGONAUT_SOURCE_COMMIT is required' }
+$version = $env:ARGONAUT_VERSION
 function Run-Checked($File, $Arguments) {
   $p = Start-Process -FilePath $File -ArgumentList $Arguments -PassThru -Wait
   if ($p.ExitCode -ne 0) { throw "$File exited with $($p.ExitCode)" }
@@ -21,9 +24,25 @@ $releaseNotes = Join-Path $env:GITHUB_WORKSPACE "packaging\RELEASE-$version.md"
 if (Test-Path $releaseNotes) { Copy-Item $releaseNotes "$bundle\RELEASE-NOTES.md" }
 $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler is unavailable' }
-& $iscc "/DAppVersion=$version" packaging/windows/installer.iss
+$evidence = Join-Path $bundle 'BUILD-EVIDENCE.txt'
+Add-Content $evidence "Inno Setup: $((Get-Item $iscc).VersionInfo.FileVersion)"
+Add-Content $evidence "PowerShell: $($PSVersionTable.PSVersion)"
+Add-Content $evidence "Windows: $([Environment]::OSVersion.VersionString)"
+& $iscc "/DAppVersion=$version" "/DAppNumericVersion=$env:ARGONAUT_WINDOWS_VERSION" packaging/windows/installer.iss
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
 $setup = Join-Path $assets "Argonaut-$version-Windows-x64-Setup.exe"
+$setupVersion = (Get-Item $setup).VersionInfo
+if ($setupVersion.FileVersion -ne $env:ARGONAUT_WINDOWS_VERSION) {
+  throw 'Setup executable version resource is incorrect'
+}
+$sourceExe = Join-Path $bundle 'Argonaut.exe'
+$versionInfo = (Get-Item $sourceExe).VersionInfo
+if ($versionInfo.FileVersion -ne $env:ARGONAUT_WINDOWS_VERSION -or
+    $versionInfo.ProductVersion -ne $version -or
+    $versionInfo.ProductName -ne 'Argonaut' -or
+    $versionInfo.CompanyName -ne 'Bruce Marcus') {
+  throw "Argonaut.exe PE version resource is incorrect: $($versionInfo | Format-List | Out-String)"
+}
 $installed = Join-Path $env:RUNNER_TEMP 'Argonaut Install Test'
 Run-Checked $setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installed`"")
 if (Test-Path "$installed\portable.flag") { throw 'Installer incorrectly enabled portable mode' }
@@ -44,10 +63,16 @@ Run-Checked "$bundle\Argonaut.exe" @('--self-test',"`"$report`"")
 Confirm-SelfTest $report
 if (-not (Test-Path "$bundle\Data\argonaut\config.json")) { throw 'Portable preferences missing' }
 Remove-Item "$bundle\Data" -Recurse -Force
-Compress-Archive -Path "$bundle\*" -DestinationPath "$assets\Argonaut-$version-Windows-x64-Portable.zip"
-git archive --format=zip --prefix="argonaut-$version/" -o "$assets\argonaut-$version-source.zip" HEAD
-if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
-Get-ChildItem $assets -File | Sort-Object Name | ForEach-Object {
-  $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-  "$digest  $($_.Name)"
-} | Set-Content -Encoding ascii "$assets\SHA256SUMS"
+$portable = Join-Path $assets "Argonaut-$version-Windows-x64-Portable.zip"
+Compress-Archive -Path "$bundle\*" -DestinationPath $portable
+$extracted = Join-Path $env:RUNNER_TEMP 'Argonaut Portable Final Test'
+Expand-Archive -Path $portable -DestinationPath $extracted
+if (Test-Path "$extracted\Data") { throw 'Distributed Portable ZIP contains test-generated Data' }
+$report = Join-Path $env:RUNNER_TEMP 'portable-final-self-test.json'
+Run-Checked "$extracted\Argonaut.exe" @('--self-test',"`"$report`"")
+Confirm-SelfTest $report
+$finalVersion = (Get-Item "$extracted\Argonaut.exe").VersionInfo
+if ($finalVersion.FileVersion -ne $env:ARGONAUT_WINDOWS_VERSION -or
+    $finalVersion.ProductVersion -ne $version) {
+  throw 'Portable ZIP executable version resource is incorrect'
+}

@@ -12,3 +12,6 @@ class VersionTests(unittest.TestCase):
             self.assertEqual(version.build_info(),{'version':'2.3.4','build':'abcdef123'})
             p.write_text('{broken')
             self.assertIn('unpackaged',version.build_info()['build'])
+
+    def test_source_checkout_fallback_is_current_stable_version(self):
+        self.assertEqual('1.9', version.VERSION)

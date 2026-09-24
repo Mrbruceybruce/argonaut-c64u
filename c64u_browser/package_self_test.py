@@ -61,6 +61,8 @@ def run(package_metadata, report_path):
         from .gui import Browser
         from .platform_support import local_roots, portable_root, publish_new
         from .profiles import Preferences
+        from .recording import pipeline_description as recording_pipeline
+        from .replay_buffer import pipeline_description as replay_pipeline
         from .version import ASSETS, build_info
 
         root = portable_root()
@@ -85,7 +87,34 @@ def run(package_metadata, report_path):
         missing = [name for name in plugin_names if not Gst.ElementFactory.find(name)]
         _require(not missing, 'runtime.gstreamer',
                  'Required media plugins are unavailable.', checks)
+        recording = Gst.parse_launch(recording_pipeline(240, True))
+        replay = Gst.parse_launch(replay_pipeline(240, True))
+        _require(recording.get_by_name('video') is not None and
+                 recording.get_by_name('audio') is not None and
+                 recording.get_by_name('file') is not None,
+                 'runtime.recording_pipeline',
+                 'The recording pipeline could not be constructed.', checks)
+        _require(replay.get_by_name('video') is not None and
+                 replay.get_by_name('audio') is not None and
+                 replay.get_by_name('sink') is not None and
+                 Gst.ElementFactory.find('splitmuxsrc') is not None,
+                 'runtime.replay_pipeline',
+                 'The replay pipeline or export reader is unavailable.', checks)
+        recording.set_state(Gst.State.NULL);replay.set_state(Gst.State.NULL)
         _require(Gtk.init_check(), 'runtime.gtk', 'GTK could not initialize.', checks)
+
+        credentials = Credentials()
+        if root:
+            credential_ready = getattr(credentials, 'session_only', False)
+        elif sys.platform == 'win32':
+            credential_ready = type(credentials).__name__ == 'WindowsCredentials'
+        elif sys.platform == 'darwin':
+            credential_ready = type(credentials).__name__ == 'MacOSCredentials'
+        else:
+            credential_ready = (type(credentials).__name__ == 'Credentials' and
+                                credentials.error is None)
+        _require(credential_ready, 'runtime.credentials_backend',
+                 'The packaged credential backend is unavailable.', checks)
 
         with tempfile.TemporaryDirectory() as directory:
             app = Browser()
@@ -334,9 +363,9 @@ def run(package_metadata, report_path):
                      (ASSETS / 'argonaut.png').is_file(),
                      'package.assets', 'Required application artwork is missing.', checks)
 
-            expected_version = package_metadata.get('version', '1.5')
+            expected_version = package_metadata.get('version')
             identity = build_info()
-            _require(identity['version'] == expected_version and
+            _require(bool(expected_version) and identity['version'] == expected_version and
                      'unpackaged' not in identity['build'],
                      'package.identity', 'Package build identity is incorrect.', checks)
 
@@ -401,6 +430,9 @@ def run(package_metadata, report_path):
                 _require(app.lookup_action('quit').get_enabled(), 'ui.quit_action',
                          'The Quit action is unavailable.', checks)
             else:
+                _require(Preferences().path.parent.name == 'argonaut',
+                         'stable.settings_path',
+                         'Stable settings path is not isolated.', checks)
                 from .test_lab_access import enabled as test_lab_enabled
                 _require(not hasattr(app, 'test_lab_tab') and
                          not test_lab_enabled(app.preferences),

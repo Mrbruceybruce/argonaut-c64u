@@ -11,5 +11,9 @@ a=Analysis([str(root/'packaging/windows/launch.py')],pathex=[str(root)],datas=da
  'gstreamer':{'include_plugins':['coreelements','app','audioconvert','audioresample','autodetect','directsound','wasapi','wasapi2','videoconvertscale','vpx','vorbis','ogg','matroska','multifile','typefindfunctions','playback','volume']}},
  excludes=['gi.repository.Secret'])
 pyz=PYZ(a.pure)
-exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Argonaut',console=False,icon=str(root/'packaging/icons/argonaut.ico'))
+version_file=root/'packaging/windows/version_info.txt'
+if not version_file.is_file():
+ raise SystemExit('Generate packaging/windows/version_info.txt before building')
+exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Argonaut',console=False,
+ icon=str(root/'packaging/icons/argonaut.ico'),version=str(version_file))
 coll=COLLECT(exe,a.binaries,a.datas,name='Argonaut')

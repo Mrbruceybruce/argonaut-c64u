@@ -25,10 +25,11 @@ boundaries. Portable code and platform tests remain required throughout;
 repeated desktop packaging is deferred until a major release is ready for
 consolidated regression testing.
 
-The current boundary is Stable 1.9. Its consolidated platform gate follows SID
-Jukebox Linux acceptance and the Game Library Bulk Import enhancement. The gate
-covers the server-first Core foundation, USB/SD Backup & Restore, Game Library,
-SID Jukebox, and Bulk Import together. Cross-platform
+The current boundary is Stable 1.9. Feature implementation and Linux acceptance
+are complete, and repository history has been reconciled. The unsigned private
+qualification workflow is prepared; the consolidated platform gate is next and
+has not yet been completed. The gate covers the server-first Core foundation,
+USB/SD Backup & Restore, Game Library, SID Jukebox, and Bulk Import together. Cross-platform
 qualification blocks Stable 1.9 publication; it does not require a separate
 Windows/Mac physical cycle between those Linux-first feature sections. See the
 authoritative sequence and retained implementation history in
@@ -38,7 +39,7 @@ This separates app settings, not the connected C64U hardware or files: operation
 in either app still affect the selected real device. Mount & Run and Send Text have passed initial hardware testing; the
 historical replay acceptance checklist is in [DEVELOPMENT-TEST.md](DEVELOPMENT-TEST.md).
 It is not the 1.9 platform gate. See [build and release guidance](RELEASING.md)
-for the remaining workflows and the preparation still needed for 1.9.
+for the unsigned qualification workflow and the remaining platform gate.
 
 The Debian development package also includes the per-user C64 AI bridge
 launcher and service unit. Test Lab can create its private pairing, start or

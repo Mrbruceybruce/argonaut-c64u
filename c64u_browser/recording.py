@@ -10,6 +10,11 @@ import gi
 gi.require_version('Gst','1.0')
 from gi.repository import Gst
 
+def pipeline_description(height,audio=True):
+ pipeline='webmmux name=mux ! filesink name=file appsrc name=video is-live=true format=time block=false max-bytes=4194304 ! queue ! videoconvert ! vp8enc deadline=1 cpu-used=8 ! queue ! mux. '
+ if audio:pipeline+='appsrc name=audio is-live=true format=time block=false max-bytes=262144 ! queue ! audioconvert ! audioresample ! vorbisenc ! queue ! mux.'
+ return pipeline
+
 class Recorder:
  def __init__(self,path,height,audio=True):
   Gst.init(None)
@@ -18,9 +23,7 @@ class Recorder:
   fd,self.temporary=tempfile.mkstemp(prefix='.argonaut-recording-',suffix='.webm',dir=Path(path).parent);os.close(fd)
   self.pipeline=None
   try:
-   pipeline='webmmux name=mux ! filesink name=file appsrc name=video is-live=true format=time block=false max-bytes=4194304 ! queue ! videoconvert ! vp8enc deadline=1 cpu-used=8 ! queue ! mux. '
-   if audio:pipeline+='appsrc name=audio is-live=true format=time block=false max-bytes=262144 ! queue ! audioconvert ! audioresample ! vorbisenc ! queue ! mux.'
-   self.pipeline=Gst.parse_launch(pipeline);self.pipeline.get_by_name('file').set_property('location',self.temporary)
+   self.pipeline=Gst.parse_launch(pipeline_description(height,audio));self.pipeline.get_by_name('file').set_property('location',self.temporary)
    self.video=self.pipeline.get_by_name('video');self.video.set_property('caps',Gst.Caps.from_string(f'video/x-raw,format=RGB,width=384,height={height},framerate=30/1'))
    self.sound=self.pipeline.get_by_name('audio') if audio else None
    if self.sound:self.sound.set_property('caps',Gst.Caps.from_string('audio/x-raw,format=S16LE,rate=48000,channels=2,layout=interleaved'))

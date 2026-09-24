@@ -18,6 +18,32 @@ from gi.repository import Gst
 MIN_EXPORT_HEADROOM = 4 * 1024 * 1024
 
 
+def pipeline_description(height, audio=True, seconds=30, fragment_seconds=2):
+    frame_count = max(1, round(fragment_seconds * 30))
+    max_files = math.ceil(seconds / fragment_seconds) + 1
+    description = (
+        'splitmuxsink name=sink muxer-factory=webmmux '
+        'async-finalize=true send-keyframe-requests=true '
+        'location="fragment-%05d.webm" '
+        f'max-size-time={round(fragment_seconds * Gst.SECOND)} '
+        f'max-files={max_files} '
+        'appsrc name=video is-live=true format=time block=false '
+        'max-bytes=4194304 '
+        f'caps="video/x-raw,format=RGB,width=384,height={height},framerate=30/1" '
+        '! queue max-size-buffers=8 max-size-bytes=0 max-size-time=0 '
+        '! videoconvert '
+        f'! vp8enc deadline=1 cpu-used=8 keyframe-max-dist={frame_count} '
+        '! queue ! sink.video ')
+    if audio:
+        description += (
+            'appsrc name=audio is-live=true format=time block=false '
+            'max-bytes=262144 '
+            'caps="audio/x-raw,format=S16LE,rate=48000,channels=2,layout=interleaved" '
+            '! queue max-size-buffers=64 max-size-bytes=0 max-size-time=0 '
+            '! audioconvert ! audioresample ! vorbisenc ! queue ! sink.audio_0')
+    return description
+
+
 def export_space_required(encoded_bytes):
     """Allow for the remuxed output plus a small filesystem safety margin."""
     return max(MIN_EXPORT_HEADROOM, int(encoded_bytes) + MIN_EXPORT_HEADROOM)
@@ -70,27 +96,10 @@ class ReplayBuffer:
         self.max_files = math.ceil(seconds / fragment_seconds) + 1
         self.pipeline = None
         try:
-            frame_count = max(1, round(fragment_seconds * 30))
-            description = (
-                'splitmuxsink name=sink muxer-factory=webmmux '
-                'async-finalize=true send-keyframe-requests=true '
-                f'location="{self.pattern}" '
-                f'max-size-time={round(fragment_seconds * Gst.SECOND)} '
-                f'max-files={self.max_files} '
-                'appsrc name=video is-live=true format=time block=false '
-                'max-bytes=4194304 '
-                f'caps="video/x-raw,format=RGB,width=384,height={height},framerate=30/1" '
-                '! queue max-size-buffers=8 max-size-bytes=0 max-size-time=0 '
-                '! videoconvert '
-                f'! vp8enc deadline=1 cpu-used=8 keyframe-max-dist={frame_count} '
-                '! queue ! sink.video ')
-            if audio:
-                description += (
-                    'appsrc name=audio is-live=true format=time block=false '
-                    'max-bytes=262144 '
-                    'caps="audio/x-raw,format=S16LE,rate=48000,channels=2,layout=interleaved" '
-                    '! queue max-size-buffers=64 max-size-bytes=0 max-size-time=0 '
-                    '! audioconvert ! audioresample ! vorbisenc ! queue ! sink.audio_0')
+            description = pipeline_description(
+                height, audio, seconds, fragment_seconds).replace(
+                    'location="fragment-%05d.webm"',
+                    f'location="{self.pattern}"')
             self.pipeline = Gst.parse_launch(description)
             self.sink = self.pipeline.get_by_name('sink')
             self.video = self.pipeline.get_by_name('video')

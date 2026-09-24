@@ -3,8 +3,8 @@
 import json
 import os
 from . import development
+from .release import VERSION
 from pathlib import Path
-VERSION = '1.8'
 ASSETS = Path(__file__).resolve().parent / 'assets'
 
 def build_info():

@@ -18,7 +18,9 @@ Uninstall through Windows Settings > Apps. Profiles remain in %APPDATA%\argonaut
 and saved passwords remain in Windows Credential Manager. Uninstall preserves them.
 
 No Python or MSYS2 installation is needed. Windows 10/11 x64 is the initial target.
-These builds are unsigned. In a VM use bridged networking and connect by LAN IP.
+Stable 1.9 builds are unsigned. Verify SHA256SUMS before using the normal
+per-file Windows option to continue past any publisher/reputation warning.
+In a VM use bridged networking and connect by LAN IP.
 Preview needs Ethernet on the C64U and inbound UDP 11000–11001 on the Windows PC.
 Neither package changes firewall rules. Allow only your trusted private network.
 

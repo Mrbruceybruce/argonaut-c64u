@@ -1,23 +1,55 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Stamp package version and source identity without storing local paths."""
-import argparse, hashlib, json, os, subprocess
+import argparse, hashlib, json, os, subprocess, sys
+import re
 from pathlib import Path
 
-def metadata(source, version):
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from c64u_browser.release import (MAC_BUNDLE_VERSION, TAG, VERSION,
+                                  WINDOWS_NUMERIC_VERSION, validate_version)
+
+def _git(source, *args):
+    return subprocess.check_output(
+        ['git', '-C', str(source), *args], stderr=subprocess.DEVNULL,
+        text=True).strip()
+
+
+def metadata(source, version, release=False):
     source = Path(source).resolve()
-    build = os.environ.get('ARGONAUT_SOURCE_COMMIT','')
-    if build and (len(build)!=40 or any(c not in '0123456789abcdef' for c in build)):
+    if release:
+        version = validate_version(version)
+    elif not isinstance(version, str) or not re.fullmatch(r'[0-9A-Za-z][0-9A-Za-z.+~-]*', version):
+        raise ValueError('Invalid package version')
+    if release and version != VERSION:
+        raise ValueError(f'Stable release packaging requires version {VERSION}')
+    requested = os.environ.get('ARGONAUT_SOURCE_COMMIT','')
+    if requested and (len(requested)!=40 or any(c not in '0123456789abcdef' for c in requested)):
         raise ValueError('ARGONAUT_SOURCE_COMMIT must be a full Git commit ID')
+    build = ''
     try:
-        root = subprocess.check_output(['git','-C',str(source),'rev-parse','--show-toplevel'],stderr=subprocess.DEVNULL,text=True).strip()
-        if not build and Path(root).resolve() == source:
-            build = subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()
-            dirty = subprocess.check_output(['git','-C',str(source),'status','--porcelain','--untracked-files=no'],text=True).strip()
-            if dirty: build += '-modified'
+        root = _git(source, 'rev-parse', '--show-toplevel')
+        if Path(root).resolve() == source:
+            head = _git(source, 'rev-parse', 'HEAD')
+            if requested and requested != head:
+                raise ValueError(
+                    'ARGONAUT_SOURCE_COMMIT does not match the source checkout')
+            dirty = _git(source, 'status', '--porcelain',
+                         '--untracked-files=all')
+            if release and dirty:
+                raise ValueError('Stable release packaging requires a clean checkout')
+            build = head + ('-modified' if dirty else '')
     except (OSError, subprocess.CalledProcessError):
-        pass
+        if release:
+            raise ValueError('Stable release packaging requires an exact Git checkout')
+    if requested and not build:
+        if release:
+            raise ValueError('Could not verify ARGONAUT_SOURCE_COMMIT against checkout')
+        build = requested
     if not build:
+        if release:
+            raise ValueError('Stable release packaging requires a Git commit identity')
         digest = hashlib.sha256()
         files = sorted((source/'c64u_browser').glob('*.py')) + sorted((source/'c64u_browser/assets').glob('*'))
         for path in files:
@@ -26,15 +58,21 @@ def metadata(source, version):
                 if path.suffix in ('.py','.svg','.json','.txt'):data=data.replace(b'\r\n',b'\n')
                 digest.update(path.relative_to(source).as_posix().encode()+b'\0'+data)
         build = 'source-'+digest.hexdigest()[:16]
-    return {'version':version, 'build':build}
+    result = {'version':version, 'build':build}
+    if release:
+        result.update({'release': True, 'tag': TAG,
+                       'bundle_version': MAC_BUNDLE_VERSION,
+                       'windows_version': WINDOWS_NUMERIC_VERSION})
+    return result
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
-    parser.add_argument('--version',required=True)
+    parser.add_argument('--version',default=VERSION)
+    parser.add_argument('--release',action='store_true')
     parser.add_argument('--development',action='store_true')
     parser.add_argument('--source',type=Path,default=Path(__file__).resolve().parents[1])
     args=parser.parse_args()
     destination=args.source/'c64u_browser/_build.json'
-    data=metadata(args.source,args.version)
+    data=metadata(args.source,args.version,args.release)
     if args.development:data['development']=True
     destination.write_text(json.dumps(data,indent=2)+'\n')

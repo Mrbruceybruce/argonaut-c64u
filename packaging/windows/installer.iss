@@ -1,11 +1,15 @@
 #ifndef AppVersion
-#define AppVersion "1.5"
+#error AppVersion must be defined by the release pipeline
+#endif
+#ifndef AppNumericVersion
+#error AppNumericVersion must be defined by the release pipeline
 #endif
 [Setup]
 SetupIconFile=..\icons\argonaut.ico
 AppId=Argonaut-C64U
 AppName=Argonaut
 AppVersion={#AppVersion}
+VersionInfoVersion={#AppNumericVersion}
 AppPublisher=Bruce Marcus
 AppPublisherURL=https://github.com/Mrbruceybruce/argonaut-c64u
 DefaultDirName={localappdata}\Programs\Argonaut

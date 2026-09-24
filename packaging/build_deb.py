@@ -1,16 +1,26 @@
 #!/usr/bin/python3
 """Build a Debian binary package using only Python and dpkg-deb."""
-import argparse,os,shutil,subprocess,tempfile,json
+import argparse,os,shutil,subprocess,tempfile,json,sys
 from build_metadata import metadata
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path(__file__).resolve().parents[1]);p.add_argument('--output',type=Path,default=Path('dist'));p.add_argument('--version',default='1.5');p.add_argument('--development',action='store_true');args=p.parse_args()
+ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
+from c64u_browser.release import VERSION
+p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=ROOT);p.add_argument('--output',type=Path,default=Path('dist'));p.add_argument('--version',default=VERSION);p.add_argument('--development',action='store_true');p.add_argument('--release',action='store_true');args=p.parse_args()
 source=args.source.resolve();assets=Path(__file__).resolve().parent;out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 version=args.version
 app_name='argonaut-development' if args.development else 'argonaut'
 package='argonaut-c64u-development' if args.development else 'argonaut-c64u'
-build=metadata(source,version.replace('~','-'))
+build=metadata(source,version.replace('~','-'),args.release)
 if args.development:build['development']=True
-epoch=int(os.environ.get('SOURCE_DATE_EPOCH','1789240332'))
+commit=build['build']
+if commit.endswith('-modified'):commit=commit[:-9]
+try:
+ epoch=int(subprocess.check_output(['git','-C',str(source),'show','-s','--format=%ct',commit],text=True).strip())
+except (OSError,subprocess.CalledProcessError,ValueError):
+ if args.release:raise SystemExit('Could not derive SOURCE_DATE_EPOCH from release commit')
+ epoch=int(os.environ.get('SOURCE_DATE_EPOCH','0'))
+if args.release and os.environ.get('SOURCE_DATE_EPOCH') not in (None,str(epoch)):
+ raise SystemExit('SOURCE_DATE_EPOCH does not match the immutable release commit')
 with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
  root=Path(temp)
  def write(name,text,mode=0o644):
@@ -69,8 +79,15 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
   shutil.copyfile(assets/f'icons/argonaut-{size}.png',destination)
  for name in ['README.md','LICENSE','COPYRIGHT']:
   write(f'usr/share/doc/{package}/'+name,(source/name).read_text())
+ evidence=os.environ.get('ARGONAUT_BUILD_EVIDENCE','')
+ if evidence:
+  evidence_path=Path(evidence)
+  if not evidence_path.is_file():raise SystemExit('Build evidence file is missing')
+  write(f'usr/share/doc/{package}/BUILD-EVIDENCE.txt',evidence_path.read_text())
  release_notes=assets/f'RELEASE-{version}.md'
- if not release_notes.is_file():release_notes=assets/'RELEASE-NOTES.md'
+ if not release_notes.is_file():
+  if args.release:raise SystemExit(f'Missing release notes: {release_notes}')
+  release_notes=assets/'RELEASE-NOTES.md'
  write(f'usr/share/doc/{package}/RELEASE-NOTES.md',release_notes.read_text())
  write(f'usr/share/doc/{package}/copyright',(source/'COPYRIGHT').read_text() + '\nLicense: GPL-3.0-or-later. Full license: LICENSE in this directory.\n')
  size=sum(f.stat().st_size for f in root.rglob('*') if f.is_file())//1024+1
@@ -87,7 +104,7 @@ Suggests: ollama
 Description: GTK desktop controller and file manager for C64 Ultimate
  Manage connection profiles, USB and SD files, settings, ROMs,
  configuration backups, screen preview, screenshots and recordings.
- Built and tested on Debian 13 with GTK 4.
+ Uses the system Python 3 and GTK 4 runtime.
 ''')
  for f in root.rglob('*'):os.utime(f,(epoch,epoch))
  subprocess.run(['dpkg-deb','--root-owner-group','--build',str(root),str(out/f'{package}_{version}_all.deb')],check=True,env={**os.environ,'SOURCE_DATE_EPOCH':str(epoch)})
