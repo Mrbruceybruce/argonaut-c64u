@@ -1,8 +1,8 @@
 # Running and building on macOS
 
-The published 0.1.4 Mac package is Apple Silicon only, macOS 15 or newer.
-Intel packaging is experimental and needs testing on a physical Intel Mac.
-The Intel workflow uses macOS 15; earlier macOS versions are not validated.
+The published 1.8 release has separate Apple Silicon and Intel packages for
+macOS 15 or newer. Hosted build checks do not replace physical Mac acceptance
+for the next release. Earlier macOS versions are not validated.
 
 ## Run from source
 
@@ -24,13 +24,14 @@ report the failing command and its error rather than continuing.
 
 ## Build an application bundle
 
-Use current main for Intel packaging support. The 0.1.4 release tag's spec explicitly
-selected ARM64 and cannot produce an Intel bundle without that change.
+Build from the intended source revision and record its commit. The example below
+labels the bundle 1.8; choose a version that matches your source and release plan.
+See [build and release guidance](RELEASING.md) before preparing a candidate.
 
 ```sh
 .venv/bin/python -m pip install pyinstaller
 .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
-.venv/bin/python packaging/build_metadata.py --version 0.1.4
+.venv/bin/python packaging/build_metadata.py --version 1.8
 .venv/bin/python -m PyInstaller --noconfirm --clean packaging/macos/argonaut.spec
 open dist/Argonaut.app
 ```
@@ -40,8 +41,12 @@ Silicon. Python and all native dependencies must match. It is not a universal ap
 PyInstaller bundles the runtime; recipients do not need Homebrew or Python.
 The app is ad-hoc signed, not Developer ID signed or notarized.
 
-The workflows `.github/workflows/macos.yml` and `macos-intel.yml` create DMG/ZIP
-packages and check relocated startup, About, media plugins, and signatures.
+The macOS jobs in `.github/workflows/stable-1.8.yml` and
+`development-packages.yml` create DMG/ZIP packages for both architectures and
+check relocated packaged startup and signatures. Both resolve source from
+`development`, regardless of the dispatch branch, and retain their existing
+1.8 / 1.8-replay.3 versions. Keep publishing off; these are not 1.9 workflows.
+The separate 0.1.4 Mac builders and one-off publishers have been retired.
 Passing unit tests alone does not demonstrate that the graphical app launches.
 
 ## Intel tester checklist

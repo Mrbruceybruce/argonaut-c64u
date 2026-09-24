@@ -4,11 +4,11 @@ Argonaut controls and manages a C64 Ultimate from your computer. It provides
 file transfers, settings and favorites, ROM selection, configuration backups,
 and live screen preview with audio.
 
-This guide covers Argonaut 1.5 on Debian, Windows, and Apple Silicon or Intel Mac. Available settings and actions depend on the connected C64U firmware.
+This guide covers Argonaut 1.8 on Debian, Windows, and Apple Silicon or Intel Mac. Available settings and actions depend on the connected C64U firmware.
 
 ## 1. Install Argonaut
 
-Choose the package for your computer from the unified 1.5 release.
+Choose the package for your computer from the unified 1.8 release.
 
 | Computer | Download | Install |
 | --- | --- | --- |

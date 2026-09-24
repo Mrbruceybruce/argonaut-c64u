@@ -1,3 +1,8 @@
+HISTORICAL: README for the retired 0.1.4-era Mac test builders.
+The test-build and platform limitations below describe that period.
+For current packages and build procedures, see docs/RELEASING.md in the
+repository and https://github.com/Mrbruceybruce/argonaut-c64u/releases.
+
 Argonaut macOS test build — Apple Silicon, macOS 15 or newer
 
 Open the DMG and drag Argonaut into Applications, then launch it there.
