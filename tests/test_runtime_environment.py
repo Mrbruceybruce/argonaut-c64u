@@ -34,8 +34,11 @@ class RuntimeEnvironmentTests(unittest.TestCase):
         for development, channel in ((False, 'argonaut'), (True, 'argonaut-development')):
             configure_gstreamer_registry(development=development)
             expected = self.home / 'Library/Caches' / channel / 'gstreamer/registry.bin'
-            self.assertEqual(os.environ['GST_REGISTRY'], str(expected))
-            self.assertEqual(os.environ['GST_REGISTRY_1_0'], str(expected))
+            registry = Path(os.environ['GST_REGISTRY']).resolve()
+            self.assertEqual(registry, expected.resolve())
+            self.assertEqual(Path(os.environ['GST_REGISTRY_1_0']).resolve(), expected.resolve())
+            self.assertFalse(registry.is_relative_to(self.bundle.resolve()))
+            self.assertFalse(registry.is_relative_to(self.bundle.parents[1].resolve()))
             expected.write_bytes(b'simulated GStreamer cache')
             self.assertFalse(list(self.bundle.parents[1].rglob('registry.bin')))
             self.assertEqual(os.environ['GST_PLUGIN_PATH'], str(self.bundle))
