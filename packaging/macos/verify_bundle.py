@@ -32,10 +32,11 @@ def verify(app, version, bundle_version, arch, build):
         if not path.is_file():
             continue
         try:
-            kind = output('file', '-b', str(path))
+            kind = subprocess.check_output(
+                ['file', '-b', str(path)], stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError:
             continue
-        if 'Mach-O' not in kind:
+        if b'Mach-O' not in kind:
             continue
         for line in output('otool', '-L', str(path)).splitlines()[1:]:
             dependency = line.strip().split(' (compatibility', 1)[0]
