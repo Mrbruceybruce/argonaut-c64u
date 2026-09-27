@@ -13,7 +13,8 @@ from threading import Lock
 
 from .api import BrowserError
 from .deletion import prepare as prepare_deletion, delete_reviewed
-from .files import child, operate
+from .files import child, operate_managed
+from .ftp_reads import read_operation
 from .folder_copy import build_plan, execute_plan
 from .jobs import CoreJob, JobCancelled
 from .scheduler import CoreScheduler, DeviceSession, JobBinding
@@ -112,10 +113,15 @@ class DeleteResult:
     removed: tuple[str, ...]
     total: int
     failure: str = ''
+    stopped_target: str | None = None
+    mutation: dict | None = None
+    not_attempted: tuple[str, ...] = ()
 
     @property
     def message(self):
-        return (f'Deleted {len(self.removed)} of {self.total} item(s).'+
+        uncertainty = (' Result uncertain for '+self.stopped_target+'.'
+                       if self.mutation and self.mutation['outcome']=='unknown' else '')
+        return (f'Deleted {len(self.removed)} of {self.total} item(s).'+uncertainty+
                 (' Stopped: '+self.failure if self.failure else ''))
 
 
@@ -317,7 +323,8 @@ class FileService:
         session=expected_session or self._session(locations)
         def task(job):
             client=self._client(locations,session);job.check_cancel()
-            items=prepare_deletion(client,local,targets,job.check_cancel)
+            with read_operation(client, job.check_cancel):
+                items=prepare_deletion(client,local,targets,job.check_cancel)
             job.check_cancel();plan_id=uuid.uuid4().hex
             with self._lock:
                 self._cleanup_plans_locked()
@@ -335,6 +342,15 @@ class FileService:
             self._check_session(stored.session)
             client=self._client((FileLocation(stored.scope,stored.targets[0]),),
                                 stored.session)
+            if not local:
+                report=delete_reviewed(client,False,stored.targets,stored.items,
+                                       check=job.check_cancel,managed=True)
+                result=DeleteResult(tuple(report.removed),len(stored.items),
+                    str(report.error) if report.error else '',report.stopped_target,
+                    report.mutation,report.not_attempted)
+                if isinstance(report.error,JobCancelled):raise JobCancelled(result=result)
+                if report.error:raise FileJobFailure('delete',str(report.error),result)
+                return result
             removed,error=delete_reviewed(client,local,stored.targets,stored.items,
                                           check=job.check_cancel)
             result=DeleteResult(tuple(removed),len(stored.items),error or '')
@@ -350,9 +366,28 @@ class FileService:
         def task(job):
             job.check_cancel();self._check_session(session)
             if local:Path(target).mkdir()
-            else:operate(self._client((parent,),session),'mkdir',target)
+            else:self._managed_mutation(self._client((parent,),session),'mkdir',target,check=job.check_cancel)
             return FileLocation(parent.scope,target)
         return self._job('file.folder.create',task,session=session)
+
+    @staticmethod
+    def _managed_mutation(client, action, path, **kwargs):
+        try:return operate_managed(client,action,path,**kwargs)
+        except JobCancelled:raise
+        except BrowserError as exc:
+            # Availability of the network never implies mutation replay safety.
+            raise FileJobFailure(getattr(exc,'kind','mutation'),str(exc),
+                                 getattr(exc,'result',None),retryable=False) from None
+
+    def rename(self, source, new_name):
+        if source.scope!=C64U:
+            raise BrowserError('This rename operation requires a C64U source.')
+        session=self._session((source,))
+        def task(job):
+            client=self._client((source,),session)
+            return self._managed_mutation(client,'rename',source.path,
+                                          new_name=new_name,check=job.check_cancel)
+        return self._job('file.rename',task,session=session)
 
     def prepare_native_upload(self, source, destination_folder, name):
         self._local(source)

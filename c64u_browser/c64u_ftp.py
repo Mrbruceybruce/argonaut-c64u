@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Unused Slice 1 C64U FTP boundary. Existing production routes do not import it.
+"""Core-owned C64U FTP transport.
 
 One operation-scoped lease, no pool, no retries, no generic command/socket API.
 All wire parsing uses bytes. Only this module owns the sockets. Core services
@@ -19,7 +19,7 @@ from .c64u_ftp_types import (
     CapabilityState as CS, ContainerPresentation, C64UFtpCapabilities,
     ConnectionBinding, ErrorCode as EC, FtpOperationError, FtpPolicy,
     FtpSessionIdentity, ListingLimits, ListingParser, ListingResult,
-    Outcome, SessionState, TransferResult, checked_path,
+    Outcome, SessionState, TransferResult, MutationEvidence, checked_path,
 )
 
 
@@ -121,6 +121,8 @@ class C64UFtpClient:
         self._count = 0
         self._submitted = False
         self._invalid_reason = None
+        self._cancel_deferred = 0
+        self._mutation = None
 
     @property
     def identity(self):
@@ -159,7 +161,7 @@ class C64UFtpClient:
         if self._invalid_reason is not None:
             raise FtpOperationError(self._invalid_reason, 'binding')
         self._manager._check(self._binding)
-        if self._cancelled():
+        if not self._cancel_deferred and self._cancelled():
             raise FtpOperationError(EC.CANCELLED, self._phase)
         if self._state in (SessionState.FAILED, SessionState.RECOVERING):
             raise FtpOperationError(EC.STALE, self._phase)
@@ -192,14 +194,15 @@ class C64UFtpClient:
         elif isinstance(exc, TimeoutError):
             code = {'data-connect': EC.DATA_CONNECT_TIMEOUT,
                     'data-io': EC.DATA_IDLE_TIMEOUT,
-                    'completion': EC.COMPLETION_UNKNOWN}.get(self._phase, EC.CONTROL_TIMEOUT)
+                    'completion': EC.COMPLETION_UNKNOWN,
+                    'mutation-reply': EC.COMPLETION_UNKNOWN}.get(self._phase, EC.CONTROL_TIMEOUT)
             error = FtpOperationError(code, self._phase, retryable=True)
         elif isinstance(exc, ConnectionRefusedError) and self._phase == 'control-connect':
             error = FtpOperationError(EC.CONTROL_REFUSED, self._phase, retryable=True)
         elif isinstance(exc, OSError) and exc.errno in (errno.ENETUNREACH, errno.EHOSTUNREACH):
             error = FtpOperationError(EC.NETWORK, self._phase, retryable=True)
         else:
-            code = (EC.COMPLETION_UNKNOWN if self._phase == 'completion' else
+            code = (EC.COMPLETION_UNKNOWN if self._phase in ('completion', 'mutation-reply') else
                     EC.LOCAL_IO if self._phase == 'local-io' else
                     EC.STOR if self._operation == 'STOR' else
                     EC.RETR if self._operation == 'RETR' else
@@ -208,9 +211,17 @@ class C64UFtpClient:
         outcome = error.outcome
         if self._submitted and outcome == Outcome.NOT_STARTED:
             outcome = Outcome.UNKNOWN
+        mutation = self._mutation
+        if mutation is not None:
+            # RNFR loss leaves rename unsubmitted; RNTO loss is uncertain mutation.
+            outcome = (Outcome.REJECTED if error.outcome == Outcome.REJECTED else
+                       Outcome.UNKNOWN if mutation.consequential_submitted else
+                       Outcome.NOT_STARTED)
+            mutation = replace(mutation, outcome=outcome,
+                               error_category=error.code.value)
         error = FtpOperationError(error.code, error.phase, reply_code=error.reply_code,
                                   retryable=error.retryable, outcome=outcome,
-                                  transferred=self._count)
+                                  transferred=self._count, mutation=mutation)
         self._event('error', **error.as_dict())
         self._invalidate(SessionState.RECOVERING if error.code == EC.RECOVERING else SessionState.FAILED)
         return error
@@ -221,6 +232,9 @@ class C64UFtpClient:
             raise FtpOperationError(EC.BUSY, 'operation')
         start = time.monotonic()
         try:
+            self._mutation = (MutationEvidence(verb, 'RNFR' if verb == 'rename' else verb)
+                              if verb in ('rename', 'MKD', 'DELE', 'RMD') else None)
+            self._submitted = False
             if self._invalid_reason is not None:
                 raise FtpOperationError(self._invalid_reason, 'binding')
             if self._state != SessionState.READY:
@@ -293,6 +307,9 @@ class C64UFtpClient:
             # Check cancellation first; mark before sendall because a failed
             # send can still have delivered some command bytes.
             self._submitted = True
+        if self._mutation is not None:
+            self._mutation = replace(self._mutation, stage_submitted=True,
+                                     consequential_submitted=(verb != 'RNFR'))
         self._control.sendall(command + b'\r\n')
 
     def _command(self, verb, argument=None):
@@ -376,6 +393,55 @@ class C64UFtpClient:
             self._state_to(SessionState.READY)
         except Exception as exc:
             raise self._failure(exc) from None
+
+    @contextmanager
+    def _defer_cancel(self):
+        # Only cooperative cancellation is masked. _check still validates binding.
+        self._cancel_deferred += 1
+        try:yield
+        finally:self._cancel_deferred -= 1
+
+    def _mutation_command(self, verb, path, accepted):
+        self._mutation = replace(self._mutation, stage=verb, stage_submitted=False,
+                                 reply_code=None)
+        self._phase = 'mutation-reply'
+        self._send(verb, path)
+        reply = self._reply()
+        self._mutation = replace(self._mutation, reply_code=reply[0])
+        self._expect(reply, accepted)
+        self._mutation = replace(self._mutation,
+            acknowledged=self._mutation.acknowledged + ((verb, reply[0]),))
+
+    def rename(self, source, destination):
+        with self._operation_scope('rename'):
+            checked_path(source);checked_path(destination)
+            self._check()  # final cooperative check before RNFR
+            with self._defer_cancel():
+                self._mutation_command('RNFR', source, range(300, 400))
+                self._mutation_command('RNTO', destination, range(200, 300))
+            return self._mutation_complete()
+
+    def _single_mutation(self, verb, path, accepted):
+        with self._operation_scope(verb):
+            checked_path(path)
+            self._check()
+            with self._defer_cancel():
+                self._mutation_command(verb, path, accepted)
+            return self._mutation_complete()
+
+    def _mutation_complete(self):
+        self._mutation = replace(self._mutation, outcome=Outcome.COMPLETED)
+        self._event('mutation-complete', mutation=self._mutation.as_dict())
+        return self._mutation
+
+    def mkdir(self, path):
+        return self._single_mutation('MKD', path, range(200, 300))
+
+    def delete(self, path):
+        return self._single_mutation('DELE', path, (200, 250))
+
+    def rmdir(self, path):
+        return self._single_mutation('RMD', path, range(200, 300))
 
     def size(self, path):
         path = checked_path(path)

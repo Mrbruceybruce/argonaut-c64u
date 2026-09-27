@@ -4,6 +4,8 @@
 import ftplib
 import posixpath
 import uuid
+from dataclasses import dataclass
+from .ftp_reads import adapter_for
 from .api import BrowserError, safe_argument
 from .transfers import connect, remote_file
 from .diagnostics import operation_event
@@ -29,7 +31,7 @@ def operate(client, action, path, new_name=None, confirmation=None):
         return _operate(client, action, path, new_name, confirmation)
 
 
-def _operate(client, action, path, new_name, confirmation):
+def _operate(client, action, path, new_name, confirmation, managed=None):
     remote_file(path)
     parent, name = posixpath.split(path)
     child(parent, name)
@@ -66,6 +68,8 @@ def _operate(client, action, path, new_name, confirmation):
                 raise BrowserError('Folder is not empty; recursive deletion is disabled.')
     else:
         raise BrowserError('Unknown file operation.')
+    if managed is not None:
+        return managed(entry, destination, case_only, temporary, parent)
     ftp = None
     try:
         ftp = connect(client)
@@ -88,3 +92,58 @@ def _operate(client, action, path, new_name, confirmation):
                            + (f' The item may be named {temporary!r} or {destination!r}; no automatic rollback was attempted.' if temporary else '')) from exc
     finally:
         if ftp is not None: ftp.close()
+
+
+@dataclass(frozen=True)
+class MutationResult:
+    operation: str
+    source: str
+    destination: str | None = None
+    temporary: str | None = None
+    completed: tuple[dict, ...] = ()
+    stopped: dict | None = None
+    verification: str = 'not-required'
+
+
+def operate_managed(client, action, path, new_name=None, confirmation=None, check=None):
+    """Explicit 3B entry. Deferred composite callers still use operate()."""
+    adapter = adapter_for(client)
+    if adapter is None:
+        raise BrowserError('This operation requires a Core-managed C64U session.')
+    completed = []
+    destination = temporary = None
+    verification = 'not-required'
+
+    def execute(entry, target, case_only, intermediate, parent):
+        nonlocal destination, temporary, verification
+        destination, temporary = target, intermediate
+        if action == 'rename':
+            if case_only:
+                verification = 'unperformed'
+                with adapter.defer_cancellation():
+                    completed.append(adapter.mutate('rename', path, temporary))
+                    completed.append(adapter.mutate('rename', temporary, destination))
+                _, entries = client.list_directory(parent)
+                if not any(e.name == new_name for e in entries):
+                    verification = 'failed'
+                    raise BrowserError('Server did not report the requested letter case. Refresh to inspect the resulting name.')
+                verification = 'passed'
+            else:completed.append(adapter.mutate('rename', path, destination))
+        else:
+            verb = 'mkdir' if action == 'mkdir' else 'rmdir' if entry.kind == 'dir' else 'delete'
+            completed.append(adapter.mutate(verb, path))
+        return destination or path
+
+    with operation_event('ftp', 'file_' + action, 'entry'):
+        try:
+            with adapter.operation(check):
+                result = _operate(client, action, path, new_name, confirmation, managed=execute)
+            return MutationResult(action, path, destination or result, temporary,
+                                  tuple(completed), verification=verification)
+        except Exception as exc:
+            error = getattr(exc, 'ftp_error', None)
+            evidence = getattr(error, 'mutation', None)
+            exc.result = MutationResult(action, path, destination, temporary,
+                tuple(completed), evidence.as_dict() if evidence is not None else None,
+                verification)
+            raise

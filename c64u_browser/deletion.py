@@ -3,11 +3,13 @@ from .platform_support import parents
 # Copyright (C) 2026 Bruce Marcus
 """Review a bounded deletion snapshot; never recursively delete unseen entries."""
 from dataclasses import dataclass
+from contextlib import nullcontext
 from pathlib import Path
 import stat
 from .api import BrowserError
 from .storage import storage_root
-from .files import child, inspect, operate
+from .files import child, inspect, operate, operate_managed
+from .ftp_reads import adapter_for
 
 @dataclass(frozen=True)
 class Item:
@@ -50,14 +52,40 @@ def prepare(client,local,targets,check=lambda:None):
     return tuple(items)
 
 
-def delete_reviewed(client,local,targets,items,check=lambda:None):
+@dataclass
+class DeletionReport:
+    removed: list
+    stopped_target: str | None = None
+    mutation: object = None
+    not_attempted: tuple[str, ...] = ()
+    error: Exception | None = None
+
+
+def delete_reviewed(client,local,targets,items,check=lambda:None,*,managed=False):
+    adapter=adapter_for(client) if managed else None
     removed=[]
+    try:
+        if managed and adapter is None:
+            raise BrowserError('Reviewed remote deletion requires a Core-managed session.')
+        with adapter.operation(check) if adapter is not None else nullcontext():
+            return _delete_items(client,local,targets,items,check,managed,removed)
+    except Exception as exc:
+        # _delete_items carries the exact stopped item and completed prefix.
+        report=getattr(exc,'deletion_report',None)
+        if report is None:
+            report=DeletionReport(removed,not_attempted=tuple(i.path for i in items),error=exc)
+        return report if managed else (removed,str(exc))
+
+
+def _delete_items(client,local,targets,items,check,managed,removed):
+    current=None
     try:
         check()
         if prepare(client,local,targets,check)!=items:
             raise BrowserError('Contents changed since review. Review the deletion again.')
         directories={i.path:i for i in items if i.kind=='dir'}
         for item in items:
+            current=item.path
             check()
             for parent in parents(item.path,local):
                 if parent in directories and snapshot(client,local,parent)!=directories[parent]:
@@ -67,7 +95,17 @@ def delete_reviewed(client,local,targets,items,check=lambda:None):
             if local:
                 if item.kind=='dir':Path(item.path).rmdir()
                 else:Path(item.path).unlink()
-            else:operate(client,'delete',item.path,confirmation=item.path)
+            else:
+                operation=operate_managed if managed else operate
+                operation(client,'delete',item.path,confirmation=item.path)
             removed.append(item.path)
-        return removed,None
-    except Exception as exc:return removed,str(exc)
+        return DeletionReport(removed) if managed else (removed,None)
+    except Exception as exc:
+        result=getattr(exc,'result',None)
+        mutation=getattr(result,'stopped',None)
+        attempted=bool(mutation and mutation['consequential_submitted'])
+        removed_set=set(removed)
+        pending=tuple(i.path for i in items if i.path not in removed_set and
+                      not (attempted and i.path==current))
+        exc.deletion_report=DeletionReport(removed,current,mutation,pending,exc)
+        raise

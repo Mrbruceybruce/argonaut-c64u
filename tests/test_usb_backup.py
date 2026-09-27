@@ -412,7 +412,24 @@ class UsbBackupTests(unittest.TestCase):
         self.assertIn(partial.location.path,self.client.files)
         reviewed=self.files.prepare_partial_delete(partial).wait(5)
         self.assertEqual('succeeded',reviewed.state)
-        deleted=self.files.execute_delete(reviewed.result.plan_id).wait(5)
+        # The restore remains a legacy in-memory transport; only its reviewed
+        # cleanup now requires the managed mutation seam. Real-wire partial
+        # cleanup is covered by test_ftp_mutations.
+        from contextlib import contextmanager
+        from c64u_browser.ftp_reads import FtpReadAdapter
+        memory=self.client
+        class CleanupAdapter(FtpReadAdapter):
+            def __init__(self):pass
+            @contextmanager
+            def operation(self,check=None):
+                if check:check()
+                yield
+            def mutate(self,operation,path,destination=None):
+                if operation!='delete':raise AssertionError(operation)
+                MemoryFTP(memory).delete(path)
+                return {'operation':'DELE','outcome':'completed'}
+        with patch.object(self.client,'_ftp_reads',CleanupAdapter(),create=True):
+            deleted=self.files.execute_delete(reviewed.result.plan_id).wait(5)
         self.assertEqual('succeeded',deleted.state)
         self.assertNotIn(partial.location.path,self.client.files)
 

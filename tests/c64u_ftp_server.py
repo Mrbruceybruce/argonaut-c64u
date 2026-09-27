@@ -14,7 +14,8 @@ class FakeC64UFtp:
                  feat=b'211-Features:\r\n MLSD\r\n MLST type*;size*;modify*;\r\n211 End\r\n',
                  replies=None, files=None, completion=b'226 Complete\r\n',
                  welcome=b'220 C64U fixture\r\n', split=False,
-                 data_wait=None, completion_wait=None, coalesced=False, directories=None):
+                 data_wait=None, completion_wait=None, coalesced=False, directories=None,
+                 mutation_tree=False, after_mutation=None, mutation_hook=None):
         self.listing, self.list_data, self.feat = listing, list_data, feat
         self.replies = replies or {}
         self.files = dict(files or {b'/file': b'abc'})
@@ -22,6 +23,9 @@ class FakeC64UFtp:
         self.data_wait, self.completion_wait = data_wait, completion_wait
         self.coalesced = coalesced
         self.directories = None if directories is None else dict(directories)
+        self.mutation_tree = mutation_tree
+        self.after_mutation = after_mutation or {}
+        self.mutation_hook = mutation_hook
         self.bytes_transferred = 0
         self.commands = []
         self.connections = 0
@@ -36,6 +40,7 @@ class FakeC64UFtp:
             def handle(self):
                 listener = None
                 cwd = b'/'
+                rename_source = None
                 with fixture._lock:
                     fixture.connections += 1
                     fixture.live += 1
@@ -48,6 +53,14 @@ class FakeC64UFtp:
                             self.connection.sendall(data[offset:offset+3])
                     else:
                         self.connection.sendall(data)
+                def mutation_reply(verb, argument, default):
+                    if fixture.mutation_hook:fixture.mutation_hook(verb, argument)
+                    reply = fixture.after_mutation.get(verb, default)
+                    if callable(reply):reply = reply(argument)
+                    if reply is None:return False
+                    send(reply)
+                    return True
+
                 try:
                     send(fixture.welcome)
                     while True:
@@ -73,6 +86,41 @@ class FakeC64UFtp:
                                 send(b'550 Missing directory\r\n');continue
                             cwd=argument;send(b'250 Directory changed\r\n')
                         elif verb == b'PWD':send(b'257 \"'+cwd.replace(b'\"',b'\"\"')+b'\"\r\n')
+                        elif fixture.mutation_tree and verb in (b'RNFR', b'RNTO', b'MKD', b'DELE', b'RMD'):
+                            if verb == b'RNFR':
+                                if argument not in fixture.files and argument not in fixture.directories:
+                                    send(b'550 Missing source\r\n');continue
+                                rename_source = argument
+                                reply = b'350 Continue\r\n'
+                            elif verb == b'RNTO':
+                                if rename_source is None:
+                                    send(b'503 RNFR required\r\n');continue
+                                if argument in fixture.files or argument in fixture.directories:
+                                    send(b'550 Exists\r\n');continue
+                                for tree in (fixture.files, fixture.directories):
+                                    for path in tuple(tree):
+                                        if path == rename_source or path.startswith(rename_source+b'/'):
+                                            tree[argument+path[len(rename_source):]] = tree.pop(path)
+                                rename_source = None
+                                reply = b'250 Renamed\r\n'
+                            elif verb == b'MKD':
+                                if argument in fixture.directories or argument in fixture.files:
+                                    send(b'550 Exists\r\n');continue
+                                fixture.directories[argument] = b''
+                                reply = b'257 "created"\r\n'
+                            elif verb == b'DELE':
+                                if argument not in fixture.files:
+                                    send(b'550 Missing file\r\n');continue
+                                del fixture.files[argument]
+                                reply = b'250 Deleted\r\n'
+                            else:
+                                if argument not in fixture.directories or any(
+                                        path.startswith(argument+b'/') for tree in
+                                        (fixture.files,fixture.directories) for path in tree):
+                                    send(b'550 Missing or nonempty\r\n');continue
+                                del fixture.directories[argument]
+                                reply = b'250 Removed\r\n'
+                            if not mutation_reply(verb, argument, reply):return
                         elif verb == b'SIZE':
                             if argument not in fixture.files:send(b'550 Missing\r\n')
                             else:send(b'213 '+str(len(fixture.files[argument])).encode()+b'\r\n')
@@ -101,6 +149,16 @@ class FakeC64UFtp:
                                         content.extend(block)
                                     fixture.files[argument] = bytes(content)
                                 else:
+                                    if fixture.mutation_tree:
+                                        prefix = cwd.rstrip(b'/')+b'/'
+                                        records = []
+                                        for path in fixture.directories:
+                                            name = path[len(prefix):] if path.startswith(prefix) else b''
+                                            if name and b'/' not in name:records.append(b'type=dir; '+name+b'\r\n')
+                                        for path, payload in fixture.files.items():
+                                            name = path[len(prefix):] if path.startswith(prefix) else b''
+                                            if name and b'/' not in name:records.append(b'type=file;size='+str(len(payload)).encode()+b'; '+name+b'\r\n')
+                                        fixture.directories[cwd] = b''.join(sorted(records))
                                     listing = fixture.directories[cwd] if verb == b'MLSD' and fixture.directories is not None else fixture.listing
                                     content = (listing if verb == b'MLSD' else
                                                fixture.list_data if verb == b'LIST' else fixture.files[argument])

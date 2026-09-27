@@ -12,7 +12,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib, Gdk, Gio, Graphene
 from .api import BrowserError, ConnectionFailure
-from .files import operate, child
+from .files import child
 from .navigation import History
 from .storage import storage_root, discover
 from .storage_ui import DriveButtons
@@ -1385,13 +1385,54 @@ class Browser(Gtk.Application):
         target = parent / name if local else child(parent, name)
         def submit(new):
             child('/USB2', new)
-            def task():
-                if local:
+            if local:
+                def task():
                     # GIO refuses replacement unless OVERWRITE is explicitly requested.
                     Gio.File.new_for_path(str(target)).move(Gio.File.new_for_path(str(parent / new)), Gio.FileCopyFlags.NONE, None, None, None)
                     return str(parent / new)
-                return operate(self.client, 'rename', target, new_name=new)
-            self.run(task, self.completed)
+                self.run(task, self.completed)
+                return
+            client = self.client
+            job = self.core.files.rename(FileLocation.c64u(target), new)
+            submitted = job.snapshot()
+            device_id, session_id = submitted.device_id, submitted.session_id
+            def same_session():
+                current = self.core.device_session()
+                return (self.client is not None and current.device_id == device_id
+                        and current.session_id == session_id)
+            def refresh_current():
+                return same_session() and self.remote == parent
+            def done(snapshot):
+                if snapshot.state == 'succeeded':
+                    if not same_session():
+                        self.status.set_text('Rename completed on the previous connection.')
+                        return
+                    message = 'Completed: ' + snapshot.result.destination
+                    self.refresh_local()
+                    self.status.set_text(message)
+                    if not refresh_current():return
+                    def refresh():
+                        # Recheck when the worker starts, not only when queued.
+                        if not refresh_current():return None
+                        try:return client.list_directory(parent)
+                        except Exception as exc:return exc
+                    def refreshed(listing):
+                        # Includes stale errors: never deliver them to recovery
+                        # or presentation for a different connection/folder.
+                        if not refresh_current() or listing is None:return
+                        if isinstance(listing, Exception):raise listing
+                        self.show_remote(listing)
+                        self.status.set_text(message)
+                    self.run(refresh, refreshed)
+                else:
+                    result = snapshot.result
+                    detail = (' Inspect '+result.temporary+' and '+result.destination+'.'
+                              if result is not None and result.temporary else '')
+                    evidence = (' Both rename steps completed; case verification '+result.verification+'.'
+                                if result is not None and len(result.completed)==2 else '')
+                    previous = '' if same_session() else 'Rename on the previous connection: '
+                    self.status.set_text(previous+snapshot.error.message+evidence+detail)
+            self.run_file_job(job, done)
         self.prompt('Rename', 'New name:', submit, name, action_label='Rename')
 
     def delete_item(self, local, name):

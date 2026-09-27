@@ -12,8 +12,8 @@ current state recorded here.
 - Stable 1.9 is released as `v1.9`. Its release artifacts are immutable.
 - `main` and `v1.9` are not the 1.10 development workspace. Current 1.10 work
   belongs on `development`.
-- Accepted development baseline: `bcd9ea94aee5d6af1a77378c0c0877ea0a5cfae7`
-  — `Migrate C64U read paths to aware FTP client`.
+- Accepted development baseline: `0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`
+  — `Implement managed streaming reads for FTP Slice 3A`.
 - Argonaut 1.10 direction: **C64U Network Foundation**.
 
 ## Completed FTP work
@@ -32,7 +32,7 @@ streaming downloads retained their legacy implementation. The Development
 package self-test now enforces channel-specific credential behavior; credential
 implementations are unchanged.
 
-Accepted automated baseline: normal and optimized suites each ran 791 tests
+Slice 2 automated baseline: normal and optimized suites each ran 791 tests
 with 36 opt-in display skips; 78 focused FTP/adapter/credential tests passed.
 See C64U-FTP.md for migration boundaries and detailed acceptance evidence.
 
@@ -89,12 +89,13 @@ different FTP implementations.
 - Quick Connect → Reconnect is planned.
 - A System/Light/Dark theme preference is planned.
 
-## Slice 3A — implemented; physical checks passed, final review pending
+## Slice 3A — accepted, committed and pushed
 
-The uncommitted 3A change is based on authoritative commit
+Slice 3A was physically accepted on both C64Us and committed/pushed to
+`development` as `0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`, with parent
 `4f7a86745239e60b3c6f4e2287d94af8b3c00508`. Authorized read-only physical
-acceptance checks passed on both C64Us on 27 September 2026. Results await final
-review before commit; no package, commit or publication was performed.
+checks passed on 27 September 2026; final review and the approved commit/push
+are complete.
 
 Core-bound streaming downloads and USB content hashing now use the managed FTP
 client. Their SIZE → RETR → SIZE observations preserve exact counts and received
@@ -132,18 +133,60 @@ No zero-byte file existed in the inspected source directories; none was created.
 No remote mutation, active-transfer interruption or production code change was
 performed during acceptance. See C64U-FTP.md for counts, hashes and limitations.
 
-Remaining checkpoints are **not implemented**:
+## Slice 3B — physical checks passed; final review pending
 
-- **3B:** mutation primitives and Core-owned directory operations.
-- **3C:** staged uploads and partial lifecycle.
-- **3D:** replacement and composite workflows.
-- **3E:** unbound-client retirement.
+The uncommitted 3B implementation is based on accepted Slice 3A commit
+`0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`. Authorized physical checks passed
+on both C64Us on 27 September 2026, including automated actual-display GTK
+rename qualification. Final acceptance review remains pending; no 3B commit,
+push, package or release has been performed.
 
-Uploads, replacement exchange/original-content reads, Flash writes, mutation
-primitives, partial-upload cleanup policy and unbound compatibility fallbacks
-remain legacy. Later work must preserve staging, readback hashing, conflict
-review, replacement rules and explicit destructive authorization. 3A does not
-implement upload exact-length changes or cancellation-deferred exchange scopes.
+Managed RNFR/RNTO, MKD, DELE and RMD retain structured mutation certainty,
+submission evidence, actual reply codes and acknowledged prior steps. No result
+authorizes replay. Remote rename now enters a dedicated FileService device job.
+Standalone FileService folder creation and reviewed remote deletion explicitly
+use the same private operation owner as reads; nested validation listings reuse
+one lease. Deletion preview and execution remain separate operations.
+
+Cooperative cancellation is deferred through each submitted mutation's reply,
+through RNFR/RNTO as one serialized pair, and across both case-only rename pairs.
+Binding/recovery and transport failures remain effective. Case verification
+restores cancellation and retains both completed steps if verification stops.
+Reviewed deletion records only acknowledged removals, the stopped target and
+its mutation evidence, and unattempted reviewed items. Existing review, expiry,
+session, revalidation, ordering, bounds and root protections remain in force.
+
+After the approved GUI session-guard correction, deterministic verification is
+**7 GUI/routing tests and 223 focused tests passed**. Complete normal and
+optimized suites each ran **849 tests, 36 opt-in display skips, no failures**.
+The original 38 mutation tests plus five GUI regressions add 43 tests to the
+accepted 806-test / 36-skip baseline. The existing in-memory USB partial
+cleanup test now supplies the managed cleanup seam; socket coverage verifies
+real managed partial cleanup. No prior test was removed.
+
+Physical results: beige `192.168.68.70` / `25EA78`, firmware `1.1.0s2`, and
+Founder's `192.168.68.69` / `25BE71`, firmware `1.1.0`, both API `0.1`, passed
+managed standalone MKD, ordinary and case-only file/directory rename, content
+readback, and reviewed DELE/RMD. Unique disposable trees under beige `/USB2`
+and Founder's `/SD` were emptied and removed through reviewed deletion only.
+
+Each managed mutation operation used one session, one authentication and one
+FEAT, including both case-only rename pairs and nested validation. Leases were
+released and connection epochs stayed unchanged within each phase. The real GTK
+prompt, busy controls, completion and refreshed name were exercised by an
+external driver on display `:0`; this is automated GUI qualification, not human
+visual sign-off. The stale-session GUI race remains deterministically covered;
+no active mutation was interrupted and no uncertain-outcome fault was induced.
+Production/test source hashes were unchanged throughout qualification. Details,
+hashes, disposable paths and external probe limitations are in C64U-FTP.md.
+
+**3C–3E remain unimplemented:** staged uploads/partial lifecycle, replacement
+and composite workflows, and unbound-client retirement. Folder-copy MKD,
+fresh-folder upload MKD, staged-upload publication, replacement staging/exchange/
+cleanup, Flash writes and compatibility FTP facilities retain their existing
+routing. The reviewed partial-upload deletion path uses 3B primitives without
+changing partial ownership/authorization policy. There is no STOR migration,
+upload length change, automatic rollback, or replacement-exchange framework.
 
 ## Later Network Foundation boundaries
 

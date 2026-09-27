@@ -2,7 +2,7 @@
 """Private Core FTP operation lifetime and read adapter.
 
 Preserves Entry/IdentityEntry/bytes contracts. No lease or socket leaves this
-module. Mutation helpers and unbound legacy CLI clients are not migrated here.
+module. Approved standalone mutations share this lifetime; legacy composites remain separate.
 """
 from contextlib import contextmanager, nullcontext, ExitStack
 from contextvars import ContextVar
@@ -18,7 +18,7 @@ from .diagnostics import diagnostic_event
 def transport_event(event):
     # Client events contain only safe fields. Existing diagnostic context adds
     # the Core job ID; no peer prose, path, password, or payload is copied.
-    diagnostic_event('ftp', 'read-transport', 'session',
+    diagnostic_event('ftp', 'transport', 'session',
                      'error' if event['kind'] == 'error' else 'ok', details=event)
 
 
@@ -47,6 +47,9 @@ def translate(error):
         EC.SIZE_MISMATCH.value: 'File changed or download was incomplete.',
         EC.COMPLETION_UNKNOWN.value: 'The C64U did not confirm completion; reading stopped.',
     }.get(detail, 'C64U FTP operation failed; no unverified result was accepted.'))
+    if error.mutation is not None:
+        message = ('C64U mutation ' + error.mutation.outcome.value +
+                   '; refresh and review the recorded result before another attempt.')
     result = ConnectionFailure(kind, message)
     result.ftp_code = detail
     result.reply_code = error.reply_code
@@ -55,6 +58,7 @@ def translate(error):
     result.transferred = error.transferred
     result.retryable = error.retryable
     result.ftp_error = error
+    result.mutation = error.mutation
     return result
 
 
@@ -65,11 +69,17 @@ class _FtpOperation:
     client: object = None
     stack: object = None
     transport_error: FtpOperationError | None = None
+    cancel_deferred: int = 0
+    mutation_used: bool = False
 
     def cancelled(self):
         try:
             for check in self.checks:
-                if check is not None:check()
+                if check is not None:
+                    try:check()
+                    except Exception as exc:
+                        if self.cancel_deferred and getattr(exc, 'cancelled', False):continue
+                        raise
         except Exception as exc:
             self.failure = exc
             return True
@@ -126,6 +136,32 @@ class _FtpOperations:
             if token is not None:self._context.reset(token)
             if acquired:self._lock.release()
 
+    @contextmanager
+    def defer_cancellation(self):
+        """Private case-only rename boundary; never a binding/transport mask."""
+        state = self._context.get()
+        self._manager._check(self.binding)
+        state.check()
+        state.cancel_deferred += 1
+        try:yield
+        finally:state.cancel_deferred -= 1
+
+    def mutate(self, operation, path, destination=None):
+        with self.operation():
+            state = self._context.get()
+            state.mutation_used = True
+            safe_argument(path)
+            try:
+                args = [path.encode(self._encoding)]
+                if destination is not None:
+                    safe_argument(destination)
+                    args.append(destination.encode(self._encoding))
+            except UnicodeError:
+                raise BrowserError('Filename encoding failed.') from None
+            if operation not in ('rename', 'mkdir', 'delete', 'rmdir'):
+                raise BrowserError('Unknown mutation operation.')
+            return getattr(self._client(), operation)(*args).as_dict()
+
     @staticmethod
     def _raise_failure(state, error):
         state.transport_error = error
@@ -151,6 +187,8 @@ class FtpReadAdapter(_FtpOperations):
         """Explicit caller-selected fallback boundary, never automatic recovery."""
         state = self._context.get()
         if state is None:return
+        if state.mutation_used:
+            raise BrowserError('A mutation operation cannot restart as a read fallback.')
         self._manager._check(self.binding)
         state.check()
         if state.client is not None:

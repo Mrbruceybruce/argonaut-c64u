@@ -1,6 +1,6 @@
-# C64U Network Foundation — FTP Slices 1–3A
+# C64U Network Foundation — FTP Slices 1–3B
 
-Status: **Slices 1–2 accepted; Slice 3A physical checks passed on both devices, final review pending**.
+Status: **Slices 1–3A accepted; Slice 3B physical checks passed, final review pending**.
 Baseline: released Stable 1.9 `3acb9be310560f69df5a80619e192585a7e87155`.
 
 ## Boundary and ownership
@@ -15,7 +15,7 @@ a client only through `manager.lease(binding, presentation=..., cancelled=...)`.
 A manager permits one operation-scoped lease per physical device. A second
 acquisition fails promptly with `lease-busy`; it never waits behind itself.
 Nested helpers must pass the existing lease. There is no idle pool, automatic
-reconnection, automatic retry, or mutation replay. Core shares one manager across migrated read routes; independent processes/other applications
+reconnection, automatic retry, or mutation replay. Core shares one manager across migrated read and standalone mutation routes; independent processes/other applications
 cannot be counted by an in-process manager. The firmware's four-session ceiling
 is not a parallelism target.
 
@@ -73,8 +73,8 @@ poisons the lease. There is no ABOR/QUIT dependency on an unsynchronized stream.
 * Transfer results contain count, SHA-256 of transferred bytes, terminal reply
   code and outcome. A successful STOR is not independent readback verification.
   Existing higher layers retain staging, readback, SIZE, conflict review,
-  replacement, deletion and partial-ownership policy. Mutation primitives beyond
-  STOR are deferred to their migration slice.
+  replacement, deletion and partial-ownership policy. Slice 3B adds the mutation
+  primitives described below; STOR production migration remains deferred.
 
 Completion requires data closure and terminal 226/250. Data callbacks alone are
 not success. No further cancellation check relabels a terminally accepted
@@ -338,8 +338,9 @@ Slice 3, new package builds or further device operations.
 ## Slice 3A — shared operation lifetime and streaming reads
 
 Implementation baseline: `4f7a86745239e60b3c6f4e2287d94af8b3c00508`.
-This section describes the uncommitted implementation. Authorized physical
-checks are recorded below; final review is pending and 3B–3E are not complete.
+Slice 3A was physically accepted, committed and pushed to `development` as
+`0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`. Authorized physical checks are
+recorded below. This section records the 3A boundary; 3B changes follow it.
 
 `ftp_reads.py` separates the private `_FtpOperations` lifetime from
 `FtpReadAdapter` read behavior. Existing Core attachment and identity/epoch
@@ -417,8 +418,9 @@ successfully with that permission. `git diff --check` passed.
 Executed against the reviewed, uncommitted source at base
 `4f7a86745239e60b3c6f4e2287d94af8b3c00508`. No production code or tests changed
 in this pass. Only this document and CURRENT-STATE.md were updated afterward.
-Final human review remains required before commit/push. These results do not
-accept or authorize implementation of 3B–3E.
+Final human review subsequently accepted 3A, which was committed and pushed as
+`0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`. These physical results qualify
+3A only; they do not constitute physical acceptance of later checkpoints.
 
 The external probe used isolated Development Core state, identity-bound profiles,
 and existing empty-password configuration. No saved user configuration changed.
@@ -507,3 +509,247 @@ manifest, reviewed diff, console logs, downloaded files, complete backup
 manifests and per-session diagnostic events. Device reports are
 `beige-20260927-102522/report.json` and
 `founder-20260927-102608/report.json`.
+
+
+## Slice 3B — managed mutations and directory operations
+
+Status: **implemented, uncommitted; physical checks passed, final review pending**.
+Base: `0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a` (accepted Slice 3A).
+No physical devices were accessed during implementation/deterministic testing.
+The separately authorized physical pass is recorded below.
+
+### Explicit migration boundary
+
+The existing private operation owner in `ftp_reads.py` now also dispatches
+managed mutations. There is no second mutation lease manager or transaction
+framework. Core binding, lazy acquisition, nested reuse, outermost release,
+and no cancellation check on context exit remain unchanged. Diagnostics use
+neutral `transport` naming instead of `read-transport`.
+
+`files.operate_managed` shares validation with the existing operation helper,
+but is entered explicitly by standalone FileService folder creation, reviewed
+remote deletion, and the new scheduled `FileService.rename`. Remote GTK rename
+submits that Core job; local GIO rename is unchanged. Core returns structured
+mutation results on failure/partial completion and preserves the existing
+successful folder-creation FileLocation result.
+
+The legacy `files.operate` route remains for folder-copy and replacement
+staging MKD. Fresh-folder upload MKD, staged-upload publication rename,
+replacement exchange/cleanup, Flash MKD/publication, STOR, and unbound clients
+are not migrated. A managed failure never falls back to raw FTP. Existing
+compatibility FTP facilities remain available to those deferred consumers.
+
+### Certainty and serialization
+
+Immutable internal `MutationEvidence` records operation, stage, whether the
+current command's send was attempted, whether the consequential command's send
+was attempted, actual reply code, sanitized error category, and acknowledged
+prior command/reply pairs. Core-facing results carry ordinary data only.
+Submission is marked immediately before sendall: neither a failed send nor a
+successful send proves the server's resulting filesystem state.
+
+- NOT_STARTED: no consequential submission attempted. Lost RNFR replies retain
+  RNFR submission evidence while RNTO remains unsubmitted.
+- UNKNOWN: consequential submission attempted without definitive completion or
+  refusal. Do not report the target as definitely changed/removed.
+- COMPLETED: successful terminal reply received.
+- REJECTED: explicit negative reply received. FTP 550 does not prove absence.
+
+Failures poison the lease, including refusals. No outcome automatically retries
+or replays a mutation. FileService mutation failures are nonretryable; transport
+availability metadata is not permission to repeat a command. The explicit read
+fallback cannot reset an operation that has entered mutation dispatch.
+
+Reply compatibility preserves legacy acceptance: RNFR accepts 3xx, RNTO/MKD/RMD
+accept 2xx, and DELE accepts 200/250. Canonical expected replies remain
+350/250/257/250/250 respectively. Actual codes are retained. Peer prose and
+server-returned MKD paths are not exposed or used to infer filesystem identity.
+
+RNFR and RNTO run under one transport lock. After a final cooperative check,
+cancellation is deferred through both commands; no unrelated command interleaves.
+RNFR refusal/lost reply prevents RNTO. RNTO refusal or uncertain completion stops
+without rollback/replay. MKD/DELE/RMD likewise resolve their reply despite a newly
+pending cooperative cancellation. Network timeouts, binding invalidation and
+recovery failures remain effective during every protected section.
+
+### Caller contracts and results
+
+Ordinary rename retains same-parent USB/SD policy, exact source/type validation,
+case-insensitive collision refusal and same-name no-op. It adds no post-rename
+verification. Case-only rename retains the checked unique temporary name and
+both rename steps under one lease. Cooperative cancellation is deferred across
+both pairs, then restored before the existing exact-name listing check.
+
+A case-only result records completed primitive evidence, temporary/destination
+paths, stopped primitive evidence if present, and verification as not-required,
+unperformed, failed or passed. If cancellation stops verification after both
+renames, the cancelled job retains both acknowledged steps; it does not claim
+nothing changed. The verification still checks only requested-name presence.
+No automatic rollback or cleanup is introduced.
+
+Reviewed deletion retains consumed/expiring/session-bound plans, exact-path
+confirmation, root protection, traversal bounds, complete re-enumeration,
+metadata snapshots, per-item/parent revalidation, child-before-parent ordering,
+empty-folder checking, and stop-on-failure. Preview gets a separate operation;
+execution reuses one lease for revalidation and all deletion primitives.
+`DeleteResult` additively records stopped_target, mutation evidence, and
+not_attempted paths. Only acknowledged deletions enter removed. Typed cancellation
+replaces English-message matching on the managed remote path. Reviewed deletion
+of a Core-observed partial upload keeps the existing session/ownership policy.
+
+FTP cannot make preflight checks atomic against external writers. Remote deletion
+snapshots still compare type/size rather than content identity. Ordinary rename
+and MKD remain acknowledgement-based. No stronger stability guarantee is claimed.
+
+### Deterministic verification
+
+`test_ftp_mutations.py` adds 38 tests covering reply refusals/loss, send failure,
+timeout/malformed completion, RNFR/RNTO ordering, cancellation deferral, binding
+and recovery invalidation, case-only partial results/verification, deletion
+ordering and uncertainty, lease reuse/release, session binding, sanitized results
+and diagnostics, GUI scheduling, local GIO routing, and deferred-caller routing.
+The socket fixture models mutations independently of terminal-reply delivery.
+The existing USB restore in-memory test was adapted only at its reviewed managed
+cleanup boundary; a new socket integration test covers session-bound partial
+cleanup. Existing read, upload, replacement and Flash tests remain in place.
+
+Focused run: **218 tests passed**. Complete normal and optimized suites each
+ran **844 tests, 36 opt-in display skips, no failures** (12.019 s normal;
+13.259 s optimized). This is the accepted 806-test baseline plus 38 new tests.
+No tests were removed and skip policy is unchanged. `git diff --check` passed.
+The initial sandbox attempt could not create loopback sockets; subsequent runs
+used loopback-socket permission. No device qualification is implied.
+
+The approved GUI session-guard correction captures the submitted job's device
+and session IDs and intended folder. It guards completion, asynchronous refresh
+start, and result/error application even when the compatibility facade is
+unchanged. Five added GUI regressions exercise delayed callbacks, normal
+completion, changed sessions/folders, and stale errors. Local GIO is unchanged.
+Final deterministic results after this correction: **7 GUI/routing tests passed;
+223 focused tests passed; normal and optimized suites each ran 849 tests with
+36 skips and no failures** (11.383 s / 12.869 s). This supersedes the earlier
+844-test run: five tests added, no removals or skip changes.
+
+
+## Slice 3B physical qualification — PASS (27 September 2026)
+
+Authorized checks ran against the reviewed uncommitted 3B source, including the
+GUI session-guard correction, at base
+`0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`. Production/test source SHA-256 values
+were unchanged throughout qualification. Only development documentation changed
+afterward. Final human review remains required before commit/push; 3C–3E remain
+unimplemented.
+
+### Devices and disposable data
+
+REST identity was verified before mutations in each Core/GUI/cleanup phase.
+Both devices used their existing empty Network Password configuration. Isolated
+Development Core/GUI preferences were stored with external qualification data;
+saved user profiles and credentials were not changed.
+
+| Device | Address / physical ID | Reported firmware / API | Disposable parent |
+|---|---|---|---|
+| Beige C64 Ultimate | `192.168.68.70` / `25EA78` | `1.1.0s2` / `0.1` | `/USB2` |
+| Founder's C64 Ultimate | `192.168.68.69` / `25BE71` | `1.1.0` / `0.1` | `/SD` |
+
+Exact disposable trees, both verified absent after reviewed cleanup:
+
+- Beige: `/USB2/argonaut-3b-accept-744e223ec6c744c1955e53f132ccc23c`
+- Founder's: `/SD/argonaut-3b-accept-c8d84ea3525e449ebf10e76768126f80`
+
+The unique name was checked absent before managed creation. All subsequent
+qualification mutations were confined to the recorded tree. Before destructive
+steps, the target was checked against that tree and the phase's Core binding.
+
+Each tree contained a new 53-byte disposable text file and one empty directory.
+The local payload was `Argonaut Slice 3B disposable acceptance data.` followed by
+LF, the device's six-character physical ID, and LF. Existing staged upload was
+used only for setup, not as STOR/3C qualification.
+
+SHA-256 agreed with received-byte hashes and independently read local download
+bytes after ordinary rename, case-only rename and the GUI rename:
+
+- Beige: `096e72c32e8cf435740c422c471b5a533102dcf84201b38285efe51743b23e70`
+- Founder's: `dde7426ec2f40e94ebb901480011a88609d1b2780e960e32b43def4b66fd2f7a`
+
+### Mutation and reviewed-deletion results
+
+Both devices passed the same sequence:
+
+1. Managed standalone creation of the acceptance directory and `EmptyOne` child:
+   correct FileLocation, MKD 257 acknowledgement evidence and resulting listings.
+2. Scheduled ordinary file rename `sample.txt` → `Renamed.txt`, and directory
+   rename `EmptyOne` → `EmptyTwo`: completed results and correct listings.
+3. Case-only file rename `Renamed.txt` → `renamed.txt`, and directory rename
+   `EmptyTwo` → `emptytwo`: two completed rename primitives, exact-case
+   verification passed, and no temporary rename name remained in the listing.
+4. Actual GTK rename `renamed.txt` → `GuiChecked.txt`: one completed Core rename
+   job, correct resulting filename and successful post-operation refresh.
+5. Separate reviewed deletion of `GuiChecked.txt`, then the verified-empty
+   `emptytwo` directory, then the verified-empty acceptance directory. Every
+   preview contained exactly the intended single target/type. Every execution
+   recorded that target in removed, with empty failure/unattempted fields.
+   Subsequent listings confirmed absence. Cleanup never bypassed review.
+
+All RNFR acknowledgements were 350 and RNTO acknowledgements 250. DELE and RMD
+returned 250. There were no unknown/refused mutation results, unexpected remote
+states, FTP errors or LIST fallbacks. No retries, rollbacks or uncertain-state
+cleanup occurred.
+
+### GUI/display and connection observations
+
+An external driver instantiated the real Development GTK application on display
+`:0`, with isolated Core preferences and the actual production prompt/job/refresh
+methods. It populated the real entry and submitted the dialog response, rather
+than running an extracted or mocked GUI method. On each device it observed:
+
+- mapped `Rename` dialog, expected initial filename and enabled confirmation;
+- busy state, disabled busy controls and enabled cancellation control at job
+  submission (no cancellation was requested);
+- `file.rename` in the device's Core lane, with matching device/session IDs;
+- `Completed: <disposable tree>/GuiChecked.txt` and refreshed rows containing
+  exactly `GuiChecked.txt` and `emptytwo`;
+- zero active managed leases after completion/refresh.
+
+This was automated actual-display qualification, not human visual sign-off or
+manual mouse/keyboard coverage. The stale-session presentation race was not
+induced physically; approved deterministic delayed-callback regressions remain
+authoritative for that race. No active RNFR/RNTO pair was interrupted.
+
+| Per-operation managed measurement | Beige | Founder's |
+|---|---:|---:|
+| Each standalone MKD: sessions / USER / FEAT | 1 / 1 / 1 | 1 / 1 / 1 |
+| Each ordinary file/directory rename: sessions / USER / FEAT | 1 / 1 / 1 | 1 / 1 / 1 |
+| Each case-only rename, both pairs: sessions / USER / FEAT | 1 / 1 / 1 | 1 / 1 / 1 |
+| GUI rename mutation: sessions / USER / FEAT | 1 / 1 / 1 | 1 / 1 / 1 |
+| Each reviewed deletion execution: sessions / USER / FEAT | 1 / 1 / 1 | 1 / 1 / 1 |
+| Active leases after measured operations | 0 | 0 |
+
+Validation listings reused each operation's lease. Review, execution and
+post-operation observation retained separate lifetimes. The GUI refresh is a
+separate read session, not part of its mutation lease. Core connection epochs
+remained unchanged within each phase. Core, GUI and cleanup used fresh isolated
+connections with new expected epochs; no mid-operation reconnect was tested.
+Legacy setup-upload sessions are not counted as managed 3B qualification.
+
+### Probe limitations and retained evidence
+
+The first external Core probe stopped before mutation because its serializer
+could not handle an immutable mapping in the connection result. Only the
+external serializer was corrected. An initial external GUI launch used the
+application's overloaded `run` method incorrectly and failed before device
+access; the launcher was corrected to use `Gio.Application.run`. Both failed
+probe records are retained. Neither was a production/device mutation failure.
+The GTK driver emitted a deprecation warning for `Gtk.Dialog.response`; the
+actual dialog, job and refresh checks passed.
+
+No dropped replies, send failures, active-transfer disconnects, uncertain
+mutations or other destructive fault conditions were induced. Those remain
+socket-fixture coverage. This qualification used small disposable data, not
+large uploads, replacement, Flash writes or later Slice 3 checkpoints.
+
+External evidence is in `argonaut-qualification/network-slice3b-physical/`, outside
+the repository: probes, reviewed diff, source hash manifest, operation/GUI logs,
+local readbacks, reports and structured diagnostic events. Accepted device
+reports are `beige-20260927-110054/report.json` and
+`founder-20260927-110125/report.json`, with `gui-report.json` alongside each.

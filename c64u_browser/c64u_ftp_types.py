@@ -73,19 +73,46 @@ class FtpOperationError(Exception):
     retryable describes availability only; it NEVER authorizes mutation replay.
     """
     def __init__(self, code, phase, *, reply_code=None, retryable=False,
-                 outcome=Outcome.NOT_STARTED, transferred=0):
+                 outcome=Outcome.NOT_STARTED, transferred=0, mutation=None):
         self.code = ErrorCode(code)
         self.phase = phase
         self.reply_code = reply_code
         self.retryable = retryable
         self.outcome = outcome
         self.transferred = transferred
+        self.mutation = mutation
         super().__init__(f'C64U FTP {self.code.value} ({phase}).')
 
     def as_dict(self):
-        return dict(code=self.code.value, phase=self.phase,
+        result = dict(code=self.code.value, phase=self.phase,
                     reply_code=self.reply_code, retryable=self.retryable,
                     outcome=self.outcome.value, transferred=self.transferred)
+        if self.mutation is not None:result['mutation'] = self.mutation.as_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class MutationEvidence:
+    """Wire acknowledgement, never permission to replay a mutation.
+
+    Submission means send was attempted, not that the peer received the bytes.
+    RNFR can have uncertain protocol state without RNTO ever being submitted.
+    """
+    operation: str
+    stage: str
+    outcome: Outcome = Outcome.NOT_STARTED
+    stage_submitted: bool = False
+    consequential_submitted: bool = False
+    reply_code: int | None = None
+    error_category: str | None = None
+    acknowledged: tuple[tuple[str, int], ...] = ()
+
+    def as_dict(self):
+        return dict(operation=self.operation, stage=self.stage,
+                    outcome=self.outcome.value, stage_submitted=self.stage_submitted,
+                    consequential_submitted=self.consequential_submitted,
+                    reply_code=self.reply_code, error_category=self.error_category,
+                    acknowledged=self.acknowledged)
 
 
 @dataclass(frozen=True)
