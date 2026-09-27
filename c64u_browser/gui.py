@@ -995,13 +995,7 @@ class Browser(Gtk.Application):
             self.partial_upload=result.partial_upload
             self.partial_button.set_sensitive(True)
         if self.client:self.refresh_remote()
-        details=('Added:\n'+('\n'.join(result.added) or '(none)')+
-                 '\n\nReplaced:\n'+('\n'.join(result.replaced) or '(none)')+
-                 '\n\nSkipped/conflicts:\n'+
-                 ('\n'.join(result.skipped+result.conflicts) or '(none)')+
-                 '\n\nUnfinished:\n'+('\n'.join(result.remaining) or '(none)')+
-                 (('\n\nPartial upload:\n'+result.partial_path)
-                  if result.partial_path else ''))
+        details=result.details()
         self.usb_report('USB restore complete' if snapshot.state=='succeeded'
                         else 'USB restore stopped',result.message,details)
 
@@ -1044,7 +1038,8 @@ class Browser(Gtk.Application):
                     return
                 message, partial = result.message, result.partial_upload
                 copied = completed_roots(names, result.completed)
-                if snapshot.state=='failed': self.copy_report(result)
+                if snapshot.state=='failed' or (snapshot.state=='cancelled' and result.replacements):
+                    self.copy_report(result)
                 if partial:
                     self.partial_upload = partial
                     self.partial_button.set_sensitive(True)

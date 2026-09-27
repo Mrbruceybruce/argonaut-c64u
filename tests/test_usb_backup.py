@@ -126,6 +126,17 @@ class UsbBackupTests(unittest.TestCase):
         lifetime.start();self.addCleanup(lifetime.stop)
         seam=patch('c64u_browser.folder_copy.upload_managed',side_effect=addition)
         seam.start();self.addCleanup(seam.stop)
+        # Preserve this suite's in-memory replacement policy coverage. Actual
+        # managed composition/evidence is exercised by test_ftp_replacements.
+        from c64u_browser.replacement import replace_file
+        from c64u_browser.managed_replacement import ReplacementEvidence
+        def replacement(client, step, source_local, progress, *, validate=None):
+            if validate:validate()
+            replace_file(client,step,source_local,False,progress)
+            return ReplacementEvidence('complete',step.destination,'','','',
+                                       publication='completed',cleanup='completed')
+        replacement_seam=patch('c64u_browser.folder_copy.replace_managed',side_effect=replacement)
+        replacement_seam.start();self.addCleanup(replacement_seam.stop)
 
 
     def backup_request(self,name='backup',paths=()):

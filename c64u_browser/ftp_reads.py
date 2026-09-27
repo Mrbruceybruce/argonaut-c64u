@@ -71,6 +71,7 @@ class _FtpOperation:
     transport_error: FtpOperationError | None = None
     cancel_deferred: int = 0
     mutation_used: bool = False
+    cancellation_observed: bool = False
 
     def cancelled(self):
         try:
@@ -78,7 +79,9 @@ class _FtpOperation:
                 if check is not None:
                     try:check()
                     except Exception as exc:
-                        if self.cancel_deferred and getattr(exc, 'cancelled', False):continue
+                        if self.cancel_deferred and getattr(exc, 'cancelled', False):
+                            self.cancellation_observed = True
+                            continue
                         raise
         except Exception as exc:
             self.failure = exc
@@ -138,12 +141,12 @@ class _FtpOperations:
 
     @contextmanager
     def defer_cancellation(self):
-        """Private case-only rename boundary; never a binding/transport mask."""
+        """Private composite boundary; never a binding/transport mask."""
         state = self._context.get()
         self._manager._check(self.binding)
         state.check()
         state.cancel_deferred += 1
-        try:yield
+        try:yield state
         finally:state.cancel_deferred -= 1
 
     def mutate(self, operation, path, destination=None):

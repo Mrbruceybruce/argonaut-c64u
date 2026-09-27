@@ -13,6 +13,7 @@ from .file_copy import copy_files
 from .transfers import upload_managed
 from .ftp_reads import adapter_for
 from .replacement import signature, replace_file
+from .managed_replacement import replace_managed
 
 @dataclass
 class Step:
@@ -38,6 +39,7 @@ class Report:
     partial: str = None
     cancelled: bool = False
     uploads: list = field(default_factory=list)
+    replacements: list = field(default_factory=list)
 
     @property
     def message(self):
@@ -114,17 +116,12 @@ def build_plan(client, source_local, parent, names, local, destination, check=la
     return plan
 
 
-def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, managed_uploads=False):
+def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, managed_uploads=False, managed_replacements=False):
     report = Report(skipped=list(plan.conflicts))
     checked_directories = set()
     for index,step in enumerate(plan.steps):
         try:
-            addition = managed_uploads and source_local and not local and not step.directory and step.signature is None
-            adapter = adapter_for(client) if addition else None
-            if addition and adapter is None:
-                raise BrowserError('Upload requires a Core-managed C64U session.')
-            # Per-file validation and upload share the lease; no batch-wide owner.
-            with adapter.operation(getattr(progress, 'check', None)) if addition else nullcontext():
+            def validate():
                 getattr(progress, 'check', lambda:None)()
                 if kind(client,source_local,step.source) != ('dir' if step.directory else 'file'):
                     raise BrowserError('Source changed since the copy was prepared: '+str(step.source))
@@ -133,7 +130,18 @@ def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, m
                 for ancestor in parents(step.destination,local):
                     if ancestor in checked_directories and kind(client,local,ancestor) != 'dir':
                         raise BrowserError('Destination folder changed: '+ancestor)
-                target_kind = kind(client,local,step.destination)
+                return kind(client,local,step.destination)
+            if managed_replacements and not local and step.signature is not None:
+                report.replacements.append(replace_managed(client, step, source_local, progress, validate=validate))
+                report.completed.append(step.relative)
+                continue
+            addition = managed_uploads and source_local and not local and not step.directory and step.signature is None
+            adapter = adapter_for(client) if addition else None
+            if addition and adapter is None:
+                raise BrowserError('Upload requires a Core-managed C64U session.')
+            # Per-file validation and upload share the lease; no batch-wide owner.
+            with adapter.operation(getattr(progress, 'check', None)) if addition else nullcontext():
+                target_kind = validate()
                 if step.signature is not None:
                     replace_file(client,step,source_local,local,progress)
                 elif step.directory:
@@ -159,7 +167,9 @@ def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, m
                         raise BrowserError(message)
                 report.completed.append(step.relative + ('/' if step.directory else ''))
         except Exception as exc:
-            evidence = getattr(exc, 'upload_evidence', None)
+            replacement = getattr(exc, 'replacement_evidence', None)
+            if replacement is not None:report.replacements.append(replacement)
+            evidence = getattr(exc, 'upload_evidence', None) if replacement is None else None
             if evidence is not None:
                 report.uploads.append(evidence)
                 report.partial = getattr(exc, 'partial_path', None)

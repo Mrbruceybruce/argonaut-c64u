@@ -115,6 +115,7 @@ class RestoreResult:
     failure: str = ''
     partial_upload: PartialUpload | None = None
     uploads: tuple = ()
+    replacements: tuple = ()
 
     @property
     def message(self):
@@ -122,6 +123,17 @@ class RestoreResult:
               f'{len(self.replaced)} replacement(s); '
               f'{len(self.unchanged)} unchanged; {len(self.skipped)} skipped.')
         return text+((' Stopped: '+self.failure) if self.failure else '')
+
+
+    def details(self):
+        text = ('Added:\n' + ('\n'.join(self.added) or '(none)') +
+                '\n\nReplaced:\n' + ('\n'.join(self.replaced) or '(none)') +
+                '\n\nSkipped/conflicts:\n' + ('\n'.join(self.skipped + self.conflicts) or '(none)') +
+                '\n\nUnfinished:\n' + ('\n'.join(self.remaining) or '(none)'))
+        if self.partial_path:text += '\n\nPartial upload:\n' + self.partial_path
+        for replacement in self.replacements:
+            if replacement.inspection_message():text += '\n\n' + replacement.inspection_message()
+        return text
 
 
 @dataclass(frozen=True)
@@ -728,7 +740,7 @@ class UsbBackupService:
                     steps.append(Step(item.path,source,destination,False,True,
                                       signature(client,False,destination)))
             plan=Plan(steps=steps)
-            report=execute_plan(client,plan,True,False,job.byte_progress('restore'), managed_uploads=True)
+            report=execute_plan(client,plan,True,False,job.byte_progress('restore'), managed_uploads=True, managed_replacements=True)
             completed=set(value.rstrip('/') for value in report.completed)
             replaced=tuple(path for path in replacement_set if path in completed)
             added=tuple(path for path in stored.classification.additions if path.rstrip('/') in completed)
@@ -739,7 +751,7 @@ class UsbBackupService:
             result=RestoreResult(added,replaced,stored.classification.unchanged,skipped,
                 stored.classification.conflicts,tuple(report.remaining),
                 sum(file_map[path].size for path in completed if path in file_map),
-                report.partial,report.error,partial,tuple(report.uploads))
+                report.partial,report.error,partial,tuple(report.uploads),tuple(report.replacements))
             if report.cancelled:raise JobCancelled(result=result)
             if report.error:raise UsbBackupFailure('restore',report.error,result)
             return result

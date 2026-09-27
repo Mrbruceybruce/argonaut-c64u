@@ -1,6 +1,6 @@
-# C64U Network Foundation — FTP Slices 1–3C
+# C64U Network Foundation — FTP Slices 1–3D
 
-Status: **Slices 1–3B accepted and committed; 3C physically qualified, uncommitted, final review pending**.
+Status: **Slices 1–3C accepted and committed; 3D physically qualified, uncommitted, final review pending**.
 Baseline: released Stable 1.9 `3acb9be310560f69df5a80619e192585a7e87155`.
 
 ## Boundary and ownership
@@ -760,7 +760,8 @@ reports are `beige-20260927-110054/report.json` and
 
 ## Slice 3C — managed normal staged uploads and partial lifecycle
 
-Status: **physically qualified on both devices, uncommitted; final review pending**.
+Status: **physically accepted, committed and pushed** as
+`6a09af5b8559df73d83e12db3eeeeba3d8106a1a`.
 Base: accepted 3B `fd0e205deece43865293d2a61d64bdc3834b3c05`.
 No physical devices were accessed during implementation or deterministic tests.
 
@@ -901,7 +902,8 @@ Logs are external `/tmp/argonaut-3c-correction-focused.log`,
 `/tmp/argonaut-3c-correction-normal.log` and
 `/tmp/argonaut-3c-correction-optimized.log`. `git diff --check` passed.
 No physical device was used for the correction tests. Subsequent authorized
-physical qualification is recorded below; commit/push remain pending.
+physical qualification is recorded below; subsequent acceptance and commit/push
+are complete.
 
 
 ### Slice 3C physical qualification — 27 September 2026
@@ -909,7 +911,8 @@ physical qualification is recorded below; commit/push remain pending.
 Authorized checks passed independently on both devices using the uncommitted
 reviewed implementation at base `fd0e205deece43865293d2a61d64bdc3834b3c05`.
 Identity and firmware/API were verified before mutation. Final acceptance review
-and commit/push remain pending.
+subsequently passed, followed by commit/push as
+`6a09af5b8559df73d83e12db3eeeeba3d8106a1a` (parent is the base above).
 
 | Device | Address | Physical ID | Firmware | API | Disposable parent |
 |---|---|---|---|---|---|
@@ -985,3 +988,305 @@ readbacks and backup manifests remain outside the repository under
 `../argonaut-qualification/network-slice3c-physical/`, with device records in
 `beige-20260927-120502/` and `founder-20260927-120630/`. They are excluded from
 the proposed commit.
+
+
+## Slice 3D — managed replacement and composite replacement
+
+Status: **physically qualified, uncommitted; final review pending**.
+Base: accepted 3C `6a09af5b8559df73d83e12db3eeeeba3d8106a1a`.
+No physical devices were accessed for implementation or deterministic tests.
+
+### Explicit consumer boundary
+
+`managed_replacement.replace_managed` is a separate Core orchestration entry.
+FileService and USB restore explicitly select it through `execute_plan`'s
+`managed_replacements` option for remote-destination replacement steps only.
+Its enclosing lifetime includes the existing source/ancestor/destination execution
+validation. Legacy `replacement.replace_file`, local-destination replacement,
+remote-to-remote additions, general folder-plan directory creation, Flash, CLI
+fresh-folder uploads and AI installation/upgrade/provisioning retain their routes.
+Missing managed context fails without a raw FTP fallback. Accepted 3C additions
+remain unchanged. Neither compatibility retirement nor all of Slice 3 is complete.
+
+### One file, one managed operation
+
+Sequence:
+
+1. Check cancellation, validate the execution step and compare the reviewed
+   remote signature (exact filename/listing size).
+2. Create the checked unique sibling `c64u-replace-<uuid>` directory using 3B
+   managed MKD; generate a distinct sibling `c64u-old-<uuid>` backup path.
+3. Independently observe the original using SIZE → RETR/hash → SIZE.
+4. Stage the source through 3C managed upload, retaining its complete evidence.
+5. Check cancellation, revalidate the reviewed signature, independently observe
+   the original again with SIZE → RETR/hash → SIZE and compare the hashes.
+6. Inspect the backup name for collision; check binding/cancellation immediately
+   before exchange.
+7. Under operation-level cooperative-cancellation deferral: original → backup,
+   staged → final, DELE backup, RMD staging directory.
+8. Leave deferral and release the outer lease without an exit cancellation check;
+   record completion. Local temporary resources are cleaned on exit.
+
+Nested listings, reads, uploads and mutations use the same captured adapter and
+lazy lease. Absolute remote paths survive listing CWD changes. No operation
+holds a lease across user review or across the whole batch. A remote-source
+replacement prepares a private local temporary directory, downloads through the
+accepted 3A count/hash/fsync/no-replace path, then uploads that file through 3C,
+all under the replacement lease. Local temporary files are removed on success,
+failure and cancellation; remote failure state is never automatically removed.
+
+Staging upload retains destination/temp inspection → STOR → bounded RETR/hash →
+SIZE → destination recheck → staging publication. Its internal rename is separate
+from both exchange renames: there are three rename pairs on the successful path.
+A nested UploadEvidence `published` value describes the file inside staging,
+not the replacement final. No extra final read is added to production replacement.
+
+### Approved original-read behavior change and retained limits
+
+Legacy original RETRs were unbounded. Both now use the existing exact 3A stream
+with a discard sink and received-byte SHA-256, including empty files. Unusable,
+malformed or changing SIZE and short/overlong RETR stop replacement. The two
+observations remain independent; normal upload verification is a third RETR,
+not a substitute for either original observation.
+
+The generic reviewed remote signature remains name/size, not a reviewed hash.
+Same-size change during staging is detected by the two original observations;
+same-size change before the first execution read, changes after the second,
+change-and-revert and external-writer races remain outside the guarantee. There
+is no snapshot or atomic compare-and-exchange. Source uploads retain 3C's exact
+opened-descriptor length contract, without source locking or stability guarantees.
+
+USB restore retains consumed/session-bound plans, backup-storage identity,
+manifest verification, volume fingerprints, reclassification and explicit
+replacement selection. Equal-size comparison retains its existing preview and
+execution hashes; different-size classification may remain size-based. Generic
+replacement does not inherit a stronger review promise. Unselected replacements
+remain skipped; additions keep 3C routing; unrelated files are not removed.
+
+### Cancellation, failures and evidence
+
+The existing private operation-level deferral now records when it observes and
+suppresses cooperative cancellation. It spans both exchange renames and all
+successful-path remote cleanup. Transport primitive serialization is unchanged.
+Binding invalidation, recovery, socket/protocol failures, timeout, validation and
+unrelated callback failures remain effective. No cancellation-sensitive progress
+callback is invoked in this protected section. Pending cancellation cannot erase
+an acknowledged publication or substitute for a real failure. A successful last
+replacement may finish its job successfully despite late cancellation; a following
+item checks cancellation and preserves the completed prefix.
+
+ReplacementEvidence is ordinary structured data, returned separately in
+Report/CopyResult/RestoreResult `replacements`. It records phase and relevant
+paths; staging MKD and nested UploadEvidence; both signatures/original hash/count
+observations; protection status; both exchange mutations, DELE and RMD evidence;
+ordered acknowledged steps; stopped/uncertain step; publication/cleanup states;
+candidate and uncertain paths; observed/deferred cancellation; sanitized failure
+category and transport evidence. None denotes an unattempted primitive or an
+observation not completed. Failure phase/evidence distinguishes those cases.
+Cancellation flags describe observations, not an assertion that no later request
+exists: in particular, no new check is inserted after successful RMD.
+
+- RNFR uncertainty retains submitted RNFR evidence but unsubmitted consequential
+  RNTO. It does not claim a completed filesystem rename.
+- Unknown first RNTO records final/backup alternatives; replacement publication
+  has not completed. After acknowledged first rename, the backup is the original's
+  last acknowledged location, even if the second rename is refused/unsubmitted.
+- Unknown second RNTO records staged/final alternatives and unknown publication.
+- Completed second rename fixes publication as completed even if DELE/RMD fail.
+  Backup removal and directory cleanup retain independent certainty.
+- Full acknowledged exchange/cleanup is success. A later local temporary cleanup
+  error retains acknowledged remote success rather than changing its certainty.
+
+Whole-workflow completed/remaining accounting is retained. A cleanup failure can
+leave an item unfinished, but the message explicitly says publication completed
+and cleanup is incomplete. Replacement failures are nonretryable; transport
+availability metadata never authorizes mutation replay. Partial replacement
+state is not exported as an ordinary PartialUpload cleanup shortcut, including
+when a nested upload has a staging candidate. No automatic remote cleanup,
+rollback or recovery transaction is introduced.
+
+Every failed managed lease is released without reconnecting/reacquiring,
+continuing cleanup or resetting through read fallback. Any later inspection is
+a new independent operation. Candidate paths are neither proof of existence nor
+exclusive ownership. Fresh inspection and explicit reviewed deletion are required;
+never delete possible original/backup/final data or both uncertain rename
+alternatives merely from failure evidence. A refusal, including 550, does not
+prove path absence.
+
+### Deterministic validation
+
+`tests/test_ftp_replacements.py` adds **48 tests**, including additional parameterized
+subcases. Real loopback/Core coverage establishes:
+
+- Stale signatures/bindings; original content/size changes; unusable/malformed SIZE;
+  short/overlong original reads; zero-byte originals and replacements.
+- MKD refusal/lost reply, staged upload/readback failure and staged-publication
+  uncertainty; backup collision; independent original observations.
+- First/second rename non-submission, refusals, RNFR/RNTO loss and acknowledged
+  prefixes; DELE/RMD refusals/lost replies; completed publication versus cleanup.
+- Cancellation before/during staging and original reads, immediately before
+  exchange, during exchange/cleanup and after the final RMD; real Core job success
+  or completed-prefix cancellation as appropriate; no cancellation leakage.
+- Binding/recovery/network/protocol failure precedence and unrelated callbacks;
+  one authentication/FEAT/lease, release, stable epoch and failed-lease non-reopening.
+- FileService local/remote-source replacement, local temporary cleanup on all
+  exits, USB skip/replace/stale-content review and cleanup-failure accounting;
+  sanitized nonretryable evidence and deferred routing.
+
+The fixture adds a path-aware pre-command response hook; existing post-mutation
+hooks distinguish a mutation's effect from loss of its reply. Tests select the
+specific path/rename pair, rather than accidentally faulting staging publication.
+The existing in-memory USB policy suite supplies an explicit replacement seam;
+its behavior remains tested, while real managed ownership/evidence is established
+by the independent socket integration suite. No existing tests were removed.
+
+**258 focused tests passed**. Complete normal and optimized suites each ran
+**931 tests with 36 opt-in display skips and no failures** (14.821 s normal;
+15.479 s optimized). This is the committed 883-test baseline plus 48 new tests;
+skip policy is unchanged. The initial restricted run could not open loopback
+sockets; authorized loopback-capable runs supplied these results. Logs remain
+outside the repository at `/tmp/argonaut-3d-focused.log`,
+`/tmp/argonaut-3d-normal.log` and `/tmp/argonaut-3d-optimized.log`.
+
+Physical acceptance was pending at this deterministic checkpoint. The subsequent
+authorized two-device qualification is recorded below. Lost replies, exchange
+interruption and uncertain destructive outcomes remain deterministic scenarios.
+
+
+### 3D pre-physical review corrections
+
+Remote-source temporary cleanup is now explicit and runs after primary
+replacement errors/cancellation have been normalized. A secondary cleanup
+exception cannot replace remote mutation certainty, acknowledged steps, nested
+upload evidence, path alternatives or the primary cancellation classification.
+`ReplacementEvidence.local_cleanup` additively records attempted/failed cleanup
+with the sanitized `local-cleanup-failed` category; raw local exception text and
+private temporary paths are not exposed. If remote replacement and remote cleanup
+succeeded, a subsequent local cleanup error remains a reported failure with
+remote publication/cleanup still completed. No remote continuation or recovery
+is triggered by a local cleanup error.
+
+`ReplacementEvidence.inspection_message()` supplies the Core-formatted failure
+summary. It distinguishes intended final paths, staging candidates, uncertain
+location alternatives, last acknowledged original backup locations, and completed
+publication with unresolved cleanup. Acknowledged removed backups/directories
+are not offered as cleanup candidates. Every summary includes an inspection-only
+warning: paths do not authorize replay, rollback or cleanup; fresh inspection
+and explicit review are required before destructive action.
+
+CopyResult.details() and RestoreResult.details() render these summaries. GTK
+passes through the restore details and also opens its existing copy report for
+cancelled jobs carrying replacement evidence. It does not reconstruct mutation
+state or create cleanup actions. Existing accounting and ordinary upload partial
+reporting remain unchanged; replacement paths never populate PartialUpload.
+
+Eight correction regressions exercise unknown final RNTO, nested upload
+uncertainty, cancellation and full remote success combined with local cleanup
+failure; visible copy/USB summaries for unknown/refused publication and cleanup
+failure; actual headless GUI report callbacks; and retained ordinary partial-path
+presentation. No earlier test is removed. These corrections do not change the
+3D operation boundary, original observations, staging, exchange deferral or
+mutation/replacement authorization semantics. Physical qualification is recorded below.
+
+Correction validation supersedes the earlier totals: **8 targeted tests and
+266 focused tests passed**. Normal and optimized suites each ran **939 tests,
+36 skips, no failures** (15.164 s normal; 14.677 s optimized). This is the
+931-test pre-review result plus eight tests; no tests were removed or skip
+policy changed. `git diff --check` passed. External logs are
+`/tmp/argonaut-3d-corrections-targeted.log`,
+`/tmp/argonaut-3d-corrections-focused.log`,
+`/tmp/argonaut-3d-corrections-normal.log` and
+`/tmp/argonaut-3d-corrections-optimized.log`. No physical testing, commit or push
+was performed in this correction pass.
+
+
+### Slice 3D physical qualification — PASS (27 September 2026)
+
+The approved uncommitted implementation at base
+`6a09af5b8559df73d83e12db3eeeeba3d8106a1a` passed on both machines, with
+65 recorded checks per device. HEAD and origin/development matched that base;
+only the reviewed 12-file change set was present, nothing was staged and
+`git diff --check` passed before qualification. Production/test SHA-256 snapshots
+were unchanged afterward. Only development documentation was edited in this pass.
+
+| Device | Address / physical ID | Firmware / API | Disposable tree (now removed) |
+| --- | --- | --- | --- |
+| Beige | `192.168.68.70` / `25EA78` | `1.1.0s2` / `0.1` | `/USB2/argonaut-3d-accept-4ebe584be1aa4058b3e16ff902ef77ad` |
+| Founder’s | `192.168.68.69` / `25BE71` | `1.1.0` / `0.1` | `/SD/argonaut-3d-accept-1a5dc86335ef406892d98aa4ed328d07` |
+
+Identity and firmware/API were reverified before mutations. Parents were selected
+independently: `/USB2` on beige, `/SD` on Founder’s. Already accepted mkdir and
+normal upload supplied disposable setup data. All initial and replacement files
+were 640 bytes; differing same-size content exercised content verification.
+
+For each device, FileService reviewed local-source replacement passed both
+independent original SIZE/RETR/SIZE observations, staging upload verification,
+signature revalidation, exchange and cleanup. Remote-source replacement also
+passed its managed source download and preserved the source. Its private local
+temporary directory was empty afterward: the external probe selected an isolated
+process temporary root without modifying production code.
+
+A genuine USB backup of `restore.bin` completed with verified manifest handling.
+A separate reviewed replacement deliberately changed that disposable destination.
+Restore preview identified exactly that file as a replacement, with no additions
+or conflicts. Explicit `replace=True` execution restored it, with one completed
+replacement, no remaining items and successful publication/cleanup evidence.
+Independent final downloads verified all five known files. The sentinel was
+checked after every scenario and remained unchanged, outside replacement plans.
+
+The following initial and final SHA-256 values were verified independently;
+every entry is **640 bytes**. Remote destination final equals preserved source;
+restore final equals the genuine backup original.
+
+| Device | File | Initial SHA-256 | Final SHA-256 |
+| --- | --- | --- | --- |
+| Beige | `local.bin` | `00646e2dadcb166b62b2deb1abfc469fbd1e09b465de1d96e30329cd0bd708a3` | `6f2abc4cf883443e9d5c374a8c4506e4555503941f449c44a588bee44432a186` |
+| Beige | `remote.bin` | `8484cddea910021b34ef969de6e7efd600e546c13ddb1c49a000bcfc7a957e32` | `473315b7b001ead4f73d5391194f3574f516b3b341ed193e8bb970f44a869df4` |
+| Beige | `restore.bin` | `59c9f0e76dfd7b9f09c7081e5e1789ceb2b0750295a31cbaf38756a314aff8c9` | `59c9f0e76dfd7b9f09c7081e5e1789ceb2b0750295a31cbaf38756a314aff8c9` |
+| Beige | `sentinel.bin` | `04f5d261dfee3b3fb8c21cfad03d7c26148f49c561f307490b3c0acae4afb457` | `04f5d261dfee3b3fb8c21cfad03d7c26148f49c561f307490b3c0acae4afb457` |
+| Beige | `source/remote.bin` | `473315b7b001ead4f73d5391194f3574f516b3b341ed193e8bb970f44a869df4` | `473315b7b001ead4f73d5391194f3574f516b3b341ed193e8bb970f44a869df4` |
+| Founder’s | `local.bin` | `69197b2c342bc29826d386ff121b168cede00a17c7f1003e1930dd3b622bc652` | `00ff9d80637de950131830771ed51e112f04f073b559109127411a17f0221c82` |
+| Founder’s | `remote.bin` | `14b9bfc2b2df4bd705f299ac94f5922e2384c2945617d3f98a25c3bf59177084` | `cb376415d256dde71c980cf41b3ee3a84dd1af414896196fc83e1b3f2ea69cb5` |
+| Founder’s | `restore.bin` | `4b4ea0ecad0e23e350381971db1c202d702fea1dd92887edefe34bd336470ce0` | `4b4ea0ecad0e23e350381971db1c202d702fea1dd92887edefe34bd336470ce0` |
+| Founder’s | `sentinel.bin` | `a37d771e0724b4cb6911e5a61a2a6b11140a9bd11df5cc5bc0312427dd0c3b9a` | `a37d771e0724b4cb6911e5a61a2a6b11140a9bd11df5cc5bc0312427dd0c3b9a` |
+| Founder’s | `source/remote.bin` | `cb376415d256dde71c980cf41b3ee3a84dd1af414896196fc83e1b3f2ea69cb5` | `cb376415d256dde71c980cf41b3ee3a84dd1af414896196fc83e1b3f2ea69cb5` |
+
+Existing diagnostic events showed one FTP session, one USER and one FEAT per
+replacement, including remote-source download plus upload. Local-source and USB
+file replacement each used three RETRs/five SIZE commands; remote-source used
+four RETRs/seven SIZE commands. Each included one STOR and three acknowledged
+RNFR/RNTO pairs: nested upload publication inside staging, original → backup,
+and staged → final, followed by acknowledged DELE backup and RMD staging.
+Structured evidence confirmed the exact paths, original observations, completed
+publication and completed cleanup. No fallback/error diagnostic, self-contention
+or unexpected session change occurred. All measured operations ended with zero
+active leases and a stable Core epoch. USB preview/fingerprinting and execution
+are separate lifetimes; the one-session claim concerns each file replacement,
+not the entire USB job.
+
+Independent listings confirmed no generated backup/staging artifacts remained.
+After all checks passed, a fresh reviewed deletion removed exactly five files
+and two directories per device. A subsequent parent listing verified acceptance
+tree absence; zero active leases remained. No blanket/failure cleanup was used.
+
+This was headless Core/service qualification using existing diagnostics, not a
+physical GUI interaction test. Normal successful exchange is physically proven;
+cancellation, lost replies, binding invalidation, network interruption, local
+cleanup failure and external-writer races were intentionally not induced and
+remain deterministic fixture responsibilities. No reconnect or mutation replay
+was required. The existing normal/optimized baseline remains **939 tests / 36
+opt-in display skips, no failures**; suites were not repeated because production
+and test content did not change during qualification.
+
+External probe, diagnostics, initial/final manifests, readbacks and genuine
+backups remain outside the repository in
+`../argonaut-qualification/network-slice3d-physical/`, under
+`beige-20260927-124324/` and `founder-20260927-124328/`. They are not proposed
+commit contents. No commit, push, package or release was performed.
+
+Deferred consumers remain remote-to-remote nonreplacement additions, general
+folder-plan directory creation, Flash, CLI fresh-folder uploads, AI installation/
+upgrade/provisioning, general compatibility/raw-FTP retirement and final ownership
+audit. Local-destination replacement remains unchanged. This qualifies 3D only;
+Slice 3 as a whole is not complete. Final review and commit/push authorization
+remain pending.

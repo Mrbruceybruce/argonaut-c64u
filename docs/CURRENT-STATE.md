@@ -12,8 +12,8 @@ current state recorded here.
 - Stable 1.9 is released as `v1.9`. Its release artifacts are immutable.
 - `main` and `v1.9` are not the 1.10 development workspace. Current 1.10 work
   belongs on `development`.
-- Accepted development baseline: `fd0e205deece43865293d2a61d64bdc3834b3c05`
-  — `Implement managed mutation primitives for FTP Slice 3B`.
+- Accepted development baseline: `6a09af5b8559df73d83e12db3eeeeba3d8106a1a`
+  — `Implement managed staged uploads for FTP Slice 3C`.
 - Argonaut 1.10 direction: **C64U Network Foundation**.
 
 ## Completed FTP work
@@ -180,15 +180,16 @@ no active mutation was interrupted and no uncertain-outcome fault was induced.
 Production/test source hashes were unchanged throughout qualification. Details,
 hashes, disposable paths and external probe limitations are in C64U-FTP.md.
 
-## Slice 3C — physically qualified, uncommitted; final review pending
+## Slice 3C — accepted, committed and pushed
 
 The approved 3C implementation is based on accepted 3B commit
 `fd0e205deece43865293d2a61d64bdc3834b3c05`. It migrates normal FileService
 Core-host → C64U file additions, including folder-plan files, and USB restore
 addition files. Explicit routing leaves legacy `upload()` consumers unchanged.
 Authorized physical 3C checks passed on both devices on 27 September 2026.
-Final acceptance review and commit/push remain pending; no package or release
-has been created.
+Final acceptance review passed; 3C was committed and pushed as
+`6a09af5b8559df73d83e12db3eeeeba3d8106a1a`, with parent
+`fd0e205deece43865293d2a61d64bdc3834b3c05`. No package or release was created.
 
 Each file's plan validation and preflight listings, STOR, independent bounded
 RETR/hash, SIZE, destination recheck and publication rename reuse one managed
@@ -234,12 +235,85 @@ remain qualified by deterministic fixtures. Production/test source hashes were
 unchanged during qualification; only this document and C64U-FTP.md were updated.
 C64U-FTP.md records exact paths, hashes, external evidence and limitations.
 
-**Deferred:** replacement staging/exchange/cleanup and USB restore replacements;
-remote-to-remote composite copy; Flash staged uploads; CLI fresh-folder uploads;
-AI-client installation/provisioning; general unbound-client retirement.
-Folder-plan directory creation retains its existing route. No 3D work or
-replacement-exchange cancellation scope is implemented. Reviewed cleanup retains
-the accepted 3B deletion primitives and existing authorization policy.
+At the 3C checkpoint, replacement, composites, Flash, CLI and AI provisioning
+remained deferred. The implemented 3D boundary and remaining exceptions follow.
+
+## Slice 3D — physically qualified, uncommitted; final review pending
+
+The approved 3D implementation is based on the accepted 3C commit above.
+`managed_replacement.replace_managed` is selected explicitly for FileService
+reviewed local-source and remote-source replacements with a C64U destination,
+and USB restore replacement steps. Legacy `replace_file()` is unchanged; AI
+upgrade and local-destination replacement do not silently migrate.
+
+Each replacement owns one managed lifetime across execution validation, staging
+MKD, original observation, staged copy, signature revalidation, independent
+original observation, backup inspection and protected exchange/cleanup. Nested
+listings, 3A reads/downloads, 3C uploads and 3B mutations reuse its fixed-binding
+lease. A failed operation cannot reconnect, replay, reset as a read fallback or
+continue cleanup. Preview and subsequent failure inspection are separate operations.
+
+Both original observations now use exact SIZE → RETR/hash → SIZE. This approved
+change rejects unavailable/malformed/changing SIZE and short/overlong reads.
+Generic remote review still contains name/size only; these two execution reads
+provide neither a review-time hash nor a source snapshot or atomic exchange.
+USB restore retains content-bound comparison only where its existing equal-size
+classification hashes the destination; different-size classification remains
+size-based. Independent observations are never replaced with cached hashes.
+
+Local sources use managed upload into the unique staging directory. Remote
+sources first use managed download into a private local temporary directory,
+then managed upload; local temporary cleanup runs on all exits. The nested
+upload's published state means publication inside staging, not final replacement.
+
+After backup-name inspection, a final binding/cooperative-cancellation check
+precedes the protected original→backup, staged→final, DELE backup, RMD staging
+sequence. Cooperative cancellation alone is deferred across that finite sequence.
+There is no exit cancellation check or automatic rollback. Completed replacements
+remain completed; pending cancellation takes effect before the next item.
+Binding/recovery/transport failures and unrelated exceptions still stop work.
+
+Ordered replacement evidence is carried separately in copy/restore results:
+staging MKD/upload, original observations/signatures, each exchange/cleanup
+mutation, acknowledged prefix, uncertain paths and publication versus cleanup
+status. Publication-completed/cleanup-failed is explicitly reported, even though
+whole-workflow accounting leaves that item unfinished. Replacement evidence never
+authorizes cleanup and does not become an ordinary PartialUpload shortcut.
+Later inspection and explicitly selected reviewed deletion require new operations.
+
+The pre-physical corrections preserve normalized remote/cancellation evidence
+before local temporary cleanup. A cleanup error is recorded separately with a
+sanitized category; acknowledged remote success remains success in the remote
+state even when local cleanup fails. Core-formatted inspection summaries now
+reach copy and USB reports, including cancelled copy jobs with replacement
+evidence. They identify relevant paths and uncertainty without granting replay,
+rollback or cleanup authorization. Ordinary PartialUpload behavior is unchanged.
+
+After the pre-physical corrections, **8 targeted and 266 focused tests passed**.
+Complete normal and optimized suites each ran **939 tests with 36 opt-in display
+skips, no failures** (931 reviewed tests + 8 correction regressions; equivalently
+883 accepted tests + 48 replacement tests + 8 corrections; no removals/skip changes).
+The separately authorized physical pass passed on both C64Us on 27 September
+2026, with 65 recorded checks per device. Beige `25EA78` (`192.168.68.70`,
+firmware `1.1.0s2`, API `0.1`) used a unique disposable tree under `/USB2`;
+Founder’s `25BE71` (`192.168.68.69`, firmware `1.1.0`, API `0.1`) used `/SD`.
+Reviewed local-source and remote-source replacement and genuine USB backup/restore
+replacement passed with independent 640-byte SHA-256 readbacks. Remote source
+and sentinel were preserved; backup/staging artifacts and local temporary data
+were removed. Each replacement reused one FTP session, one USER and one FEAT;
+leases released and Core epochs stayed stable. Final reviewed deletion removed
+each disposable tree and absence was independently verified. Cancellation and
+fault injection were intentionally omitted. Source/test hashes are unchanged
+from the reviewed implementation; the deterministic baseline remains 939/36.
+See C64U-FTP.md for exact paths, hashes, evidence and physical-test limitations.
+No commit, push, package or release was performed.
+
+**Still deferred:** remote-to-remote nonreplacement additions; general folder-plan
+directory creation; Flash; CLI fresh-folder uploads; AI installation/upgrade/
+provisioning; general compatibility/raw-FTP retirement and final ownership audit.
+Local-destination replacement retains its existing behavior. Slice 3 as a whole
+is not complete. Physical 3D qualification passed; final review and commit/push
+authorization remain pending.
 
 ## Later Network Foundation boundaries
 

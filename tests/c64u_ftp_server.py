@@ -16,7 +16,7 @@ class FakeC64UFtp:
                  welcome=b'220 C64U fixture\r\n', split=False,
                  data_wait=None, completion_wait=None, coalesced=False, directories=None,
                  mutation_tree=False, after_mutation=None, mutation_hook=None,
-                 transfer_hook=None, readback_data=None, transfer_completion=None):
+                 transfer_hook=None, readback_data=None, transfer_completion=None, before_command=None):
         self.listing, self.list_data, self.feat = listing, list_data, feat
         self.replies = replies or {}
         self.files = dict(files or {b'/file': b'abc'})
@@ -27,6 +27,7 @@ class FakeC64UFtp:
         self.mutation_tree = mutation_tree
         self.after_mutation = after_mutation or {}
         self.mutation_hook = mutation_hook
+        self.before_command = before_command
         self.transfer_hook = transfer_hook
         self.readback_data = readback_data
         self.transfer_completion = transfer_completion
@@ -74,6 +75,11 @@ class FakeC64UFtp:
                         verb, _, argument = line[:-2].partition(b' ')
                         with fixture._lock:
                             fixture.commands.append((verb, argument))
+                        override = fixture.before_command(verb, argument) if fixture.before_command else None
+                        if override is not None:
+                            if not override:return
+                            send(override)
+                            continue
                         if verb in fixture.replies:
                             reply = fixture.replies[verb]
                             if callable(reply):reply = reply(argument)
