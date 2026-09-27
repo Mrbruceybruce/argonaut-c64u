@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Temporary Core-owned read adapter; remove with the legacy FTP facade.
+"""Private Core FTP operation lifetime and read adapter.
 
 Preserves Entry/IdentityEntry/bytes contracts. No lease or socket leaves this
 module. Mutation helpers and unbound legacy CLI clients are not migrated here.
@@ -46,20 +46,25 @@ def translate(error):
         EC.SIZE_UNAVAILABLE.value: 'The C64U did not provide a usable file size; reading stopped.',
         EC.SIZE_MISMATCH.value: 'File changed or download was incomplete.',
         EC.COMPLETION_UNKNOWN.value: 'The C64U did not confirm completion; reading stopped.',
-    }.get(detail, 'C64U FTP read failed; no unverified result was accepted.'))
+    }.get(detail, 'C64U FTP operation failed; no unverified result was accepted.'))
     result = ConnectionFailure(kind, message)
     result.ftp_code = detail
     result.reply_code = error.reply_code
     result.phase = error.phase
+    result.outcome = error.outcome
+    result.transferred = error.transferred
+    result.retryable = error.retryable
+    result.ftp_error = error
     return result
 
 
 @dataclass
-class _ReadOperation:
+class _FtpOperation:
     checks: list = field(default_factory=list)
     failure: Exception | None = None
     client: object = None
     stack: object = None
+    transport_error: FtpOperationError | None = None
 
     def cancelled(self):
         try:
@@ -74,13 +79,14 @@ class _ReadOperation:
         if self.cancelled():raise self.failure
 
 
-class FtpReadAdapter:
+class _FtpOperations:
+    """Private fixed-binding lifetime, shared by nested FTP helpers."""
     def __init__(self, manager, binding, *, encoding='utf-8', check=None):
         self._manager = manager
         self.binding = binding
         self._encoding = encoding
         self._check = check
-        self._context = ContextVar('argonaut_ftp_read_operation', default=None)
+        self._context = ContextVar('argonaut_ftp_operation', default=None)
         self._lock = threading.Lock()
         self.capability_evidence = None
 
@@ -90,22 +96,22 @@ class FtpReadAdapter:
         if existing is not None:
             existing.checks.append(check)
             try:
+                self._manager._check(self.binding)
                 existing.check()
                 yield
             except FtpOperationError as exc:
-                if existing.failure is not None:raise existing.failure from None
-                raise translate(exc) from None
+                self._raise_failure(existing, exc)
             finally:existing.checks.pop()
             return
-        state = _ReadOperation([self._check, check])
+        state = _FtpOperation([self._check, check])
         acquired = False
         token = None
         try:
             # Serialize independent read contexts; nested helpers reuse context.
             # This runs on a worker, never waits while holding another FTP lease.
             while not acquired:
-                state.check()
                 self._manager._check(self.binding)
+                state.check()
                 acquired = self._lock.acquire(timeout=.1)
             state.check()
             with ExitStack() as stack:
@@ -115,24 +121,82 @@ class FtpReadAdapter:
                 finally:
                     if state.client is not None:self.capability_evidence = state.client.capabilities
         except FtpOperationError as exc:
-            if state.failure is not None:raise state.failure from None
-            raise translate(exc) from None
+            self._raise_failure(state, exc)
         finally:
             if token is not None:self._context.reset(token)
             if acquired:self._lock.release()
 
+    @staticmethod
+    def _raise_failure(state, error):
+        state.transport_error = error
+        # Keep wire evidence even when restoring the original callback/cancel
+        # exception. Binding invalidation must not be masked by cancellation.
+        if state.failure is not None and error.code not in (EC.STALE, EC.RECOVERING):
+            state.failure.ftp_error = error
+            raise state.failure from None
+        raise translate(error) from None
+
     def _client(self):
         state = self._context.get()
-        if state.client is not None and state.client.state.value != 'ready':
-            # A caller may explicitly choose another directory after a rejected
-            # preferred path. Never reuse a poisoned stream or retry implicitly.
-            self.capability_evidence = state.client.capabilities
-            state.stack.close()
-            state.client = None
+        if state.transport_error is not None:
+            raise state.transport_error
         if state.client is None:
             state.client = state.stack.enter_context(
                 self._manager.lease(self.binding, cancelled=state.cancelled))
         return state.client
+
+
+class FtpReadAdapter(_FtpOperations):
+    def end_read_attempt(self):
+        """Explicit caller-selected fallback boundary, never automatic recovery."""
+        state = self._context.get()
+        if state is None:return
+        self._manager._check(self.binding)
+        state.check()
+        if state.client is not None:
+            self.capability_evidence = state.client.capabilities
+        state.stack.close()
+        state.client = None
+        state.transport_error = None
+
+    def read_into(self, path, sink, *, progress=None, check=None, finish=None):
+        """Stream one exact SIZE/RETR/SIZE observation, including empty files.
+
+        The caller prepares/owns the sink and any publication or fsync policy.
+        Optional finish runs after RETR and before the final SIZE observation.
+        The returned transfer evidence contains no transport/session handle.
+        """
+        safe_argument(path)
+        try:wire_path = path.encode(self._encoding)
+        except UnicodeError:
+            raise BrowserError('Filename encoding failed.') from None
+        with self.operation(check):
+            state = self._context.get()
+            client = self._client()
+            expected = client.size(wire_path)
+            class Sink:
+                def write(self, block):
+                    try:
+                        state.check()
+                        return sink.write(block)
+                    except Exception as exc:
+                        state.failure = exc
+                        raise
+            def update(count):
+                state.check()
+                if progress is not None:
+                    try:progress(count)
+                    except Exception as exc:
+                        state.failure = exc
+                        raise
+            result = client.read_into(wire_path, Sink(), max_bytes=expected,
+                                      expected_bytes=expected, progress=update)
+            if finish is not None:finish()
+            state.check()
+            if client.size(wire_path) != expected:
+                raise BrowserError('Remote size changed or transfer was incomplete; no verified result accepted.')
+            state.check()
+            return result
 
     def list_directory(self, path='/', *, identity=False):
         if identity:
@@ -196,3 +260,8 @@ def adapter_for(client):
 def read_operation(client, check=None):
     adapter = adapter_for(client)
     return adapter.operation(check) if adapter is not None else nullcontext()
+
+
+def end_read_attempt(client):
+    adapter = adapter_for(client)
+    if adapter is not None:adapter.end_read_attempt()

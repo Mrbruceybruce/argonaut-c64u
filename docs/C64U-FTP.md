@@ -1,6 +1,6 @@
-# C64U Network Foundation — FTP Slices 1–2
+# C64U Network Foundation — FTP Slices 1–3A
 
-Status: **Slice 2 read-only Core integration and Linux physical acceptance complete**.
+Status: **Slices 1–2 accepted; Slice 3A physical checks passed on both devices, final review pending**.
 Baseline: released Stable 1.9 `3acb9be310560f69df5a80619e192585a7e87155`.
 
 ## Boundary and ownership
@@ -175,7 +175,10 @@ safe structured transport events enter the existing diagnostic context/job ID.
 FEAT occurs once per fresh lease; advertised MLSD is distinct from verified
 MLSD, SIZE and PASV. No capability UI is added.
 
-### Deliberately retained legacy consumers
+### Legacy consumers retained at the Slice 2 checkpoint
+
+The following records the Slice 2 boundary; the 3A changes below supersede its
+streaming-download and USB hashing entries for Core-bound clients.
 
 - `transfers.py`: streaming download plus upload/readback, staging and cleanup.
 - `replacement.py`: replacement/readback and its original-content protection.
@@ -330,3 +333,177 @@ are retained with the external qualification evidence.
 
 Acceptance was read-only. This record does not authorize mutation migration,
 Slice 3, new package builds or further device operations.
+
+
+## Slice 3A — shared operation lifetime and streaming reads
+
+Implementation baseline: `4f7a86745239e60b3c6f4e2287d94af8b3c00508`.
+This section describes the uncommitted implementation. Authorized physical
+checks are recorded below; final review is pending and 3B–3E are not complete.
+
+`ftp_reads.py` separates the private `_FtpOperations` lifetime from
+`FtpReadAdapter` read behavior. Existing Core attachment and identity/epoch
+ownership are unchanged. The lifetime owns a lazy lease, nested checks and
+failure evidence; nested listings, bounded reads and streams reuse it.
+Outermost exit closes the lease without a new cancellation check. Independent
+read contexts retain serialization. Binding/recovery validation is separate
+from cooperative cancellation and cannot be masked by a pending cancellation.
+No mutation-specific result types or cancellation-deferral mechanism is added.
+
+A failed lease (including failed acquisition) stays failed within its operation.
+There is no automatic reopening in the client accessor. Only the existing
+caller-selected preferred-directory fallback explicitly ends the failed read
+attempt before choosing its fallback directory. New independent operations can
+acquire fresh leases; none replays failed work automatically.
+
+Translated errors retain the original sanitized `FtpOperationError`, outcome,
+transferred count, phase, reply code and availability retryability. Restored
+caller/cancellation exceptions also retain transport evidence where a transport
+failure occurred. No raw FTP object or lease is returned by a read operation.
+
+### Streaming contracts
+
+For a Core-bound client, `transfers.download()` uses a prepared local staging
+sink and the adapter's exact SIZE → RETR → SIZE stream. Received bytes are hashed
+by the transport. Flush/fsync runs after RETR and before the final SIZE check;
+publication still refuses an existing or concurrently created destination.
+Failure/cancellation removes only the local staging file. Zero-byte streams are
+supported without changing the nonempty bounded native-file read contract.
+
+Overlong streams are now rejected at the reported SIZE bound, before excess
+bytes enter the sink, rather than after downloading the entire stream. Short
+reads, unavailable/changing SIZE and missing terminal completion never publish.
+This is transfer validation, not a new source-snapshot guarantee. The local
+staging file is prepared before FTP acquisition and is removed on early errors.
+
+`UsbBackupService._remote_hash()` uses the same exact streaming operation with a
+discard sink and the transport's received-byte digest. Backup execution encloses
+each file's listing, download, local hash and separate remote verification read
+in one operation. Preview still reads the source once, execution still reads it
+twice, and all digests must agree. No observation is replaced with a cached hash.
+Preview/execution, independent files and full-volume fingerprint traversals keep
+separate operation boundaries; each fingerprint still uses one lease.
+
+### Retained boundary
+
+STOR/upload, replacement's original-content protection/exchange, Flash uploads,
+rename/MKD/DELE/RMD, partial-upload cleanup policy, the raw compatibility helper
+and unbound-client fallbacks are unchanged. Composite callers can benefit from
+the migrated download helper without migrating their mutation behavior. No
+physical devices were accessed during implementation/deterministic testing.
+The separately authorized physical pass is recorded below.
+
+### Deterministic verification
+
+`tests/test_ftp_streaming.py` adds 15 socket-fixture/integration regressions for
+nested reuse and authentication/FEAT counts; lazy acquisition and release;
+failed-lease/acquisition non-reopening; exact/empty streams and terminal errors;
+staging, fsync and destination protection; cancellation isolation and late exit;
+stale binding and structured failure evidence; and independent USB observations.
+Existing preferred-folder fallback, bounded-read, fingerprint, protocol and
+legacy mutation tests remain in place.
+
+Focused protocol/adapter/streaming/transfer/cancellation/USB/file-service/
+diagnostics run: **139 tests passed**. Complete normal and optimized suites:
+**806 tests each, 36 opt-in display skips each, no failures**. This is the
+accepted 791-test baseline plus 15 new tests, with no removals or skip changes.
+Socket tests required permission to create loopback sockets in the execution
+sandbox; the first restricted attempt could not create sockets and was rerun
+successfully with that permission. `git diff --check` passed.
+
+
+## Slice 3A physical acceptance — PASS (27 September 2026)
+
+Executed against the reviewed, uncommitted source at base
+`4f7a86745239e60b3c6f4e2287d94af8b3c00508`. No production code or tests changed
+in this pass. Only this document and CURRENT-STATE.md were updated afterward.
+Final human review remains required before commit/push. These results do not
+accept or authorize implementation of 3B–3E.
+
+The external probe used isolated Development Core state, identity-bound profiles,
+and existing empty-password configuration. No saved user configuration changed.
+Core REST identity checks preceded FTP reads; distinct IDs were required.
+No STOR, RNFR, RNTO, MKD, DELE, RMD or APPE was issued. No active transfer was
+interrupted and no destructive fault was induced. No FTP error or LIST fallback
+was observed.
+
+| Device | Address / physical ID | Firmware / API | Existing source | Bytes |
+|---|---|---|---|---:|
+| Beige C64 Ultimate | `192.168.68.70` / `25EA78` | `1.1.0s2` / `0.1` | `/USB1/sid/arcademem.sid` | 8,952 |
+| Founder's Edition C64 Ultimate | `192.168.68.69` / `25BE71` | `1.1.0` / `0.1` | `/SD/test.txt` | 4 |
+
+SHA-256 values agreed across the ordinary local download, nested repeat download,
+independent remote hash, backup manifest/local payload, and post-reconnect read.
+They also match the previously recorded Slice 2 content evidence:
+
+- Beige: `a4e2341064d1ef072ddc9d20c2131eb42fdc15027c4330bd9f87c3c0e0d8bb84`
+- Founder's: `9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08`
+
+### Operations and connection evidence
+
+On each device:
+
+1. FileService copy preview and execution downloaded the existing file to a new
+   Core-host directory. Published bytes and hashes matched; no `.c64u-*` staging
+   artifact remained. The transfer's observed wire sequence was SIZE/RETR/SIZE.
+2. A scheduled Core read operation enclosed a listing, streaming download and
+   independent USB hash. Exactly one FTP session, one USER/authentication and
+   one FEAT covered both SIZE/RETR/SIZE sequences (two RETRs, four SIZEs).
+3. UsbBackupService preview read the selected file once; execution downloaded
+   it and performed a separate remote verification read. Existing local reread
+   and hash comparison completed. Manifest state was `complete`, with one file,
+   correct size/hash, no unfinished entries and matching independently reread
+   local payload. Preview and execution were separate jobs/lease lifetimes.
+4. An idle `core.reconnect()` preserved physical identity and changed the Core
+   epoch. The previous adapter was rejected as stale without a wire event. A
+   subsequent nested download/hash succeeded with the same bytes and digest.
+
+Every measured operation ended with zero active managed leases, including
+before Core shutdown. Epochs remained unchanged during ordinary reads. Each
+FTP session negotiated FEAT once; there was no nested self-contention.
+
+| Measurement | Beige | Founder's |
+|---|---:|---:|
+| Ordinary copy execution sessions | 2 | 2 |
+| Nested listing + download + independent hash sessions | 1 | 1 |
+| Backup preview RETRs / SIZEs | 1 / 2 | 1 / 2 |
+| Backup execution RETRs / SIZEs | 2 / 4 | 2 / 4 |
+| Backup preview total sessions | 4 | 3 |
+| Backup execution total sessions | 3 | 2 |
+| Per-file backup execution session (listing + two reads) | 1 | 1 |
+| Post-reconnect nested download/hash sessions | 1 | 1 |
+
+Ordinary copy execution keeps its existing separate preflight-listing and
+streaming-transfer boundaries; two sessions do not mean two transfer leases.
+Backup totals include separate volume fingerprint/enumeration work. Beige also
+has the selected file's `sid` ancestor directory. Neither entire copy jobs nor
+entire backup jobs are claimed to use one session.
+
+The current beige volume fingerprint used 35 listings per traversal and was
+`29e6bcc6674a42651a5aa1bf2fe8609a22b085c961c156504d0c327a6735b243`.
+Founder's SD fingerprint was
+`4ed3be35d76a8a1fa7c34326fbc4d7c47c9c002e55bce8b1bcf94bee3f020c4b`.
+Preparation/execution comparisons passed. The beige tree differs from the
+historical Slice 2 34-listing tree; no unchanged-tree performance comparison
+is claimed.
+
+### Limits and retained evidence
+
+- No zero-byte file was present in the inspected source directories (`/USB1/sid`
+  and `/SD`). No empty file was created; physical zero-byte coverage remains
+  unexercised, with deterministic coverage retained.
+- These were small known files and selected-file backups, not large-file or
+  whole-volume payload backup qualification.
+- FTP diagnostics establish SIZE/RETR/SIZE ordering and session reuse. They do
+  not independently trace local flush/fsync calls. Those calls ran through the
+  unchanged reviewed download path; ordering is established by code review and
+  deterministic tests, with successful publication observed physically.
+- Reconnect was performed between completed operations, not during transfer.
+- This was headless Core source acceptance, not a new package or GUI qualification.
+
+External evidence is retained beside the repository in
+`argonaut-qualification/network-slice3a-physical/`: the probe, source SHA-256
+manifest, reviewed diff, console logs, downloaded files, complete backup
+manifests and per-session diagnostic events. Device reports are
+`beige-20260927-102522/report.json` and
+`founder-20260927-102608/report.json`.

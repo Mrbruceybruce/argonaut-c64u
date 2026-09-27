@@ -12,6 +12,7 @@ import uuid
 from .api import BrowserError, safe_argument
 from .storage import storage_root
 from .diagnostics import operation_event
+from .ftp_reads import adapter_for
 
 
 class UploadFailure(BrowserError):
@@ -56,6 +57,19 @@ def _download(client, source, destination, progress):
     try:
         if os.path.lexists(destination):
             raise BrowserError('Destination already exists; nothing was overwritten.')
+        adapter = adapter_for(client)
+        if adapter is not None:
+            with tempfile.NamedTemporaryFile(dir=destination.parent, prefix='.c64u-', delete=False) as output:
+                temporary = output.name
+                def finish():
+                    output.flush()
+                    os.fsync(output.fileno())
+                result = adapter.read_into(source, output, progress=progress,
+                                           check=check, finish=finish)
+            check()
+            publish_new(temporary, destination)
+            return {'path': str(destination), 'bytes': result.transferred,
+                    'sha256': result.sha256}
         ftp = connect(client)
         expected = ftp.size(source)
         if expected is None:

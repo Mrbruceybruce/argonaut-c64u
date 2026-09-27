@@ -23,7 +23,7 @@ from .replacement import signature
 from .scheduler import JobBinding
 from .storage import storage_root
 from .transfers import connect, download
-from .ftp_reads import read_operation
+from .ftp_reads import read_operation, adapter_for
 
 
 MANIFEST_NAME='.argonaut-usb-backup.json'
@@ -483,6 +483,14 @@ class UsbBackupService:
         return self._submit('usb.backup.prepare',task,session)
 
     def _remote_hash(self,client,path,job,phase,base,total):
+        adapter=adapter_for(client)
+        if adapter is not None:
+            class HashSink:
+                def write(self,block):return len(block)
+            def progress(count):
+                job.report(JobProgress(phase,base+count,total,'bytes','Verifying USB backup data…'))
+            result=adapter.read_into(path,HashSink(),progress=progress,check=job.check_cancel)
+            return result.transferred,result.sha256
         ftp=connect(client);digest=hashlib.sha256();count=0
         try:
             expected=ftp.size(path)
@@ -531,24 +539,25 @@ class UsbBackupService:
                         completed_dirs.append(item.relative);manifest['directories'].append(item.relative)
                         _json_write(folder/MANIFEST_NAME,manifest);continue
                     target.parent.mkdir(parents=True,exist_ok=True)
-                    entry=next((row for row in client.list_directory(posixpath.dirname(item.path))[1]
-                                if row.name==posixpath.basename(item.path)),None)
-                    if entry is None or entry.kind!='file' or entry.size!=item.size:
-                        raise BrowserError('A C64U source file changed after preview: '+item.path)
-                    base=bytes_done
-                    progress=job.byte_progress('backup-download')
-                    def overall(count):
-                        progress.check();job.report(JobProgress('backup-download',base+count,total,'bytes','Backing up USB files…'))
-                    overall.check=job.check_cancel
-                    first=download(client,item.path,target,overall)
-                    local_size,local_digest=_local_hash(target,job.check_cancel)
-                    second_size,second_digest=self._remote_hash(
-                        client,item.path,job,'backup-verify',base,total)
-                    if (first['bytes']!=item.size or local_size!=item.size or second_size!=item.size or
-                            first['sha256']!=local_digest or local_digest!=second_digest or
-                            local_digest!=item.sha256):
-                        target.unlink(missing_ok=True)
-                        raise BrowserError('A source file changed or verification failed: '+item.path)
+                    with read_operation(client,job.check_cancel):
+                        entry=next((row for row in client.list_directory(posixpath.dirname(item.path))[1]
+                                    if row.name==posixpath.basename(item.path)),None)
+                        if entry is None or entry.kind!='file' or entry.size!=item.size:
+                            raise BrowserError('A C64U source file changed after preview: '+item.path)
+                        base=bytes_done
+                        progress=job.byte_progress('backup-download')
+                        def overall(count):
+                            progress.check();job.report(JobProgress('backup-download',base+count,total,'bytes','Backing up USB files…'))
+                        overall.check=job.check_cancel
+                        first=download(client,item.path,target,overall)
+                        local_size,local_digest=_local_hash(target,job.check_cancel)
+                        second_size,second_digest=self._remote_hash(
+                            client,item.path,job,'backup-verify',base,total)
+                        if (first['bytes']!=item.size or local_size!=item.size or second_size!=item.size or
+                                first['sha256']!=local_digest or local_digest!=second_digest or
+                                local_digest!=item.sha256):
+                            target.unlink(missing_ok=True)
+                            raise BrowserError('A source file changed or verification failed: '+item.path)
                     bytes_done+=item.size;completed_files.append(item.relative)
                     manifest['files'].append({'path':item.relative,'size':item.size,'sha256':local_digest})
                     _json_write(folder/MANIFEST_NAME,manifest)

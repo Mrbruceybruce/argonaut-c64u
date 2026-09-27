@@ -27,10 +27,10 @@ Transport objects and credentials do not escape to clients.
 **Slice 2 — read-only production migration and physical acceptance complete:**
 ordinary listings, raw/octet-preserving identity listings and bounded remote
 reads use the new client. Full-volume fingerprint traversal reuses one
-operation-scoped lease. Mutation/write paths and remaining streaming downloads
-retain their legacy implementation. The Development package self-test now
-enforces channel-specific credential behavior; credential implementations are
-unchanged.
+operation-scoped lease. At that checkpoint, mutation/write paths and remaining
+streaming downloads retained their legacy implementation. The Development
+package self-test now enforces channel-specific credential behavior; credential
+implementations are unchanged.
 
 Accepted automated baseline: normal and optimized suites each ran 791 tests
 with 36 opt-in display skips; 78 focused FTP/adapter/credential tests passed.
@@ -89,19 +89,61 @@ different FTP implementations.
 - Quick Connect → Reconnect is planned.
 - A System/Light/Dark theme preference is planned.
 
-## Next: Slice 3 — transfer/mutation migration
+## Slice 3A — implemented; physical checks passed, final review pending
 
-**Before implementation, inspect and review remaining mutation/streaming
-contracts and direct-client ownership. Slice 3 is not yet implemented.**
+The uncommitted 3A change is based on authoritative commit
+`4f7a86745239e60b3c6f4e2287d94af8b3c00508`. Authorized read-only physical
+acceptance checks passed on both C64Us on 27 September 2026. Results await final
+review before commit; no package, commit or publication was performed.
 
-Expected eventual scope: STOR/upload, remaining download paths,
-SIZE/STOR/RETR verification, rename/move, MKD/RMD, DELE, replacement primitives,
-partial-upload ownership/cleanup and operation-scoped lease reuse.
+Core-bound streaming downloads and USB content hashing now use the managed FTP
+client. Their SIZE → RETR → SIZE observations preserve exact counts and received
+hashes, including zero-byte files. Downloads retain local staging, flush/fsync,
+no-replace publication and failure/cancellation cleanup. USB backup retains its
+preview read, execution download, local reread and independent remote reread;
+the execution listing and two remote reads share one per-file lease. Preview
+and execution remain separate lifetimes.
 
-Preserve staging, readback hashing, conflict review, replacement rules and
-explicit destructive authorization. Do not accidentally redesign higher-level
-service orchestration while migrating transport. A transport primitive's
-success is not permission to discard existing verification or cleanup ownership.
+The private operation lifetime is shared by nested read helpers: fixed Core
+binding, lazy acquisition, outermost release and operation-owned cancellation.
+Structured transport outcome/count evidence survives translation. Binding and
+recovery checks remain independent of cooperative cancellation. Context exit
+does not itself check cancellation. A failed lease cannot implicitly reconnect;
+the existing preferred-directory fallback explicitly ends its read attempt.
+Bounded reads and full-volume fingerprints preserve their existing contracts.
+
+3A automated verification: **139 focused tests passed**; complete normal and
+optimized suites each ran **806 tests with 36 opt-in display skips**, no failures.
+The increase over the accepted 791-test baseline is 15 new integration tests;
+no existing tests were removed and the skip count is unchanged.
+
+Physical 3A coverage: normal Core file-copy download, nested streaming download
+and independent USB hash, selected-file backup preview/execution, local reread
+verification, idle Core reconnect and rejection of the old binding before wire
+access. Beige `25EA78` (`192.168.68.70`, firmware `1.1.0s2`) used the existing
+8,952-byte `/USB1/sid/arcademem.sid`; Founder's `25BE71` (`192.168.68.69`, firmware
+`1.1.0`) used the existing four-byte `/SD/test.txt`. Both retain API `0.1`.
+
+Nested listing/download/hash and each backup file's execution verification used
+one FTP session, one authentication and one FEAT. Preview and execution retained
+separate observations; no active leases remained after measured operations.
+Hashes matched the existing Slice 2 file evidence and local backup manifests.
+No zero-byte file existed in the inspected source directories; none was created.
+No remote mutation, active-transfer interruption or production code change was
+performed during acceptance. See C64U-FTP.md for counts, hashes and limitations.
+
+Remaining checkpoints are **not implemented**:
+
+- **3B:** mutation primitives and Core-owned directory operations.
+- **3C:** staged uploads and partial lifecycle.
+- **3D:** replacement and composite workflows.
+- **3E:** unbound-client retirement.
+
+Uploads, replacement exchange/original-content reads, Flash writes, mutation
+primitives, partial-upload cleanup policy and unbound compatibility fallbacks
+remain legacy. Later work must preserve staging, readback hashing, conflict
+review, replacement rules and explicit destructive authorization. 3A does not
+implement upload exact-length changes or cancellation-deferred exchange scopes.
 
 ## Later Network Foundation boundaries
 
