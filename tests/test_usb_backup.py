@@ -103,6 +103,30 @@ class UsbBackupTests(unittest.TestCase):
         self.service=UsbBackupService(lambda:self.client,lambda:self.session,self.scheduler)
         self.files=FileService(lambda:self.client,lambda:self.session,
                                scheduler=self.scheduler)
+        # This suite exercises restore policy with an in-memory legacy peer.
+        # Supply the explicit upload seam; real managed wire/evidence behavior is
+        # covered by test_ftp_uploads, not inferred from this double.
+        from c64u_browser.transfers import upload, UploadEvidence
+        def addition(client, source, parent, progress):
+            try:
+                result=upload(client,source,parent,progress)
+                result['upload']=UploadEvidence('complete','',result['path'],
+                                                disposition='published')
+                return result
+            except Exception as exc:
+                partial=getattr(exc,'partial_path',None)
+                exc.upload_evidence=UploadEvidence('stor',partial or '',
+                    parent+'/'+Path(source).name,
+                    disposition='staging-candidate' if partial else 'not-started')
+                raise
+        from contextlib import nullcontext
+        from types import SimpleNamespace
+        lifetime=patch('c64u_browser.folder_copy.adapter_for',
+                       return_value=SimpleNamespace(operation=lambda check:nullcontext()))
+        lifetime.start();self.addCleanup(lifetime.stop)
+        seam=patch('c64u_browser.folder_copy.upload_managed',side_effect=addition)
+        seam.start();self.addCleanup(seam.stop)
+
 
     def backup_request(self,name='backup',paths=()):
         return BackupRequest(FileLocation.c64u('/USB2'),tuple(paths),

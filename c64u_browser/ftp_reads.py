@@ -162,6 +162,37 @@ class _FtpOperations:
                 raise BrowserError('Unknown mutation operation.')
             return getattr(self._client(), operation)(*args).as_dict()
 
+    def write_from(self, path, source, expected_bytes, progress=None):
+        with self.operation():
+            state = self._context.get()
+            state.mutation_used = True
+            def update(count):
+                try:
+                    state.check()
+                    if progress is not None:progress(count)
+                except Exception as exc:
+                    state.failure = exc
+                    raise
+            return self._client().write_from(self._path(path), source,
+                expected_bytes=expected_bytes, progress=update)
+
+    def readback(self, path, expected_bytes):
+        """One bounded RETR observation; upload owns the subsequent SIZE."""
+        class Discard:
+            def write(self, block):return len(block)
+        with self.operation():
+            return self._client().read_into(self._path(path), Discard(),
+                max_bytes=expected_bytes, expected_bytes=expected_bytes)
+
+    def size(self, path):
+        with self.operation():
+            return self._client().size(self._path(path))
+
+    def _path(self, path):
+        safe_argument(path)
+        try:return path.encode(self._encoding)
+        except UnicodeError:raise BrowserError('Filename encoding failed.') from None
+
     @staticmethod
     def _raise_failure(state, error):
         state.transport_error = error

@@ -3,12 +3,15 @@ from .platform_support import parents, contains_path
 # Copyright (C) 2026 Bruce Marcus
 """Read-only recursive planning followed by conservative, sequential copying."""
 from dataclasses import dataclass, field
+from contextlib import nullcontext
 from pathlib import Path
 import os
 import posixpath
 from .api import BrowserError
 from .files import child, operate
 from .file_copy import copy_files
+from .transfers import upload_managed
+from .ftp_reads import adapter_for
 from .replacement import signature, replace_file
 
 @dataclass
@@ -34,6 +37,7 @@ class Report:
     error: str = ''
     partial: str = None
     cancelled: bool = False
+    uploads: list = field(default_factory=list)
 
     @property
     def message(self):
@@ -110,41 +114,55 @@ def build_plan(client, source_local, parent, names, local, destination, check=la
     return plan
 
 
-def execute_plan(client, plan, source_local, local, progress=lambda n:None):
+def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, managed_uploads=False):
     report = Report(skipped=list(plan.conflicts))
     checked_directories = set()
     for index,step in enumerate(plan.steps):
         try:
-            getattr(progress, 'check', lambda:None)()
-            if kind(client,source_local,step.source) != ('dir' if step.directory else 'file'):
-                raise BrowserError('Source changed since the copy was prepared: '+str(step.source))
-            # Recheck every destination ancestor used by this plan, so a changed
-            # directory cannot redirect later writes through a local symlink.
-            for ancestor in parents(step.destination,local):
-                if ancestor in checked_directories and kind(client,local,ancestor) != 'dir':
-                    raise BrowserError('Destination folder changed: '+ancestor)
-            target_kind = kind(client,local,step.destination)
-            if step.signature is not None:
-                replace_file(client,step,source_local,local,progress)
-            elif step.directory:
-                if step.existed:
-                    if target_kind != 'dir': raise BrowserError('Destination folder changed: '+str(step.destination))
-                elif target_kind is not None:
-                    raise BrowserError('Destination appeared after review: '+str(step.destination))
-                elif local: Path(step.destination).mkdir()
-                else: operate(client,'mkdir',step.destination)
-                checked_directories.add(str(step.destination))
-            else:
-                if target_kind is not None: raise BrowserError('Destination appeared after review: '+str(step.destination))
-                parent = Path(step.source).parent if source_local else posixpath.dirname(step.source)
-                dest_parent = Path(step.destination).parent if local else posixpath.dirname(step.destination)
-                name = Path(step.source).name if source_local else posixpath.basename(step.source)
-                message, partial = copy_files(client,source_local,parent,[name],local,dest_parent,progress)
-                if not message.startswith('Copied 1 file(s):'):
-                    report.partial = partial
-                    raise BrowserError(message)
-            report.completed.append(step.relative + ('/' if step.directory else ''))
+            addition = managed_uploads and source_local and not local and not step.directory and step.signature is None
+            adapter = adapter_for(client) if addition else None
+            if addition and adapter is None:
+                raise BrowserError('Upload requires a Core-managed C64U session.')
+            # Per-file validation and upload share the lease; no batch-wide owner.
+            with adapter.operation(getattr(progress, 'check', None)) if addition else nullcontext():
+                getattr(progress, 'check', lambda:None)()
+                if kind(client,source_local,step.source) != ('dir' if step.directory else 'file'):
+                    raise BrowserError('Source changed since the copy was prepared: '+str(step.source))
+                # Recheck every destination ancestor used by this plan, so a changed
+                # directory cannot redirect later writes through a local symlink.
+                for ancestor in parents(step.destination,local):
+                    if ancestor in checked_directories and kind(client,local,ancestor) != 'dir':
+                        raise BrowserError('Destination folder changed: '+ancestor)
+                target_kind = kind(client,local,step.destination)
+                if step.signature is not None:
+                    replace_file(client,step,source_local,local,progress)
+                elif step.directory:
+                    if step.existed:
+                        if target_kind != 'dir': raise BrowserError('Destination folder changed: '+str(step.destination))
+                    elif target_kind is not None:
+                        raise BrowserError('Destination appeared after review: '+str(step.destination))
+                    elif local: Path(step.destination).mkdir()
+                    else: operate(client,'mkdir',step.destination)
+                    checked_directories.add(str(step.destination))
+                elif managed_uploads and source_local and not local:
+                    if target_kind is not None:raise BrowserError('Destination appeared after review: '+str(step.destination))
+                    result = upload_managed(client, step.source, posixpath.dirname(step.destination), progress)
+                    report.uploads.append(result['upload'])
+                else:
+                    if target_kind is not None: raise BrowserError('Destination appeared after review: '+str(step.destination))
+                    parent = Path(step.source).parent if source_local else posixpath.dirname(step.source)
+                    dest_parent = Path(step.destination).parent if local else posixpath.dirname(step.destination)
+                    name = Path(step.source).name if source_local else posixpath.basename(step.source)
+                    message, partial = copy_files(client,source_local,parent,[name],local,dest_parent,progress)
+                    if not message.startswith('Copied 1 file(s):'):
+                        report.partial = partial
+                        raise BrowserError(message)
+                report.completed.append(step.relative + ('/' if step.directory else ''))
         except Exception as exc:
+            evidence = getattr(exc, 'upload_evidence', None)
+            if evidence is not None:
+                report.uploads.append(evidence)
+                report.partial = getattr(exc, 'partial_path', None)
             report.error = str(exc)
             report.cancelled = bool(getattr(exc,'cancelled',False))
             if report.cancelled:

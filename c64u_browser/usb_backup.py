@@ -114,6 +114,7 @@ class RestoreResult:
     partial_path: str | None = None
     failure: str = ''
     partial_upload: PartialUpload | None = None
+    uploads: tuple = ()
 
     @property
     def message(self):
@@ -727,7 +728,7 @@ class UsbBackupService:
                     steps.append(Step(item.path,source,destination,False,True,
                                       signature(client,False,destination)))
             plan=Plan(steps=steps)
-            report=execute_plan(client,plan,True,False,job.byte_progress('restore'))
+            report=execute_plan(client,plan,True,False,job.byte_progress('restore'), managed_uploads=True)
             completed=set(value.rstrip('/') for value in report.completed)
             replaced=tuple(path for path in replacement_set if path in completed)
             added=tuple(path for path in stored.classification.additions if path.rstrip('/') in completed)
@@ -738,7 +739,7 @@ class UsbBackupService:
             result=RestoreResult(added,replaced,stored.classification.unchanged,skipped,
                 stored.classification.conflicts,tuple(report.remaining),
                 sum(file_map[path].size for path in completed if path in file_map),
-                report.partial,report.error,partial)
+                report.partial,report.error,partial,tuple(report.uploads))
             if report.cancelled:raise JobCancelled(result=result)
             if report.error:raise UsbBackupFailure('restore',report.error,result)
             return result

@@ -9,6 +9,7 @@ from pathlib import Path
 import posixpath
 import tempfile
 import uuid
+from dataclasses import dataclass, replace
 from .api import BrowserError, safe_argument
 from .storage import storage_root
 from .diagnostics import operation_event
@@ -201,3 +202,118 @@ def _upload(client, source, parent, progress):
         raise UploadFailure(f'Upload failed: {exc}.{recovery}',temporary if started else None) from exc
     finally:
         if ftp is not None: ftp.close()
+
+
+# Explicit 3C entry: legacy upload() remains for deferred composite consumers.
+@dataclass(frozen=True)
+class UploadEvidence:
+    phase: str
+    staging: str
+    destination: str
+    expected_bytes: int | None = None
+    stor: dict | None = None
+    readback: str = 'unperformed'
+    size: str = 'unperformed'
+    publication: dict | None = None
+    disposition: str = 'not-started'
+    error_category: str | None = None
+    error_code: str | None = None
+    transport_error: dict | None = None
+
+    def inspection_message(self):
+        if self.disposition == 'location-unknown':
+            return ('Publication was not confirmed. The uploaded file may be at '
+                    f'{self.staging} or {self.destination}. Inspect before further action; '
+                    'no retry or cleanup was attempted.')
+        return ''
+
+
+def upload_managed(client, source, parent='/USB2', progress=lambda n: None):
+    """Core-only staged addition. Never retries or removes remote state."""
+    from .files import child, inspect
+    source = Path(source)
+    destination = child(parent, source.name)
+    temporary = child(parent, 'c64u-part-' + uuid.uuid4().hex)
+    evidence = UploadEvidence('preflight', temporary, destination)
+    check = getattr(progress, 'check', lambda: None)
+    try:
+        check()
+        adapter = adapter_for(client)
+        if adapter is None:
+            raise BrowserError('Upload requires a Core-managed C64U session.')
+        with operation_event('ftp', 'upload', 'file'), adapter.operation(check):
+            if inspect(client, destination) is not None:
+                raise BrowserError('Destination already exists; upload refused.')
+            if inspect(client, temporary) is not None:
+                raise BrowserError('Temporary filename exists; upload refused.')
+            evidence = replace(evidence, phase='source')
+            check()
+            with source.open('rb') as stream:
+                if not source.is_file():raise BrowserError('Choose a regular file.')
+                expected = os.fstat(stream.fileno()).st_size
+                evidence = replace(evidence, phase='stor', expected_bytes=expected)
+                sent = adapter.write_from(temporary, stream, expected, progress)
+                evidence = replace(evidence, stor=sent.transfer.as_dict(),
+                                   disposition='staging-candidate', phase='source-close')
+            evidence = replace(evidence, phase='readback', readback='pending')
+            observed = adapter.readback(temporary, sent.transferred)
+            if observed.sha256 != sent.sha256:
+                evidence = replace(evidence, readback='failed')
+                raise BrowserError('Upload readback hash verification failed.')
+            evidence = replace(evidence, readback='passed', phase='size', size='pending')
+            if adapter.size(temporary) != sent.transferred:
+                evidence = replace(evidence, size='failed')
+                raise BrowserError('Upload SIZE verification failed.')
+            evidence = replace(evidence, size='passed', phase='destination-recheck')
+            if inspect(client, destination) is not None:
+                raise BrowserError('Destination appeared during transfer; publish refused.')
+            evidence = replace(evidence, phase='publication')
+            check()
+            publication = adapter.mutate('rename', temporary, destination)
+            evidence = replace(evidence, publication=publication, disposition='published', phase='complete')
+            # No check after the acknowledged consequential rename, including context exit.
+            return {'path': destination, 'bytes': sent.transferred, 'sha256': sent.sha256,
+                    'verified': True, 'upload': evidence}
+    except Exception as exc:
+        wire = getattr(exc, 'ftp_error', None)
+        stor = getattr(wire, 'transfer', None)
+        mutation = getattr(wire, 'mutation', None)
+        if evidence.phase == 'stor' and stor is not None:
+            data = stor.as_dict()
+            # A preliminary refusal does not establish creation of a staging file.
+            refused = data['preliminary_reply'] is not None and data['preliminary_reply'] >= 400
+            evidence = replace(evidence, stor=data, disposition=(
+                'no-candidate' if refused else
+                'staging-candidate' if data['submitted'] else 'not-started'))
+        if evidence.phase == 'publication' and mutation is not None:
+            data = mutation.as_dict()
+            evidence = replace(evidence, publication=data)
+            if data['consequential_submitted'] and data['outcome'] == 'unknown':
+                evidence = replace(evidence, disposition='location-unknown')
+        if evidence.readback == 'pending':evidence = replace(evidence, readback='failed')
+        if evidence.size == 'pending':evidence = replace(evidence, size='failed')
+        category = ('cancelled' if getattr(exc, 'cancelled', False) else
+                    'transport' if wire is not None else
+                    'verification' if evidence.phase in ('readback', 'size') else
+                    'conflict' if evidence.phase in ('preflight', 'destination-recheck') else 'upload')
+        if (wire is not None and wire.code.value == 'size-mismatch' and
+                evidence.stor and evidence.stor['length_status'] in ('short', 'overlong')):
+            category = 'source-length'
+        code = wire.code.value if wire is not None else category
+        evidence = replace(evidence, error_category=category, error_code=code,
+                           transport_error=wire.as_dict() if wire is not None else None)
+        partial = temporary if evidence.disposition == 'staging-candidate' else None
+        if getattr(exc, 'cancelled', False):
+            exc.upload_evidence = evidence
+            exc.partial_path = partial
+            raise
+        message = evidence.inspection_message()
+        if not message:
+            message = (f'Upload stopped during {evidence.phase}: C64U FTP {code}. Inspect the recorded result.'
+                       if wire is not None else str(exc) if isinstance(exc, BrowserError)
+                       else 'Upload failed; inspect the recorded result.')
+        failure = UploadFailure(message, partial)
+        failure.upload_evidence = evidence
+        failure.code = 'upload-' + category
+        failure.retryable = False
+        raise failure from None

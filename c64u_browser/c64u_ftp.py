@@ -19,7 +19,7 @@ from .c64u_ftp_types import (
     CapabilityState as CS, ContainerPresentation, C64UFtpCapabilities,
     ConnectionBinding, ErrorCode as EC, FtpOperationError, FtpPolicy,
     FtpSessionIdentity, ListingLimits, ListingParser, ListingResult,
-    Outcome, SessionState, TransferResult, MutationEvidence, checked_path,
+    Outcome, SessionState, TransferResult, MutationEvidence, WriteEvidence, checked_path,
 )
 
 
@@ -123,6 +123,7 @@ class C64UFtpClient:
         self._invalid_reason = None
         self._cancel_deferred = 0
         self._mutation = None
+        self._write = None
 
     @property
     def identity(self):
@@ -219,9 +220,14 @@ class C64UFtpClient:
                        Outcome.NOT_STARTED)
             mutation = replace(mutation, outcome=outcome,
                                error_category=error.code.value)
+        write = self._write
+        if write is not None:
+            write = replace(write, submitted=self._submitted, transferred=self._count,
+                            outcome=outcome if self._submitted else Outcome.NOT_STARTED,
+                            error_category=error.code.value)
         error = FtpOperationError(error.code, error.phase, reply_code=error.reply_code,
                                   retryable=error.retryable, outcome=outcome,
-                                  transferred=self._count, mutation=mutation)
+                                  transferred=self._count, mutation=mutation, transfer=write)
         self._event('error', **error.as_dict())
         self._invalidate(SessionState.RECOVERING if error.code == EC.RECOVERING else SessionState.FAILED)
         return error
@@ -232,6 +238,7 @@ class C64UFtpClient:
             raise FtpOperationError(EC.BUSY, 'operation')
         start = time.monotonic()
         try:
+            self._write = None
             self._mutation = (MutationEvidence(verb, 'RNFR' if verb == 'rename' else verb)
                               if verb in ('rename', 'MKD', 'DELE', 'RMD') else None)
             self._submitted = False
@@ -314,7 +321,9 @@ class C64UFtpClient:
 
     def _command(self, verb, argument=None):
         if self._state in (SessionState.READY, SessionState.TRANSFERRING):
-            self._phase = 'control-reply'
+            self._phase = ('stor-' + verb.lower()
+                           if self._write is not None and not self._submitted and verb in ('TYPE', 'PASV')
+                           else 'control-reply')
         self._send(verb, argument)
         return self._reply()
 
@@ -485,6 +494,8 @@ class C64UFtpClient:
             self._data = None
             self._submitted = False
             return None
+        if source is not None:
+            self._write = replace(self._write, submitted=True, preliminary_reply=reply[0])
         self._expect(reply, (125,150), EC.STOR if source is not None else
                      EC.RETR if verb == 'RETR' else EC.LISTING)
         self._state_to(SessionState.TRANSFERRING)
@@ -502,8 +513,14 @@ class C64UFtpClient:
                 self._data.settimeout(self._policy.data_idle)
                 block = self._data.recv(8192)
             if not block:
+                if source is not None:
+                    self._write = replace(self._write,
+                        sha256=digest.hexdigest() if self._count == expected else None,
+                        length_status='exact' if self._count == expected else 'short')
                 break
             if maximum is not None and self._count + len(block) > maximum:
+                if source is not None:
+                    self._write = replace(self._write, length_status='overlong')
                 raise FtpOperationError(EC.SIZE_MISMATCH, 'data-bound')
             if source is not None:
                 self._phase = 'data-io'
@@ -522,18 +539,24 @@ class C64UFtpClient:
         self._phase = 'completion'
         self._check()
         reply = self._reply(self._policy.final_reply)
+        if source is not None:
+            self._write = replace(self._write, terminal_reply=reply[0])
         # A rejected final reply after STOR is uncertain storage state, even if
         # the server says failure. No automatic cleanup/retry is authorized.
         if reply[0] not in (226,250):
             raise FtpOperationError(EC.COMPLETION_UNKNOWN, 'completion',
                                     reply_code=reply[0], outcome=Outcome.UNKNOWN)
         if expected is not None and self._count != expected:
-            raise FtpOperationError(EC.SIZE_MISMATCH, 'verification', outcome=Outcome.COMPLETED)
+            raise FtpOperationError(EC.SIZE_MISMATCH, 'verification',
+                                    reply_code=reply[0], outcome=Outcome.COMPLETED)
         self._state_to(SessionState.READY)
         self._event('transfer-complete', transferred=self._count, outcome=Outcome.COMPLETED.value)
         # Do not check cancellation after terminal acceptance: late cancellation
         # cannot relabel an accepted write as not having occurred.
-        return TransferResult(self._count, digest.hexdigest(), reply[0])
+        if source is not None:
+            self._write = replace(self._write, transferred=self._count, sha256=digest.hexdigest(),
+                                  outcome=Outcome.COMPLETED)
+        return TransferResult(self._count, digest.hexdigest(), reply[0], transfer=self._write)
 
     def list_directory(self, path, *, limits=None):
         path = checked_path(path)
@@ -589,5 +612,6 @@ class C64UFtpClient:
         if type(expected_bytes) is not int or expected_bytes < 0:
             raise FtpOperationError(EC.INVALID_ARGUMENT, 'write-bound')
         with self._operation_scope('STOR'):
+            self._write = WriteEvidence(expected_bytes)
             return self._transfer('STOR', path, source=source, expected=expected_bytes,
                                   maximum=expected_bytes, progress=progress)

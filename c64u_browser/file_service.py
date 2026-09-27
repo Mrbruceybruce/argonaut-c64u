@@ -77,6 +77,7 @@ class CopyResult:
     partial_path: str | None = None
     failure: str = ''
     partial_upload: PartialUpload | None = None
+    uploads: tuple = ()
 
     @property
     def message(self):
@@ -89,7 +90,9 @@ class CopyResult:
         for title,items in (('Completed',self.completed),('Skipped',self.skipped),
                             ('Unfinished (first item failed)',self.remaining)):
             if items:text+='\n\n'+title+':\n'+'\n'.join(items)
-        if self.partial_path:text+='\n\nPartial upload: '+self.partial_path
+        if self.partial_path:text+='\n\nPossible partial upload: '+self.partial_path
+        for upload in self.uploads:
+            if upload.inspection_message():text+='\n\n'+upload.inspection_message()
         return text
 
 
@@ -289,12 +292,12 @@ class FileService:
             client=self._client((request.source,request.destination),stored.session)
             report=execute_plan(client,plan,request.source.scope==CORE_HOST,
                                 request.destination.scope==CORE_HOST,
-                                job.byte_progress())
+                                job.byte_progress(), managed_uploads=True)
             partial=(PartialUpload(FileLocation.c64u(report.partial),
                         stored.session.device_id,stored.session.session_id)
                      if report.partial and stored.session else None)
             result=CopyResult(tuple(report.completed),tuple(report.skipped),
-                tuple(report.remaining),report.partial,report.error,partial)
+                tuple(report.remaining),report.partial,report.error,partial,tuple(report.uploads))
             if getattr(report,'cancelled',False):raise JobCancelled(result=result)
             if report.error:
                 raise FileJobFailure('partial-upload' if report.partial else 'transfer',

@@ -101,7 +101,8 @@ class ProtocolTests(unittest.TestCase):
                 got=client.read_into(b'/new',sink,max_bytes=1000,expected_bytes=len(data))
                 self.assertEqual(data,sink.getvalue())
                 self.assertEqual(hashlib.sha256(data).hexdigest(),got.sha256)
-                self.assertEqual(sent,got)
+                self.assertEqual(replace(sent,transfer=None),got)
+                self.assertTrue(sent.transfer.submitted)
                 client.list_directory(b'/USB1')
             for index,(verb,arg) in enumerate(server.commands):
                 if verb==b'PASV':self.assertEqual((b'TYPE',b'I'),server.commands[index-1])

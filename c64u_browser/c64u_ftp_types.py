@@ -73,7 +73,7 @@ class FtpOperationError(Exception):
     retryable describes availability only; it NEVER authorizes mutation replay.
     """
     def __init__(self, code, phase, *, reply_code=None, retryable=False,
-                 outcome=Outcome.NOT_STARTED, transferred=0, mutation=None):
+                 outcome=Outcome.NOT_STARTED, transferred=0, mutation=None, transfer=None):
         self.code = ErrorCode(code)
         self.phase = phase
         self.reply_code = reply_code
@@ -81,6 +81,7 @@ class FtpOperationError(Exception):
         self.outcome = outcome
         self.transferred = transferred
         self.mutation = mutation
+        self.transfer = transfer
         super().__init__(f'C64U FTP {self.code.value} ({phase}).')
 
     def as_dict(self):
@@ -88,7 +89,29 @@ class FtpOperationError(Exception):
                     reply_code=self.reply_code, retryable=self.retryable,
                     outcome=self.outcome.value, transferred=self.transferred)
         if self.mutation is not None:result['mutation'] = self.mutation.as_dict()
+        if self.transfer is not None:result['transfer'] = self.transfer.as_dict()
         return result
+
+
+@dataclass(frozen=True)
+class WriteEvidence:
+    """Local send observations and STOR replies, never remote ownership."""
+    expected_bytes: int
+    submitted: bool = False
+    preliminary_reply: int | None = None
+    terminal_reply: int | None = None
+    transferred: int = 0
+    sha256: str | None = None
+    outcome: Outcome = Outcome.NOT_STARTED
+    length_status: str = 'unobserved'
+    error_category: str | None = None
+
+    def as_dict(self):
+        return dict(expected_bytes=self.expected_bytes, submitted=self.submitted,
+                    preliminary_reply=self.preliminary_reply, terminal_reply=self.terminal_reply,
+                    transferred=self.transferred, sha256=self.sha256,
+                    outcome=self.outcome.value, length_status=self.length_status,
+                    error_category=self.error_category)
 
 
 @dataclass(frozen=True)
@@ -216,6 +239,7 @@ class TransferResult:
     sha256: str
     reply_code: int
     outcome: Outcome = Outcome.COMPLETED
+    transfer: WriteEvidence | None = None
 
 
 def checked_path(path):

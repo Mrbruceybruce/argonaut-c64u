@@ -15,7 +15,8 @@ class FakeC64UFtp:
                  replies=None, files=None, completion=b'226 Complete\r\n',
                  welcome=b'220 C64U fixture\r\n', split=False,
                  data_wait=None, completion_wait=None, coalesced=False, directories=None,
-                 mutation_tree=False, after_mutation=None, mutation_hook=None):
+                 mutation_tree=False, after_mutation=None, mutation_hook=None,
+                 transfer_hook=None, readback_data=None, transfer_completion=None):
         self.listing, self.list_data, self.feat = listing, list_data, feat
         self.replies = replies or {}
         self.files = dict(files or {b'/file': b'abc'})
@@ -26,6 +27,9 @@ class FakeC64UFtp:
         self.mutation_tree = mutation_tree
         self.after_mutation = after_mutation or {}
         self.mutation_hook = mutation_hook
+        self.transfer_hook = transfer_hook
+        self.readback_data = readback_data
+        self.transfer_completion = transfer_completion
         self.bytes_transferred = 0
         self.commands = []
         self.connections = 0
@@ -135,7 +139,9 @@ class FakeC64UFtp:
                         elif verb in (b'MLSD',b'LIST',b'RETR',b'STOR'):
                             if verb == b'RETR' and argument not in fixture.files:
                                 send(b'550 Missing\r\n');continue
-                            send(b'150 Opening\r\n' + (fixture.completion if fixture.coalesced else b''))
+                            completion = (fixture.transfer_completion(verb, argument)
+                                          if fixture.transfer_completion else fixture.completion)
+                            send(b'150 Opening\r\n' + (completion if fixture.coalesced else b''))
                             data, _ = listener.accept()
                             with data:
                                 data.settimeout(2)
@@ -162,11 +168,14 @@ class FakeC64UFtp:
                                     listing = fixture.directories[cwd] if verb == b'MLSD' and fixture.directories is not None else fixture.listing
                                     content = (listing if verb == b'MLSD' else
                                                fixture.list_data if verb == b'LIST' else fixture.files[argument])
+                                    if verb == b'RETR' and fixture.readback_data:
+                                        content = fixture.readback_data(argument, content)
                                     data.sendall(content)
                                     with fixture._lock:fixture.bytes_transferred += len(content)
+                            if fixture.transfer_hook:fixture.transfer_hook(verb, argument)
                             if fixture.completion_wait:fixture.completion_wait.wait(2)
-                            if fixture.completion is None:return
-                            if not fixture.coalesced:send(fixture.completion)
+                            if completion is None:return
+                            if not fixture.coalesced:send(completion)
                         else:send(b'502 Unsupported\r\n')
                 except (OSError, ValueError):
                     # Expected when the client poisons/closes an interrupted lease.

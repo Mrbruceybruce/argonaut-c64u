@@ -1,6 +1,6 @@
-# C64U Network Foundation — FTP Slices 1–3B
+# C64U Network Foundation — FTP Slices 1–3C
 
-Status: **Slices 1–3A accepted; Slice 3B physical checks passed, final review pending**.
+Status: **Slices 1–3B accepted and committed; 3C physically qualified, uncommitted, final review pending**.
 Baseline: released Stable 1.9 `3acb9be310560f69df5a80619e192585a7e87155`.
 
 ## Boundary and ownership
@@ -69,12 +69,13 @@ poisons the lease. There is no ABOR/QUIT dependency on an unsynchronized stream.
   prepared binary sink, hard byte bound and optional exact length check.
 * `write_from(path, source, expected_bytes=..., progress=...)`: prepared binary
   source and exact length bound. **Not a staged/no-overwrite upload API.** Only
-  authorized Core orchestration should use this primitive in later slices.
+  authorized Core orchestration uses this primitive; approved 3C additions are
+  the first migrated production consumers.
 * Transfer results contain count, SHA-256 of transferred bytes, terminal reply
   code and outcome. A successful STOR is not independent readback verification.
   Existing higher layers retain staging, readback, SIZE, conflict review,
   replacement, deletion and partial-ownership policy. Slice 3B adds the mutation
-  primitives described below; STOR production migration remains deferred.
+  primitives described below; the 3C section records the bounded STOR migration.
 
 Completion requires data closure and terminal 226/250. Data callbacks alone are
 not success. No further cancellation check relabels a terminally accepted
@@ -513,7 +514,8 @@ manifests and per-session diagnostic events. Device reports are
 
 ## Slice 3B — managed mutations and directory operations
 
-Status: **implemented, uncommitted; physical checks passed, final review pending**.
+Status: **physically accepted, committed and pushed** as
+`fd0e205deece43865293d2a61d64bdc3834b3c05`.
 Base: `0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a` (accepted Slice 3A).
 No physical devices were accessed during implementation/deterministic testing.
 The separately authorized physical pass is recorded below.
@@ -637,8 +639,9 @@ Authorized checks ran against the reviewed uncommitted 3B source, including the
 GUI session-guard correction, at base
 `0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`. Production/test source SHA-256 values
 were unchanged throughout qualification. Only development documentation changed
-afterward. Final human review remains required before commit/push; 3C–3E remain
-unimplemented.
+afterward. Final human review accepted 3B, which was committed and pushed as
+`fd0e205deece43865293d2a61d64bdc3834b3c05`. Later checkpoint status is recorded
+separately below.
 
 ### Devices and disposable data
 
@@ -753,3 +756,232 @@ the repository: probes, reviewed diff, source hash manifest, operation/GUI logs,
 local readbacks, reports and structured diagnostic events. Accepted device
 reports are `beige-20260927-110054/report.json` and
 `founder-20260927-110125/report.json`, with `gui-report.json` alongside each.
+
+
+## Slice 3C — managed normal staged uploads and partial lifecycle
+
+Status: **physically qualified on both devices, uncommitted; final review pending**.
+Base: accepted 3B `fd0e205deece43865293d2a61d64bdc3834b3c05`.
+No physical devices were accessed during implementation or deterministic tests.
+
+### Explicit consumer boundary
+
+`transfers.upload_managed` is selected only for FileService Core-host → C64U
+addition-file steps and USB restore addition files. Folder-plan file additions
+use it too; directory creation retains its existing route. The managed branch
+consumes a structured return, not a parsed success message. Missing managed
+context fails without a raw FTP fallback.
+
+Legacy `upload()` remains unchanged for replacement staging, remote-to-remote
+composite copying and AI installation/provisioning. Flash `upload_flash`, CLI
+`upload_new_folder`, replacement exchange/cleanup and unbound compatibility
+remain deferred. Restore replacements still call the original replacement
+route. No generic transaction framework or replacement cancellation scope is
+introduced.
+
+### Lifetime, source and verification
+
+One `_FtpOperations` lifetime owns each file's plan validation, destination/temp
+inspection, STOR staging, RETR/hash staging, SIZE staging, destination recheck
+and RNFR/RNTO publication. Nested helpers reuse its lazy lease; outermost exit
+releases it without a cancellation check. Absolute paths prevent listing CWD
+changes from redirecting transfers. STOR dispatch marks the operation as
+consequential, preventing explicit read fallback from reopening a failed write.
+No lease spans a whole batch, review or later cleanup.
+
+Staging uses the existing checked `c64u-part-<uuid>` name and case-insensitive
+collision refusal. Existing path/source validation remains. The source opens
+once in binary mode; `os.fstat(stream.fileno()).st_size` supplies exact expected
+length to `write_from` on that same stream. There are no locks, immutable
+snapshots, spools, second source opens or mtime/inode checks. A same-length
+concurrent rewrite can still pass: verification concerns bytes actually sent.
+
+Zero-byte uploads are supported. Short and overlong local streams fail without
+publication. A short stream can receive a positive terminal STOR reply and
+still fail exact-length validation. An overlong block is rejected before send.
+Successful sent bytes are independently read back and hashed; RETR is bounded
+by the sent count, rejecting an overflowing block before accepting it. This
+approved failure-timing change does not add an initial SIZE or post-publication
+read. Verification remains RETR/hash → SIZE, then the final destination recheck.
+FTP cannot make that recheck and RNTO an atomic no-replace publication against
+external writers.
+
+### Evidence, cancellation and partial reporting
+
+`WriteEvidence` records expected length, attempted submission, preliminary and
+terminal replies when observed, counted whole successful sends, full sent hash
+when EOF established the exact length, transport outcome, length status and
+sanitized error category. A failed send may have delivered additional bytes;
+the count is a local observation, not exact remote storage size. No partial-prefix
+hash is exported. A positive terminal reply survives subsequent length failure.
+A negative terminal STOR reply retains unknown storage outcome and its actual
+reply code. No error authorizes replay; failures poison the lease.
+
+`UploadEvidence` separates workflow phase, both paths, STOR evidence, readback
+and SIZE status, publication mutation evidence and disposition. Copy/restore
+results add an `uploads` tuple without removing existing fields. Successful
+per-file results retain path, bytes, SHA-256 and verified status. Managed errors
+are nonretryable at the service/job boundary; peer prose is not exposed.
+
+- `not-started`: no consequential upload submission is established; no partial.
+- `no-candidate`: preliminary STOR refusal, without asserting file creation.
+- `staging-candidate`: possible Core-associated staging residual, not proof of
+  current existence or exclusive ownership. Failures during transfer, after
+  accepted STOR, during verification, on final conflict or refused publication
+  retain this candidate when supported by the recorded evidence.
+- `location-unknown`: consequential RNTO submission lacks a definitive result.
+  Both staging/final paths are inspection evidence, neither is selected for
+  cleanup, and `partial_path`/`partial_upload` are absent.
+- `published`: RNTO acknowledged; the file is recorded completed, not partial.
+
+Cancellation is honored before submission and during streaming/verification.
+Accepted STOR evidence survives subsequent cancellation. RNFR/RNTO uses the
+existing 3B serialized deferral; binding/recovery/socket failures remain effective.
+No cancellation check follows acknowledged publication or context exit. A batch
+can then cancel before its next item while retaining the published prefix.
+
+Partial cleanup remains `PartialUpload → prepare_partial_delete → fresh review
+→ managed reviewed deletion`, with original device/session binding, reconnect
+invalidation, expiring/consumed plans and execution revalidation. Cleanup preview
+and execution use new operation leases after the failed upload has released its
+lease. Nothing is automatically deleted. `PartialUpload` remains a constructible
+session-bound record, not a provenance registry or unforgeable authorization
+token. Unknown publication requires ordinary inspection and independently
+reviewed deletion of an explicitly selected existing item.
+
+### Deterministic validation
+
+`test_ftp_uploads.py` adds 29 tests (with additional phase/fault subcases) for
+exact/empty/short/overlong sources, descriptor identity, mutable same-length
+sources, preflight refusal, submission and completion failures, send-prefix
+counts, callback/cancellation/binding behavior, bounded readback, SIZE failures,
+destination races, RNFR/RNTO refusal/loss, acknowledged late cancellation,
+per-file lease reuse and release, stale bindings, batch cancellation isolation,
+FileService/restore evidence, reviewed cleanup and deferred consumer routing.
+
+The loopback fixture adds per-transfer completion/readback hooks so STOR faults
+do not accidentally fail preceding MLSD. The existing protocol round-trip test
+compares common transfer fields separately from additive STOR evidence. Existing
+in-memory USB restore tests provide an explicit managed-upload/lifetime seam;
+new real-socket Core tests establish the production behavior independently.
+No existing test was removed. **229 focused tests passed**. Complete normal and
+optimized suites each ran **878 tests, 36 opt-in display skips, no failures**
+(14.137 s normal; 14.168 s optimized). The accepted 849-test / 36-skip baseline
+plus 29 new tests accounts for the total; no skip policy changed.
+
+The first restricted protocol run could not open loopback sockets. Authorized
+loopback-capable runs supplied the reported results. Full-suite logs are external
+in `/tmp/argonaut-3c-normal.log` and `/tmp/argonaut-3c-optimized.log`, with focused
+results in `/tmp/argonaut-3c-focused.log`. `git diff --check` passed. Physical
+acceptance was pending at that deterministic checkpoint; see the physical
+qualification record below.
+
+
+### Pre-physical evidence correction
+
+TYPE/PASV refusal before STOR submission now leaves `WriteEvidence.outcome` as
+not-started. The enclosing sanitized transport failure retains its own outcome,
+category and reply code; phases `stor-type`, `stor-pasv` and `data-connect`
+distinguish setup failures. `UploadEvidence.transport_error` carries that safe
+error record through copy/restore results. Actual preliminary STOR refusal
+remains submitted/rejected, with no asserted staging cleanup candidate.
+No transfer, publication, cancellation, cleanup or deferred-routing policy changed.
+
+Five added regressions cover TYPE refusal, PASV refusal, data-connect failure,
+actual STOR refusal, and upload verification RETR terminal loss. The latter
+required no transfer behavior change: completed STOR evidence survives, expected
+received bytes do not establish verification completion, and publication stays
+unattempted with a staging candidate retained. All five targeted tests passed.
+
+Final correction validation supersedes the earlier totals: **234 focused tests
+passed; normal and optimized suites each ran 883 tests with 36 skips and no
+failures** (13.116 s normal; 13.789 s optimized). This is 878 + 5, or the accepted
+849-test baseline + 34; no tests were removed or skip policy changed.
+Logs are external `/tmp/argonaut-3c-correction-focused.log`,
+`/tmp/argonaut-3c-correction-normal.log` and
+`/tmp/argonaut-3c-correction-optimized.log`. `git diff --check` passed.
+No physical device was used for the correction tests. Subsequent authorized
+physical qualification is recorded below; commit/push remain pending.
+
+
+### Slice 3C physical qualification — 27 September 2026
+
+Authorized checks passed independently on both devices using the uncommitted
+reviewed implementation at base `fd0e205deece43865293d2a61d64bdc3834b3c05`.
+Identity and firmware/API were verified before mutation. Final acceptance review
+and commit/push remain pending.
+
+| Device | Address | Physical ID | Firmware | API | Disposable parent |
+|---|---|---|---|---|---|
+| Beige | `192.168.68.70` | `25EA78` | `1.1.0s2` | `0.1` | `/USB2` |
+| Founder's | `192.168.68.69` | `25BE71` | `1.1.0` | `0.1` | `/SD` |
+
+Exact disposable trees (both subsequently removed and verified absent):
+
+- Beige: `/USB2/argonaut-3c-accept-8ac84231104c444f93392b3b3c31f9c5`
+- Founder's: `/SD/argonaut-3c-accept-6f5b18250cf74df18bbdeb8643568dd6`
+
+Each tree contained only `empty.bin` and `known.bin`. Managed FileService
+zero-byte uploads reported expected/sent counts of zero, exact length, STOR
+150/226, passed RETR/hash and SIZE verification, and published RNFR/RNTO
+350/250 evidence. Fresh listings confirmed size zero and no staging residue.
+The empty SHA-256 was
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Known-content files were 1,076 bytes each, incorporating the device identity:
+
+- Beige SHA-256: `32334cbb34f975096cbbb98465a3cf34f3711d4feed94de522d8412b242ca260`
+- Founder's SHA-256: `e7592a1b649cdd17be47fd7e893217edc1b1fca3be1e7ae3d83f2c26153f0093`
+
+Expected/sent counts and sent hashes matched the local sources. Both uploads
+reported completed STOR, passed bounded independent RETR/hash and SIZE checks,
+and acknowledged publication, with no partial result or staging residue.
+Independent Core downloads of the published files matched counts and hashes.
+These extra acceptance reads add no production verification requirement.
+
+A local `KNOWN.BIN` conflicted with existing `known.bin` on both devices.
+FileService preview reported the conflict and skip preserved it; a separately
+scheduled bound managed-upload attempt refused it before STOR/publication,
+returning not-started evidence without a partial cleanup candidate. Subsequent
+listings and independent downloads confirmed no residue and unchanged content.
+
+Existing diagnostic session IDs correlated each successful normal upload's
+preflight listings, STOR, RETR, SIZE, destination recheck and RNFR/RNTO with
+**one FTP session, one USER authentication and one FEAT**. Each recorded four
+MLSD listings, one STOR, one RETR, one SIZE, one RNFR and one RNTO. All measured
+operations ended with zero active leases and unchanged Core device/session epoch;
+subsequent independent operations acquired normally. No transport error or
+LIST fallback occurred. No temporary production instrumentation was added.
+
+Each device supplied a real selected-file USB backup of `known.bin`, including
+normal preview, execution verification and a complete manifest. Reviewed deletion
+of that disposable source made it an addition. Restore preview classified exactly
+one addition, with no replacements/conflicts; execution recorded one published
+addition, 1,076 bytes, no remaining items and no partial result. The restore
+file's upload diagnostics again showed one session/USER/FEAT and one each of
+STOR/RETR/SIZE/RNFR/RNTO. Independent restored-file downloads matched the hashes
+above, and fresh listings found no staging residue. Full-volume fingerprinting,
+preview and execution retain their distinct operation lifetimes; the complete
+backup/restore workflow is not claimed to use one FTP session.
+
+Final independent inspection found only the two expected files in each tree.
+Accepted reviewed deletion removed those files and their directory; fresh parent
+listings confirmed absence, with zero active leases. Directory setup and cleanup
+used accepted 3B mechanisms and are not new 3C qualification claims.
+
+Physical cooperative cancellation/partial cleanup was intentionally omitted:
+there was no controlled timing procedure that could separate ordinary cancellation
+from transport uncertainty. No lost-reply, socket/setup/data failure, active
+binding invalidation or external-writer race was induced. Those cases remain
+qualified by deterministic fixtures. These were headless Core/FileService checks,
+not additional GUI qualification. Flash, CLI fresh-folder uploads, replacement/
+composites, AI provisioning and compatibility retirement remain deferred.
+
+The final deterministic baseline remains **883 tests / 36 skips**, normal and
+optimized, no failures; no production/test source changed during qualification
+(as verified against pre-run hashes). Only the two authoritative development
+documents were updated. External scripts, reports, diagnostics, local sources,
+readbacks and backup manifests remain outside the repository under
+`../argonaut-qualification/network-slice3c-physical/`, with device records in
+`beige-20260927-120502/` and `founder-20260927-120630/`. They are excluded from
+the proposed commit.

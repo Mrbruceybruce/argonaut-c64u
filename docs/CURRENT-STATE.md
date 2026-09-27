@@ -12,8 +12,8 @@ current state recorded here.
 - Stable 1.9 is released as `v1.9`. Its release artifacts are immutable.
 - `main` and `v1.9` are not the 1.10 development workspace. Current 1.10 work
   belongs on `development`.
-- Accepted development baseline: `0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`
-  — `Implement managed streaming reads for FTP Slice 3A`.
+- Accepted development baseline: `fd0e205deece43865293d2a61d64bdc3834b3c05`
+  — `Implement managed mutation primitives for FTP Slice 3B`.
 - Argonaut 1.10 direction: **C64U Network Foundation**.
 
 ## Completed FTP work
@@ -133,13 +133,13 @@ No zero-byte file existed in the inspected source directories; none was created.
 No remote mutation, active-transfer interruption or production code change was
 performed during acceptance. See C64U-FTP.md for counts, hashes and limitations.
 
-## Slice 3B — physical checks passed; final review pending
+## Slice 3B — accepted, committed and pushed
 
-The uncommitted 3B implementation is based on accepted Slice 3A commit
+Slice 3B was physically accepted on both C64Us and committed/pushed to
+`development` as `fd0e205deece43865293d2a61d64bdc3834b3c05`, with parent
 `0f5b77f88f4fac6bddac0fa5e3cc2f5929ab544a`. Authorized physical checks passed
-on both C64Us on 27 September 2026, including automated actual-display GTK
-rename qualification. Final acceptance review remains pending; no 3B commit,
-push, package or release has been performed.
+on 27 September 2026, including automated actual-display GTK rename
+qualification. Final acceptance review and the approved commit/push are complete.
 
 Managed RNFR/RNTO, MKD, DELE and RMD retain structured mutation certainty,
 submission evidence, actual reply codes and acknowledged prior steps. No result
@@ -180,13 +180,66 @@ no active mutation was interrupted and no uncertain-outcome fault was induced.
 Production/test source hashes were unchanged throughout qualification. Details,
 hashes, disposable paths and external probe limitations are in C64U-FTP.md.
 
-**3C–3E remain unimplemented:** staged uploads/partial lifecycle, replacement
-and composite workflows, and unbound-client retirement. Folder-copy MKD,
-fresh-folder upload MKD, staged-upload publication, replacement staging/exchange/
-cleanup, Flash writes and compatibility FTP facilities retain their existing
-routing. The reviewed partial-upload deletion path uses 3B primitives without
-changing partial ownership/authorization policy. There is no STOR migration,
-upload length change, automatic rollback, or replacement-exchange framework.
+## Slice 3C — physically qualified, uncommitted; final review pending
+
+The approved 3C implementation is based on accepted 3B commit
+`fd0e205deece43865293d2a61d64bdc3834b3c05`. It migrates normal FileService
+Core-host → C64U file additions, including folder-plan files, and USB restore
+addition files. Explicit routing leaves legacy `upload()` consumers unchanged.
+Authorized physical 3C checks passed on both devices on 27 September 2026.
+Final acceptance review and commit/push remain pending; no package or release
+has been created.
+
+Each file's plan validation and preflight listings, STOR, independent bounded
+RETR/hash, SIZE, destination recheck and publication rename reuse one managed
+operation lease. Files do not share a batch-wide lease. Publication uses 3B
+RNFR/RNTO; no post-publication read or cancellation check is added.
+
+The source is opened once and sized with fstat on the transferred descriptor.
+Short/overlong sources fail; same-length rewrites remain outside the guarantee.
+No source locking, snapshot, second source open or mtime/inode stability check
+is introduced. Verification RETR is bounded by the sent count and rejects an
+excess block before accepting it. Its order remains RETR/hash → SIZE.
+
+Structured results retain STOR submission/replies/count/length evidence,
+verification states and publication evidence. A lost RNTO reply yields
+location-unknown evidence with both possible paths, without a staging-only
+cleanup shortcut. Acknowledged publication remains completed despite late
+cancellation. Staging candidates still require fresh, session-bound reviewed
+deletion; they are not proof of existence or exclusive ownership. No automatic
+retry, rollback or remote cleanup is introduced.
+
+After the pre-physical evidence correction, **234 focused tests passed**; normal
+and optimized suites each ran **883 tests with 36 opt-in display skips, no
+failures**. This is the accepted 849-test baseline plus 34 new tests (29 initial
+3C tests and five correction regressions); no existing tests were removed.
+Pre-STOR setup failures now retain STOR not-started evidence separately from
+the sanitized setup failure, including its phase and reply code.
+Details are recorded in C64U-FTP.md. Implementation/pre-physical review and
+the evidence correction were approved before physical qualification.
+
+Both devices passed zero-byte and 1,076-byte known-content FileService uploads,
+independent published-file readback, case-insensitive collision refusal, and a
+genuine USB backup/restore addition with verified manifest and result accounting.
+Beige `25EA78` used `/USB2` (firmware `1.1.0s2`); Founder's `25BE71` used `/SD`
+(firmware `1.1.0`); both reported API `0.1`. Each normal upload and each restore
+file upload used one session/authentication/FEAT across preflight, STOR, RETR,
+SIZE, recheck and publication. All measured operations released their leases
+and preserved the Core epoch. Independently inspected disposable trees were
+removed through accepted reviewed deletion and verified absent.
+
+Physical cancellation/partial cleanup was intentionally not attempted: no safe
+controlled timing boundary was available. Fault injection and uncertain outcomes
+remain qualified by deterministic fixtures. Production/test source hashes were
+unchanged during qualification; only this document and C64U-FTP.md were updated.
+C64U-FTP.md records exact paths, hashes, external evidence and limitations.
+
+**Deferred:** replacement staging/exchange/cleanup and USB restore replacements;
+remote-to-remote composite copy; Flash staged uploads; CLI fresh-folder uploads;
+AI-client installation/provisioning; general unbound-client retirement.
+Folder-plan directory creation retains its existing route. No 3D work or
+replacement-exchange cancellation scope is implemented. Reviewed cleanup retains
+the accepted 3B deletion primitives and existing authorization policy.
 
 ## Later Network Foundation boundaries
 
