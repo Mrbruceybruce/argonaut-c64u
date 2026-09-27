@@ -62,9 +62,12 @@ class UltimateClient:
                 raise BrowserError("Ports must be between 1 and 65535.")
         self.port, self.timeout, self.encoding = port, timeout, encoding
         self.http_port = http_port
+        self._ftp_reads = None
 
     def list_directory(self, path='/'):
         with operation_event('ftp', 'list_directory', 'directory'):
+            if self._ftp_reads is not None:
+                return self._ftp_reads.list_directory(path)
             return self._list_directory(path)
 
     def list_directory_identity(self, path=b'/'):
@@ -75,6 +78,8 @@ class UltimateClient:
         converted back to bytes and never exposed as user-facing text.
         """
         with operation_event('ftp', 'list_directory_identity', 'directory'):
+            if self._ftp_reads is not None:
+                return self._ftp_reads.list_directory(path, identity=True)
             return self._list_directory_identity(path)
 
     def _list_directory_identity(self, path):

@@ -1,6 +1,6 @@
-# C64U Network Foundation — FTP Slice 1
+# C64U Network Foundation — FTP Slices 1–2
 
-Status: **unused transport foundation; not connected to production callers**.
+Status: **Slice 2 read-only Core integration and Linux physical acceptance complete**.
 Baseline: released Stable 1.9 `3acb9be310560f69df5a80619e192585a7e87155`.
 
 ## Boundary and ownership
@@ -9,14 +9,13 @@ Baseline: released Stable 1.9 `3acb9be310560f69df5a80619e192585a7e87155`.
 capability, policy, listing and transfer contracts. `c64u_ftp.py` owns the wire
 protocol. Neither imports GTK, `UltimateClient`, nor `ftplib`.
 
-Core will supply a `C64UFtpLeaseManager` with a current-binding provider and a
+Core supplies a `C64UFtpLeaseManager` with a current-binding provider and a
 private password provider. Providers are not exposed through the client. Obtain
 a client only through `manager.lease(binding, presentation=..., cancelled=...)`.
 A manager permits one operation-scoped lease per physical device. A second
 acquisition fails promptly with `lease-busy`; it never waits behind itself.
 Nested helpers must pass the existing lease. There is no idle pool, automatic
-reconnection, automatic retry, or mutation replay. Future Core integration must
-share one manager across all routes; independent processes/other applications
+reconnection, automatic retry, or mutation replay. Core shares one manager across migrated read routes; independent processes/other applications
 cannot be counted by an in-process manager. The firmware's four-session ceiling
 is not a parallelism target.
 
@@ -124,8 +123,210 @@ and coalesced replies, errors, data delays and lost/failing completion. The data
 connect timeout test injects that specific socket failure while retaining real
 control/PASV traffic: OS-dependent network blackholes are not deterministic tests.
 
-No real device operations are part of these tests. Existing production imports
-are checked to exclude the new module. The next proposed slice is ordinary and
-raw-identity directory browsing/bounded reads through adapters that preserve
-service path checks, limits and result shapes. USB fingerprints, Game Launch and
-SID authorized-content policies must remain unchanged.
+No real device operations are part of these tests. Architecture tests permit
+protocol imports only in Core and the transitional read adapter; GTK and feature
+clients receive no new transport access.
+
+## Slice 2 migration and removal boundary
+
+Baseline: `44dc2045995b9bf96df98c6e557bd8f97d7867c3`.
+`ftp_reads.py` translates byte listings into existing `Entry`/`IdentityEntry`
+results and bounded reads into bytes. Core privately attaches it to its verified
+`UltimateClient`; the existing Core device facade delegates without publishing
+a lease. Presentation remains anonymous/FILES, directories first then casefolded
+names. Existing entries expose no timestamp field. Identity remains raw octets;
+ordinary display preserves the selected strict encoding (including the existing
+latin-1 opt-in). An invalid UTF-8 display name is not silently replaced.
+
+Core reserves its connection UUID after REST/profile identity checks and commits
+that same UUID after initial browsing. Reconnect changes the UUID; health checks
+and fresh FTP leases do not. The FTP layer does not prove physical identity;
+Core's existing profile fallback remains explicitly unverified if REST supplies
+no physical identifier. Disconnect invalidates live migrated leases.
+
+Each read uses one lease for SIZE → bounded RETR → terminal completion → SIZE.
+Existing native-file, SID and Game Library size limits remain in their owning
+services (including the separate 64 MiB CRT entry point). Disk-image acquisition
+uses the same adapter before the unchanged DMA submission. Full-volume
+fingerprinting wraps its entire existing traversal in one read operation;
+path/PWD comparisons, raw length-delimited digest, bounds, cancellation and
+before/after safety policies remain unchanged. SID still validates exact content
+and submits attached bytes; Game Launch and USB retain full-volume protection.
+
+Nested read helpers reuse the operation context. Independent reads serialize
+at the adapter boundary; there is no idle pool and no lease across a review
+or user think-time. Core jobs supply cancellation through a scoped context,
+reset on job completion. Failures release/poison the lease. An explicit caller
+fallback after a rejected preferred folder opens a fresh lease; the adapter does
+not replay a failed operation. Streaming cancellation remains bounded by the
+transport timeout while a socket is blocked.
+
+Structured transport errors become existing `ConnectionFailure`/`BrowserError`
+contracts, with sanitized `ftp_code`, reply code and phase retained internally.
+Authentication, session change, network/timeout, malformed/incomplete listing,
+size and completion errors remain distinguishable. FTP 550 is **missing or
+inaccessible**, not proof of absence. Existing catalog services may retain their
+coarser unavailable-state presentation. No malformed listing becomes an empty
+successful directory. Strict unsupported/ambiguous MLSD records fail closed;
+only explicit command-unsupported responses permit LIST fallback.
+
+Latest immutable capability evidence is retained privately on the adapter and
+safe structured transport events enter the existing diagnostic context/job ID.
+FEAT occurs once per fresh lease; advertised MLSD is distinct from verified
+MLSD, SIZE and PASV. No capability UI is added.
+
+### Deliberately retained legacy consumers
+
+- `transfers.py`: streaming download plus upload/readback, staging and cleanup.
+- `replacement.py`: replacement/readback and its original-content protection.
+- `native_files.py`: Flash write/readback; bounded-read fallback for unbound clients.
+- `disk_run.py`: unbound compatibility-client read fallback; DMA is unchanged.
+- `usb_backup.py`: backup streaming downloads and restore/source readback hashing;
+  only identity enumeration/full-volume fingerprints migrate here.
+- `api.py`: unbound `UltimateClient` listing implementations for the existing CLI,
+  direct profile clients and test doubles, which do not own a verified Core epoch.
+- `CoreDeviceOperations.open_ftp`: existing legacy helper used by these operations;
+  no additional public raw escape route was introduced.
+
+Remove the adapter and legacy read fallback when those direct clients enter the
+Core identity/session boundary and remaining transfer/mutation workflows migrate
+together with their staging/readback/ownership rules. Do not delete legacy code
+before that contract migration. Slice 3 should address that boundary explicitly,
+not simply swap STOR into existing mutation helpers.
+
+## Reproducible performance evidence
+
+Run `python3 -B tests/benchmark_ftp_reads.py --repeats 5` (loopback only).
+Measured on Debian 13, Python 3.13.5, Linux 6.12.107+deb13-amd64.
+Five alternating old/new trials; medians below. Identical synthetic trees, exact
+same digest algorithm, four 513-byte bounded file reads per workload. Every
+old/new digest and downloaded byte buffer matched. Timing is not a physical
+C64U performance guarantee. Fixture control sockets use TCP_NODELAY equally on
+both paths to avoid a synthetic delayed-ACK artifact.
+
+| Workload (files / directories) | Fingerprint old → new ms | Change | Total old → new ms | Total change | Connections old → new (fingerprint only) |
+|---|---:|---:|---:|---:|---:|
+| many-small-files (1600 / 17) | 23.41 → 25.27 | +7.9% | 27.74 → 32.61 | +17.5% | 21 → 5 (17 → 1) |
+| nested-directories (72 / 25) | 26.01 → 14.23 | -45.3% | 29.42 → 20.84 | -29.1% | 29 → 5 (25 → 1) |
+| mixed-game-sid (384 / 33) | 35.39 → 20.53 | -42.0% | 38.64 → 27.28 | -29.4% | 37 → 5 (33 → 1) |
+| non-utf8-identities (128 / 9) | 11.11 → 7.44 | -33.1% | 14.41 → 13.75 | -4.6% | 13 → 5 (9 → 1) |
+
+Negative percentages mean faster. Authentications equal total connections in
+both implementations. Legacy FEAT count is zero; Slice 2 is five per workload
+(one fingerprint plus four independent reads). Each side performs eight SIZE
+commands and four RETRs. Listings and wire byte counts are unchanged:
+
+| Workload | Listings | Bytes transferred |
+|---|---:|---:|
+| many-small-files | 17 | 56756 |
+| nested-directories | 25 | 4956 |
+| mixed-game-sid | 33 | 15716 |
+| non-utf8-identities | 9 | 7452 |
+
+Many-small-files fingerprinting regressed about 8% (1.86 ms) on localhost;
+strict fact parsing, bounds/binding checks and negotiation add work. Nested/mixed
+fixtures benefit more from eliminating handshakes. Four independent reads take
+about 5.5–6.2 ms versus 3.8–4.4 ms median on this fixture, including fresh FEAT and
+protocol validation. These are aggregate observations, not a profiler attribution.
+The repeatable structural improvement is fingerprint connections: 17/25/33/9 → 1.
+Hardware timing is still needed; no latency simulation was used to inflate gains.
+
+## Proposed read-only physical acceptance (not executed)
+
+Repeat on beige `192.168.68.70`, firmware `1.1.0s2`, then Founder's Edition using
+its configured profile/current firmware. Use an isolated Development state and
+existing files only; do not upload, launch/play, rename, delete or restore.
+
+1. Record physical identity, firmware, profile and Core session. Browse root,
+   USB/SD roots and several nested folders; compare names/types/sizes and current
+   directory with the accepted baseline. Keep FILES presentation unchanged.
+2. Capture internal capability/diagnostic evidence: one FEAT per fresh lease,
+   MLSD advertised versus verified, PASV and SIZE; record any controlled fallback.
+3. Perform full-volume identity scans on unchanged media, including the existing
+   Schatzj\x84ger paths where present. Repeated digests must agree; record counts,
+   elapsed time and one control authentication per complete scan. Compare with
+   the baseline against the same unchanged tree, three alternating trials.
+4. Validate existing Game Library D64/CRT and SID records without launching them.
+   Check content identity/metadata; review preparation may fingerprint but must
+   not execute a launch. Verify one SIZE/RETR/SIZE lease per bounded read and
+   current native/CRT/SID limits. Cancel a scan/read and confirm release.
+5. Disconnect/reconnect manually; old plans/bindings must be rejected, the new
+   epoch must work, and folder browsing alone must not change the Core epoch.
+6. Record operation counts and timings separately for both devices. Unexpected
+   listing format, PWD, timeout or validation errors stop acceptance for diagnosis;
+   do not weaken completeness checks or retry consequential work.
+
+Physical acceptance and any mutation migration require separate approval.
+
+## Slice 2 automated verification
+
+Baseline: 761 tests in each complete normal/optimized suite, 36 opt-in display
+skips. Slice 2: **779 tests in each suite, 36 identical display skips, no
+failures**. Focused protocol/adapter run: **66 passed** (48 protocol, 18 production
+integration). Additional transfer/Core/session/scheduler/recovery/USB/Game
+Library/Bulk Import/launch/SID/disk/native/hardware-check/cleanup group: **211
+passed**. Compilation and AST checks passed for 212 Python files; whitespace
+validation passed. Hardware-check tests use test doubles, not real hardware.
+No physical device, packaging, commit or publication operation was performed.
+
+## Slice 2 physical acceptance — PASS (27 September 2026)
+
+Bruce accepted both devices using Development `1.10-network-slice2.1+ac.2`,
+SHA-256 `c60f9777ff7d7f0ebcb266ebf4b3f72e7127bd3b1c3b1d413d86e2afbe2811ab`.
+The candidate contains the reviewed uncommitted Slice 2 implementation and the
+approved channel-aware package credential self-test correction. Credential
+implementations were not changed. ac.1 remains preserved failed qualification
+evidence (`ded16a0ec325ccc0a324fe8bdaff2855232afbe3664eaf980e2cdb3f32632551`);
+it is not retroactively accepted.
+
+### Beige primary device
+
+- Address `192.168.68.70`; C64 Ultimate; physical ID `25EA78`;
+  firmware `1.1.0s2`; API `0.1`.
+- ac.2 GUI browsing, FEAT, MLSD, PASV, root/PWD semantics and USB1/USB2 browsing
+  passed. No LIST fallback.
+- Repeated full USB1 fingerprints agreed:
+  `40922faa550ffb0beab47992263af1167d015db10512cbfd5a5bae1792b899f5`.
+  Each scan used 34 directory listings, one FTP control connection,
+  one authentication and one FEAT negotiation. Elapsed times were approximately
+  10.992 s and 10.943 s. These are absolute physical measurements, not a claimed
+  speedup over Stable; no comparable Stable timing is recorded here.
+- SIZE, RETR, SID catalog validation and repeated 8,952-byte bounded reads passed.
+- Cancellation after five directory listings, fresh reconnect and subsequent
+  root browse passed.
+
+### Founder's Edition secondary compatibility device
+
+- Address `192.168.68.69`; C64 Ultimate; physical ID `25BE71`;
+  firmware `1.1.0`; API `0.1`.
+- FEAT, MLSD, PASV, root/USB1/SD browsing and `/SD/test.txt` listing passed.
+- SIZE and RETR verified; repeated SIZE → RETR → SIZE produced exact four-byte
+  bounded reads. No fallback or FTP compatibility quirk was observed.
+- Relevant observed protocol behavior was equivalent to the beige device.
+  Different firmware strings alone do not establish different FTP implementations.
+  No firmware change or obsolete-firmware testing was required.
+
+### External probe correction and existing root behavior
+
+The initial external probe incorrectly assumed `core.connect(remote_folder='/')`
+would remain at root. Existing `storage.initial_directory()` instead discovers
+storage roots and chooses the first when the preferred folder is not one of
+those roots. A root listing can advertise an unavailable storage entry, whose
+subsequent CWD receives 550. This was an acceptance-probe startup defect, not a
+Slice 2 root/PWD or MLSD failure. The corrected external probe explicitly used
+known-accessible `/USB2` for beige connection/reconnect, then independently
+performed the requested browse. Eight synthetic probe regressions passed.
+The corrected probe was used for accepted physical evidence. It remains outside
+Argonaut source. Production initial-folder behavior was not changed.
+
+### Final automated verification scope
+
+The approved credential correction adds 12 regressions to the 779-test Slice 2
+suite: complete normal and optimized suites now contain 791 tests, with the
+same 36 opt-in display skips. Focused FTP protocol/adapter/credential coverage
+contains 78 tests (48 protocol, 18 adapter, 12 credential). Candidate package
+self-tests previously passed 45/45 in both modes. Final pre-commit rerun results
+are retained with the external qualification evidence.
+
+Acceptance was read-only. This record does not authorize mutation migration,
+Slice 3, new package builds or further device operations.

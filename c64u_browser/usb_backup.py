@@ -23,6 +23,7 @@ from .replacement import signature
 from .scheduler import JobBinding
 from .storage import storage_root
 from .transfers import connect, download
+from .ftp_reads import read_operation
 
 
 MANIFEST_NAME='.argonaut-usb-backup.json'
@@ -351,7 +352,7 @@ class UsbBackupService:
             for child,item in children:visit(child,item,depth+1)
 
         raw_volume=volume.encode('utf-8')
-        with operation_context(phase=phase), \
+        with operation_context(phase=phase), read_operation(client, check), \
                 diagnostic_span('core','volume_fingerprint','volume'):
             visit(raw_volume)
         return digest.hexdigest()

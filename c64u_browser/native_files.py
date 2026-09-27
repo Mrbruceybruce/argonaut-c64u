@@ -8,6 +8,7 @@ import posixpath
 import uuid
 from .api import BrowserError,safe_argument
 from .transfers import connect
+from .ftp_reads import adapter_for
 from .backups import allowed
 from .storage import storage_root
 from .diagnostics import operation_event
@@ -41,6 +42,9 @@ def _read_remote(client,path,max_bytes=MAX_BYTES,absolute_max=MAX_BYTES,
  safe_argument(path)
  if type(max_bytes) is not int or not 1<=max_bytes<=absolute_max:raise BrowserError('Invalid remote file size bound.')
  if not ((storage_root(path) and storage_root(path)!=path) or any(path.startswith(folder+'/') for folder in FLASH_FOLDERS.values())) or any(p in ('','.','..') for p in path.split('/')[1:]):raise BrowserError('Choose a USB/SD or supported Flash file.')
+ adapter=adapter_for(client)
+ if adapter is not None:
+  return adapter.read(path,max_bytes,progress=progress,check=check)
  ftp=connect(client)
  try:
   expected=ftp.size(path)

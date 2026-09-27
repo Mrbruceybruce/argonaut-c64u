@@ -44,6 +44,48 @@ def _write_report(path, metadata, result, checks, failure=None):
     temporary.replace(destination)
 
 
+def _check_credential_channel(package_metadata, checks):
+    from . import development
+    from .credentials import Credentials, SessionCredentials
+    from .platform_support import config_base, portable_root
+    from .profiles import Preferences
+
+    expected_development = package_metadata.get('development', False)
+    _require(type(expected_development) is bool and
+             development.enabled() == expected_development,
+             'runtime.credential_channel',
+             'The active channel does not match package identity.', checks)
+    name = 'argonaut-development' if expected_development else 'argonaut'
+    other = 'argonaut' if expected_development else 'argonaut-development'
+    base = config_base()
+    actual = Preferences().path.resolve()
+    _require(actual == (base / name / 'config.json').resolve() and
+             actual != (base / other / 'config.json').resolve(),
+             'runtime.credential_settings_path',
+             'Settings do not use the isolated package channel.', checks)
+
+    credentials = Credentials()
+    if expected_development or portable_root() is not None:
+        expected_type = SessionCredentials
+        session_only = True
+    elif sys.platform == 'win32':
+        from .windows_credentials import WindowsCredentials
+        expected_type = WindowsCredentials
+        session_only = False
+    elif sys.platform == 'darwin':
+        from .macos_credentials import MacOSCredentials
+        expected_type = MacOSCredentials
+        session_only = False
+    else:
+        expected_type = Credentials
+        session_only = False
+    _require(type(credentials) is expected_type and
+             getattr(credentials, 'session_only', False) is session_only and
+             credentials.error is None,
+             'runtime.credentials_backend',
+             'The credential backend does not match the package channel.', checks)
+
+
 def run(package_metadata, report_path):
     checks = []
     app = None
@@ -65,6 +107,7 @@ def run(package_metadata, report_path):
         from .replay_buffer import pipeline_description as replay_pipeline
         from .version import ASSETS, build_info
 
+        _check_credential_channel(package_metadata, checks)
         root = portable_root()
         if root:
             config_name = ('argonaut-development'
@@ -102,19 +145,6 @@ def run(package_metadata, report_path):
                  'The replay pipeline or export reader is unavailable.', checks)
         recording.set_state(Gst.State.NULL);replay.set_state(Gst.State.NULL)
         _require(Gtk.init_check(), 'runtime.gtk', 'GTK could not initialize.', checks)
-
-        credentials = Credentials()
-        if root:
-            credential_ready = getattr(credentials, 'session_only', False)
-        elif sys.platform == 'win32':
-            credential_ready = type(credentials).__name__ == 'WindowsCredentials'
-        elif sys.platform == 'darwin':
-            credential_ready = type(credentials).__name__ == 'MacOSCredentials'
-        else:
-            credential_ready = (type(credentials).__name__ == 'Credentials' and
-                                credentials.error is None)
-        _require(credential_ready, 'runtime.credentials_backend',
-                 'The packaged credential backend is unavailable.', checks)
 
         with tempfile.TemporaryDirectory() as directory:
             app = Browser()

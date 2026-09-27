@@ -604,12 +604,12 @@ class ParserTests(unittest.TestCase):
             error=FtpOperationError(code,'phase',outcome=Outcome.UNKNOWN)
             self.assertEqual(code.value,json.loads(json.dumps(error.as_dict()))['code'])
 
-    def test_no_production_imports_and_headless_boundary(self):
+    def test_only_core_read_adapter_imports_transport_and_headless_boundary(self):
         import ast
         from pathlib import Path
         root=Path(__file__).resolve().parents[1]/'c64u_browser'
         for path in root.glob('*.py'):
-            if path.name.startswith('c64u_ftp'):continue
+            if path.name.startswith('c64u_ftp') or path.name in ('core.py','ftp_reads.py'):continue
             tree=ast.parse(path.read_text())
             for node in ast.walk(tree):
                 if isinstance(node,ast.ImportFrom):

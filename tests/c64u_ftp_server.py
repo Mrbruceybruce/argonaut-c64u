@@ -14,13 +14,15 @@ class FakeC64UFtp:
                  feat=b'211-Features:\r\n MLSD\r\n MLST type*;size*;modify*;\r\n211 End\r\n',
                  replies=None, files=None, completion=b'226 Complete\r\n',
                  welcome=b'220 C64U fixture\r\n', split=False,
-                 data_wait=None, completion_wait=None, coalesced=False):
+                 data_wait=None, completion_wait=None, coalesced=False, directories=None):
         self.listing, self.list_data, self.feat = listing, list_data, feat
         self.replies = replies or {}
         self.files = dict(files or {b'/file': b'abc'})
         self.completion, self.welcome, self.split = completion, welcome, split
         self.data_wait, self.completion_wait = data_wait, completion_wait
         self.coalesced = coalesced
+        self.directories = None if directories is None else dict(directories)
+        self.bytes_transferred = 0
         self.commands = []
         self.connections = 0
         self.live = 0
@@ -38,6 +40,7 @@ class FakeC64UFtp:
                     fixture.connections += 1
                     fixture.live += 1
                 self.connection.settimeout(3)
+                self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
                 def send(data):
                     if fixture.split:
@@ -56,6 +59,7 @@ class FakeC64UFtp:
                             fixture.commands.append((verb, argument))
                         if verb in fixture.replies:
                             reply = fixture.replies[verb]
+                            if callable(reply):reply = reply(argument)
                             if reply is None:
                                 return
                             send(reply)
@@ -65,6 +69,8 @@ class FakeC64UFtp:
                         elif verb == b'FEAT':send(fixture.feat)
                         elif verb == b'TYPE':send(b'200 Type set\r\n')
                         elif verb == b'CWD':
+                            if fixture.directories is not None and argument not in fixture.directories:
+                                send(b'550 Missing directory\r\n');continue
                             cwd=argument;send(b'250 Directory changed\r\n')
                         elif verb == b'PWD':send(b'257 \"'+cwd.replace(b'\"',b'\"\"')+b'\"\r\n')
                         elif verb == b'SIZE':
@@ -95,9 +101,11 @@ class FakeC64UFtp:
                                         content.extend(block)
                                     fixture.files[argument] = bytes(content)
                                 else:
-                                    content = (fixture.listing if verb == b'MLSD' else
+                                    listing = fixture.directories[cwd] if verb == b'MLSD' and fixture.directories is not None else fixture.listing
+                                    content = (listing if verb == b'MLSD' else
                                                fixture.list_data if verb == b'LIST' else fixture.files[argument])
                                     data.sendall(content)
+                                    with fixture._lock:fixture.bytes_transferred += len(content)
                             if fixture.completion_wait:fixture.completion_wait.wait(2)
                             if fixture.completion is None:return
                             if not fixture.coalesced:send(fixture.completion)

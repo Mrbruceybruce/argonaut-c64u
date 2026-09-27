@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Transport-neutral Core jobs, progress, cancellation, results and events."""
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
 from threading import Event, Lock
@@ -9,6 +10,13 @@ import uuid
 
 from .api import BrowserError, ConnectionFailure
 from .diagnostics import operation_context
+
+
+_CURRENT_CHECK = ContextVar('argonaut_current_job_check', default=None)
+
+def check_current_job():
+    check = _CURRENT_CHECK.get()
+    if check is not None:check()
 
 
 class JobState(str, Enum):
@@ -206,7 +214,9 @@ class CoreJob:
             self.check_cancel()
             if preflight is not None: preflight()
             with operation_context(job_id=self.id, phase=self.operation):
-                result=self._task(self)
+                token=_CURRENT_CHECK.set(self.check_cancel)
+                try:result=self._task(self)
+                finally:_CURRENT_CHECK.reset(token)
             # A late cancellation request does not relabel completed consequential
             # work. Only a check that actually stopped work raises JobCancelled.
             with self._lock:

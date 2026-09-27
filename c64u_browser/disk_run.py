@@ -5,6 +5,7 @@ import socket
 import struct
 from .api import BrowserError, safe_argument
 from .transfers import connect
+from .ftp_reads import adapter_for
 from .diagnostics import operation_event
 
 # Standard 35/40/42-track D64 images, with or without error-byte tables.
@@ -46,18 +47,22 @@ def _mount_and_run(client, path):
     ftp=None
     sent=False
     try:
-        ftp=connect(client)
-        size=ftp.size(path)
-        if size not in D64_SIZES:
-            raise BrowserError('Unsupported D64 size; use a standard 35, 40 or 42-track image.')
-        def collect(block):
-            if len(image)+len(block)>size:
-                raise BrowserError('Image changed during download; nothing was started.')
-            image.extend(block)
-        ftp.retrbinary('RETR '+path,collect)
-        if len(image)!=size or ftp.size(path)!=size:
-            raise BrowserError('Incomplete or changed image; nothing was started.')
-        ftp.close();ftp=None
+        adapter=adapter_for(client)
+        if adapter is not None:
+            image=adapter.read(path,max(D64_SIZES),allowed_sizes=D64_SIZES)
+        else:
+            ftp=connect(client)
+            size=ftp.size(path)
+            if size not in D64_SIZES:
+                raise BrowserError('Unsupported D64 size; use a standard 35, 40 or 42-track image.')
+            def collect(block):
+                if len(image)+len(block)>size:
+                    raise BrowserError('Image changed during download; nothing was started.')
+                image.extend(block)
+            ftp.retrbinary('RETR '+path,collect)
+            if len(image)!=size or ftp.size(path)!=size:
+                raise BrowserError('Incomplete or changed image; nothing was started.')
+            ftp.close();ftp=None
         sent=True
         run_image_bytes(client, bytes(image))
     except (OSError,EOFError,ftplib.Error,BrowserError) as exc:

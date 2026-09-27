@@ -6,6 +6,7 @@ The desktop currently runs this facade in-process.  Future transports and
 clients must call the same application operations instead of owning an
 ``UltimateClient`` themselves.
 """
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
@@ -19,6 +20,10 @@ import uuid
 
 from .api import BrowserError, ConnectionFailure, UltimateClient
 from .credentials import Credentials
+from .c64u_ftp import C64UFtpLeaseManager
+from .c64u_ftp_types import ConnectionBinding, DeviceIdentity, FtpOperationError, ErrorCode
+from .ftp_reads import FtpReadAdapter, adapter_for, read_operation, transport_event
+from .jobs import check_current_job
 from .discovery import local_networks, standard_scan, subnet_scan
 from .file_service import FileLocation, FileService
 from .game_launch import GameLaunchService
@@ -97,6 +102,9 @@ class CoreDeviceOperations:
 
     def _client(self):
         return self._core._require_client()
+
+    @property
+    def _ftp_reads(self): return adapter_for(self._client())
 
     @property
     def host(self): return self._client().host
@@ -200,6 +208,9 @@ class ArgonautCore:
         self._device_identity = ''
         self._session_id = ''
         self._listeners = []
+        self._pending_ftp = None
+        self._ftp_manager = C64UFtpLeaseManager(
+            self._ftp_binding, self._ftp_password, diagnostic=transport_event)
         self._device_operations = CoreDeviceOperations(self)
         self.scheduler = CoreScheduler(self.device_session)
         self.files = FileService(self._require_client,
@@ -327,11 +338,49 @@ class ArgonautCore:
         # also tied to one connection session. It is not treated as verified.
         return 'profile:'+profile.id
 
-    def _begin_session(self, profile, info):
+    def _ftp_binding(self, device_id):
+        if self._pending_ftp is not None:
+            binding, _ = self._pending_ftp
+            if binding.device.physical_id == device_id:return binding
+        adapter = adapter_for(self._client)
+        if (adapter is not None and adapter.binding.device.physical_id == device_id
+                and adapter.binding.core_session_id == self._session_id):
+            return adapter.binding
+        return None
+
+    def _ftp_password(self, binding):
+        if self._pending_ftp is not None and self._pending_ftp[0] == binding:
+            return self._pending_ftp[1].password
+        if self._ftp_binding(binding.device.physical_id) == binding:
+            return self._require_client().password
+        raise FtpOperationError(ErrorCode.STALE, 'binding')
+
+    @contextmanager
+    def _prepare_read_session(self, client, profile, info):
+        # Reserve once, after REST identity verification. Commit the same UUID
+        # after initial browsing succeeds; individual FTP leases never renew it.
+        session_id = uuid.uuid4().hex
+        if not isinstance(client, UltimateClient):
+            yield session_id  # Existing in-memory service doubles own no FTP.
+            return
+        if self._pending_ftp is not None:
+            raise CoreError('session', 'Another C64U connection is being prepared.')
+        identity = DeviceIdentity(self._physical_identity(profile, info),
+                                  info['info']['product'], info['info']['firmware_version'],
+                                  info['version']['version'])
+        binding = ConnectionBinding(identity, session_id, client.host, client.port)
+        client._ftp_reads = FtpReadAdapter(self._ftp_manager, binding,
+                                          encoding=client.encoding, check=check_current_job)
+        self._pending_ftp = (binding, client)
+        try:yield session_id
+        finally:self._pending_ftp = None
+
+    def _begin_session(self, profile, info, session_id=None):
         self._device_identity=self._physical_identity(profile,info)
-        self._session_id=uuid.uuid4().hex
+        self._session_id=session_id or uuid.uuid4().hex
 
     def _end_session(self, *, keep_device=True):
+        self._ftp_manager.invalidate(self._device_identity)
         self._session_id=''
         if not keep_device:self._device_identity=''
 
@@ -457,13 +506,15 @@ class ArgonautCore:
                     device_mac=info.get('network_mac', '') or profile.device_mac)
                 profile.verify_identity(client.test_connection())
             folder = remote_folder or '/USB2'
-            path, entries = initial_directory(client, folder)
-            if persist:
-                profile = self.save_profile(profile, entered_password, remember)
-            self._client = client
-            self._active_profile = profile
-            self._device_info = copy.deepcopy(info)
-            self._begin_session(profile,info)
+            with self._prepare_read_session(client, profile, info) as session_id:
+                with read_operation(client):
+                    path, entries = initial_directory(client, folder)
+                if persist:
+                    profile = self.save_profile(profile, entered_password, remember)
+                self._client = client
+                self._active_profile = profile
+                self._device_info = copy.deepcopy(info)
+                self._begin_session(profile,info,session_id)
             result = ConnectionResult(profile, _public_info(info), path,
                                       tuple(entries))
             self._emit('connected', data={'host': profile.host})
@@ -518,7 +569,6 @@ class ArgonautCore:
             info = client.test_connection()
             profile.verify_identity(info, require_bound=bool(
                 profile.device_id or profile.device_mac))
-            path, entries = initial_directory(client, remote_folder)
         except ConnectionFailure as exc:
             raise CoreError(exc.kind, str(exc),
                             retryable=exc.kind in ('host', 'network')) from exc
@@ -533,9 +583,15 @@ class ArgonautCore:
                 self.mark_connection_lost('A different device answered at this address.')
                 raise CoreError('identity',
                     'A different device answered at this address. Connect manually.')
-        self._client = client
-        self._device_info = copy.deepcopy(info)
-        self._begin_session(profile,info)
+        try:
+            with self._prepare_read_session(client, profile, info) as session_id:
+                with read_operation(client):
+                    path, entries = initial_directory(client, remote_folder)
+                self._client = client
+                self._device_info = copy.deepcopy(info)
+                self._begin_session(profile,info,session_id)
+        except ConnectionFailure as exc:
+            raise CoreError(exc.kind, str(exc), retryable=exc.kind in ('host', 'network')) from exc
         result = ConnectionResult(profile, _public_info(info), path,
                                   tuple(entries))
         self._emit('reconnected', data={'host': profile.host})
@@ -555,4 +611,5 @@ class ArgonautCore:
 
     def close(self):
         """Release Core execution resources; jobs are not persisted."""
+        self._ftp_manager.invalidate(self._device_identity)
         self.scheduler.close()
