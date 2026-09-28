@@ -312,8 +312,8 @@ No commit, push, package or release was performed.
 directory creation; Flash; CLI fresh-folder uploads; AI installation/upgrade/
 provisioning; general compatibility/raw-FTP retirement and final ownership audit.
 Local-destination replacement retains its existing behavior. Slice 3 as a whole
-is not complete. Physical 3D qualification passed; final review and commit/push
-authorization remain pending.
+is not complete. Slice 3D is accepted, physically qualified, committed and
+pushed at `8315985317086e52460c981a8135bffb359da958`.
 
 ## Later Network Foundation boundaries
 
@@ -322,3 +322,13 @@ client where justified, and the existing Ident discovery capability. Shared
 concepts may include identity, connection epoch, capabilities, credentials,
 recovery, cancellation and structured diagnostics. Protocol-specific behavior
 and consequence-specific safety remain explicit.
+## Next approved checkpoint
+
+R1 — Managed Folder Composites is designed and approved for implementation.
+
+The authoritative implementation contract is
+[`R1-MANAGED-FOLDER-COMPOSITES.md`](R1-MANAGED-FOLDER-COMPOSITES.md).
+
+R1 migrates remote folder-plan MKD and same-device remote-to-remote
+nonreplacement additions. R2 and later remaining-ownership checkpoints have
+not begun.
