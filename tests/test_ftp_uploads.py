@@ -359,21 +359,25 @@ class UploadTests(unittest.TestCase):
             self.assertEqual('unknown',exc.upload_evidence.stor['outcome'])
             self.assertEqual('transport',exc.upload_evidence.error_category)
 
-    def test_folder_plan_additions_use_managed_files_but_legacy_directory_creation(self):
+    def test_folder_plan_additions_use_managed_files_and_managed_directory_creation(self):
         with server() as ftp:
             core,_=self.connect(ftp);root=self.source().parent;folder=root/'folder';folder.mkdir()
             (folder/'one').write_bytes(b'one');(folder/'empty').touch()
             request=CopyRequest(FileLocation.core_host(root),('folder',),FileLocation.c64u('/USB1'))
             preview=core.files.prepare_copy(request).wait(5)
-            def mkdir(client,action,path):
-                self.assertEqual('mkdir',action);ftp.directories[path.encode()]=b''
-            with patch('c64u_browser.folder_copy.operate',side_effect=mkdir) as legacy_mkdir:
+
+            with patch(
+                'c64u_browser.folder_copy.operate',
+                side_effect=AssertionError('legacy remote MKD must not be used'),
+            ):
                 result=core.files.execute_copy(preview.result.plan_id).wait(5)
+
             self.assertEqual('succeeded',result.state,result.error)
-            legacy_mkdir.assert_called_once()
             self.assertEqual(b'one',ftp.files[b'/USB1/folder/one'])
             self.assertEqual(b'',ftp.files[b'/USB1/folder/empty'])
             self.assertEqual(2,len(result.result.uploads))
+            self.assertEqual(1,len(result.result.folder_steps))
+            self.assertEqual('mkdir',result.result.folder_steps[0].operation)
 
     def test_cancel_during_publication_and_after_ack_preserves_success(self):
         for stage in ('RNFR','RNTO','complete'):

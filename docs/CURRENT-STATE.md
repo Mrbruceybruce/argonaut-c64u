@@ -322,13 +322,29 @@ client where justified, and the existing Ident discovery capability. Shared
 concepts may include identity, connection epoch, capabilities, credentials,
 recovery, cancellation and structured diagnostics. Protocol-specific behavior
 and consequence-specific safety remain explicit.
-## Next approved checkpoint
+## Current checkpoint
 
-R1 — Managed Folder Composites is designed and approved for implementation.
-
-The authoritative implementation contract is
-[`R1-MANAGED-FOLDER-COMPOSITES.md`](R1-MANAGED-FOLDER-COMPOSITES.md).
+R1 — Managed Folder Composites is implemented and physically qualified on both
+C64 Ultimates. The authoritative contract and detailed physical acceptance
+record are in
+[R1-MANAGED-FOLDER-COMPOSITES.md](R1-MANAGED-FOLDER-COMPOSITES.md).
 
 R1 migrates remote folder-plan MKD and same-device remote-to-remote
-nonreplacement additions. R2 and later remaining-ownership checkpoints have
-not begun.
+nonreplacement additions while preserving the accepted 3C addition and 3D
+replacement boundaries. Implementation review added truthful pre-validation
+`setup` evidence and explicit ancestor-change and genuine USB restore
+missing-directory coverage.
+
+Authorized physical qualification passed on 29 September 2026. Beige `25EA78`
+used `/USB2`; Founder's `25BE71` used `/SD`. Both devices passed managed nested
+directory creation, normal and zero-byte same-device remote-to-remote additions,
+source preservation, independent destination verification, genuine backup and
+missing-directory restore, stable Core epoch, zero remaining leases, reviewed
+cleanup and independent absence verification.
+
+Immediately after physical qualification, the focused R1 suite passed **20/20**,
+the USB backup/restore regression suite passed **19/19**, and the FTP regression
+family passed **186/186**. `git diff --check` was clean.
+
+R1 remains uncommitted pending final review and normal fast-forward commit/push.
+R2 and later remaining-ownership checkpoints have not begun.

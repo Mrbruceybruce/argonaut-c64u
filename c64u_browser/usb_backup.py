@@ -116,6 +116,7 @@ class RestoreResult:
     partial_upload: PartialUpload | None = None
     uploads: tuple = ()
     replacements: tuple = ()
+    folder_steps: tuple = ()
 
     @property
     def message(self):
@@ -131,6 +132,8 @@ class RestoreResult:
                 '\n\nSkipped/conflicts:\n' + ('\n'.join(self.skipped + self.conflicts) or '(none)') +
                 '\n\nUnfinished:\n' + ('\n'.join(self.remaining) or '(none)'))
         if self.partial_path:text += '\n\nPartial upload:\n' + self.partial_path
+        for step in self.folder_steps:
+            if step.inspection_message():text+='\n\n'+step.inspection_message()
         for replacement in self.replacements:
             if replacement.inspection_message():text += '\n\n' + replacement.inspection_message()
         return text
@@ -740,7 +743,7 @@ class UsbBackupService:
                     steps.append(Step(item.path,source,destination,False,True,
                                       signature(client,False,destination)))
             plan=Plan(steps=steps)
-            report=execute_plan(client,plan,True,False,job.byte_progress('restore'), managed_uploads=True, managed_replacements=True)
+            report=execute_plan(client,plan,True,False,job.byte_progress('restore'), managed_uploads=True, managed_replacements=True, managed_folders=True)
             completed=set(value.rstrip('/') for value in report.completed)
             replaced=tuple(path for path in replacement_set if path in completed)
             added=tuple(path for path in stored.classification.additions if path.rstrip('/') in completed)
@@ -751,7 +754,7 @@ class UsbBackupService:
             result=RestoreResult(added,replaced,stored.classification.unchanged,skipped,
                 stored.classification.conflicts,tuple(report.remaining),
                 sum(file_map[path].size for path in completed if path in file_map),
-                report.partial,report.error,partial,tuple(report.uploads),tuple(report.replacements))
+                report.partial,report.error,partial,tuple(report.uploads),tuple(report.replacements),tuple(report.folder_steps))
             if report.cancelled:raise JobCancelled(result=result)
             if report.error:raise UsbBackupFailure('restore',report.error,result)
             return result

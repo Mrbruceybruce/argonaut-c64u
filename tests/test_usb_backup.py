@@ -126,6 +126,17 @@ class UsbBackupTests(unittest.TestCase):
         lifetime.start();self.addCleanup(lifetime.stop)
         seam=patch('c64u_browser.folder_copy.upload_managed',side_effect=addition)
         seam.start();self.addCleanup(seam.stop)
+        # R1 directory seam for this policy-only peer; socket suite proves ownership.
+        from c64u_browser.folder_steps import FolderStepEvidence
+        from c64u_browser.files import operate
+        def directory(client, step, progress, validate, *, directory=False):
+            self.assertTrue(directory)
+            if validate() is not None:raise BrowserError('Destination appeared after review.')
+            operate(client,'mkdir',step.destination)
+            return FolderStepEvidence(step.relative,'mkdir',str(step.source),step.destination,
+                                      phase='complete',validation='passed')
+        directory_seam=patch('c64u_browser.folder_copy.execute_managed_step',side_effect=directory)
+        directory_seam.start();self.addCleanup(directory_seam.stop)
         # Preserve this suite's in-memory replacement policy coverage. Actual
         # managed composition/evidence is exercised by test_ftp_replacements.
         from c64u_browser.replacement import replace_file

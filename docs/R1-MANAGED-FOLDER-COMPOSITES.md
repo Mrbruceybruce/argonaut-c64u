@@ -687,3 +687,76 @@ During implementation, stop and report rather than expanding scope if:
   later checkpoints.
 
 Do not begin R2 as part of R1.
+
+## Physical qualification — PASS (29 September 2026)
+
+The reviewed R1 implementation passed authorized headless Core/service physical
+qualification independently on both C64 Ultimates. Qualification used uniquely
+named disposable trees and the normal identity-bound Argonaut profiles.
+
+| Device | Address / physical ID | Firmware | Storage | Disposable tree (now removed) |
+| --- | --- | --- | --- | --- |
+| Beige | `192.168.68.70` / `25EA78` | `1.1.0s2` | `/USB2` | `/USB2/argonaut-r1-accept-166f51aa31974f2d8f5af0c60cc062cf` |
+| Founder's | `192.168.68.69` / `25BE71` | `1.1.0` | `/SD` | `/SD/argonaut-r1-accept-8d8020abf4a84aebb105f66a7ef9c7f8` |
+
+Identity was reverified through bound Core profiles before mutation. Previously
+accepted managed mkdir and 3C local-source additions supplied disposable setup
+data. Each R1 FileService folder plan copied a normal file, a zero-byte file and
+a nested directory from one remote location to another on the same device. The
+destination parent already existed; the nested destination directory did not.
+
+On each device the folder plan completed exactly four items with no remaining
+or skipped work:
+
+- normal file: `remote-addition`;
+- zero-byte file: `remote-addition`;
+- nested directory: managed `mkdir`;
+- nested file: `remote-addition`.
+
+All four folder-step records completed with passed validation and no error
+category. File publication evidence was completed for each remote addition.
+Directory creation correctly had no file-publication completion.
+
+Independent post-operation listings verified the zero-byte source and
+destination as zero bytes. Independent bounded reads verified the non-empty
+source and destination contents and matching SHA-256 values while preserving
+the remote source and an unrelated sentinel.
+
+| Device | Content | SHA-256 |
+| --- | --- | --- |
+| Beige | normal source/destination | `0abc18e15a0dbd17bfc0a0d2cd6b7df2d13e1899669acfa857404aea7e51bc5b` |
+| Beige | nested source/destination | `6aa26c8fd197e1becf38fcc8f6e4abdc852d89c47483e7d68c4a0b717b943135` |
+| Founder’s | normal source/destination | `8d5b50e8116b7ce2189cb754a84c9b8c859411915686675ab408b57e6a8c365a` |
+| Founder’s | nested source/destination | `469b74ae4143db9f7662b7e8c028ff3ec28a01814c2d6c9322891206ac581478` |
+
+A genuine Argonaut backup was then made from each device. Beige backed up the
+600-byte nested destination from `/USB2`; Founder's backed up the 640-byte
+nested destination from `/SD`. Each manifest reported `state: complete`, an
+empty failure field, the expected bound device identity and volume, and a
+payload SHA-256 matching the independently verified physical file.
+
+Reviewed FileService deletion then removed only the disposable nested file and
+its containing `nested` directory. USB restore preview/execution restored the
+missing directory and file. On both devices the restore result reported the
+directory and file as additions, with no replacements, skips, conflicts or
+remaining work. R1 supplied one managed `mkdir` folder-step record with passed
+validation; the restored file remained on the accepted 3C addition path.
+Independent readback matched the genuine backup byte-for-byte and by SHA-256.
+
+Every measured consequential operation preserved the Core epoch and ended with
+zero active leases. Physical qualification did not inject lost replies,
+uncertain publication, cleanup failure, cancellation or network interruption;
+those remain deterministic-fixture responsibilities. Per-step authentication
+and FEAT ownership are covered by deterministic socket tests; this physical pass
+did not retain a complete diagnostic-event count suitable for an additional
+physical count claim.
+
+Final cleanup used fresh reviewed deletion plans. Beige removed 12 reviewed
+items from its disposable tree; Founder's cleanup was likewise reviewed to
+remain inside its unique disposable root. Independent parent listings verified
+both acceptance trees absent afterward, with stable Core epochs and zero active
+leases.
+
+Immediately after physical qualification, the focused R1 suite passed **20/20**,
+the USB backup/restore regression suite passed **19/19**, and the FTP regression
+family passed **186/186**. `git diff --check` was clean. No R2 work was begun.

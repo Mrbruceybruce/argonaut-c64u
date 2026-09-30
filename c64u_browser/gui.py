@@ -1038,7 +1038,7 @@ class Browser(Gtk.Application):
                     return
                 message, partial = result.message, result.partial_upload
                 copied = completed_roots(names, result.completed)
-                if snapshot.state=='failed' or (snapshot.state=='cancelled' and result.replacements):
+                if snapshot.state=='failed' or (snapshot.state=='cancelled' and (result.replacements or result.folder_steps)):
                     self.copy_report(result)
                 if partial:
                     self.partial_upload = partial

@@ -43,12 +43,12 @@ def connect(client):
         raise
 
 
-def download(client, source, destination, progress=lambda n: None):
+def download(client, source, destination, progress=lambda n: None, *, preserve_cleanup=False):
     with operation_event('ftp', 'download', 'file'):
-        return _download(client, source, destination, progress)
+        return _download(client, source, destination, progress, preserve_cleanup=preserve_cleanup)
 
 
-def _download(client, source, destination, progress):
+def _download(client, source, destination, progress, *, preserve_cleanup=False):
     check = getattr(progress, 'check', lambda:None)
     check()
     remote_file(source)
@@ -60,17 +60,8 @@ def _download(client, source, destination, progress):
             raise BrowserError('Destination already exists; nothing was overwritten.')
         adapter = adapter_for(client)
         if adapter is not None:
-            with tempfile.NamedTemporaryFile(dir=destination.parent, prefix='.c64u-', delete=False) as output:
-                temporary = output.name
-                def finish():
-                    output.flush()
-                    os.fsync(output.fileno())
-                result = adapter.read_into(source, output, progress=progress,
-                                           check=check, finish=finish)
-            check()
-            publish_new(temporary, destination)
-            return {'path': str(destination), 'bytes': result.transferred,
-                    'sha256': result.sha256}
+            return _managed_download(adapter, source, destination, progress, check,
+                                     preserve_cleanup=preserve_cleanup)
         ftp = connect(client)
         expected = ftp.size(source)
         if expected is None:
@@ -96,12 +87,51 @@ def _download(client, source, destination, progress):
         publish_new(temporary, destination)
         return {'path': str(destination), 'bytes': count, 'sha256': digest.hexdigest()}
     except (OSError, EOFError, ftplib.Error, ValueError) as exc:
-        raise BrowserError(f'Download failed: {exc}') from exc
+        failure = BrowserError('Download failed during local I/O.' if preserve_cleanup else f'Download failed: {exc}')
+        if preserve_cleanup:
+            for name in ('local_cleanup', 'download_observation', 'ftp_error'):
+                if hasattr(exc, name):setattr(failure, name, getattr(exc, name))
+        raise failure from exc
     finally:
         if ftp is not None:
             ftp.close()
         if temporary is not None and os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def _managed_download(adapter, source, destination, progress, check, *, preserve_cleanup=False):
+    temporary = None
+    primary = None
+    observation = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=destination.parent, prefix='.c64u-', delete=False) as output:
+            temporary = output.name
+            def finish():
+                output.flush()
+                os.fsync(output.fileno())
+            result = adapter.read_into(source, output, progress=progress, check=check, finish=finish)
+        observation = dict(bytes=result.transferred, sha256=result.sha256)
+        check()
+        publish_new(temporary, destination)
+        return dict(path=str(destination), **observation)
+    except Exception as exc:
+        primary = exc
+        raise
+    finally:
+        if temporary is not None:
+            try:
+                if os.path.exists(temporary):os.unlink(temporary)
+            except Exception:
+                if not preserve_cleanup:raise
+                cleanup = (dict(scope='download-staging', error_category='local-cleanup-failed'),)
+                if primary is not None:
+                    primary.local_cleanup = tuple(getattr(primary, 'local_cleanup', ())) + cleanup
+                    if observation is not None:primary.download_observation = observation
+                else:
+                    failure = BrowserError('Managed download local staging cleanup failed.')
+                    failure.local_cleanup = cleanup
+                    failure.download_observation = observation
+                    raise failure from None
 
 
 def upload_new_folder(client, source, parent='/USB2', progress=lambda n: None):

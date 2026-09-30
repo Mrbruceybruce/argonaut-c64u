@@ -79,6 +79,7 @@ class CopyResult:
     partial_upload: PartialUpload | None = None
     uploads: tuple = ()
     replacements: tuple = ()
+    folder_steps: tuple = ()
 
     @property
     def message(self):
@@ -94,6 +95,8 @@ class CopyResult:
         if self.partial_path:text+='\n\nPossible partial upload: '+self.partial_path
         for upload in self.uploads:
             if upload.inspection_message():text+='\n\n'+upload.inspection_message()
+        for step in self.folder_steps:
+            if step.inspection_message():text+='\n\n'+step.inspection_message()
         for replacement in self.replacements:
             if replacement.inspection_message():text+='\n\n'+replacement.inspection_message()
         return text
@@ -295,12 +298,12 @@ class FileService:
             client=self._client((request.source,request.destination),stored.session)
             report=execute_plan(client,plan,request.source.scope==CORE_HOST,
                                 request.destination.scope==CORE_HOST,
-                                job.byte_progress(), managed_uploads=True, managed_replacements=True)
+                                job.byte_progress(), managed_uploads=True, managed_replacements=True, managed_folders=True)
             partial=(PartialUpload(FileLocation.c64u(report.partial),
                         stored.session.device_id,stored.session.session_id)
                      if report.partial and stored.session else None)
             result=CopyResult(tuple(report.completed),tuple(report.skipped),
-                tuple(report.remaining),report.partial,report.error,partial,tuple(report.uploads),tuple(report.replacements))
+                tuple(report.remaining),report.partial,report.error,partial,tuple(report.uploads),tuple(report.replacements),tuple(report.folder_steps))
             if getattr(report,'cancelled',False):raise JobCancelled(result=result)
             if report.error:
                 raise FileJobFailure('partial-upload' if report.partial else 'transfer',
