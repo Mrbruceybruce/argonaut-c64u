@@ -215,7 +215,8 @@ class ArgonautCore:
         self.scheduler = CoreScheduler(self.device_session)
         self.files = FileService(self._require_client,
                                  self.device_session,
-                                 scheduler=self.scheduler)
+                                 scheduler=self.scheduler,
+                                 bound_profile_provider=lambda:self.active_profile)
         self.usb = UsbBackupService(self._require_client,
                                     self.device_session,
                                     self.scheduler)
@@ -613,3 +614,9 @@ class ArgonautCore:
         """Release Core execution resources; jobs are not persisted."""
         self._ftp_manager.invalidate(self._device_identity)
         self.scheduler.close()
+
+    def prepare_fresh_folder_upload(self, source, parent):
+        return self.files.prepare_fresh_folder_upload(source, parent)
+
+    def execute_fresh_folder_upload(self, plan_id):
+        return self.files.execute_fresh_folder_upload(plan_id)

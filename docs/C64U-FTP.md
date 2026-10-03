@@ -1290,3 +1290,33 @@ upgrade/provisioning, general compatibility/raw-FTP retirement and final ownersh
 audit. Local-destination replacement remains unchanged. This qualifies 3D only;
 Slice 3 as a whole is not complete. Final review and commit/push authorization
 remain pending.
+
+
+## Current consumer checkpoint — R2 physically qualified, 3 October 2026
+
+The preceding Slice 3D status is historical. R1's accepted managed folder
+composites are recorded in R1-MANAGED-FOLDER-COMPOSITES.md. Production CLI
+put-new now uses the R2 Core/FileService fresh-folder prepare/execute boundary;
+see [R2-MANAGED-CLI-FRESH-FOLDER.md](R2-MANAGED-CLI-FRESH-FOLDER.md) for the full
+contract, deterministic evidence and physical acceptance record. The R2
+implementation is uncommitted and ready for final review and normal commit/push.
+
+Loopback fixtures establish one execution connection, USER and FEAT across
+validation/MKD/staged upload/readback/SIZE/publication, stable Core epoch and
+zero leases on terminal paths. Connect and preparation are counted separately.
+The nonempty regular-descriptor policy is opt-in for R2; default 3C zero-byte
+uploads and accepted 3D/R1 semantics are unchanged. Uncertain consequences retain
+inspection evidence and do not permit replay or implicit cleanup. Final focused
+R2 verification passed 66 methods; 276 affected regressions and 17 offline Test
+Lab checks passed. Normal and optimized suites each ran 1025 methods: 989 passed,
+36 existing display skips and zero failures.
+
+Authorized physical qualification passed independently on Beige `25EA78` using
+`/USB2` and Founder's `25BE71` using `/SD` through the actual CLI put-new path.
+Independent readback verified exact byte counts and SHA-256 hashes, no staging
+artifacts remained, Core epochs stayed stable and active leases returned to zero.
+Reviewed cleanup removed each disposable acceptance tree and fresh-session
+listings independently verified absence.
+
+Legacy read CLI, compatibility upload_new_folder, Flash and AI remain unchanged;
+general raw-FTP retirement remains deferred. No R3 work has begun.

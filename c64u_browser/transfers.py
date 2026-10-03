@@ -2,6 +2,8 @@ from .platform_support import publish_new
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Conservative transfers, separate from presentation and device controls."""
+from contextlib import contextmanager
+import stat
 import ftplib
 import hashlib
 import os
@@ -249,6 +251,7 @@ class UploadEvidence:
     error_category: str | None = None
     error_code: str | None = None
     transport_error: dict | None = None
+    destination_recheck: str = 'unperformed'
 
     def inspection_message(self):
         if self.disposition == 'location-unknown':
@@ -258,7 +261,35 @@ class UploadEvidence:
         return ''
 
 
-def upload_managed(client, source, parent='/USB2', progress=lambda n: None):
+@contextmanager
+def _nonempty_source(source):
+    # R2 only: nonblocking open prevents a raced FIFO from hanging before fstat.
+    # This is the one descriptor used for sizing and transfer, not a snapshot.
+    fd = os.open(source, os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0))
+    stream = None
+    primary = None
+    try:
+        stream = os.fdopen(fd, 'rb')
+        fd = None
+        yield stream
+    except Exception as exc:
+        primary = exc
+        raise
+    finally:
+        try:
+            if stream is not None:stream.close()
+            elif fd is not None:os.close(fd)
+        except Exception:
+            cleanup = (('source-descriptor', 'cleanup-failed'),)
+            if primary is not None:primary.local_cleanup = cleanup
+            else:
+                failure = BrowserError('Source descriptor finalization failed.')
+                failure.local_cleanup = cleanup
+                raise failure from None
+
+
+def upload_managed(client, source, parent='/USB2', progress=lambda n: None, *,
+                   require_nonempty_regular=False):
     """Core-only staged addition. Never retries or removes remote state."""
     from .files import child, inspect
     source = Path(source)
@@ -278,9 +309,12 @@ def upload_managed(client, source, parent='/USB2', progress=lambda n: None):
                 raise BrowserError('Temporary filename exists; upload refused.')
             evidence = replace(evidence, phase='source')
             check()
-            with source.open('rb') as stream:
-                if not source.is_file():raise BrowserError('Choose a regular file.')
-                expected = os.fstat(stream.fileno()).st_size
+            with (_nonempty_source(source) if require_nonempty_regular else source.open('rb')) as stream:
+                if not require_nonempty_regular and not source.is_file():raise BrowserError('Choose a regular file.')
+                observed = os.fstat(stream.fileno())
+                if require_nonempty_regular and (not stat.S_ISREG(observed.st_mode) or observed.st_size <= 0):
+                    raise BrowserError('Choose a nonempty regular file.')
+                expected = observed.st_size
                 evidence = replace(evidence, phase='stor', expected_bytes=expected)
                 sent = adapter.write_from(temporary, stream, expected, progress)
                 evidence = replace(evidence, stor=sent.transfer.as_dict(),
@@ -294,10 +328,10 @@ def upload_managed(client, source, parent='/USB2', progress=lambda n: None):
             if adapter.size(temporary) != sent.transferred:
                 evidence = replace(evidence, size='failed')
                 raise BrowserError('Upload SIZE verification failed.')
-            evidence = replace(evidence, size='passed', phase='destination-recheck')
+            evidence = replace(evidence, size='passed', phase='destination-recheck', destination_recheck='pending')
             if inspect(client, destination) is not None:
                 raise BrowserError('Destination appeared during transfer; publish refused.')
-            evidence = replace(evidence, phase='publication')
+            evidence = replace(evidence, phase='publication', destination_recheck='passed')
             check()
             publication = adapter.mutate('rename', temporary, destination)
             evidence = replace(evidence, publication=publication, disposition='published', phase='complete')
@@ -322,6 +356,7 @@ def upload_managed(client, source, parent='/USB2', progress=lambda n: None):
                 evidence = replace(evidence, disposition='location-unknown')
         if evidence.readback == 'pending':evidence = replace(evidence, readback='failed')
         if evidence.size == 'pending':evidence = replace(evidence, size='failed')
+        if evidence.destination_recheck == 'pending':evidence = replace(evidence, destination_recheck='failed')
         category = ('cancelled' if getattr(exc, 'cancelled', False) else
                     'transport' if wire is not None else
                     'verification' if evidence.phase in ('readback', 'size') else
@@ -344,6 +379,8 @@ def upload_managed(client, source, parent='/USB2', progress=lambda n: None):
                        else 'Upload failed; inspect the recorded result.')
         failure = UploadFailure(message, partial)
         failure.upload_evidence = evidence
+        if require_nonempty_regular:
+            failure.local_cleanup = tuple(getattr(exc, 'local_cleanup', ()))
         failure.code = 'upload-' + category
         failure.retryable = False
         raise failure from None

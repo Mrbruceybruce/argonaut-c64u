@@ -12,8 +12,10 @@ current state recorded here.
 - Stable 1.9 is released as `v1.9`. Its release artifacts are immutable.
 - `main` and `v1.9` are not the 1.10 development workspace. Current 1.10 work
   belongs on `development`.
-- Accepted development baseline: `6a09af5b8559df73d83e12db3eeeeba3d8106a1a`
-  — `Implement managed staged uploads for FTP Slice 3C`.
+- Verified development authority: `3f7dace0b2c5b80316919db832dc583d4a19392a`;
+  R1 parent `d0e605ebdc29cca15558d7fb6c5bf2dcfc6690bc`.
+  R2 implementation is uncommitted and physically qualified on both C64 Ultimates;
+  final review and normal commit/push remain pending.
 - Argonaut 1.10 direction: **C64U Network Foundation**.
 
 ## Completed FTP work
@@ -238,7 +240,7 @@ C64U-FTP.md records exact paths, hashes, external evidence and limitations.
 At the 3C checkpoint, replacement, composites, Flash, CLI and AI provisioning
 remained deferred. The implemented 3D boundary and remaining exceptions follow.
 
-## Slice 3D — physically qualified, uncommitted; final review pending
+## Slice 3D — accepted, committed and pushed
 
 The approved 3D implementation is based on the accepted 3C commit above.
 `managed_replacement.replace_managed` is selected explicitly for FileService
@@ -308,9 +310,10 @@ from the reviewed implementation; the deterministic baseline remains 939/36.
 See C64U-FTP.md for exact paths, hashes, evidence and physical-test limitations.
 No commit, push, package or release was performed.
 
-**Still deferred:** remote-to-remote nonreplacement additions; general folder-plan
-directory creation; Flash; CLI fresh-folder uploads; AI installation/upgrade/
+**Still deferred:** Flash; CLI fresh-folder uploads; AI installation/upgrade/
 provisioning; general compatibility/raw-FTP retirement and final ownership audit.
+R1 has since migrated remote-to-remote nonreplacement additions and general
+folder-plan directory creation, as recorded in the current checkpoint below.
 Local-destination replacement retains its existing behavior. Slice 3 as a whole
 is not complete. Slice 3D is accepted, physically qualified, committed and
 pushed at `8315985317086e52460c981a8135bffb359da958`.
@@ -346,5 +349,31 @@ Immediately after physical qualification, the focused R1 suite passed **20/20**,
 the USB backup/restore regression suite passed **19/19**, and the FTP regression
 family passed **186/186**. `git diff --check` was clean.
 
-R1 remains uncommitted pending final review and normal fast-forward commit/push.
-R2 and later remaining-ownership checkpoints have not begun.
+R1 is committed and pushed at
+`d0e605ebdc29cca15558d7fb6c5bf2dcfc6690bc`.
+
+R2 — Managed CLI Fresh-Folder Upload is implemented and physically qualified
+on both C64 Ultimates as of 3 October 2026. The approved contract, implementation
+boundary, deterministic evidence and physical acceptance record are in
+[R2-MANAGED-CLI-FRESH-FOLDER.md](R2-MANAGED-CLI-FRESH-FOLDER.md).
+Only production CLI put-new now uses saved bound profile authority and the
+Core/FileService fresh-folder composite. Legacy read CLI, compatibility
+upload_new_folder, Flash and AI routes remain unchanged. The opt-in nonempty
+source descriptor guard preserves default 3C zero-byte support.
+
+Final pre-physical deterministic verification passed **66 focused R2 methods**,
+**276 affected regression methods**, and **17 offline Test Lab checks**. Normal
+and optimized full suites each ran **1025 methods: 989 passed, 36 existing opt-in
+display skips, zero failures**. No existing test was removed or renamed and
+`git diff --check` passed.
+
+Authorized physical qualification then passed independently on Beige `25EA78`
+using `/USB2` and Founder's `25BE71` using `/SD` through the actual CLI put-new
+path and saved identity-bound profiles. Independent readback verified the exact
+byte counts and SHA-256 hashes, no staging artifacts remained, Core epochs stayed
+stable, and active leases returned to zero. Reviewed cleanup removed exactly each
+disposable acceptance tree and fresh-session listings independently verified
+absence.
+
+R2 is ready for final review and normal commit/push. No R2 commit or push has
+occurred yet; remaining-ownership checkpoints and R3 have not begun.

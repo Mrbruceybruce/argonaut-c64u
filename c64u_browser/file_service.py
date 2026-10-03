@@ -184,13 +184,14 @@ class FileJobFailure(BrowserError):
 class FileService:
     """Core-owned file plans and jobs; no transport or credentials escape."""
     def __init__(self, client_provider, session_provider, *, scheduler=None,
-                 plan_ttl=300, plan_limit=128, clock=time.time):
+                 plan_ttl=300, plan_limit=128, clock=time.time, bound_profile_provider=None):
+        self._bound_profile_provider=bound_profile_provider
         self._client_provider=client_provider
         self._session_provider=session_provider
         self._clock=clock
         self.plan_ttl=max(0,float(plan_ttl));self.plan_limit=max(0,int(plan_limit))
         self._scheduler=scheduler or CoreScheduler(self._device_session,clock=clock)
-        self._copy_plans={};self._delete_plans={};self._native_plans={}
+        self._copy_plans={};self._delete_plans={};self._native_plans={};self._fresh_plans={}
         self._lock=Lock()
 
     def job(self, job_id):
@@ -217,7 +218,7 @@ class FileService:
 
     def _cleanup_plans_locked(self):
         now=self._clock();registries=(self._copy_plans,self._delete_plans,
-                                      self._native_plans)
+                                      self._native_plans,self._fresh_plans)
         for registry in registries:
             for plan_id,plan in tuple(registry.items()):
                 if now-plan.created_at>self.plan_ttl:registry.pop(plan_id,None)
@@ -282,7 +283,8 @@ class FileService:
             self._cleanup_plans_locked()
             return bool(self._copy_plans.pop(plan_id,None) or
                         self._delete_plans.pop(plan_id,None) or
-                        self._native_plans.pop(plan_id,None))
+                        self._native_plans.pop(plan_id,None) or
+                        self._fresh_plans.pop(plan_id,None))
 
     def execute_copy(self, plan_id, decision='skip'):
         if decision not in ('skip','replace'):
@@ -442,3 +444,11 @@ class FileService:
                 if temporary and os.path.exists(temporary):os.unlink(temporary)
             return {'destination':destination,'bytes':len(data)}
         return self._job('file.native-save-copy',task,session=session)
+
+    def prepare_fresh_folder_upload(self, source, parent):
+        from .fresh_folder import prepare
+        return prepare(self, source, parent)
+
+    def execute_fresh_folder_upload(self, plan_id):
+        from .fresh_folder import execute
+        return execute(self, plan_id)
