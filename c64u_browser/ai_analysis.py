@@ -8,6 +8,7 @@ from .test_lab_history import validate_report
 SAFE_OPERATIONS = {
     'rest': frozenset(('GET', 'PUT', 'POST', 'DELETE')),
     'ftp': frozenset(('list_directory', 'download', 'upload',
+                      # History-only label for saved reports; no live emitter.
                       'upload_new_folder', 'read_remote', 'upload_flash',
                       'replace_file', 'file_mkdir', 'file_rename',
                       'file_delete', 'file_unknown')),

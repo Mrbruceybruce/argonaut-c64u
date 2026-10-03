@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch, Mock
 from c64u_browser.api import BrowserError
-from c64u_browser.transfers import download, upload_new_folder, remote_file
+from c64u_browser.transfers import download, remote_file
 
 class Transfers(unittest.TestCase):
     def test_scope(self):
@@ -53,30 +53,7 @@ class Transfers(unittest.TestCase):
             with self.assertRaises(BrowserError): download(Mock(), '/USB2/file', target)
             self.assertEqual(target.read_bytes(), b'keep')
 
-    def test_upload_verification_and_mkdir_failure(self):
-        with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect:
-            source = Path(directory)/'test.txt'
-            source.write_bytes(b'abc')
-            ftp = connect.return_value
-            ftp.storbinary.side_effect = lambda cmd, stream, callback: callback(stream.read())
-            ftp.retrbinary.side_effect = lambda cmd, cb: cb(b'abc')
-            ftp.size.return_value = 3
-            self.assertTrue(upload_new_folder(Mock(), source)['verified'])
-            ftp.reset_mock()
-            ftp.mkd.side_effect = OSError('exists')
-            with self.assertRaises(BrowserError): upload_new_folder(Mock(), source)
-            ftp.storbinary.assert_not_called()
 
-    def test_corrupt_upload(self):
-        with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect:
-            source = Path(directory)/'test.txt'
-            source.write_bytes(b'abc')
-            ftp = connect.return_value
-            ftp.storbinary.side_effect = lambda cmd, stream, callback: callback(stream.read())
-            ftp.retrbinary.side_effect = lambda cmd, cb: cb(b'bad')
-            ftp.size.return_value = 3
-            with self.assertRaisesRegex(BrowserError, 'verification failed'): upload_new_folder(Mock(), source)
-            ftp.delete.assert_not_called()
     def test_direct_upload(self):
         from c64u_browser.transfers import upload
         with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect, patch('c64u_browser.files.inspect', return_value=None):

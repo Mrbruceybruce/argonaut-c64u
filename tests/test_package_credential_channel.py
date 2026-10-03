@@ -65,14 +65,20 @@ class CredentialChannelProposalTests(unittest.TestCase):
             self.assertEqual('',credentials.get('existing-stable-profile'))
             with self.assertRaises(BrowserError):credentials.set('existing-stable-profile','synthetic-secret')
             credentials.delete('existing-stable-profile')
-            core=ArgonautCore(preferences=Preferences())
+            def observing_factory(expected):
+                def factory(host, password, **kwargs):
+                    self.assertTrue(password == expected, 'Unexpected credential resolution')
+                    return Mock(test_connection=lambda: {})
+                return factory
+            core=ArgonautCore(preferences=Preferences(),
+                              client_factory=observing_factory('synthetic-secret'))
             try:
                 profile=core.save_profile(Profile.new('fixture','127.0.0.1'),'synthetic-secret',False)
-                self.assertEqual('synthetic-secret',core.credential_for(profile))
+                core.test_profile(profile)
             finally:core.close()
             self.assertNotIn(b'synthetic-secret',Preferences().path.read_bytes())
-            fresh=ArgonautCore(preferences=Preferences().load())
-            try:self.assertEqual('',fresh.credential_for(profile))
+            fresh=ArgonautCore(preferences=Preferences().load(), client_factory=observing_factory(''))
+            try:fresh.test_profile(profile)
             finally:fresh.close()
         self.assertEqual(before,stable.path.read_bytes())
     def test_development_secret_is_absent_after_process_termination(self):
@@ -81,7 +87,16 @@ class CredentialChannelProposalTests(unittest.TestCase):
              'PYTHONPATH':str(Path(__file__).resolve().parents[1])}
         common="from c64u_browser.core import ArgonautCore; from c64u_browser.profiles import Preferences,Profile; c=ArgonautCore(preferences=Preferences().load()); "
         first="c.save_profile(Profile.new('fixture','127.0.0.1'),'synthetic-secret',False); c.close()"
-        second="value=c.credential_for(c.preferences.profiles[0]); c.close(); raise SystemExit(1 if value else 0)"
+        second="""
+from types import SimpleNamespace
+c.close()
+def factory(host, password, **kwargs):
+    if password: raise RuntimeError('Credential survived process termination')
+    return SimpleNamespace(test_connection=lambda: {})
+c=ArgonautCore(preferences=Preferences().load(), client_factory=factory)
+c.test_profile(c.preferences.profiles[0])
+c.close()
+"""
         subprocess.run([sys.executable,'-B','-c',common+first],env=env,check=True)
         subprocess.run([sys.executable,'-B','-c',common+second],env=env,check=True)
         for path in self.root.rglob('*'):

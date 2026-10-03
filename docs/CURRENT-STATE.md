@@ -12,10 +12,12 @@ current state recorded here.
 - Stable 1.9 is released as `v1.9`. Its release artifacts are immutable.
 - `main` and `v1.9` are not the 1.10 development workspace. Current 1.10 work
   belongs on `development`.
-- Verified development authority: `3f7dace0b2c5b80316919db832dc583d4a19392a`;
-  R1 parent `d0e605ebdc29cca15558d7fb6c5bf2dcfc6690bc`.
-  R2 implementation is uncommitted and physically qualified on both C64 Ultimates;
-  final review and normal commit/push remain pending.
+- Verified post-R2 development authority:
+  `13bbc8a85d02cf75b1e58efde4e20b35d575e0df`
+  (`Implement R2 managed CLI fresh-folder upload`). R2 is accepted, physically
+  qualified on both C64 Ultimates, committed and pushed. On 3 October 2026,
+  HEAD and local `origin/development` matched with divergence `0 0` and a clean
+  worktree before the R3 documentation-only design pass.
 - Argonaut 1.10 direction: **C64U Network Foundation**.
 
 ## Completed FTP work
@@ -310,10 +312,11 @@ from the reviewed implementation; the deterministic baseline remains 939/36.
 See C64U-FTP.md for exact paths, hashes, evidence and physical-test limitations.
 No commit, push, package or release was performed.
 
-**Still deferred:** Flash; CLI fresh-folder uploads; AI installation/upgrade/
-provisioning; general compatibility/raw-FTP retirement and final ownership audit.
-R1 has since migrated remote-to-remote nonreplacement additions and general
-folder-plan directory creation, as recorded in the current checkpoint below.
+**At the 3D checkpoint, deferred:** Flash; CLI fresh-folder uploads;
+AI installation/upgrade/provisioning; general compatibility/raw-FTP retirement
+and final ownership audit. R1 has since migrated remote-to-remote nonreplacement
+additions and general folder-plan directory creation; R2 has migrated CLI
+fresh-folder uploads, as recorded below.
 Local-destination replacement retains its existing behavior. Slice 3 as a whole
 is not complete. Slice 3D is accepted, physically qualified, committed and
 pushed at `8315985317086e52460c981a8135bffb359da958`.
@@ -375,5 +378,33 @@ stable, and active leases returned to zero. Reviewed cleanup removed exactly eac
 disposable acceptance tree and fresh-session listings independently verified
 absence.
 
-R2 is ready for final review and normal commit/push. No R2 commit or push has
-occurred yet; remaining-ownership checkpoints and R3 have not begun.
+R2 is complete, committed and pushed at
+`13bbc8a85d02cf75b1e58efde4e20b35d575e0df`. Pre-commit language in the R2
+append-only design/acceptance record describes historical stages, not its
+current status.
+
+The post-R2 ownership assessment found four live raw-FTP consumer groups:
+legacy CLI `ls`/`browse`/`get`, headless Test Lab `hardware.storage`, native Flash
+writes, and AI installation/upgrade. CLI `info` remains an unmanaged REST read,
+not a raw-FTP consumer. Their ownership is unchanged by R3.
+
+**R3 — Compatibility Retirement is implemented; final review pending.**
+See [R3-COMPATIBILITY-RETIREMENT.md](R3-COMPATIBILITY-RETIREMENT.md) for the
+approved contract, static audit and deterministic evidence. Removed
+`transfers.upload_new_folder`, `_upload_new_folder`, `ConnectionDialog.credential`,
+`file_copy.conflicts` and `CoreDeviceOperations.info`; renamed the Core resolver
+to private `_credential_for` with unchanged signature/body and exactly four
+internal callers. Only the explicitly commented saved-report diagnostic label
+retains the old fresh-folder name in application source.
+
+The four unreachable raw read fallbacks and folder-copy compatibility closure
+remain deferred. The four live raw consumer groups listed above remain unchanged.
+Physical qualification is not required because no live transfer workflow changed;
+no C64U was contacted. No next checkpoint, commit or publishing work occurred.
+
+R3 deterministic acceptance: **162 focused methods** (including all 66 R2),
+**257 FTP/USB regression methods**, and **17/17 offline checks** passed.
+Normal and optimized suites each ran **1032 methods: 996 passed, 36 existing
+opt-in display skips, zero failures/errors**. Three obsolete helper-only methods
+were removed and ten added; useful assertions were re-homed or strengthened.
+`git diff --check` passed. Changes remain uncommitted for final review.

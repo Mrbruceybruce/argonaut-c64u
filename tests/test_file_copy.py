@@ -1,9 +1,8 @@
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import Mock, patch
-from c64u_browser.file_copy import conflicts, copy_files, local_copy
+from unittest.mock import patch
+from c64u_browser.file_copy import copy_files, local_copy
 from c64u_browser.transfers import UploadFailure
 
 class CopyTests(unittest.TestCase):
@@ -27,12 +26,6 @@ class CopyTests(unittest.TestCase):
             self.assertEqual(target.read_bytes(), b'existing')
             self.assertEqual(len(list(root.iterdir())), 2)
 
-    def test_conflicts_include_directories_and_broken_links(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder); (root/'dir').mkdir(); (root/'broken').symlink_to(root/'missing')
-            self.assertEqual(conflicts(None, ['dir','broken','new'], True, root), ('dir','broken'))
-        client=Mock(); client.list_directory.return_value=('/USB2',[SimpleNamespace(name='FILE')])
-        self.assertEqual(conflicts(client, ['file','new'],False,'/USB2'), ('file',))
 
     @patch('c64u_browser.file_copy.upload')
     @patch('c64u_browser.file_copy.download')

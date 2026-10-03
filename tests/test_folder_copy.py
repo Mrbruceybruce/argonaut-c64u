@@ -97,3 +97,37 @@ class FolderTests(unittest.TestCase):
         report=execute_plan(None,plan,True,True)
         self.assertTrue(report.error)
         self.assertFalse(report.completed)
+
+    def test_file_destination_directory_and_broken_link_are_preserved(self):
+        for name in ('directory', 'broken'):
+            (self.src/name).write_bytes(b'new')
+        (self.dst/'directory').mkdir()
+        (self.dst/'directory'/'sentinel').write_bytes(b'keep')
+        (self.dst/'broken').symlink_to(self.dst/'missing')
+        plan = build_plan(None, True, self.src, ['directory', 'broken'], True, self.dst)
+        self.assertEqual(['directory', 'broken'], plan.conflicts)
+        self.assertFalse(plan.steps)
+        self.assertFalse(plan.replacements)
+        report = execute_plan(None, plan, True, True)
+        self.assertEqual(plan.conflicts, report.skipped)
+        self.assertFalse(report.completed)
+        self.assertFalse(report.error)
+        self.assertEqual(b'keep', (self.dst/'directory'/'sentinel').read_bytes())
+        self.assertTrue((self.dst/'broken').is_symlink())
+        self.assertFalse((self.dst/'missing').exists())
+
+    def test_case_insensitive_existing_remote_collision_skips_without_mutation(self):
+        (self.src/'file').write_bytes(b'new')
+        client = Mock()
+        client.list_directory.return_value = ('/USB2', [SimpleNamespace(name='FILE', kind='file')])
+        plan = build_plan(client, True, self.src, ['file'], False, '/USB2')
+        self.assertEqual(['file'], plan.conflicts)
+        self.assertFalse(plan.steps)
+        self.assertFalse(plan.replacements)
+        with patch('c64u_browser.folder_copy.copy_files', side_effect=AssertionError('mutation')), \
+             patch('c64u_browser.folder_copy.operate', side_effect=AssertionError('mutation')):
+            report = execute_plan(client, plan, True, False)
+        self.assertEqual(['file'], report.skipped)
+        self.assertFalse(report.completed)
+        self.assertFalse(report.error)
+        self.assertTrue(all(call[0] == 'list_directory' for call in client.mock_calls))

@@ -574,6 +574,20 @@ Lost replies, network interruption, active-transfer disconnect, cleanup failure
 and external-writer races were intentionally not induced physically; deterministic
 fixtures remain responsible for those cases. No R3 work was performed.
 
-R2 is physically qualified on both devices and is ready for final review and
-normal commit/push. No commit, push, merge, tag, package or release has yet been
-performed for R2.
+R2 is physically qualified on both devices and was subsequently committed and
+pushed at `13bbc8a85d02cf75b1e58efde4e20b35d575e0df`. The statements above about
+pending final review and publication record the state at the earlier acceptance
+checkpoint.
+
+## R3 current retirement status — 3 October 2026
+
+[R3 — Compatibility Retirement](R3-COMPATIBILITY-RETIREMENT.md) is implemented
+and awaiting final review. It removes the unused fresh-folder helper pair,
+`ConnectionDialog.credential`, `file_copy.conflicts` and `CoreDeviceOperations.info`,
+and makes Core credential resolution private as `_credential_for` without changing
+its behavior. Earlier compatibility-retention requirements and resolver spelling
+remain historical checkpoint evidence; R3 supersedes only those boundaries.
+The accepted managed contracts and physical evidence are unchanged. Live CLI
+reads, Test Lab storage, Flash and AI routes remain unchanged; deferred raw read
+fallbacks and folder-copy alternatives remain. No physical qualification is
+required or performed for R3, and no commit or publishing has occurred.

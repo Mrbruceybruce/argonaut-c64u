@@ -8,7 +8,6 @@ import ftplib
 import hashlib
 import os
 from pathlib import Path
-import posixpath
 import tempfile
 import uuid
 from dataclasses import dataclass, replace
@@ -134,50 +133,6 @@ def _managed_download(adapter, source, destination, progress, check, *, preserve
                     failure.local_cleanup = cleanup
                     failure.download_observation = observation
                     raise failure from None
-
-
-def upload_new_folder(client, source, parent='/USB2', progress=lambda n: None):
-    """Never upload into an existing folder; leave uncertain results for inspection."""
-    with operation_event('ftp', 'upload_new_folder', 'file'):
-        return _upload_new_folder(client, source, parent, progress)
-
-
-def _upload_new_folder(client, source, parent, progress):
-    remote_file(parent + '/placeholder')
-    source = Path(source)
-    safe_argument(source.name)
-    ftp = None
-    folder = None
-    try:
-        with source.open('rb') as input_file:
-            if not source.is_file() or os.fstat(input_file.fileno()).st_size == 0:
-                raise BrowserError('Choose a nonempty regular file; empty uploads are not yet supported.')
-            ftp = connect(client)
-            ftp.cwd(parent)
-            folder = posixpath.join(parent, 'c64u-transfer-' + uuid.uuid4().hex)
-            ftp.mkd(folder)  # A failed creation aborts: never reuse an existing destination.
-            ftp.cwd(folder)
-            destination = folder + '/' + source.name
-            digest = hashlib.sha256()
-            count = 0
-            def sent(block):
-                nonlocal count
-                digest.update(block)
-                count += len(block)
-                progress(count)
-            ftp.storbinary('STOR ' + source.name, input_file, callback=sent)
-            verified = hashlib.sha256()
-            ftp.retrbinary('RETR ' + source.name, verified.update)
-            if ftp.size(source.name) != count or digest.digest() != verified.digest():
-                raise BrowserError('Upload verification failed.')
-            return {'path': destination, 'bytes': count, 'sha256': digest.hexdigest(), 'verified': True}
-    except (OSError, EOFError, ftplib.Error, ValueError, BrowserError) as exc:
-        if getattr(exc,'cancelled',False):raise
-        suffix = f' Inspect {folder!r}; partial files may remain. No automatic retry or deletion.' if folder else ''
-        raise BrowserError(f'Upload failed: {exc}.{suffix}') from exc
-    finally:
-        if ftp is not None:
-            ftp.close()
 
 
 def upload(client, source, parent='/USB2', progress=lambda n: None):

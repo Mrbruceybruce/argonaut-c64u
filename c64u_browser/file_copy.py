@@ -11,14 +11,6 @@ from .files import child
 from .transfers import download, upload, UploadFailure
 
 
-def conflicts(client, names, local, destination):
-    if local:
-        return tuple(name for name in names if os.path.lexists(Path(destination) / name))
-    _, entries = client.list_directory(destination)
-    existing = {entry.name.casefold() for entry in entries}
-    return tuple(name for name in names if name.casefold() in existing)
-
-
 def local_copy(source, destination, progress):
     source, destination = Path(source), Path(destination)
     if not source.is_file():

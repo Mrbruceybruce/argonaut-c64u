@@ -321,7 +321,14 @@ class FreshFolderTests(unittest.TestCase):
                 r = self.execute(core, ftp, preview)
                 self.assertEqual('failed', r.state); self.assertEqual('staging-candidate', r.result.upload_state)
                 self.assertEqual('failed', r.result.upload.readback if mode == 'hash' else r.result.upload.size)
-                self.assertNotIn(b'RNTO', ftp.verbs)
+                self.assertFalse(set(ftp.verbs) & {b'RNFR', b'RNTO', b'DELE', b'RMD'})
+                for verb in (b'MKD', b'STOR', b'RETR'):
+                    self.assertEqual(1, ftp.verbs.count(verb))
+                self.assertIsNone(r.result.upload.publication)
+                self.assertNotIn(preview.path.encode(), ftp.files)
+                self.assertIn(r.result.upload.staging.encode(), ftp.files)
+                self.assertEqual('created', r.result.directory_disposition)
+                self.assertFalse(r.error.retryable)
 
     def test_destination_race(self):
         with server() as ftp:

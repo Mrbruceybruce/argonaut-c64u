@@ -23,6 +23,25 @@ class AnalysisBoundaryTests(unittest.TestCase):
         self.assertNotIn('private', json.dumps(evidence))
         self.assertNotIn('secret', json.dumps(evidence))
 
+    def test_saved_retired_upload_label_remains_sanitized(self):
+        report = {'schema': 1, 'status': 'fail', 'checks': [
+            {'id': 'historical', 'status': 'fail', 'error_kind': 'UploadFailure',
+             'operations': [
+                 {'transport': 'ftp', 'operation': 'upload_new_folder',
+                  'target': 'file', 'outcome': 'error', 'error_kind': 'UploadFailure',
+                  'password': 'private', 'path': '/USB2/private', '_credential': 'private'},
+                 {'transport': 'ftp', 'operation': 'private_unknown',
+                  'target': '/USB2/private', 'outcome': 'error'}]}]}
+        evidence = failure_evidence(json.loads(json.dumps(report)))
+        operations = evidence['failures'][0]['operations']
+        self.assertEqual({'transport': 'ftp', 'operation': 'upload_new_folder',
+                          'target': 'file', 'outcome': 'error',
+                          'error_kind': 'UploadFailure'}, operations[0])
+        self.assertEqual(('other', 'other'), (operations[1]['operation'], operations[1]['target']))
+        self.assertNotIn('private', json.dumps(evidence))
+        self.assertNotIn('credential', json.dumps(evidence))
+        self.assertNotIn('password', json.dumps(evidence))
+
     def test_adapter_diagnosis_is_separate_from_verdict(self):
         report = {'schema': 1, 'status': 'fail', 'checks': [
             {'id': 'bad', 'title': 'Bad', 'status': 'fail',

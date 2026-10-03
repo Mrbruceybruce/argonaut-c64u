@@ -1320,3 +1320,16 @@ listings independently verified absence.
 
 Legacy read CLI, compatibility upload_new_folder, Flash and AI remain unchanged;
 general raw-FTP retirement remains deferred. No R3 work has begun.
+
+## R3 current retirement status — 3 October 2026
+
+[R3 — Compatibility Retirement](R3-COMPATIBILITY-RETIREMENT.md) is implemented
+and awaiting final review. It removes the unused fresh-folder helper pair,
+`ConnectionDialog.credential`, `file_copy.conflicts` and `CoreDeviceOperations.info`,
+and makes Core credential resolution private as `_credential_for` without changing
+its behavior. Earlier compatibility-retention requirements and resolver spelling
+remain historical checkpoint evidence; R3 supersedes only those boundaries.
+The accepted managed contracts and physical evidence are unchanged. Live CLI
+reads, Test Lab storage, Flash and AI routes remain unchanged; deferred raw read
+fallbacks and folder-copy alternatives remain. No physical qualification is
+required or performed for R3, and no commit or publishing has occurred.

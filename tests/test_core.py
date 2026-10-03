@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Headless contract tests for the initial Argonaut Core boundary."""
 import os
+from dataclasses import replace
+from unittest.mock import Mock
 from pathlib import Path
 import subprocess
 import sys
@@ -35,6 +37,9 @@ class FakeClient:
         self.timeout, self.encoding, self.storage_roots = 10, 'utf-8', []
         self._info = info or INFO
 
+    def read_configuration(self, category):
+        return {category: {'C64U Model': {'current': 'Synthetic model'}}}
+
     def test_connection(self): return self._info
     def list_directory(self, path='/'):
         if path == '/': return '/', [Entry('USB2', 'dir', None)]
@@ -57,7 +62,62 @@ class CoreTests(unittest.TestCase):
         self.profile = Profile.new('Living room', '192.0.2.20',
                                    device_id='ABC123')
 
-    def tearDown(self): self.temp.cleanup()
+    def tearDown(self):
+        self.core.close()
+        self.temp.cleanup()
+
+    def credential_matrix(self, operation):
+        # Each row runs through the real operation and observes only its fake client.
+        cases = [
+            ('entered', {}, True, 'session', 'remembered', 'entered', 'entered', 0),
+            ('entered-missing', {}, False, 'session', 'remembered', 'entered', 'entered', 0),
+            ('entered-changed', {'host': '192.0.2.21'}, True, 'session', 'remembered', 'entered', 'entered', 0),
+            ('session', {}, True, 'session', 'remembered', '', 'session', 0),
+            ('remembered', {}, True, None, 'remembered', '', 'remembered', 1),
+            ('empty-session', {}, True, '', 'remembered', '', 'remembered', 1),
+            ('empty-backend', {}, True, '', '', '', '', 1),
+            ('none-backend', {}, True, None, None, '', '', 1),
+            ('missing', {}, False, 'session', 'remembered', '', '', 0),
+            ('host', {'host': '192.0.2.21'}, True, 'session', 'remembered', '', '', 0),
+            ('http', {'http_port': 8080}, True, 'session', 'remembered', '', '', 0),
+            ('ftp', {'ftp_port': 2121}, True, 'session', 'remembered', '', '', 0),
+        ]
+        for label, changes, saved, session, backend, entered, expected, lookups in cases:
+            if operation == 'reconnect' and entered:
+                continue  # Reconnect has no entered-password argument.
+            with self.subTest(operation=operation, case=label):
+                profile = replace(self.profile, **changes)
+                if operation == 'reconnect':
+                    self.core.connect(profile, entered_password='bootstrap')
+                    self.core.mark_connection_lost()
+                self.prefs.profiles = [self.profile] if saved else []
+                self.core._session_passwords.clear()
+                if session is not None:self.core._session_passwords[profile.id] = session
+                self.credentials.values = {profile.id: backend}
+                self.credentials.get = Mock(return_value=backend)
+                if not lookups:
+                    self.credentials.get.side_effect = AssertionError('Unexpected stored-secret lookup')
+                result = (self.core.reconnect() if operation == 'reconnect' else
+                          getattr(self.core, operation)(profile, entered_password=entered))
+                self.assertTrue(self.created[-1].password == expected, 'Wrong credential resolution')
+                self.assertEqual(lookups, self.credentials.get.call_count)
+                self.assertEqual({profile.id: backend}, self.credentials.values)
+                if operation == 'read_model':self.assertEqual('Synthetic model', result)
+                else:
+                    for secret in ('session', 'remembered', 'entered', 'bootstrap'):
+                        self.assertNotIn(secret, repr(result))
+
+    def test_test_profile_credential_resolution_matrix(self):
+        self.credential_matrix('test_profile')
+
+    def test_read_model_credential_resolution_matrix(self):
+        self.credential_matrix('read_model')
+
+    def test_connect_credential_resolution_matrix(self):
+        self.credential_matrix('connect')
+
+    def test_reconnect_credential_resolution_matrix(self):
+        self.credential_matrix('reconnect')
 
     def test_profile_credentials_and_selected_state_are_owned_by_core(self):
         saved = self.core.save_profile(self.profile, 'secret', remember=True)

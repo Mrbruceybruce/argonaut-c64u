@@ -137,7 +137,6 @@ class CoreDeviceOperations:
     def play_sid(self, *args, **kwargs): return self._client().play_sid(*args, **kwargs)
     def start_stream(self, *args, **kwargs): return self._client().start_stream(*args, **kwargs)
     def stop_stream(self, *args, **kwargs): return self._client().stop_stream(*args, **kwargs)
-    def info(self, *args, **kwargs): return self._client().info(*args, **kwargs)
     def test_connection(self, *args, **kwargs): return self._client().test_connection(*args, **kwargs)
 
     def open_ftp(self):
@@ -408,7 +407,7 @@ class ArgonautCore:
         except Exception as exc:
             raise CoreError('client', 'Could not prepare the C64U connection.') from exc
 
-    def credential_for(self, profile, entered=''):
+    def _credential_for(self, profile, entered=''):
         if entered: return entered
         old = next((p for p in self.preferences.profiles if p.id == profile.id), None)
         if old and (old.host, old.http_port, old.ftp_port) == (
@@ -473,7 +472,7 @@ class ArgonautCore:
     def test_profile(self, profile, entered_password=''):
         try:
             client = self._new_client(profile,
-                                      self.credential_for(profile, entered_password))
+                                      self._credential_for(profile, entered_password))
             info = client.test_connection()
             reported = profile.verify_identity(info)
             return ConnectionTestResult(profile, _public_info(info), reported)
@@ -482,7 +481,7 @@ class ArgonautCore:
 
     def read_model(self, profile, entered_password=''):
         client = self._new_client(profile,
-                                  self.credential_for(profile, entered_password))
+                                  self._credential_for(profile, entered_password))
         try:
             info = client.test_connection()
             profile.verify_identity(info)
@@ -497,7 +496,7 @@ class ArgonautCore:
                 require_bound=False, bind_identity=False, persist=False,
                 remote_folder=None):
         try:
-            password = self.credential_for(profile, entered_password)
+            password = self._credential_for(profile, entered_password)
             client = self._new_client(profile, password)
             info = client.test_connection()
             reported = profile.verify_identity(info, require_bound=require_bound)
@@ -564,7 +563,7 @@ class ArgonautCore:
             raise CoreError('session', 'No C64U session is available to reconnect.')
         profile = self._active_profile
         old_info = self._device_info or {}
-        password = self.credential_for(profile)
+        password = self._credential_for(profile)
         client = self._new_client(profile, password)
         try:
             info = client.test_connection()

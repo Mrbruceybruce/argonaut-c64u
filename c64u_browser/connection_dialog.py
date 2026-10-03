@@ -148,8 +148,6 @@ class ConnectionDialog:
             except Exception as exc: return exc
         self.app.run(caught,finish)
 
-    def credential(self, profile, entered):
-        return self.app.core.credential_for(profile,entered)
 
     def test(self):
         try: p = self.profile()
