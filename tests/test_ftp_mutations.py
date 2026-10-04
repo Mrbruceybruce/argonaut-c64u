@@ -638,9 +638,23 @@ class MutationRoutingTests(unittest.TestCase):
             tree=ast.parse(Path('c64u_browser/'+name+'.py').read_text())
             self.assertTrue(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
                                 and n.func.id=='operate' for n in ast.walk(tree)))
-        for name in ('transfers','replacement','native_files'):
+        for name in ('transfers','replacement'):
             source=Path('c64u_browser/'+name+'.py').read_text()
             self.assertIn('ftp.rename(',source)
+        native=ast.parse(Path('c64u_browser/native_files.py').read_text())
+        publisher=next(n for n in native.body if isinstance(n,ast.FunctionDef) and n.name=='_upload_flash')
+        calls=[n.func for n in ast.walk(publisher) if isinstance(n,ast.Call)]
+        self.assertFalse(any(isinstance(n,ast.Name) and n.id=='connect' for n in calls))
+        self.assertFalse(any(isinstance(n,ast.Attribute) and n.attr in
+                             ('rename','storbinary','open_ftp') for n in calls))
+        self.assertTrue(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)
+                            and n.func.attr=='mutate' and n.args
+                            and isinstance(n.args[0],ast.Constant) and n.args[0].value=='rename'
+                            for n in ast.walk(publisher)))
+        # The separate native read compatibility route is still deferred.
+        reader=next(n for n in native.body if isinstance(n,ast.FunctionDef) and n.name=='_read_remote')
+        self.assertTrue(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
+                            and n.func.id=='connect' for n in ast.walk(reader)))
         self.assertIn('def open_ftp(',Path('c64u_browser/core.py').read_text())
 
 

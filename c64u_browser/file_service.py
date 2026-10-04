@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Headless Core file operations built on Argonaut's validated file modules."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import copy
+import hashlib
 import os
 import posixpath
 import tempfile
@@ -14,11 +15,11 @@ from threading import Lock
 from .api import BrowserError
 from .deletion import prepare as prepare_deletion, delete_reviewed
 from .files import child, operate_managed
-from .ftp_reads import read_operation
+from .ftp_reads import read_operation, adapter_for
 from .folder_copy import build_plan, execute_plan
 from .jobs import CoreJob, JobCancelled
 from .scheduler import CoreScheduler, DeviceSession, JobBinding
-from .native_files import read_local, read_remote, upload_flash, validate_upload
+from .native_files import read_local, read_remote, upload_flash, validate_upload, FlashEvidence
 
 
 CORE_HOST = 'core-host'
@@ -147,6 +148,11 @@ class NativeUploadPreview:
 class NativeUploadResult:
     destination: FileLocation
     size: int
+    flash: FlashEvidence | None = None
+
+    @property
+    def message(self):
+        return self.flash.message() if self.flash else "Flash upload did not start."
 
 
 @dataclass
@@ -170,7 +176,7 @@ class _DeletePlan:
 class _NativePlan:
     source: FileLocation
     destination: FileLocation
-    data: bytes
+    data: bytes = field(repr=False)
     session: DeviceSession
     created_at: float
 
@@ -192,6 +198,7 @@ class FileService:
         self.plan_ttl=max(0,float(plan_ttl));self.plan_limit=max(0,int(plan_limit))
         self._scheduler=scheduler or CoreScheduler(self._device_session,clock=clock)
         self._copy_plans={};self._delete_plans={};self._native_plans={};self._fresh_plans={}
+        self._flash_cleanup_plans={}
         self._lock=Lock()
 
     def job(self, job_id):
@@ -210,15 +217,15 @@ class FileService:
         # Compatibility for direct service users while Core adopts explicit IDs.
         return DeviceSession('test-device',str(value))
 
-    def _job(self, operation, task, *, session=None):
-        job=CoreJob(operation,task)
+    def _job(self, operation, task, *, session=None, failure_result=None):
+        job=CoreJob(operation,task,failure_result=failure_result)
         binding=(JobBinding.device(session) if session is not None
                  else JobBinding.core_host())
         return self._scheduler.submit(job,binding)
 
     def _cleanup_plans_locked(self):
         now=self._clock();registries=(self._copy_plans,self._delete_plans,
-                                      self._native_plans,self._fresh_plans)
+                                      self._native_plans,self._fresh_plans,self._flash_cleanup_plans)
         for registry in registries:
             for plan_id,plan in tuple(registry.items()):
                 if now-plan.created_at>self.plan_ttl:registry.pop(plan_id,None)
@@ -284,7 +291,8 @@ class FileService:
             return bool(self._copy_plans.pop(plan_id,None) or
                         self._delete_plans.pop(plan_id,None) or
                         self._native_plans.pop(plan_id,None) or
-                        self._fresh_plans.pop(plan_id,None))
+                        self._fresh_plans.pop(plan_id,None) or
+                        self._flash_cleanup_plans.pop(plan_id,None))
 
     def execute_copy(self, plan_id, decision='skip'):
         if decision not in ('skip','replace'):
@@ -405,10 +413,25 @@ class FileService:
         destination=FileLocation.c64u(posixpath.join(destination_folder,name))
         session=self._session((source,destination))
         def task(job):
-            client=self._client((source,),session) if source.scope==C64U else None
-            job.check_cancel()
-            data=read_local(source.path) if source.scope==CORE_HOST else read_remote(client,source.path)
-            validate_upload(destination_folder,name,data);job.check_cancel()
+            def check():
+                self._check_session(session);job.check_cancel()
+            try:
+                check()
+                if source.scope==CORE_HOST:
+                    data=read_local(source.path)
+                else:
+                    client=self._client((source,),session)
+                    adapter=adapter_for(client)
+                    if adapter is None:raise BrowserError('Managed source adapter required.')
+                    with adapter.operation(check):data=read_remote(client,source.path)
+                validate_upload(destination_folder,name,data);check()
+            except Exception as exc:
+                evidence=FlashEvidence(phase='source',validation='refused',
+                    error_category='cancelled' if getattr(exc,'cancelled',False) else 'source',
+                    cancellation_requested=bool(getattr(exc,'cancelled',False)))
+                result=NativeUploadResult(FileLocation.c64u(''),0,evidence)
+                if getattr(exc,'cancelled',False):raise JobCancelled(result.message,result) from None
+                raise FileJobFailure('flash-source',result.message,result) from None
             plan_id=uuid.uuid4().hex
             with self._lock:
                 self._cleanup_plans_locked()
@@ -416,17 +439,54 @@ class FileService:
                     source,destination,data,session,self._clock())
                 self._cleanup_plans_locked()
             return NativeUploadPreview(plan_id,source,destination,len(data),time.time())
-        return self._job('file.native-upload.prepare',task,session=session)
+        return self._job('file.native-upload.prepare',task,session=session,
+                         failure_result=self._native_unstarted_result)
+
+    @staticmethod
+    def _native_unstarted_result(exc):
+        result=getattr(exc,'result',None)
+        if isinstance(result,NativeUploadResult):return result
+        cancelled=bool(getattr(exc,'cancelled',False))
+        evidence=FlashEvidence(phase='queued',error_category='cancelled' if cancelled else 'session',
+            cancellation_phase='queued' if cancelled else None,cancellation_requested=cancelled)
+        return NativeUploadResult(FileLocation.c64u(''),0,evidence)
 
     def execute_native_upload(self, plan_id):
         stored=self._take_plan(self._native_plans,plan_id,'Upload plan')
         def task(job):
-            job.check_cancel();self._check_session(stored.session)
-            folder,name=posixpath.split(stored.destination.path)
-            result=upload_flash(self._client((stored.destination,),stored.session),
-                                folder,name,stored.data)
-            return NativeUploadResult(FileLocation.c64u(result),len(stored.data))
-        return self._job('file.native-upload.execute',task,session=stored.session)
+            def check():
+                self._check_session(stored.session);job.check_cancel()
+            try:
+                check()
+                folder,name=posixpath.split(stored.destination.path)
+                observation=dict(kind='local-capture' if stored.source.scope==CORE_HOST else 'managed-size-retr-size',
+                                 bytes=len(stored.data),sha256=hashlib.sha256(stored.data).hexdigest())
+                evidence=upload_flash(self._client((stored.destination,),stored.session),
+                    folder,name,stored.data,check=check,source_observation=observation,
+                    cancellation_requested=lambda:job.snapshot().state=='cancel-requested')
+                return NativeUploadResult(stored.destination,len(stored.data),evidence)
+            except Exception as exc:
+                evidence=getattr(exc,'flash_evidence',FlashEvidence(
+                    phase='session',error_category='session',
+                    cancellation_requested=bool(getattr(exc,'cancelled',False))))
+                result=NativeUploadResult(stored.destination,len(stored.data),evidence)
+                if getattr(exc,'cancelled',False):raise JobCancelled(result.message,result) from None
+                raise FileJobFailure('flash-upload',result.message,result) from None
+            finally:
+                # CoreJob retains its task closure; release consumed payload there too.
+                stored.data=b''
+        def failure_result(exc):
+            # CoreJob can refuse before task/finally (queued cancellation or a
+            # stale binding). Preserve task evidence and release bytes either way.
+            stored.data=b''
+            return self._native_unstarted_result(exc)
+        try:
+            return self._job('file.native-upload.execute',task,session=stored.session,
+                             failure_result=failure_result)
+        except Exception:
+            stored.data=b''
+            raise
+
 
     def save_native_copy(self, source, destination):
         if source.scope!=C64U or destination.scope!=CORE_HOST:
@@ -451,4 +511,13 @@ class FileService:
 
     def execute_fresh_folder_upload(self, plan_id):
         from .fresh_folder import execute
+        return execute(self, plan_id)
+
+    def prepare_flash_cleanup(self, path, expected_size, expected_sha256):
+        """Internal qualification support; never a general Flash delete UI."""
+        from .flash_cleanup import prepare
+        return prepare(self, path, expected_size, expected_sha256)
+
+    def execute_flash_cleanup(self, plan_id):
+        from .flash_cleanup import execute
         return execute(self, plan_id)

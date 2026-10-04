@@ -39,25 +39,11 @@ class NativeTests(unittest.TestCase):
   validate_upload('/Flash/roms','a.bin',b'1234')
   validate_upload('/Flash/configs','a.cfg',b'[A]\nX=1\n')
  def test_verified_upload_no_overwrite_and_corruption(self):
-  for corrupt in (False,True):
-   files={};folders={'roms'}
-   class FTP:
-    def storbinary(self,cmd,stream):files[cmd[5:]]=stream.read()
-    def retrbinary(self,cmd,callback):callback(b'wrong' if corrupt else files[cmd[5:]])
-    def size(self,path):return len(files[path])
-    def rename(self,src,dst):files[dst]=files.pop(src)
-    def close(self):pass
-    def mkd(self,path):folders.add(path.rsplit('/',1)[-1])
-   client=Mock()
-   client.list_directory.side_effect=lambda path:(path,[Entry(n,'dir',None) for n in folders] if path=='/Flash' else [Entry(p.rsplit('/',1)[-1],'file',len(v)) for p,v in files.items()])
-   with patch('c64u_browser.native_files.connect',return_value=FTP()):
-    if corrupt:
-     with self.assertRaisesRegex(BrowserError,'verification'):upload_flash(client,'/Flash/roms','a.bin',b'new')
-     self.assertNotIn('/Flash/roms/a.bin',files)
-    else:
-     self.assertEqual(upload_flash(client,'/Flash/roms','a.bin',b'new'),'/Flash/roms/a.bin')
-     with self.assertRaisesRegex(BrowserError,'already exists'):upload_flash(client,'/Flash/roms','a.bin',b'other')
-     self.assertEqual(files,{'/Flash/roms/a.bin':b'new'})
+  # R6 wire verification lives in test_r6_flash; raw clients must now refuse.
+  with patch('c64u_browser.native_files.connect',side_effect=AssertionError('raw factory')):
+   with self.assertRaises(BrowserError) as caught:
+    upload_flash(Mock(),'/Flash/roms','a.bin',b'new')
+  self.assertEqual('not-started',caught.exception.flash_evidence.upload.disposition)
  def test_rollback_scoped_to_profile_and_changed_fields(self):
   with TemporaryDirectory() as d:
    prefs=Preferences(Path(d)/'prefs.json');p=Profile.new('one','host');q=Profile.new('two','host')

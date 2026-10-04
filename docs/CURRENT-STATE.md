@@ -12,13 +12,13 @@ current state recorded here.
 - Stable 1.9 is released as `v1.9`. Its release artifacts are immutable.
 - `main` and `v1.9` are not the 1.10 development workspace. Current 1.10 work
   belongs on `development`.
-- Verified post-R4 development authority:
-  `8ac1b24cb70f996b877b3eef81fd1c5817748bff`
-  (`Implement R4 managed C64 AI installation`), parent
-  `a081b01c4a62198b35b88199c4c8e48f9c535f90`. R4 is accepted, committed and pushed.
+- Verified post-R5 development authority:
+  `dab627979b9d3bb085c955c6e3bea8cdaff8b338`
+  (`Implement R5 Core-owned headless reads`), parent
+  `8ac1b24cb70f996b877b3eef81fd1c5817748bff`. R5 is accepted, committed and pushed.
   On 4 October 2026, HEAD and local `origin/development` matched with divergence
-  `0 0` and a clean worktree before the R5 documentation-only design pass.
-  R2–R4 physical acceptance evidence remains recorded below and in their docs.
+  `0 0` and a clean worktree before the R6 documentation-only design pass.
+  R2–R5 physical acceptance evidence remains recorded below and in their docs.
 - Argonaut 1.10 direction: **C64U Network Foundation**.
 
 ## Completed FTP work
@@ -460,7 +460,7 @@ client, production bridge configuration, pairing/services/health and launch
 were untouched. No commit, push, branch/worktree, package or release was performed.
 The final review and subsequent R4 commit/push are complete (authority above).
 
-## R5 — Core-owned headless reads: physically qualified; final review pending
+## R5 — Core-owned headless reads: accepted, committed and pushed
 
 [R5 implementation record](R5-CORE-OWNED-HEADLESS-READS.md) records the approved
 saved-bound-profile CLI ls/get migration, retirement of browse, REST-only info,
@@ -476,12 +476,58 @@ R5 adds 30 methods to the R4 baseline, with no new skips. See the R5 record for
 commands, corrected iterations, ownership proof and complete changed-file inventory.
 
 **Read-only physically qualified on Beige and Founder on 4 October 2026;
-not committed/pushed. Stop for final R5 review.** Actual bound-profile CLI ls/get
+subsequently accepted, committed and pushed at the authority above.** Actual bound-profile CLI ls/get
 and all four headless hardware checks passed on both devices. Separate local
 readbacks matched historical sizes/hashes (8,952 and 4 bytes), followed by local
 cleanup. No initial FTP browse, stable per-run sessions, zero terminal leases
 and successful shutdown were observed. No remote writes occurred; evidence is
 send-boundary diagnostics, not packet capture. See the R5 physical record for
-exact profiles, paths, hashes and observer limitations. R4 remains accepted,
-committed and pushed at the authority above. Flash and Network Foundation remain
+exact profiles, paths, hashes and observer limitations. The R5 document's older
+final-review/unpublished wording records the pre-publication checkpoint; the
+verified R5 authority above supersedes it. Flash and Network Foundation remain
 incomplete.
+
+## R6 — Managed Flash publication: physically qualified; final review pending
+
+[R6 design, historical stop and resumed evidence](R6-MANAGED-FLASH-PUBLICATION.md)
+records the original approved design, the stopped partial implementation and the
+explicitly authorized resumption at user-supplied RU baseline 41% remaining.
+The original stop history is preserved: a 16-byte CRT slice was compared against
+a 17-byte literal, rejecting every CRT. Review authorized only correction to the
+exact 16-byte space-padded signature. All other Flash validation rules remain.
+The independent directory-race fixture now models CWD plus argument-free MLSD.
+
+Both source workflows now use private bounded immutable snapshots and one managed
+Flash publisher, including optional known-directory MKD, exact-length STOR,
+independent readback/hash/SIZE and destination recheck before managed rename.
+Structured consequences survive job cancellation/failure and GUI rendering;
+queued refusal releases consumed snapshot bytes. The raw Flash publisher is
+retired. Shared/deferred compatibility and generic 3C behavior remain unchanged.
+
+Deterministic verification passed: 56 focused methods; 274 affected regressions;
+normal and optimized suites each 1,153 methods / 1,117 passed +36 existing skips;
+Offline Test Lab 17 checks. Thirty added methods, none removed/renamed, no new
+skips. R6 records the sandbox socket failures, original stopped iteration and
+later obsolete raw-Flash ownership assertion correction, with passing reruns.
+Ownership/policy, bounded privacy and tracked/untracked whitespace checks passed.
+
+R5 remains HEAD/local `origin/development` at the authority above, divergence
+`0 0`, with an empty index. R6 is **physically qualified on Beige and Founder,
+uncommitted/unpushed; final review pending**. The reviewed exact-path cleanup
+prerequisite passed 293/293 focused/affected deterministic tests.
+
+Controlled physical qualification passed on 4 October 2026, Beige fully finished
+before Founder. Saved bound Development profiles reported Beige `25EA78` at
+`192.168.68.70` / firmware `1.1.0s2`, and Founder `25BE71` at `192.168.68.69` /
+firmware `1.1.0`, both API `0.1`. Each used existing `/Flash/roms` and one unique
+one-byte disposable `.bin`: actual FileService R6 publication, independent full
+readback/hash, staging inspection, reviewed exact-path cleanup with one acknowledged
+DELE, cleanup absence and fresh final absence all passed. Stable separate Core
+sessions and zero terminal leases were verified. No fixture or staging remained.
+Missing-directory MKD stayed deterministic-only; Founder's absent configs was not
+created. No activation/application/reset/reboot/settings mutation occurred.
+
+The R6 physical record contains exact paths, hashes, identities, sessions, managed
+send/reply evidence and limitations (not packet capture; external-writer races
+remain). Implementation/tests were preserved. Final compatibility closure and
+Network Foundation completion remain deferred. **Stop for final R6 review.**

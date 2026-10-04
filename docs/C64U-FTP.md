@@ -1378,3 +1378,31 @@ deferred compatibility routes. `CoreDeviceOperations.open_ftp` is retained:
 automatic approval review rejected its removal because `transfers.connect`
 retains a production dynamic `client.open_ftp()` call. No broader retirement was
 attempted. See R4's implementation record for this remaining review item.
+
+
+## R6 current Flash ownership and physical qualification — 4 October 2026
+
+The historical Flash ownership entries above are superseded for supported
+Core-bound publication by [R6](R6-MANAGED-FLASH-PUBLICATION.md). Both FileService
+native source preparations converge on the private immutable snapshot and managed
+Flash publisher: exact directory policy, exact-length STOR, independent staged
+readback/hash/SIZE, destination recheck and acknowledged managed RNFR/RNTO.
+The raw Flash publisher is retired. The narrow internal exact-path cleanup
+capability independently verifies the approved disposable file before one managed
+DELE and retains acknowledged/unknown evidence plus independent absence status.
+Ordinary USB/SD deletion policy is unchanged; this is not general Flash deletion.
+
+R6 physical qualification passed on Beige, then Founder, each in existing
+`/Flash/roms`, with one harmless one-byte disposable fixture, independent final
+readback, no staging residue, exact verified deletion and fresh final absence.
+Core sessions stayed stable and terminal leases were zero. No physical MKD/RMD,
+activation/application/reset/reboot/settings mutation occurred. Missing-directory
+MKD remains deterministic-only. Evidence is managed send/reply boundaries, not
+packet capture; no atomic external-writer exclusion is claimed. See the R6 record
+for exact paths, hashes, profile/session identities and limitations.
+
+Shared `transfers.connect`, deferred native-read/disk/USB/upload/replacement
+compatibility and `CoreDeviceOperations.open_ftp` remain for separately reviewed
+closure. R5's completed headless-read migration remains authoritative. This pass
+does not perform final compatibility work. R6 is uncommitted/unpushed and stopped
+for final review; committed HEAD remains R5.

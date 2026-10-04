@@ -62,7 +62,9 @@ class FlashFiles:
   def finish(snapshot):
    self.controls.set_sensitive(True)
    if self.tab.client is not self.client:
-    self.status.set_text('Connection changed. Close and reopen Flash files.');return
+    evidence=getattr(snapshot.result,'flash',None)
+    summary=evidence.message()+' ' if evidence is not None else ''
+    self.status.set_text(summary+'Connection changed. Close and reopen Flash files.');return
    done(snapshot)
   self.app.run_file_job(job,finish)
  def refresh(self,after=None):
@@ -115,11 +117,11 @@ class FlashFiles:
      self.app.core.files.discard_plan(preview.plan_id);return
     def uploaded(destination):
      self.refresh(after=lambda:self.tab.reload() if not self.tab.pending and not self.tab.drafts else None)
-     self.app.status.set_text('Saved and verified: '+destination.destination.path)
+     self.app.status.set_text(destination.message)
     upload=self.app.core.files.execute_native_upload(preview.plan_id)
     def finished(result):
      if result.state=='succeeded':uploaded(result.result)
-     else:self.status.set_text(result.error.message)
+     else:self.status.set_text(result.result.message if result.result else result.error.message)
     self.run_core_job(upload,finished)
    dialog.connect('response',response);dialog.present()
   self.run_core_job(job,done)

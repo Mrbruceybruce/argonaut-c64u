@@ -116,7 +116,9 @@ class FileServiceTests(unittest.TestCase):
                    return_value='/Flash/roms/kernal.bin') as upload:
             result=self.service.execute_native_upload(preview.plan_id).wait(5)
         self.assertEqual('succeeded',result.state)
-        upload.assert_called_once_with(fake,'/Flash/roms','kernal.bin',b'rom-data')
+        self.assertEqual((fake,'/Flash/roms','kernal.bin',b'rom-data'),upload.call_args.args)
+        self.assertTrue(callable(upload.call_args.kwargs['check']))
+        self.assertEqual('local-capture',upload.call_args.kwargs['source_observation']['kind'])
 
     def test_unused_plan_expires_and_consumed_plan_cannot_be_reused(self):
         now=[100.0]

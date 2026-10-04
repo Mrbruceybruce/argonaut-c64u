@@ -2,12 +2,13 @@
 # Copyright (C) 2026 Bruce Marcus
 """Scoped Flash storage and native CFG conversion; never executes file contents."""
 from pathlib import Path
+from dataclasses import dataclass, replace
 import io
 import hashlib
 import posixpath
 import uuid
 from .api import BrowserError,safe_argument
-from .transfers import connect
+from .transfers import connect, UploadEvidence
 from .ftp_reads import adapter_for
 from .backups import allowed
 from .storage import storage_root
@@ -115,43 +116,177 @@ def validate_upload(folder,name,data):
   parse_cfg(data)
   if not data.endswith(b'\n'):raise BrowserError('Native configuration uploads must end with a newline.')
  elif folder.endswith('/carts'):
-  if extension!='.crt' or len(data)<64 or data[:16]!=b'C64 CARTRIDGE   \x00':raise BrowserError('Choose a C64 .crt cartridge image.')
+  if extension!='.crt' or len(data)<64 or data[:16]!=b'C64 CARTRIDGE   ':raise BrowserError('Choose a C64 .crt cartridge image.')
  else:
   if extension not in ('.bin','.rom','.64c'):raise BrowserError('Choose a .bin, .rom or .64c ROM file.')
  if not folder.endswith('/configs') and len(name.encode('utf-8'))>30:raise BrowserError('Use a ROM or cartridge filename of at most 30 bytes.')
 
-def upload_flash(client,folder,name,data):
- with operation_event('ftp','upload_flash','file'):
-  return _upload_flash(client,folder,name,data)
+@dataclass(frozen=True)
+class FlashEvidence:
+    """Safe Flash consequences; never contains the private source bytes."""
+    phase: str = 'validation'
+    directory: str = ''
+    directory_state: str = 'unobserved'
+    mkdir: dict | None = None
+    upload: UploadEvidence | None = None
+    validation: str = 'pending'
+    expected_sha256: str = ''
+    source_observation: dict | None = None
+    acknowledged: tuple[str, ...] = ()
+    error_category: str | None = None
+    cancellation_phase: str | None = None
+    cancellation_requested: bool = False
+    local_cleanup: tuple = ()
 
-def _upload_flash(client,folder,name,data):
- validate_upload(folder,name,data)
- destination=flash_path(folder,name)
- temporary=flash_path(folder,'argonaut-part-'+uuid.uuid4().hex)
- ftp=connect(client);started=False
- try:
-  # Create only the selected, known folder if it is absent from Flash's root.
-  _,root=client.list_directory('/Flash')
-  item=next((e for e in root if e.name.casefold()==posixpath.basename(folder).casefold()),None)
-  if item is None:ftp.mkd(folder)
-  elif item.kind!='dir' or item.name!=posixpath.basename(folder):raise BrowserError('Flash folder is unavailable or ambiguous.')
-  def exists(path):
-   return any(e.name.casefold()==posixpath.basename(path).casefold() for e in client.list_directory(folder)[1])
-  if exists(destination):raise BrowserError('That filename already exists in Flash. Choose a different filename; nothing was overwritten.')
-  if exists(temporary):raise BrowserError('Temporary filename already exists.')
-  started=True
-  ftp.storbinary('STOR '+temporary,io.BytesIO(data))
-  digest=hashlib.sha256();count=0
-  def verify(block):
-   nonlocal count
-   count+=len(block)
-   if count>len(data):raise BrowserError('Upload verification failed.')
-   digest.update(block)
-  ftp.retrbinary('RETR '+temporary,verify)
-  if count!=len(data) or ftp.size(temporary)!=len(data) or digest.digest()!=hashlib.sha256(data).digest():raise BrowserError('Upload verification failed.')
-  if exists(destination):raise BrowserError('Destination appeared during upload; publication refused.')
-  ftp.rename(temporary,destination)
-  return destination
- except Exception as exc:
-  raise BrowserError(str(exc)+(f' Inspect {temporary} and {destination} before retrying.' if started else '')) from exc
- finally:ftp.close()
+    @property
+    def verified_staged(self):
+        return bool(self.upload and self.upload.readback == 'passed' and self.upload.size == 'passed')
+
+    def message(self):
+        parts = []
+        if self.directory_state == 'acknowledged-created':
+            parts.append('Created directory: '+self.directory+'.')
+        elif self.directory_state == 'creation-unknown':
+            parts.append('Directory creation was not confirmed. Inspect '+self.directory+'.')
+        if self.upload and self.upload.disposition == 'published':
+            parts.append('Verified staged bytes were published: '+self.upload.destination+'.')
+        else:
+            parts.append('Flash upload stopped during '+self.phase+'.')
+            if self.upload:
+                if self.upload.disposition == 'location-unknown':
+                    parts.append(self.upload.inspection_message())
+                elif self.upload.disposition == 'staging-candidate':
+                    parts.append('Possible staging file: '+self.upload.staging+'. Inspect before further action.')
+            if self.validation == 'refused':parts.append('Source or destination validation refused before mutation.')
+        parts.append('No automatic retry or remote cleanup was attempted.')
+        return ' '.join(parts)
+
+
+def upload_flash(client,folder,name,data,*,check=None,source_observation=None,
+                 cancellation_requested=lambda:False):
+    with operation_event('ftp','upload_flash','file'):
+        return _upload_flash(client,folder,name,data,check=check,
+                            source_observation=source_observation,
+                            cancellation_requested=cancellation_requested)
+
+
+def _upload_flash(client,folder,name,data,*,check=None,source_observation=None,
+                  cancellation_requested=lambda:False):
+    check = check or (lambda:None)
+    evidence = FlashEvidence(source_observation=source_observation)
+    upload = None
+    try:
+        # Only immutable private snapshots enter this publisher. Validate before
+        # obtaining a mutation-capable lease; never reopen either source.
+        if type(data) is not bytes:raise BrowserError('An immutable source snapshot is required.')
+        validate_upload(folder,name,data)
+        destination = flash_path(folder,name)
+        temporary = flash_path(folder,'argonaut-part-'+uuid.uuid4().hex)
+        digest = hashlib.sha256(data).hexdigest()
+        upload = UploadEvidence('preflight',temporary,destination,len(data))
+        evidence = replace(evidence,phase='directory',directory=folder,
+                           validation='passed',expected_sha256=digest)
+        check()
+        adapter = adapter_for(client)
+        if adapter is None:raise BrowserError('Flash upload requires a managed Core session.')
+        with adapter.operation(check):
+            def listing(path):
+                actual, entries = adapter.list_directory(path)
+                if actual != path:raise BrowserError('Flash directory identity refused.')
+                return entries
+            def exact_directory(parent,child):
+                matches = [e for e in listing(parent) if e.name.casefold()==child.casefold()]
+                if not matches:return False
+                if len(matches)!=1 or matches[0].name!=child or matches[0].kind!='dir':
+                    raise BrowserError('Flash directory identity refused.')
+                return True
+            def selected():
+                if not exact_directory('/','Flash'):raise BrowserError('Flash parent unavailable.')
+                return exact_directory('/Flash',posixpath.basename(folder))
+            present = selected()
+            if not present:
+                # Immediately observe the exact parent/child again before MKD.
+                present = selected()
+            if present:
+                evidence = replace(evidence,directory_state='already-present')
+            else:
+                evidence = replace(evidence,phase='mkdir')
+                check()
+                created = adapter.mutate('mkdir',folder)
+                # No check between the acknowledged reply and recording it.
+                evidence = replace(evidence,directory_state='acknowledged-created',
+                                   mkdir=created,acknowledged=('directory-created',))
+                evidence = replace(evidence,phase='directory-recheck')
+                if not selected():raise BrowserError('Created Flash directory unavailable.')
+            def absent(path):
+                if any(e.name.casefold()==posixpath.basename(path).casefold() for e in listing(folder)):
+                    raise BrowserError('Flash filename collision; publication refused.')
+            evidence = replace(evidence,phase='preflight')
+            absent(destination);absent(temporary)
+            evidence = replace(evidence,phase='stor')
+            upload = replace(upload,phase='stor')
+            with io.BytesIO(data) as stream:
+                sent = adapter.write_from(temporary,stream,len(data))
+            upload = replace(upload,stor=sent.transfer.as_dict(),disposition='staging-candidate')
+            if sent.transferred!=len(data) or sent.sha256!=digest:
+                raise BrowserError('Snapshot transfer mismatch.')
+            evidence = replace(evidence,phase='readback')
+            upload = replace(upload,phase='readback',readback='pending')
+            observed = adapter.readback(temporary,len(data))
+            if observed.transferred!=len(data) or observed.sha256!=digest:
+                raise BrowserError('Flash readback verification failed.')
+            evidence = replace(evidence,phase='size')
+            upload = replace(upload,phase='size',readback='passed',size='pending')
+            if adapter.size(temporary)!=len(data):raise BrowserError('Flash SIZE verification failed.')
+            evidence = replace(evidence,phase='destination-recheck')
+            upload = replace(upload,phase='destination-recheck',size='passed',destination_recheck='pending')
+            if not selected():raise BrowserError('Flash directory disappeared.')
+            absent(destination)
+            evidence = replace(evidence,phase='publication')
+            upload = replace(upload,phase='publication',destination_recheck='passed')
+            check()
+            publication = adapter.mutate('rename',temporary,destination)
+            upload = replace(upload,phase='complete',publication=publication,disposition='published')
+            # No cancellation check or read after acknowledged publication.
+            return replace(evidence,phase='complete',upload=upload,
+                           acknowledged=evidence.acknowledged+('published',),
+                           cancellation_requested=cancellation_requested())
+    except Exception as exc:
+        wire = getattr(exc,'ftp_error',None)
+        mutation = getattr(wire,'mutation',None)
+        cancelled = bool(getattr(exc,'cancelled',False))
+        if evidence.phase == 'validation':evidence = replace(evidence,validation='refused')
+        if evidence.phase in ('directory','directory-recheck') and evidence.directory_state!='acknowledged-created':
+            evidence = replace(evidence,directory_state='refused')
+        if evidence.phase == 'mkdir':
+            result = mutation.as_dict() if mutation else None
+            evidence = replace(evidence,mkdir=result,directory_state=(
+                'creation-unknown' if result and result['consequential_submitted'] and result['outcome']=='unknown'
+                else 'refused'))
+        category = ('cancelled' if cancelled else 'transport' if wire else
+                    'validation' if evidence.validation=='refused' else 'refusal')
+        if upload:
+            if evidence.phase=='stor' and getattr(wire,'transfer',None):
+                stor=wire.transfer.as_dict()
+                refused=stor['preliminary_reply'] is not None and stor['preliminary_reply']>=400
+                upload=replace(upload,stor=stor,disposition='no-candidate' if refused else
+                               'staging-candidate' if stor['submitted'] else 'not-started')
+            if evidence.phase=='publication' and mutation:
+                result=mutation.as_dict()
+                upload=replace(upload,publication=result)
+                if result['consequential_submitted'] and result['outcome']=='unknown':
+                    upload=replace(upload,disposition='location-unknown')
+            upload=replace(upload,error_category=category,error_code=wire.code.value if wire else category,
+                           transport_error=wire.as_dict() if wire else None,
+                           **{key:'failed' for key in ('readback','size','destination_recheck')
+                              if getattr(upload,key)=='pending'})
+        evidence=replace(evidence,upload=upload,error_category=category,
+                         cancellation_phase=evidence.phase if cancelled else None,
+                         cancellation_requested=cancelled or cancellation_requested())
+        if cancelled:
+            exc.flash_evidence=evidence
+            raise
+        failure=BrowserError(evidence.message())
+        failure.flash_evidence=evidence
+        failure.retryable=False
+        raise failure from None
