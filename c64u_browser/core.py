@@ -12,7 +12,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Mapping
 import copy
-import ftplib
 import socket
 import struct
 import urllib.request
@@ -138,20 +137,6 @@ class CoreDeviceOperations:
     def start_stream(self, *args, **kwargs): return self._client().start_stream(*args, **kwargs)
     def stop_stream(self, *args, **kwargs): return self._client().stop_stream(*args, **kwargs)
     def test_connection(self, *args, **kwargs): return self._client().test_connection(*args, **kwargs)
-
-    def open_ftp(self):
-        """Return an authenticated FTP channel without exposing its secret."""
-        client = self._client()
-        ftp = ftplib.FTP(timeout=client.timeout, encoding=client.encoding)
-        try:
-            ftp.connect(client.host, client.port)
-            ftp.login('anonymous', client.password)
-            ftp.set_pasv(True)
-            ftp.voidcmd('TYPE I')
-            return ftp
-        except BaseException:
-            ftp.close()
-            raise
 
     def read_memory(self, address, length):
         """Read bytes through the authenticated REST API."""

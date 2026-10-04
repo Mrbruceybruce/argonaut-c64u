@@ -4,8 +4,6 @@ from .platform_support import publish_new
 """Conservative transfers, separate from presentation and device controls."""
 from contextlib import contextmanager
 import stat
-import ftplib
-import hashlib
 import os
 from pathlib import Path
 import tempfile
@@ -29,21 +27,6 @@ def remote_file(path):
     return path
 
 
-def connect(client):
-    if getattr(client, 'credentials_encapsulated', False) is True:
-        return client.open_ftp()
-    ftp = ftplib.FTP(timeout=client.timeout, encoding=client.encoding)
-    try:
-        ftp.connect(client.host, client.port)
-        ftp.login('anonymous', client.password)
-        ftp.set_pasv(True)
-        ftp.voidcmd('TYPE I')
-        return ftp
-    except BaseException:
-        ftp.close()
-        raise
-
-
 def download(client, source, destination, progress=lambda n: None, *, preserve_cleanup=False):
     with operation_event('ftp', 'download', 'file'):
         return _download(client, source, destination, progress, preserve_cleanup=preserve_cleanup)
@@ -62,7 +45,7 @@ def _download(client, source, destination, progress, *, preserve_cleanup=False):
             raise BrowserError('Managed Core download requires a read adapter.')
         return _managed_download(adapter, source, destination, progress, check,
                                  preserve_cleanup=preserve_cleanup)
-    except (OSError, EOFError, ftplib.Error, ValueError) as exc:
+    except (OSError, EOFError, ValueError) as exc:
         failure = BrowserError('Download failed during local I/O.' if preserve_cleanup else f'Download failed: {exc}')
         if preserve_cleanup:
             for name in ('local_cleanup', 'download_observation', 'ftp_error'):
@@ -105,63 +88,7 @@ def _managed_download(adapter, source, destination, progress, check, *, preserve
                     raise failure from None
 
 
-def upload(client, source, parent='/USB2', progress=lambda n: None):
-    """Stage and verify a file, then rename into the requested directory."""
-    with operation_event('ftp', 'upload', 'file'):
-        return _upload(client, source, parent, progress)
-
-
-def _upload(client, source, parent, progress):
-    check = getattr(progress, 'check', lambda:None)
-    from .files import child, inspect
-    source = Path(source)
-    destination = child(parent, source.name)
-    temporary = child(parent, 'c64u-part-' + uuid.uuid4().hex)
-    ftp = None
-    started = False
-    try:
-        check()
-        if inspect(client, destination) is not None:
-            raise BrowserError('Destination already exists; upload refused.')
-        if inspect(client, temporary) is not None:
-            raise BrowserError('Temporary filename exists; upload refused.')
-        with source.open('rb') as stream:
-            if not source.is_file():
-                raise BrowserError('Choose a regular file.')
-            ftp = connect(client)
-            digest = hashlib.sha256()
-            count = 0
-            def sent(block):
-                nonlocal count
-                digest.update(block)
-                count += len(block)
-                progress(count)
-            started = True
-            ftp.storbinary('STOR ' + temporary, stream, callback=sent)
-            verified = hashlib.sha256()
-            def verify(block):
-                check()
-                verified.update(block)
-            ftp.retrbinary('RETR ' + temporary, verify)
-            if ftp.size(temporary) != count or digest.digest() != verified.digest():
-                raise BrowserError('Upload verification failed.')
-            # Recheck immediately before publishing. FTP has no atomic no-replace rename.
-            if inspect(client, destination) is not None:
-                raise BrowserError('Destination appeared during transfer; publish refused.')
-            check()
-            ftp.rename(temporary, destination)
-            return {'path': destination, 'bytes': count, 'sha256': digest.hexdigest(), 'verified': True}
-    except (OSError, EOFError, ftplib.Error, ValueError, BrowserError) as exc:
-        if getattr(exc,'cancelled',False):
-            if started:setattr(exc,'partial_path',temporary)
-            raise
-        recovery = f' Inspect {temporary!r} and {destination!r}; no automatic retry or deletion.' if started else ''
-        raise UploadFailure(f'Upload failed: {exc}.{recovery}',temporary if started else None) from exc
-    finally:
-        if ftp is not None: ftp.close()
-
-
-# Explicit 3C entry: legacy upload() remains for deferred composite consumers.
+# Managed staged upload evidence.
 @dataclass(frozen=True)
 class UploadEvidence:
     phase: str

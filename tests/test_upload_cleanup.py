@@ -5,19 +5,27 @@ from types import SimpleNamespace
 from unittest.mock import Mock,patch
 from c64u_browser.file_service import FileLocation,PartialUpload
 from c64u_browser.gui import Browser
-from c64u_browser.transfers import upload,UploadFailure
+from c64u_browser.transfers import upload_managed,UploadFailure
 from c64u_browser.usb_backup import RestoreResult
 class CleanupTests(unittest.TestCase):
  def test_only_staged_path_offered_after_failure(self):
-  with TemporaryDirectory() as d,patch('c64u_browser.files.inspect',return_value=None),patch('c64u_browser.transfers.connect') as connect:
-   p=Path(d)/'original.bin';p.write_bytes(b'abc');ftp=connect.return_value;ftp.storbinary.side_effect=OSError('disconnected')
-   with self.assertRaises(UploadFailure) as caught:upload(Mock(),p)
-   self.assertEqual(caught.exception.partial_path,ftp.storbinary.call_args.args[0][5:])
-   self.assertNotEqual(caught.exception.partial_path,'/USB2/original.bin');ftp.delete.assert_not_called()
+  from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+  peer=MemoryFilesystem()
+  peer.interrupted=True
+  with TemporaryDirectory() as d:
+   p=Path(d)/'original.bin';p.write_bytes(b'abc')
+   with self.assertRaises(UploadFailure) as caught:upload_managed(peer.attach(),p)
+   staged=next(c[1] for c in peer.calls if c[0]=='write')
+   self.assertEqual(caught.exception.partial_path,staged.decode())
+   self.assertNotEqual(caught.exception.partial_path,'/USB2/original.bin')
+   self.assertFalse(any(c[0]=='delete' for c in peer.calls))
+   self.assertEqual(0,peer.active)
  def test_no_cleanup_before_upload_started(self):
-  with patch('c64u_browser.files.inspect',return_value=object()):
-   with self.assertRaises(UploadFailure) as caught:upload(Mock(),'original.bin')
-   self.assertIsNone(caught.exception.partial_path)
+  from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+  peer=MemoryFilesystem(files={b'/USB2/original.bin':b'keep'})
+  with self.assertRaises(UploadFailure) as caught:upload_managed(peer.attach(),'original.bin')
+  self.assertIsNone(caught.exception.partial_path)
+  self.assertFalse(any(c[0]=='write' for c in peer.calls))
  def test_cancelled_usb_restore_enables_owned_partial_cleanup(self):
   partial=PartialUpload(FileLocation.c64u('/USB1/c64u-part-owned'),'device','session')
   result=RestoreResult((),(),(),(),(),('movie.webm',),0,

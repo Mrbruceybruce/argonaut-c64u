@@ -1,10 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """D64 Mount & Run through the firmware's authenticated DMA service."""
-import ftplib
 import socket
 import struct
 from .api import BrowserError, safe_argument
-from .transfers import connect
 from .ftp_reads import adapter_for
 from .diagnostics import operation_event
 
@@ -44,33 +42,19 @@ def mount_and_run(client, path):
 def _mount_and_run(client, path):
     validate_path(path)
     image=bytearray()
-    ftp=None
     sent=False
     try:
         adapter=adapter_for(client)
         if adapter is not None:
             image=adapter.read(path,max(D64_SIZES),allowed_sizes=D64_SIZES)
         else:
-            ftp=connect(client)
-            size=ftp.size(path)
-            if size not in D64_SIZES:
-                raise BrowserError('Unsupported D64 size; use a standard 35, 40 or 42-track image.')
-            def collect(block):
-                if len(image)+len(block)>size:
-                    raise BrowserError('Image changed during download; nothing was started.')
-                image.extend(block)
-            ftp.retrbinary('RETR '+path,collect)
-            if len(image)!=size or ftp.size(path)!=size:
-                raise BrowserError('Incomplete or changed image; nothing was started.')
-            ftp.close();ftp=None
+            raise BrowserError('Disk image reads require a Core-managed read adapter.')
         sent=True
         run_image_bytes(client, bytes(image))
-    except (OSError,EOFError,ftplib.Error,BrowserError) as exc:
+    except (OSError,EOFError,BrowserError) as exc:
         if isinstance(exc, DmaLaunchError):raise
         detail='Run may have started; check the C64U before retrying. ' if sent else 'Nothing was started. '
         raise BrowserError(detail+'Mount & Run failed: '+str(exc)+'. DMA service must be enabled on TCP port 64.') from exc
-    finally:
-        if ftp is not None:ftp.close()
 
 
 def run_image_bytes(client, image):

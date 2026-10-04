@@ -487,7 +487,7 @@ final-review/unpublished wording records the pre-publication checkpoint; the
 verified R5 authority above supersedes it. Flash and Network Foundation remain
 incomplete.
 
-## R6 — Managed Flash publication: physically qualified; final review pending
+## R6 — Managed Flash publication: published
 
 [R6 design, historical stop and resumed evidence](R6-MANAGED-FLASH-PUBLICATION.md)
 records the original approved design, the stopped partial implementation and the
@@ -511,10 +511,15 @@ skips. R6 records the sandbox socket failures, original stopped iteration and
 later obsolete raw-Flash ownership assertion correction, with passing reruns.
 Ownership/policy, bounded privacy and tracked/untracked whitespace checks passed.
 
-R5 remains HEAD/local `origin/development` at the authority above, divergence
-`0 0`, with an empty index. R6 is **physically qualified on Beige and Founder,
-uncommitted/unpushed; final review pending**. The reviewed exact-path cleanup
-prerequisite passed 293/293 focused/affected deterministic tests.
+R6 is **physically qualified, accepted, committed and published** at
+`f9457acd3bcef4269d9d98e95ef3c6dc33f90ff1`, parent R5
+`dab627979b9d3bb085c955c6e3bea8cdaff8b338`, subject
+`Implement R6 managed Flash publication`. The final-closure starting inspection
+verified HEAD = local `origin/development`, divergence `0 0`, clean worktree.
+The exact-path cleanup prerequisite added 18 tests after the 1,153-test run above:
+published R6 contains 1,171 discovered test methods (1,135 plus 36 display skips).
+Its focused/affected verification passed 293/293 tests. Older unpublished wording
+in the R6 checkpoint record describes history, superseded by this authority.
 
 Controlled physical qualification passed on 4 October 2026, Beige fully finished
 before Founder. Saved bound Development profiles reported Beige `25EA78` at
@@ -529,5 +534,25 @@ created. No activation/application/reset/reboot/settings mutation occurred.
 
 The R6 physical record contains exact paths, hashes, identities, sessions, managed
 send/reply evidence and limitations (not packet capture; external-writer races
-remain). Implementation/tests were preserved. Final compatibility closure and
-Network Foundation completion remain deferred. **Stop for final R6 review.**
+remain). Implementation/tests were preserved through publication.
+
+## Final FTP ownership closure — implementation for final review
+
+The final bounded compatibility deletion and fixture conversion is implemented
+against published R6, with starting user-supplied RU baseline 32% remaining.
+Supported live FTP has one owner: `C64UFtpLeaseManager` / `C64UFtpClient`, through
+managed adapters and accepted primitives. Missing managed context refuses; raw
+factories, remote alternatives, and raw-selecting switches are removed. Offline
+fixtures remain explicit and cannot be selected as a production fallback.
+
+[Closure evidence and complete inventory](FTP-OWNERSHIP-CLOSURE.md) records exact
+commands, test accounting, corrected iterations and ownership checks. Verification:
+125 closure/affected tests and 466 managed/R4/R5/R6 tests passed; normal and
+optimized full suites each ran 1,177 tests (1,141 passed, 36 unchanged display
+skips); Offline Test Lab passed 17/17 checks. Six methods added, none deleted,
+four renamed. Syntax, ownership, whitespace and bounded privacy/secret scans pass.
+No supported
+managed wire sequencing or policy changed, so no new physical qualification was
+needed or performed. This work remains uncommitted for compact final review.
+FTP ownership closure does not complete all Network Foundation/product work:
+Streams, Ultimate Menu and cartdumper remain separate roadmap features.

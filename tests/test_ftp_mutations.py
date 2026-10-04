@@ -525,7 +525,7 @@ class MutationCoreTests(unittest.TestCase):
             self.assertNotIn(b'RMD',ftp.verbs)
 
     def test_managed_missing_adapter_never_falls_back(self):
-        with patch('c64u_browser.files.connect') as raw:
+        with patch('ftplib.FTP') as raw:
             with self.assertRaises(BrowserError):operate_managed(SimpleNamespace(),'mkdir','/USB1/new')
             raw.assert_not_called()
 
@@ -629,18 +629,18 @@ class MutationRoutingTests(unittest.TestCase):
                     browser.show_remote.assert_not_called();browser.status.set_text.assert_not_called()
                     browser.core.files.rename.assert_called_once()
 
-    def test_deferred_composites_keep_explicit_legacy_routes(self):
+    def test_composites_have_no_legacy_routes(self):
         # These are migration-boundary assertions; full behavioral suites still run.
         for name in ('folder_copy','replacement','transfers','native_files'):
             source=Path('c64u_browser/'+name+'.py').read_text()
             self.assertNotIn('operate_managed',source)
         for name in ('folder_copy','replacement'):
             tree=ast.parse(Path('c64u_browser/'+name+'.py').read_text())
-            self.assertTrue(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
+            self.assertFalse(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
                                 and n.func.id=='operate' for n in ast.walk(tree)))
         for name in ('transfers','replacement'):
             source=Path('c64u_browser/'+name+'.py').read_text()
-            self.assertIn('ftp.rename(',source)
+            self.assertNotIn('ftp.rename(',source)
         native=ast.parse(Path('c64u_browser/native_files.py').read_text())
         publisher=next(n for n in native.body if isinstance(n,ast.FunctionDef) and n.name=='_upload_flash')
         calls=[n.func for n in ast.walk(publisher) if isinstance(n,ast.Call)]
@@ -651,11 +651,11 @@ class MutationRoutingTests(unittest.TestCase):
                             and n.func.attr=='mutate' and n.args
                             and isinstance(n.args[0],ast.Constant) and n.args[0].value=='rename'
                             for n in ast.walk(publisher)))
-        # The separate native read compatibility route is still deferred.
+        # Native reads also have no raw alternative.
         reader=next(n for n in native.body if isinstance(n,ast.FunctionDef) and n.name=='_read_remote')
-        self.assertTrue(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
+        self.assertFalse(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
                             and n.func.id=='connect' for n in ast.walk(reader)))
-        self.assertIn('def open_ftp(',Path('c64u_browser/core.py').read_text())
+        self.assertNotIn('def open_ftp(',Path('c64u_browser/core.py').read_text())
 
 
 if __name__=='__main__':unittest.main()

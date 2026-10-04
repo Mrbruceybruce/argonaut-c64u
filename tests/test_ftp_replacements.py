@@ -313,7 +313,7 @@ class ReplacementTests(unittest.TestCase):
             core,_=self.connect(ftp);source=self.source();progress,pending=self.progress()
             ftp.mutation_hook=lambda v,p:pending.__setitem__(0,True) if v==b'RMD' else None
             plan=Plan(steps=[Step('a',source,'/USB1/a',False,True,('a',3)),Step('next',source,'/USB1/next',False)])
-            result=execute_plan(core._client,plan,True,False,progress,managed_uploads=True,managed_replacements=True)
+            result=execute_plan(core._client,plan,True,False,progress)
             self.assertTrue(result.cancelled);self.assertEqual(['a'],result.completed);self.assertEqual(['next'],result.remaining)
             self.assertEqual('completed',result.replacements[0].publication);self.assertEqual(0,core._ftp_manager.active_count)
             pending[0]=False;self.run_replace(core,ftp)
@@ -452,12 +452,14 @@ class ReplacementTests(unittest.TestCase):
             self.assertFalse(any(isinstance(n,ast.Name) and n.id=='replace_managed' for n in ast.walk(tree)))
         source=self.source()
         for local,signature in ((True,('a',3)),(False,None)):
-            with patch('c64u_browser.folder_copy.kind',side_effect=['file','file' if local else None]),patch('c64u_browser.folder_copy.copy_files',return_value=('Copied 1 file(s): a',None)) as copy,patch('c64u_browser.folder_copy.replace_managed',side_effect=AssertionError('deferred')) as managed,patch('c64u_browser.folder_copy.replace_file') as legacy:
+            from types import SimpleNamespace
+            with patch('c64u_browser.folder_copy.kind',side_effect=['file','file']),patch('c64u_browser.folder_copy.execute_managed_step',return_value=SimpleNamespace(upload=None)) as composite,patch('c64u_browser.folder_copy.replace_managed',side_effect=AssertionError('not replacement')) as managed,patch('c64u_browser.folder_copy.replace_file') as local_replace:
                 plan=Plan(steps=[Step('a',source,'/USB1/a',False,True,signature)])
-                execute_plan(object(),plan,False,local,managed_replacements=True)
+                report=execute_plan(object(),plan,False,local)
+                self.assertFalse(report.error,report.error)
                 managed.assert_not_called()
-                if local:legacy.assert_called_once()
-                else:copy.assert_called_once()
+                self.assertEqual(local,local_replace.called)
+                self.assertEqual(not local,composite.called)
 
     def test_core_job_late_cancel_success_and_batch_prefix(self):
         from c64u_browser.jobs import _CURRENT_CHECK

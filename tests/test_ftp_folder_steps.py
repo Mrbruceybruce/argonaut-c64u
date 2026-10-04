@@ -270,7 +270,7 @@ class FolderStepTests(unittest.TestCase):
                     steps=[Step('folder','/USB1/source/folder','/USB1/dest/folder',True)]
                 else:steps=[Step('a',S.decode(),D.decode(),False)]
                 steps.append(Step('later',S.decode(),'/USB1/dest/later',False))
-                report=execute_plan(core._client,Plan(steps=steps),False,False,progress,managed_folders=True)
+                report=execute_plan(core._client,Plan(steps=steps),False,False,progress)
                 self.assertTrue(report.cancelled);self.assertEqual(1,len(report.completed));self.assertEqual(['later'],report.remaining)
                 cancelled[0]=False;ftp.mutation_hook=None
                 self.assertEqual('/USB1',core._client.list_directory('/USB1')[0])
@@ -288,7 +288,7 @@ class FolderStepTests(unittest.TestCase):
                         (phase=='upload' and v==b'STOR') or
                         (phase=='verify' and v==b'RETR' and p!=S)):cancel[0]=True
                 ftp.transfer_hook=hook
-                report=execute_plan(core._client,Plan(steps=[Step('a',S.decode(),D.decode(),False)]),False,False,progress,managed_folders=True)
+                report=execute_plan(core._client,Plan(steps=[Step('a',S.decode(),D.decode(),False)]),False,False,progress)
                 self.assertTrue(report.cancelled);self.assertFalse(report.completed);self.assertNotIn(D,ftp.files)
                 self.assertEqual(0,core._ftp_manager.active_count)
 

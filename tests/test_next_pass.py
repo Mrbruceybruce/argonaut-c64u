@@ -56,29 +56,23 @@ class ReplacementTests(unittest.TestCase):
 
 class RemoteReplacementTests(unittest.TestCase):
  def test_verified_publish_and_failure_preserves_original_backup(self):
-  from types import SimpleNamespace
+  from c64u_browser.simulated_ftp_reads import MemoryFilesystem
   from c64u_browser.folder_copy import Step
-  from c64u_browser.replacement import replace_file
+  from c64u_browser.managed_replacement import replace_managed
   for fail_publish in (False,True):
-   data={'/USB2/a':b'old'};calls=[]
-   def inspect(_,path):
-    return SimpleNamespace(name=path.rsplit('/',1)[-1],kind='file',size=len(data[path])) if path in data else None
-   class FTP:
-    def retrbinary(self,command,callback):callback(data[command[5:]])
-    def rename(self,source,dest):
-     calls.append((source,dest))
-     if fail_publish and 'c64u-replace-' in source:raise OSError('lost connection')
-     data[dest]=data.pop(source)
-    def delete(self,path):del data[path]
-    def rmd(self,path):pass
-    def close(self):pass
-   def copy(client,source_local,parent,names,local,folder,progress):
-    data[folder+'/a']=b'new';return 'Copied 1 file(s): a',None
-   with patch('c64u_browser.replacement.inspect',side_effect=inspect),patch('c64u_browser.replacement.operate'),patch('c64u_browser.replacement.connect',return_value=FTP()),patch('c64u_browser.replacement.copy_files',side_effect=copy):
-    step=Step('a',Path('/source/a'),'/USB2/a',False,True,('a',3))
+   peer=MemoryFilesystem(files={b'/USB2/a':b'old'})
+   def mutation(verb,source,destination):
+    if fail_publish and verb=='rename' and b'c64u-replace-' in source and destination==b'/USB2/a':
+     raise BrowserError('lost connection')
+   peer.before_mutation=mutation
+   with TemporaryDirectory() as tmp:
+    source=Path(tmp)/'a';source.write_bytes(b'new')
+    step=Step('a',source,'/USB2/a',False,True,('a',3))
     if fail_publish:
-     with self.assertRaisesRegex(BrowserError,'original backup'):replace_file(Mock(),step,True,False,lambda n:None)
-     self.assertIn(b'old',data.values());self.assertIn(b'new',data.values())
+     with self.assertRaises(BrowserError) as caught:replace_managed(peer.attach(),step,True,lambda n:None)
+     self.assertEqual('publication_rename',caught.exception.replacement_evidence.stopped)
+     self.assertIn(b'old',peer.files.values());self.assertIn(b'new',peer.files.values())
     else:
-     replace_file(Mock(),step,True,False,lambda n:None)
-     self.assertEqual(data,{'/USB2/a':b'new'})
+     replace_managed(peer.attach(),step,True,lambda n:None)
+     self.assertEqual(peer.files,{b'/USB2/a':b'new'})
+    self.assertEqual(0,peer.active)

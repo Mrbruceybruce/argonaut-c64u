@@ -30,8 +30,9 @@ class TestLabTests(unittest.TestCase):
         self.assertEqual([check['id'] for check in simulated[8:]], [
             'sim.transfer.download', 'sim.transfer.interrupted',
             'sim.transfer.upload', 'sim.transfer.collision'])
-        self.assertTrue(all(len(check['operations']) == 1 for check in simulated[8:]))
-        self.assertEqual([check['operations'][0]['outcome'] for check in simulated[8:]],
+        self.assertEqual([[e['operation'] for e in c['operations']] for c in simulated[8:]],
+                         [['download'],['download'],['list_directory']*3+['upload'],['list_directory','upload']])
+        self.assertEqual([check['operations'][-1]['outcome'] for check in simulated[8:]],
                          ['ok', 'error', 'ok', 'error'])
         self.assertTrue(all(event['origin'] == 'simulation' for check in simulated
                             for event in check['operations']))

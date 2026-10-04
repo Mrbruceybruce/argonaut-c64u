@@ -30,13 +30,15 @@ class DeletionTests(TestCase):
         removed,error=delete_reviewed(None,True,[self.folder],items)
         self.assertFalse(removed);self.assertTrue(error);self.assertTrue((moved/'b').exists())
     def test_remote_children_before_parent_and_failure_stops(self):
-        tree={'/USB2':[('folder','dir')],'/USB2/folder':[('a','file'),('b','file')]}
-        client=Mock();client.list_directory.side_effect=lambda p:(p,[SimpleNamespace(name=n,kind=k,size=1) for n,k in tree[p]])
-        items=prepare(client,False,['/USB2/folder'])
-        def remove(c,action,path,confirmation):
-            self.assertEqual(path,confirmation)
-            if path.endswith('/b'):raise OSError('offline')
-            parent,name=path.rsplit('/',1);tree[parent]=[(n,k) for n,k in tree[parent] if n!=name]
-        with patch('c64u_browser.deletion.operate',side_effect=remove) as op:
-            removed,error=delete_reviewed(client,False,['/USB2/folder'],items)
-        self.assertEqual(removed,['/USB2/folder/a']);self.assertEqual(op.call_count,2);self.assertIn('offline',error)
+        from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+        peer=MemoryFilesystem(files={b'/USB2/folder/a':b'a',b'/USB2/folder/b':b'b'},directories=(b'/USB2/folder',))
+        client=peer.attach();items=prepare(client,False,['/USB2/folder'])
+        def fail(verb,path,destination):
+            if path.endswith(b'/b'):raise OSError('offline')
+        peer.before_mutation=fail
+        result=delete_reviewed(client,False,['/USB2/folder'],items)
+        self.assertEqual(result.removed,['/USB2/folder/a'])
+        self.assertEqual(2,len([c for c in peer.calls if c[0]=='delete']))
+        self.assertIn('offline',str(result.error))
+        self.assertIn(b'/USB2/folder/b',peer.files)
+        self.assertEqual(0,peer.active)

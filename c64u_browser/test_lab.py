@@ -7,7 +7,8 @@ import re
 import threading
 import time
 
-from .api import BrowserError, UltimateClient, parse_list
+from .api import BrowserError, UltimateClient
+from .c64u_ftp_types import ListingParser, ListingLimits, FtpOperationError
 from .diagnostics import LOGGER, operation_origin
 from .disk_image import D64Image, D71Image, D81Image, sectors_on_track, sectors_on_d71_track
 from .disk_image_edit import D64EditSession
@@ -83,12 +84,14 @@ def run_checks(checks):
 
 
 def _check_listing_parser():
-    entry = parse_list('-rw-rw-rw- 1 user ftp 123 Sep 07 12:30 My  game.d64')
-    require((entry.name, entry.kind, entry.size) == ('My  game.d64', 'file', 123),
+    parser = ListingParser('list', ListingLimits())
+    parser.feed(b'-rw-rw-rw- 1 user ftp 123 Sep 07 12:30 My  game.d64\r\n')
+    entry, = parser.finish()
+    require((entry.name, entry.kind, entry.size) == (b'My  game.d64', 'file', 123),
             'FTP listing fields differed')
     try:
-        parse_list('malformed listing')
-    except BrowserError:
+        ListingParser('list', ListingLimits()).feed(b'malformed listing\r\n')
+    except FtpOperationError:
         pass
     else:
         raise AssertionError('Malformed FTP listing was accepted')

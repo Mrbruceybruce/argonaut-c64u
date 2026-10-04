@@ -12,8 +12,8 @@ from c64u_browser.diagnostics import (LOGGER, JsonEventFormatter,
                                       enable_private_log, disable_private_log,
                                       diagnostic_span, operation_context,
                                       operation_event)
-from c64u_browser.transfers import download, upload
-from c64u_browser.files import operate
+from c64u_browser.transfers import download, upload_managed
+from c64u_browser.files import operate_managed
 from c64u_browser.native_files import read_remote
 from c64u_browser.disk_run import mount_and_run
 from c64u_browser.disk_image import D64Image, D71Image, D81Image
@@ -114,37 +114,29 @@ class DiagnosticEventsTest(unittest.TestCase):
             self.assertNotIn('private connection detail', self.stream.getvalue())
 
     def test_ftp_upload_and_file_action_events_use_generic_targets(self):
-        with tempfile.TemporaryDirectory() as directory, patch(
-                'c64u_browser.transfers.connect') as connect, patch(
-                'c64u_browser.files.inspect', return_value=None):
-            source = Path(directory) / 'private-upload.bin'
-            source.write_bytes(b'abc')
-            ftp = connect.return_value
-            ftp.storbinary.side_effect = lambda _command, stream, callback: callback(stream.read())
-            ftp.retrbinary.side_effect = lambda _command, callback: callback(b'abc')
-            ftp.size.return_value = 3
-            upload(Mock(), source, '/USB2/Private')
-        self.assertEqual((self.event()['operation'], self.event()['target']),
+        from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+        peer=MemoryFilesystem(directories=(b'/USB2/Private',))
+        client=peer.attach()
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/'private-upload.bin';source.write_bytes(b'abc')
+            upload_managed(client,source,'/USB2/Private')
+        self.assertEqual((json.loads(self.stream.getvalue().splitlines()[-1])['operation'], json.loads(self.stream.getvalue().splitlines()[-1])['target']),
                          ('upload', 'file'))
         self.assertNotIn('private-upload.bin', self.stream.getvalue())
         self.stream.seek(0)
         self.stream.truncate()
-        with patch('c64u_browser.files.inspect', return_value=Entry('private.bin', 'file', 3)), patch(
-                'c64u_browser.files.connect') as connect:
-            operate(Mock(), 'delete', '/USB2/private.bin',
-                    confirmation='/USB2/private.bin')
-            connect.return_value.delete.assert_called_once()
-        self.assertEqual((self.event()['operation'], self.event()['target']),
+        peer.files[b'/USB2/private.bin']=b'abc'
+        operate_managed(client,'delete','/USB2/private.bin',confirmation='/USB2/private.bin')
+        self.assertNotIn(b'/USB2/private.bin',peer.files)
+        self.assertEqual((json.loads(self.stream.getvalue().splitlines()[-1])['operation'], json.loads(self.stream.getvalue().splitlines()[-1])['target']),
                          ('file_delete', 'entry'))
         self.assertNotIn('private.bin', self.stream.getvalue())
 
     def test_flash_or_storage_read_and_dma_run_do_not_log_paths_or_password(self):
         client = UltimateClient('c64u.local', password='private-password')
-        with patch('c64u_browser.native_files.connect') as connect:
-            ftp = connect.return_value
-            ftp.size.return_value = 3
-            ftp.retrbinary.side_effect = lambda _command, callback: callback(b'abc')
-            self.assertEqual(read_remote(client, '/Flash/roms/private.rom'), b'abc')
+        from c64u_browser.simulated_ftp_reads import MemoryReads
+        MemoryReads(files={b'/Flash/roms/private.rom':b'abc'}).attach(client)
+        self.assertEqual(read_remote(client,'/Flash/roms/private.rom'),b'abc')
         self.assertEqual((self.event()['transport'], self.event()['target']),
                          ('ftp', 'file'))
         self.assertNotIn('private.rom', self.stream.getvalue())

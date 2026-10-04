@@ -99,7 +99,7 @@ class FlashTests(unittest.TestCase):
     def test_invalid_snapshot_refuses_before_any_adapter_or_raw_access(self):
         for data in (b'',b'x'*(MAX_BYTES+1),bytearray(b'x')):
             with (patch('c64u_browser.native_files.adapter_for',side_effect=AssertionError('lease')),
-                  patch('c64u_browser.native_files.connect',side_effect=AssertionError('raw'))):
+                  patch('ftplib.FTP',side_effect=AssertionError('raw'))):
                 with self.assertRaises(BrowserError) as caught:upload_flash(object(),'/Flash/roms','new.bin',data)
                 evidence=caught.exception.flash_evidence
                 self.assertEqual('refused',evidence.validation);self.assertIsNone(evidence.upload)
@@ -108,7 +108,7 @@ class FlashTests(unittest.TestCase):
         with server() as ftp:
             core,_=self.connect(ftp);before=ftp.connections;ftp.commands.clear();session=core.device_session()
             with (patch('ftplib.FTP',side_effect=AssertionError('raw')),
-                  patch('c64u_browser.native_files.connect',side_effect=AssertionError('raw'))):
+                  patch('ftplib.FTP',side_effect=AssertionError('raw'))):
                 evidence=upload_flash(core._client,'/Flash/roms','New.BIN',b'private-payload')
             self.assertEqual('already-present',evidence.directory_state);self.assertIsNone(evidence.mkdir)
             self.assertTrue(evidence.verified_staged);self.assertEqual('published',evidence.upload.disposition)
@@ -207,7 +207,7 @@ class FlashTests(unittest.TestCase):
     def test_remote_managed_snapshot_two_lifetimes_and_same_publisher(self):
         with server() as ftp:
             core,_=self.connect(ftp);before=ftp.connections;ftp.commands.clear()
-            with patch('c64u_browser.native_files.connect',side_effect=AssertionError('raw')):
+            with patch('ftplib.FTP',side_effect=AssertionError('raw')):
                 preview=self.prepare(core,FileLocation.c64u('/USB1/source.bin'))
                 self.assertEqual([b'SIZE',b'RETR',b'SIZE'],[v for v in ftp.verbs if v in (b'SIZE',b'RETR')])
                 self.assertEqual(1,ftp.connections-before);self.assertEqual(0,core._ftp_manager.active_count)
@@ -409,7 +409,7 @@ class FlashTests(unittest.TestCase):
         with server() as ftp:
             core,_=self.connect(ftp);adapter=core._client._ftp_reads
             core._client._ftp_reads=None
-            with patch('c64u_browser.native_files.connect',side_effect=AssertionError('raw')):
+            with patch('ftplib.FTP',side_effect=AssertionError('raw')):
                 result=core.files.prepare_native_upload(FileLocation.c64u('/USB1/source.bin'),'/Flash/roms','new.bin').wait(5)
             self.assertEqual('failed',result.state);self.assertNotIn(b'RETR',ftp.verbs)
             core._client._ftp_reads=adapter
@@ -431,5 +431,5 @@ class FlashTests(unittest.TestCase):
         gui=Path('c64u_browser/flash_dialog.py').read_text()
         self.assertIn('self.prepare(path,False)',gui);self.assertIn('self.prepare(path,True)',gui)
         self.assertIn('result.result.message if result.result',gui)
-        self.assertIn('def connect(',Path('c64u_browser/transfers.py').read_text())
-        self.assertIn('def open_ftp(',Path('c64u_browser/core.py').read_text())
+        self.assertNotIn('def connect(',Path('c64u_browser/transfers.py').read_text())
+        self.assertNotIn('def open_ftp(',Path('c64u_browser/core.py').read_text())

@@ -8,7 +8,7 @@ from pathlib import Path
 import os
 import posixpath
 from .api import BrowserError
-from .files import child, operate
+from .files import child
 from .file_copy import copy_files
 from .transfers import upload_managed
 from .ftp_reads import adapter_for
@@ -118,7 +118,7 @@ def build_plan(client, source_local, parent, names, local, destination, check=la
     return plan
 
 
-def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, managed_uploads=False, managed_replacements=False, managed_folders=False):
+def execute_plan(client, plan, source_local, local, progress=lambda n:None):
     report = Report(skipped=list(plan.conflicts))
     checked_directories = set()
     for index,step in enumerate(plan.steps):
@@ -135,7 +135,7 @@ def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, m
                 return kind(client,local,step.destination)
             missing_directory = step.directory and not step.existed
             remote_addition = not source_local and not step.directory and step.signature is None
-            if managed_folders and not local and (missing_directory or remote_addition):
+            if not local and (missing_directory or remote_addition):
                 evidence = execute_managed_step(client, step, progress, validate,
                                                 directory=missing_directory)
                 report.folder_steps.append(evidence)
@@ -143,11 +143,11 @@ def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, m
                 if step.directory:checked_directories.add(str(step.destination))
                 report.completed.append(step.relative + ('/' if step.directory else ''))
                 continue
-            if managed_replacements and not local and step.signature is not None:
+            if not local and step.signature is not None:
                 report.replacements.append(replace_managed(client, step, source_local, progress, validate=validate))
                 report.completed.append(step.relative)
                 continue
-            addition = managed_uploads and source_local and not local and not step.directory and step.signature is None
+            addition = source_local and not local and not step.directory and step.signature is None
             adapter = adapter_for(client) if addition else None
             if addition and adapter is None:
                 raise BrowserError('Upload requires a Core-managed C64U session.')
@@ -162,9 +162,9 @@ def execute_plan(client, plan, source_local, local, progress=lambda n:None, *, m
                     elif target_kind is not None:
                         raise BrowserError('Destination appeared after review: '+str(step.destination))
                     elif local: Path(step.destination).mkdir()
-                    else: operate(client,'mkdir',step.destination)
+                    else: raise BrowserError('Remote directory creation requires a managed folder step.')
                     checked_directories.add(str(step.destination))
-                elif managed_uploads and source_local and not local:
+                elif source_local and not local:
                     if target_kind is not None:raise BrowserError('Destination appeared after review: '+str(step.destination))
                     result = upload_managed(client, step.source, posixpath.dirname(step.destination), progress)
                     report.uploads.append(result['upload'])

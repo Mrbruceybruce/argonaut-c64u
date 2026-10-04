@@ -49,28 +49,34 @@ class Transfers(unittest.TestCase):
             self.assertEqual([target], list(Path(directory).iterdir()))
 
     def test_direct_upload(self):
-        from c64u_browser.transfers import upload
-        with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect, patch('c64u_browser.files.inspect', return_value=None):
-            source = Path(directory)/'test.txt'; source.write_bytes(b'abc')
-            ftp = connect.return_value
-            ftp.storbinary.side_effect = lambda cmd, stream, callback: callback(stream.read())
-            ftp.retrbinary.side_effect = lambda cmd, cb: cb(b'abc')
-            ftp.size.return_value = 3
-            self.assertEqual(upload(Mock(), source, '/USB2/Utilities')['path'], '/USB2/Utilities/test.txt')
-            ftp.mkd.assert_not_called()
-            self.assertEqual(ftp.rename.call_args.args[1], '/USB2/Utilities/test.txt')
+        from c64u_browser.transfers import upload_managed
+        from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+        peer=MemoryFilesystem(directories=(b'/USB2/Utilities',))
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/'test.txt';source.write_bytes(b'abc')
+            result=upload_managed(peer.attach(),source,'/USB2/Utilities')
+        self.assertEqual(result['path'],'/USB2/Utilities/test.txt')
+        self.assertEqual(peer.files,{b'/USB2/Utilities/test.txt':b'abc'})
+        self.assertFalse(any(c[0]=='mkdir' for c in peer.calls))
+        self.assertEqual((0,1),(peer.active,peer.released))
+
     def test_direct_upload_collision(self):
-        from c64u_browser.transfers import upload
-        with patch('c64u_browser.files.inspect', return_value=object()), patch('c64u_browser.transfers.connect') as connect:
-            with self.assertRaises(BrowserError): upload(Mock(), 'test.txt')
-            connect.assert_not_called()
+        from c64u_browser.transfers import upload_managed
+        from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+        peer=MemoryFilesystem(files={b'/USB2/test.txt':b'keep'})
+        with self.assertRaises(BrowserError):upload_managed(peer.attach(),'test.txt')
+        self.assertEqual(peer.calls,[('list',b'/USB2')])
+        self.assertEqual(peer.files,{b'/USB2/test.txt':b'keep'})
+
     def test_destination_appears_during_upload(self):
-        from c64u_browser.transfers import upload
-        with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect, patch('c64u_browser.files.inspect', side_effect=[None, None, object()]):
-            source = Path(directory)/'test.txt'; source.write_bytes(b'abc')
-            ftp = connect.return_value
-            ftp.storbinary.side_effect = lambda cmd, stream, callback: callback(stream.read())
-            ftp.retrbinary.side_effect = lambda cmd, cb: cb(b'abc')
-            ftp.size.return_value = 3
-            with self.assertRaisesRegex(BrowserError, 'appeared'): upload(Mock(), source)
-            ftp.rename.assert_not_called()
+        from c64u_browser.transfers import upload_managed
+        from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+        peer=MemoryFilesystem()
+        peer.after_read=lambda:peer.files.update({b'/USB2/test.txt':b'keep'})
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/'test.txt';source.write_bytes(b'abc')
+            with self.assertRaisesRegex(BrowserError,'appeared'):
+                upload_managed(peer.attach(),source)
+        self.assertFalse(any(c[0]=='rename' for c in peer.calls))
+        self.assertEqual(peer.files[b'/USB2/test.txt'],b'keep')
+        self.assertEqual((0,1),(peer.active,peer.released))

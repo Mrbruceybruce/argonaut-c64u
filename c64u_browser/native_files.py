@@ -8,7 +8,7 @@ import hashlib
 import posixpath
 import uuid
 from .api import BrowserError,safe_argument
-from .transfers import connect, UploadEvidence
+from .transfers import UploadEvidence
 from .ftp_reads import adapter_for
 from .backups import allowed
 from .storage import storage_root
@@ -46,23 +46,7 @@ def _read_remote(client,path,max_bytes=MAX_BYTES,absolute_max=MAX_BYTES,
  adapter=adapter_for(client)
  if adapter is not None:
   return adapter.read(path,max_bytes,progress=progress,check=check)
- ftp=connect(client)
- try:
-  expected=ftp.size(path)
-  if expected is None or not 0<expected<=max_bytes:
-   limit='16 MB' if max_bytes==MAX_BYTES else f'{max_bytes:,} bytes'
-   raise BrowserError(f'File must contain between 1 byte and {limit}.')
-  data=bytearray()
-  def receive(block):
-   if check is not None:check()
-   if len(data)+len(block)>max_bytes:raise BrowserError('File exceeds the supported size bound.')
-   data.extend(block)
-   if progress is not None:progress(len(data),expected)
-  ftp.retrbinary('RETR '+path,receive)
-  if check is not None:check()
-  if len(data)!=expected or ftp.size(path)!=expected:raise BrowserError('File changed or download was incomplete.')
-  return bytes(data)
- finally:ftp.close()
+ raise BrowserError('Remote reads require a Core-managed read adapter.')
 
 def read_local(path):
  path=Path(path)

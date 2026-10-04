@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Offline REST/FTP fixtures for the Test Lab; no device or network access."""
-import ftplib
 import hashlib
 import io
 import json
@@ -15,8 +14,8 @@ from .api import BrowserError, ConnectionFailure, UltimateClient
 from .hardware_checks import run_hardware_checks
 from .profiles import Profile
 from .test_lab import Check, require
-from .transfers import download, upload, UploadFailure
-from .simulated_ftp_reads import MemoryReads
+from .transfers import download, upload_managed, UploadFailure
+from .simulated_ftp_reads import MemoryReads, MemoryFilesystem
 
 
 class _Response:
@@ -54,50 +53,6 @@ class _RouteOpener(_RestOpener):
     def open(self, request, timeout):
         self.requests.append((request, timeout))
         return _Response(self.responses[urlsplit(request.full_url).path])
-
-
-class _TransferFTP:
-    def __init__(self, files=None, fail_download=False):
-        self.files = dict(files or {})
-        self.fail_download = fail_download
-        self.commands = []
-
-    def connect(self, host, port):
-        self.commands.append(('connect', host, port))
-
-    def login(self, user, password):
-        self.commands.append(('login', user, password))
-
-    def set_pasv(self, enabled):
-        self.commands.append(('set_pasv', enabled))
-
-    def voidcmd(self, command):
-        self.commands.append(('voidcmd', command))
-
-    def size(self, path):
-        self.commands.append(('size', path))
-        return len(self.files[path]) if path in self.files else None
-
-    def retrbinary(self, command, callback):
-        self.commands.append(('retrbinary', command))
-        if self.fail_download:
-            callback(b'a')
-            raise OSError('simulated connection loss')
-        callback(self.files[command[5:]])
-
-    def storbinary(self, command, stream, callback=None):
-        self.commands.append(('storbinary', command))
-        data = stream.read()
-        self.files[command[5:]] = data
-        if callback:
-            callback(data)
-
-    def rename(self, source, destination):
-        self.commands.append(('rename',))
-        self.files[destination] = self.files.pop(source)
-
-    def close(self):
-        self.commands.append(('close',))
 
 
 def _rest_success():
@@ -249,33 +204,32 @@ def _transfer_download_interrupt():
 
 def _transfer_upload_verified():
     data = b'verified upload payload'
-    ftp = _TransferFTP()
-    with tempfile.TemporaryDirectory() as directory, patch(
-            'ftplib.FTP', return_value=ftp), patch(
-            'c64u_browser.files.inspect', return_value=None):
+    peer = MemoryFilesystem(directories=(b'/USB2/Private',))
+    with tempfile.TemporaryDirectory() as directory:
         source = Path(directory) / 'private-upload.bin'
         source.write_bytes(data)
-        result = upload(UltimateClient('fixture.invalid', password='private'),
-                        source, '/USB2/Private')
+        result = upload_managed(peer.attach(), source, '/USB2/Private')
     require(result['verified'] and result['bytes'] == len(data),
             'FTP upload verification differed')
-    require(ftp.files == {'/USB2/Private/private-upload.bin': data},
+    require(peer.files == {b'/USB2/Private/private-upload.bin': data},
             'FTP upload did not publish only the verified file')
-    require(any(command[0] == 'rename' for command in ftp.commands) and
-            ftp.commands[-1] == ('close',),
-            'FTP upload did not publish and close the connection')
+    require([call[0] for call in peer.calls] ==
+            ['list', 'list', 'write', 'read', 'size', 'list', 'rename'],
+            'Managed upload verification sequence differed')
+    require(peer.active == 0 and peer.released == 1, 'Lease not released')
 
 
 def _transfer_upload_collision():
-    with patch('c64u_browser.files.inspect', return_value=object()), patch(
-            'ftplib.FTP') as create_ftp:
-        try:
-            upload(UltimateClient('fixture.invalid'), 'private-upload.bin', '/USB2')
-        except UploadFailure:
-            pass
-        else:
-            raise AssertionError('Colliding FTP upload was accepted')
-    create_ftp.assert_not_called()
+    peer = MemoryFilesystem(files={b'/USB2/private-upload.bin': b'keep'})
+    try:
+        upload_managed(peer.attach(), 'private-upload.bin', '/USB2')
+    except UploadFailure:
+        pass
+    else:
+        raise AssertionError('Colliding FTP upload was accepted')
+    require(peer.calls == [('list', b'/USB2')], 'Collision attempted a write')
+    require(peer.files == {b'/USB2/private-upload.bin': b'keep'}, 'Collision changed data')
+    require(peer.active == 0 and peer.released == 1, 'Lease not released')
 
 
 SIMULATED_CHECKS = (

@@ -2,9 +2,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import Mock,patch
-from c64u_browser.simulated_ftp_reads import MemoryReads
+from c64u_browser.simulated_ftp_reads import MemoryReads, MemoryFilesystem
 from c64u_browser.api import BrowserError
-from c64u_browser.transfers import upload, download, UploadFailure
+from c64u_browser.transfers import upload_managed, download, UploadFailure
 from c64u_browser.file_copy import local_copy
 from c64u_browser.folder_copy import build_plan, execute_plan
 
@@ -31,18 +31,18 @@ class CancelTests(TestCase):
     def test_upload_cancel_verification_retains_partial_without_publish(self):
         with TemporaryDirectory() as d:
             source=Path(d)/'a';source.write_bytes(b'data')
-            ftp=Mock();ftp.size.return_value=4
-            ftp.storbinary.side_effect=lambda cmd,stream,callback:callback(stream.read())
+            peer=MemoryFilesystem()
             cancelled=[False]
             def progress(n):cancelled[0]=True
             def check():
                 if cancelled[0]:self.check()
             progress.check=check
-            ftp.retrbinary.side_effect=lambda cmd,receive:receive(b'data')
-            with patch('c64u_browser.transfers.connect',return_value=ftp),patch('c64u_browser.files.inspect',return_value=None):
-                with self.assertRaises(UploadFailure) as caught:upload(Mock(),source,'/USB2',progress)
+            with self.assertRaises(UploadFailure) as caught:
+                upload_managed(peer.attach(),source,'/USB2',progress)
             self.assertTrue(caught.exception.partial_path.startswith('/USB2/c64u-part-'))
-            ftp.rename.assert_not_called();ftp.close.assert_called_once()
+            self.assertFalse(any(c[0]=='rename' for c in peer.calls))
+            self.assertIn(caught.exception.partial_path.encode(),peer.files)
+            self.assertEqual((0,1),(peer.active,peer.released))
     def test_cancel_preparation_does_not_write(self):
         with TemporaryDirectory() as d:
             with self.assertRaises(BrowserError):build_plan(None,True,d,['folder'],True,d,self.check)

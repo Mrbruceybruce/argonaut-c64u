@@ -86,7 +86,7 @@ class ReadMigrationTests(unittest.TestCase):
             self.assertEqual('list',evidence.listing_dialect)
             self.assertEqual(2,server.connections)
 
-    def test_fingerprint_exact_legacy_digest_with_one_connection(self):
+    def test_fingerprint_exact_byte_fixture_digest_with_one_connection(self):
         tree={**ROOT,b'/USB1':b'type=dir; sub\r\ntype=file;size=3; Schatzj\x84ger.d64\r\n',
               b'/USB1/sub':b'type=file;size=0; empty\r\n'}
         with FakeC64UFtp(directories=tree) as server:
@@ -96,10 +96,14 @@ class ReadMigrationTests(unittest.TestCase):
             before=server.connections
             new=UsbBackupService._volume_fingerprint(client,'/USB1')
             self.assertEqual(1,server.connections-before)
-            legacy=UltimateClient('127.0.0.1',port=server.port)
+            from test_usb_backup import RawIdentityClient
+            from c64u_browser.api import IdentityEntry
+            fixture=RawIdentityClient({b'/USB1':(IdentityEntry(b'sub','dir',None),
+                IdentityEntry(b'Schatzj\x84ger.d64','file',3)),
+                b'/USB1/sub':(IdentityEntry(b'empty','file',0),)})
             before=server.connections
-            old=UsbBackupService._volume_fingerprint(legacy,'/USB1')
-            self.assertEqual(2,server.connections-before)
+            old=UsbBackupService._volume_fingerprint(fixture,'/USB1')
+            self.assertEqual(0,server.connections-before)
             self.assertEqual(old,new)
             server.directories[b'/USB1/sub']=b'type=file;size=1; empty\r\n'
             self.assertNotEqual(new,UsbBackupService._volume_fingerprint(client,'/USB1'))
@@ -217,14 +221,11 @@ class ReadMigrationTests(unittest.TestCase):
                 self.assertNotIn('private',str(caught.exception))
             self.assertNotIn(b'LIST',server.verbs)
 
-    def test_mutating_transport_factory_remains_legacy(self):
-        with FakeC64UFtp(directories=ROOT) as server:
-            core,_=self.connect(server)
-            from c64u_browser.transfers import connect
-            with patch('ftplib.FTP') as factory:
-                ftp=connect(core.device_operations)
-                self.assertIs(ftp,factory.return_value)
-                factory.return_value.login.assert_called_once_with('anonymous','')
+    def test_raw_transport_factories_are_absent(self):
+        from c64u_browser import transfers
+        from c64u_browser.core import CoreDeviceOperations
+        self.assertFalse(hasattr(transfers,'connect'))
+        self.assertFalse(hasattr(CoreDeviceOperations,'open_ftp'))
 
     def test_core_catalog_services_and_disk_image_use_socket_adapter(self):
         from c64u_browser.game_library import GameSource

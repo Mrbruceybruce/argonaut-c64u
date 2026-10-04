@@ -48,8 +48,8 @@ class FreshFolderCliTests(unittest.TestCase):
             with patch.object(core.preferences, 'save', side_effect=AssertionError('profile write')), \
                  patch.object(core._credentials, 'set', side_effect=AssertionError('credential write')), \
                  patch.object(core, 'connect', wraps=core.connect) as connect, \
-                 patch('c64u_browser.transfers.connect', side_effect=AssertionError('raw transport')), \
-                 patch('c64u_browser.core.CoreDeviceOperations.open_ftp', side_effect=AssertionError('raw facade')):
+                 patch('ftplib.FTP', side_effect=AssertionError('raw transport')), \
+                 patch('socket.create_connection', side_effect=AssertionError('raw facade')):
                 code, record, _, _ = self.invoke(['put-new', str(source), '/USB1/parent'], core)
             self.assertEqual(0, code); self.assertEqual('succeeded', record['state'])
             self.assertEqual('published', record['result']['disposition']); self.assertTrue(record['result']['verified'])

@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """USB/SD directory operations with validated paths."""
-import ftplib
 import posixpath
 import uuid
 from dataclasses import dataclass
 from .ftp_reads import adapter_for
 from .api import BrowserError, safe_argument
-from .transfers import connect, remote_file
+from .transfers import remote_file
 from .diagnostics import operation_event
 
 
@@ -25,13 +24,7 @@ def inspect(client, path):
     return next((e for e in entries if e.name.casefold() == name.casefold()), None)
 
 
-def operate(client, action, path, new_name=None, confirmation=None):
-    logged_action = action if action in ('mkdir', 'rename', 'delete') else 'unknown'
-    with operation_event('ftp', 'file_' + logged_action, 'entry'):
-        return _operate(client, action, path, new_name, confirmation)
-
-
-def _operate(client, action, path, new_name, confirmation, managed=None):
+def _operate(client, action, path, new_name, confirmation, managed):
     remote_file(path)
     parent, name = posixpath.split(path)
     child(parent, name)
@@ -68,30 +61,7 @@ def _operate(client, action, path, new_name, confirmation, managed=None):
                 raise BrowserError('Folder is not empty; recursive deletion is disabled.')
     else:
         raise BrowserError('Unknown file operation.')
-    if managed is not None:
-        return managed(entry, destination, case_only, temporary, parent)
-    ftp = None
-    try:
-        ftp = connect(client)
-        if action == 'mkdir': ftp.mkd(path)
-        elif action == 'rename':
-            if case_only:
-                # A distinct intermediate name avoids case-insensitive self-renames.
-                ftp.rename(path, temporary)
-                ftp.rename(temporary, destination)
-                _, entries = client.list_directory(parent)
-                if not any(e.name == new_name for e in entries):
-                    raise BrowserError('Server did not report the requested letter case. Refresh to inspect the resulting name.')
-            else:
-                ftp.rename(path, destination)
-        elif entry.kind == 'dir': ftp.rmd(path)
-        else: ftp.delete(path)
-        return destination or path
-    except (OSError, EOFError, ftplib.Error) as exc:
-        raise BrowserError(f'{action} failed: {exc}. Refresh to check the result before retrying.'
-                           + (f' The item may be named {temporary!r} or {destination!r}; no automatic rollback was attempted.' if temporary else '')) from exc
-    finally:
-        if ftp is not None: ftp.close()
+    return managed(entry, destination, case_only, temporary, parent)
 
 
 @dataclass(frozen=True)
@@ -106,7 +76,7 @@ class MutationResult:
 
 
 def operate_managed(client, action, path, new_name=None, confirmation=None, check=None):
-    """Explicit 3B entry. Deferred composite callers still use operate()."""
+    """Validate and mutate only within an explicit managed operation."""
     adapter = adapter_for(client)
     if adapter is None:
         raise BrowserError('This operation requires a Core-managed C64U session.')

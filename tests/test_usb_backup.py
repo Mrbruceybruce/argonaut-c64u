@@ -20,38 +20,6 @@ from c64u_browser.usb_backup import (
     BackupRequest, MANIFEST_NAME, UsbBackupService)
 
 
-class MemoryFTP:
-    def __init__(self,client):self.client=client
-    def close(self):pass
-    def size(self,path):return len(self.client.files[path]) if path in self.client.files else None
-    def retrbinary(self,command,callback):
-        path=command[5:]
-        if path in self.client.fail_paths:raise OSError('simulated transfer failure')
-        if self.client.block_path==path:
-            self.client.transfer_started.set();self.client.transfer_release.wait(3)
-        data=self.client.files[path]
-        for offset in range(0,len(data),3):callback(data[offset:offset+3])
-        if not data:callback(b'')
-    def storbinary(self,command,stream,callback=None):
-        path=command[5:];data=stream.read();self.client._ensure_parent(path)
-        self.client.store_count+=1
-        if self.client.block_store:
-            self.client.store_started.set();self.client.store_release.wait(3)
-        if self.client.fail_store_on==self.client.store_count:
-            raise OSError('simulated upload failure')
-        self.client.files[path]=data
-        if callback:callback(data)
-    def mkd(self,path):self.client._ensure_parent(path);self.client.dirs.add(path)
-    def rename(self,source,destination):
-        self.client._ensure_parent(destination)
-        if source in self.client.files:self.client.files[destination]=self.client.files.pop(source)
-        elif source in self.client.dirs:
-            self.client.dirs.remove(source);self.client.dirs.add(destination)
-        else:raise OSError('missing source')
-    def delete(self,path):del self.client.files[path]
-    def rmd(self,path):self.client.dirs.remove(path)
-
-
 class MemoryClient:
     credentials_encapsulated=True
     def __init__(self):
@@ -60,7 +28,38 @@ class MemoryClient:
         self.block_path=None;self.transfer_started=Event();self.transfer_release=Event()
         self.store_count=0;self.fail_store_on=None;self.block_store=False
         self.store_started=Event();self.store_release=Event()
-    def open_ftp(self):return MemoryFTP(self)
+        from collections.abc import MutableMapping, MutableSet
+        from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+        owner=self
+        class Files(MutableMapping):
+            def __getitem__(self,key):return owner.files[key.decode('utf-8')]
+            def __setitem__(self,key,value):owner.files[key.decode('utf-8')]=value
+            def __delitem__(self,key):del owner.files[key.decode('utf-8')]
+            def __iter__(self):return iter(k.encode('utf-8') for k in owner.files)
+            def __len__(self):return len(owner.files)
+        class Directories(MutableSet):
+            def __contains__(self,key):return key.decode('utf-8') in owner.dirs
+            def __iter__(self):return iter(k.encode('utf-8') for k in owner.dirs)
+            def __len__(self):return len(owner.dirs)
+            def add(self,key):owner.dirs.add(key.decode('utf-8'))
+            def discard(self,key):owner.dirs.discard(key.decode('utf-8'))
+        self.peer=MemoryFilesystem(files=Files());self.peer.directories=Directories()
+        def read(path):
+            path=path.decode('utf-8')
+            if path in self.fail_paths:raise BrowserError('simulated transfer failure')
+            if self.block_path==path:
+                self.transfer_started.set();self.transfer_release.wait(3)
+        def write(path):
+            self._ensure_parent(path.decode('utf-8'));self.store_count+=1
+            if self.block_store:
+                self.store_started.set();self.store_release.wait(3)
+            if self.fail_store_on==self.store_count:raise BrowserError('simulated upload failure')
+        self.peer.before_read=read;self.peer.before_write=write
+        self.peer.attach(self)
+    def list_directory_identity(self,path):
+        # Explicit byte-preserving managed fixture path, shared with actual data.
+        self.list_calls.append(path.decode('utf-8'))
+        return self._ftp_reads.list_directory(path,identity=True)
     def _ensure_parent(self,path):
         parent=posixpath.dirname(path)
         if parent not in self.dirs:raise OSError('missing parent '+parent)
@@ -103,65 +102,7 @@ class UsbBackupTests(unittest.TestCase):
         self.service=UsbBackupService(lambda:self.client,lambda:self.session,self.scheduler)
         self.files=FileService(lambda:self.client,lambda:self.session,
                                scheduler=self.scheduler)
-        # Explicit managed download fixture only; leave legacy restore-policy
-        # doubles and their mutation seams unchanged.
-        from c64u_browser.simulated_ftp_reads import MemoryReads
-        from c64u_browser.transfers import download
-        def managed_download(client, source, destination, progress=lambda n:None, **kwargs):
-            if source in client.fail_paths:raise BrowserError('Simulated read failure.')
-            if source == client.block_path:
-                client.transfer_started.set();client.transfer_release.wait(3)
-            peer = MemoryReads(files={source.encode():client.files[source]})
-            return download(peer.attach(), source, destination, progress, **kwargs)
-        for module in ('usb_backup', 'file_copy'):
-            seam = patch('c64u_browser.'+module+'.download', side_effect=managed_download)
-            seam.start();self.addCleanup(seam.stop)
-        # This suite exercises restore policy with an in-memory legacy peer.
-        # Supply the explicit upload seam; real managed wire/evidence behavior is
-        # covered by test_ftp_uploads, not inferred from this double.
-        from c64u_browser.transfers import upload, UploadEvidence
-        def addition(client, source, parent, progress):
-            try:
-                result=upload(client,source,parent,progress)
-                result['upload']=UploadEvidence('complete','',result['path'],
-                                                disposition='published')
-                return result
-            except Exception as exc:
-                partial=getattr(exc,'partial_path',None)
-                exc.upload_evidence=UploadEvidence('stor',partial or '',
-                    parent+'/'+Path(source).name,
-                    disposition='staging-candidate' if partial else 'not-started')
-                raise
-        from contextlib import nullcontext
-        from types import SimpleNamespace
-        lifetime=patch('c64u_browser.folder_copy.adapter_for',
-                       return_value=SimpleNamespace(operation=lambda check:nullcontext()))
-        lifetime.start();self.addCleanup(lifetime.stop)
-        seam=patch('c64u_browser.folder_copy.upload_managed',side_effect=addition)
-        seam.start();self.addCleanup(seam.stop)
-        # R1 directory seam for this policy-only peer; socket suite proves ownership.
-        from c64u_browser.folder_steps import FolderStepEvidence
-        from c64u_browser.files import operate
-        def directory(client, step, progress, validate, *, directory=False):
-            self.assertTrue(directory)
-            if validate() is not None:raise BrowserError('Destination appeared after review.')
-            operate(client,'mkdir',step.destination)
-            return FolderStepEvidence(step.relative,'mkdir',str(step.source),step.destination,
-                                      phase='complete',validation='passed')
-        directory_seam=patch('c64u_browser.folder_copy.execute_managed_step',side_effect=directory)
-        directory_seam.start();self.addCleanup(directory_seam.stop)
-        # Preserve this suite's in-memory replacement policy coverage. Actual
-        # managed composition/evidence is exercised by test_ftp_replacements.
-        from c64u_browser.replacement import replace_file
-        from c64u_browser.managed_replacement import ReplacementEvidence
-        def replacement(client, step, source_local, progress, *, validate=None):
-            if validate:validate()
-            replace_file(client,step,source_local,False,progress)
-            return ReplacementEvidence('complete',step.destination,'','','',
-                                       publication='completed',cleanup='completed')
-        replacement_seam=patch('c64u_browser.folder_copy.replace_managed',side_effect=replacement)
-        replacement_seam.start();self.addCleanup(replacement_seam.stop)
-
+        self.addCleanup(lambda:self.assertEqual(0,self.client.peer.active))
 
     def backup_request(self,name='backup',paths=()):
         return BackupRequest(FileLocation.c64u('/USB2'),tuple(paths),
@@ -471,24 +412,7 @@ class UsbBackupTests(unittest.TestCase):
         self.assertIn(partial.location.path,self.client.files)
         reviewed=self.files.prepare_partial_delete(partial).wait(5)
         self.assertEqual('succeeded',reviewed.state)
-        # The restore remains a legacy in-memory transport; only its reviewed
-        # cleanup now requires the managed mutation seam. Real-wire partial
-        # cleanup is covered by test_ftp_mutations.
-        from contextlib import contextmanager
-        from c64u_browser.ftp_reads import FtpReadAdapter
-        memory=self.client
-        class CleanupAdapter(FtpReadAdapter):
-            def __init__(self):pass
-            @contextmanager
-            def operation(self,check=None):
-                if check:check()
-                yield
-            def mutate(self,operation,path,destination=None):
-                if operation!='delete':raise AssertionError(operation)
-                MemoryFTP(memory).delete(path)
-                return {'operation':'DELE','outcome':'completed'}
-        with patch.object(self.client,'_ftp_reads',CleanupAdapter(),create=True):
-            deleted=self.files.execute_delete(reviewed.result.plan_id).wait(5)
+        deleted=self.files.execute_delete(reviewed.result.plan_id).wait(5)
         self.assertEqual('succeeded',deleted.state)
         self.assertNotIn(partial.location.path,self.client.files)
 

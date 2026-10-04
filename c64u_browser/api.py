@@ -2,9 +2,7 @@
 # Copyright (C) 2026 Bruce Marcus
 """Shared FTP/REST transport layer, independent of the user interface."""
 from dataclasses import dataclass
-import ftplib
 import json
-import re
 import urllib.request
 import urllib.error
 from urllib.parse import quote, urlencode
@@ -43,14 +41,6 @@ class IdentityEntry:
     size: int | None
 
 
-def parse_list(line):
-    # Ultimate upstream UNIX-style LIST; preserve spaces inside filenames.
-    match = re.fullmatch(r'([d-])[rwx-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s+\S+\s+\d+\s+\S+ (.*)', line)
-    if not match:
-        raise BrowserError('Unrecognized FTP listing format; refusing to invent filenames.')
-    return Entry(match[3], 'dir' if match[1] == 'd' else 'file', int(match[2]))
-
-
 class UltimateClient:
     def __init__(self, host, password='', port=21, timeout=10, encoding='utf-8', http_port=80):
         safe_argument(host)
@@ -73,63 +63,13 @@ class UltimateClient:
     def list_directory_identity(self, path=b'/'):
         """List a directory without interpreting filename octets as text.
 
-        FTP has no portable filename encoding contract.  Latin-1 is used only
-        as a reversible one-byte transport mapping: names are immediately
-        converted back to bytes and never exposed as user-facing text.
+        The managed adapter retains wire octets without text conversion.
+        Missing managed context refuses before acquiring transport.
         """
         with operation_event('ftp', 'list_directory_identity', 'directory'):
             if self._ftp_reads is not None:
                 return self._ftp_reads.list_directory(path, identity=True)
-            return self._list_directory_identity(path)
-
-    def _list_directory_identity(self, path):
-        if not isinstance(path, bytes) or not path.startswith(b'/'):
-            raise BrowserError('Identity directory paths must be absolute bytes.')
-        if any(value < 32 or value == 127 for value in path):
-            raise BrowserError('Control bytes are not allowed in identity paths.')
-        ftp = ftplib.FTP(timeout=self.timeout, encoding='latin-1')
-        try:
-            ftp.connect(self.host, self.port)
-            ftp.login('anonymous', self.password)
-            ftp.set_pasv(True)
-            ftp.cwd(path.decode('latin-1'))
-            actual = ftp.pwd().encode('latin-1')
-            try:
-                rows = list(ftp.mlsd())
-                entries = []
-                for name, facts in rows:
-                    kind = facts.get('type', 'unknown')
-                    if kind in ('cdir', 'pdir'):
-                        continue
-                    size = int(facts['size']) if 'size' in facts else None
-                    entries.append(IdentityEntry(
-                        name.encode('latin-1'), kind, size))
-            except ftplib.error_perm as exc:
-                if str(exc)[:3] not in ('500', '502', '504'):
-                    raise
-                lines = []
-                ftp.retrlines('LIST', lines.append)
-                entries = []
-                for line in lines:
-                    parsed = parse_list(line)
-                    entries.append(IdentityEntry(
-                        parsed.name.encode('latin-1'), parsed.kind,
-                        parsed.size))
-            return actual, sorted(entries,key=lambda entry:(
-                entry.name,entry.kind,-1 if entry.size is None else entry.size))
-        except UnicodeError as exc:
-            raise BrowserError(
-                'FTP identity bytes could not be preserved reversibly.') from exc
-        except (OSError, EOFError, ftplib.Error, ValueError) as exc:
-            kind = ('authentication' if isinstance(exc, ftplib.error_perm)
-                    and str(exc).startswith('530') else
-                    'network' if isinstance(exc, (OSError, EOFError)) else 'ftp')
-            raise ConnectionFailure(
-                kind,
-                f'FTP identity listing failed ({self.host}:{self.port}). '
-                'Check address, FTP service, password and LAN connection.') from exc
-        finally:
-            ftp.close()
+            raise BrowserError('Managed Core identity listing requires a read adapter.')
 
     def read_about(self, route):
         if route not in ('version', 'info'):

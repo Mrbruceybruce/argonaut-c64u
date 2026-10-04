@@ -74,22 +74,16 @@ class FolderTests(unittest.TestCase):
         client=Mock(); client.list_directory.return_value=('/USB2',[])
         with self.assertRaises(BrowserError): build_plan(client,True,self.src,['folder'],False,'/USB2')
     def test_upload_creates_parent_directories_before_files(self):
-        tree={'/USB2':[]}
-        client=Mock()
-        client.list_directory.side_effect=lambda path:(path,[SimpleNamespace(name=n,kind=k) for n,k in tree[path]])
+        from c64u_browser.simulated_ftp_reads import MemoryFilesystem
+        peer=MemoryFilesystem();client=peer.attach()
         plan=build_plan(client,True,self.src,['folder'],False,'/USB2')
-        def mkdir(c,action,path):
-            self.assertEqual(action,'mkdir')
-            parent,name=path.rsplit('/',1); tree[parent].append((name,'dir')); tree[path]=[]
-        def copy(c,sl,parent,names,local,dest,progress):
-            self.assertIn(dest,tree)
-            tree[dest].append((names[0],'file'))
-            return 'Copied 1 file(s): '+names[0],None
-        with patch('c64u_browser.folder_copy.operate',side_effect=mkdir), patch('c64u_browser.folder_copy.copy_files',side_effect=copy):
-            report=execute_plan(client,plan,True,False)
+        report=execute_plan(client,plan,True,False)
         self.assertFalse(report.error,report.error)
-        self.assertIn(('a','file'),tree['/USB2/folder/nested'])
-        self.assertIn('/USB2/folder/empty',tree)
+        self.assertEqual(b'new',peer.files[b'/USB2/folder/nested/a'])
+        self.assertIn(b'/USB2/folder/empty',peer.directories)
+        calls=[c[0] for c in peer.calls]
+        self.assertLess(calls.index('mkdir'),calls.index('write'))
+        self.assertEqual(0,peer.active)
     def test_destination_directory_replaced_with_link_stops(self):
         (self.dst/'folder').mkdir()
         plan=self.plan()
@@ -125,7 +119,7 @@ class FolderTests(unittest.TestCase):
         self.assertFalse(plan.steps)
         self.assertFalse(plan.replacements)
         with patch('c64u_browser.folder_copy.copy_files', side_effect=AssertionError('mutation')), \
-             patch('c64u_browser.folder_copy.operate', side_effect=AssertionError('mutation')):
+             patch('c64u_browser.folder_copy.execute_managed_step', side_effect=AssertionError('mutation')):
             report = execute_plan(client, plan, True, False)
         self.assertEqual(['file'], report.skipped)
         self.assertFalse(report.completed)

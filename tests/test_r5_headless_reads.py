@@ -319,7 +319,7 @@ class HeadlessReadsTests(unittest.TestCase):
         body = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_download')
         self.assertFalse(any(isinstance(n, ast.Name) and n.id == 'connect' for n in ast.walk(body)))
         with self.assertRaises(BrowserError):download(UltimateClient('fixture.invalid'), '/USB1/a', self.target())
-        self.assertTrue(hasattr(__import__('c64u_browser.transfers', fromlist=['connect']), 'connect'))
+        self.assertFalse(hasattr(__import__('c64u_browser.transfers', fromlist=['connect']), 'connect'))
 
 
 class HardwareOwnershipTests(unittest.TestCase):

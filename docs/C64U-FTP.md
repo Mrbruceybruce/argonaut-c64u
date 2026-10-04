@@ -1401,8 +1401,31 @@ MKD remains deterministic-only. Evidence is managed send/reply boundaries, not
 packet capture; no atomic external-writer exclusion is claimed. See the R6 record
 for exact paths, hashes, profile/session identities and limitations.
 
-Shared `transfers.connect`, deferred native-read/disk/USB/upload/replacement
-compatibility and `CoreDeviceOperations.open_ftp` remain for separately reviewed
-closure. R5's completed headless-read migration remains authoritative. This pass
-does not perform final compatibility work. R6 is uncommitted/unpushed and stopped
-for final review; committed HEAD remains R5.
+R6 is accepted and published at
+`f9457acd3bcef4269d9d98e95ef3c6dc33f90ff1`, parent
+`dab627979b9d3bb085c955c6e3bea8cdaff8b338`, subject
+`Implement R6 managed Flash publication`. Earlier unpublished and compatibility
+retention statements above are historical checkpoint boundaries.
+
+## Final FTP ownership closure — implementation for final review
+
+The callable raw compatibility chain is removed: `CoreDeviceOperations.open_ftp`,
+`transfers.connect`, legacy `upload/_upload`, `files.operate`, remote raw
+copy/replacement/deletion/folder alternatives, native/disk/USB raw reads, raw
+identity listing, text identity fallback, `api.parse_list`, and `_TransferFTP`.
+Remote plan additions/folders/replacements and reviewed deletion are managed
+without selection flags. Local-only copy/replacement/deletion and REST/DMA remain.
+
+Supported transport acquisition stays inside `C64UFtpLeaseManager.lease` and
+`C64UFtpClient`; no application `ftplib` import remains. Missing adapters refuse
+before transport acquisition. The socket-based managed implementation and its
+accepted wire behavior are unchanged. Explicit offline managed fixtures exercise
+staged verification/publication and the accepted byte listing parser; only Offline
+Test Lab and the offline diagnosis probe import simulator fixtures.
+
+The dedicated AST/runtime boundary suite prevents raw factory reintroduction,
+checks direct-client construction ownership, and traps network creation during
+offline checks and adapter-absent operations. See [closure evidence](FTP-OWNERSHIP-CLOSURE.md)
+for deterministic results, exact inventory and limitations. Physical qualification
+is unchanged from R1–R6; no hardware was contacted. Closure is uncommitted pending
+compact final review, and does not include Streams, Ultimate Menu or cartdumper.

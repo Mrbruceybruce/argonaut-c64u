@@ -8,7 +8,7 @@ from pathlib import Path
 import stat
 from .api import BrowserError
 from .storage import storage_root
-from .files import child, inspect, operate, operate_managed
+from .files import child, inspect, operate_managed
 from .ftp_reads import adapter_for
 
 @dataclass(frozen=True)
@@ -61,7 +61,8 @@ class DeletionReport:
     error: Exception | None = None
 
 
-def delete_reviewed(client,local,targets,items,check=lambda:None,*,managed=False):
+def delete_reviewed(client,local,targets,items,check=lambda:None):
+    managed=not local
     adapter=adapter_for(client) if managed else None
     removed=[]
     try:
@@ -96,8 +97,7 @@ def _delete_items(client,local,targets,items,check,managed,removed):
                 if item.kind=='dir':Path(item.path).rmdir()
                 else:Path(item.path).unlink()
             else:
-                operation=operate_managed if managed else operate
-                operation(client,'delete',item.path,confirmation=item.path)
+                operate_managed(client,'delete',item.path,confirmation=item.path)
             removed.append(item.path)
         return DeletionReport(removed) if managed else (removed,None)
     except Exception as exc:

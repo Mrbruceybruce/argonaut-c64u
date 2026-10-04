@@ -1,18 +1,19 @@
 import ftplib
 import unittest
 from unittest.mock import patch
-from c64u_browser.api import (UltimateClient, BrowserError, IdentityEntry,
-                              parse_list)
+from c64u_browser.api import (UltimateClient, BrowserError, IdentityEntry)
 from c64u_browser.simulated_ftp_reads import MemoryReads
-from c64u_browser.c64u_ftp_types import ErrorCode
+from c64u_browser.c64u_ftp_types import ErrorCode, ListingParser, ListingLimits, FtpOperationError
 
 class Tests(unittest.TestCase):
     def test_spaces(self):
-        self.assertEqual(parse_list('-rw-rw-rw- 1 user ftp 123 Sep 07 12:30 My  game.d64').name, 'My  game.d64')
+        parser=ListingParser('list',ListingLimits())
+        parser.feed(b'-rw-rw-rw- 1 user ftp 123 Sep 07 12:30 My  game.d64\r\n')
+        self.assertEqual(parser.finish()[0].name,b'My  game.d64')
     def test_unknown_format(self):
-        with self.assertRaises(BrowserError): parse_list('garbage')
+        with self.assertRaises(FtpOperationError): ListingParser('list',ListingLimits()).feed(b'garbage\r\n')
     def test_injection(self):
-        with patch('c64u_browser.api.ftplib.FTP') as factory:
+        with patch('ftplib.FTP') as factory:
             with self.assertRaises(BrowserError): UltimateClient('device').list_directory('/\r\nDELE file')
             factory.assert_not_called()
     def test_mlsd(self):
@@ -29,20 +30,13 @@ class Tests(unittest.TestCase):
         self.assertEqual((0, 1), (peer.active, peer.released))
 
     def test_identity_listing_preserves_filename_octets_and_sorts_raw_bytes(self):
-        with patch('c64u_browser.api.ftplib.FTP') as factory:
-            ftp = factory.return_value
-            ftp.pwd.return_value = '/USB1/games/s'
-            ftp.mlsd.return_value = [
-                ('Schatzj\x84ger [Side 2] [Ariolasoft] [TWG].d64',
-                 {'type':'file','size':'174848'}),
-                ('ASCII.d64', {'type':'file','size':'174848'}),
-                ('Schatzj\x84ger [Side 1] [Ariolasoft] [TWG].d64',
-                 {'type':'file','size':'174848'}),
-                ('.', {'type':'cdir'}),
-            ]
-            actual, entries = UltimateClient('device').list_directory_identity(
-                b'/USB1/games/s')
-        factory.assert_called_once_with(timeout=10, encoding='latin-1')
+        peer=MemoryReads(rows=(
+            b'type=file;size=174848; Schatzj\x84ger [Side 2] [Ariolasoft] [TWG].d64\r\n'
+            b'type=file;size=174848; ASCII.d64\r\n'
+            b'type=file;size=174848; Schatzj\x84ger [Side 1] [Ariolasoft] [TWG].d64\r\n'
+            b'type=cdir; .\r\n'))
+        actual,entries=peer.attach().list_directory_identity(b'/USB1/games/s')
+        self.assertEqual((0,1),(peer.active,peer.released))
         self.assertEqual(b'/USB1/games/s', actual)
         self.assertEqual([
             b'ASCII.d64',
@@ -53,19 +47,14 @@ class Tests(unittest.TestCase):
                             for entry in entries))
 
     def test_identity_listing_fallback_preserves_non_utf8_octet(self):
-        with patch('c64u_browser.api.ftplib.FTP') as factory:
-            ftp = factory.return_value
-            ftp.pwd.return_value = '/USB1'
-            ftp.mlsd.side_effect = ftplib.error_perm('502 Unsupported')
-            ftp.retrlines.side_effect = lambda _cmd, callback: callback(
-                '-rw-rw-rw- 1 user ftp 174848 Sep 07 2026 Schatzj\x84ger.d64')
-            actual, entries = UltimateClient('device').list_directory_identity(
-                b'/USB1')
+        peer=MemoryReads(dialect='list',rows=b'-rw-rw-rw- 1 user ftp 174848 Sep 07 2026 Schatzj\x84ger.d64\r\n')
+        actual,entries=peer.attach().list_directory_identity(b'/USB1')
+        self.assertEqual((0,1),(peer.active,peer.released))
         self.assertEqual(b'/USB1', actual)
         self.assertEqual(b'Schatzj\x84ger.d64', entries[0].name)
 
     def test_identity_listing_rejects_text_and_control_path(self):
-        client = UltimateClient('device')
+        client = MemoryReads().attach()
         for path in ('/USB1', b'/USB1\rDELE'):
             with self.subTest(path=path), self.assertRaises(BrowserError):
                 client.list_directory_identity(path)

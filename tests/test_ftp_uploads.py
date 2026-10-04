@@ -367,7 +367,7 @@ class UploadTests(unittest.TestCase):
             preview=core.files.prepare_copy(request).wait(5)
 
             with patch(
-                'c64u_browser.folder_copy.operate',
+                'ftplib.FTP',
                 side_effect=AssertionError('legacy remote MKD must not be used'),
             ):
                 result=core.files.execute_copy(preview.result.plan_id).wait(5)
@@ -414,7 +414,7 @@ class UploadTests(unittest.TestCase):
             self.assertEqual(0,core._ftp_manager.active_count)
 
     def test_missing_managed_context_never_falls_back(self):
-        with patch('c64u_browser.transfers.connect',side_effect=AssertionError('fallback')):
+        with patch('ftplib.FTP',side_effect=AssertionError('fallback')):
             with self.assertRaises(UploadFailure):upload_managed(object(),self.source(),'/USB1')
 
     def test_file_service_file_validation_shares_upload_lease(self):
@@ -526,21 +526,17 @@ class UploadTests(unittest.TestCase):
             self.assertEqual(('existing',),result.result.remaining)
             self.assertIn('Publication was not confirmed',result.result.message)
 
-    def test_deferred_routes_do_not_select_managed_upload(self):
-        import ast
-        for name in ('replacement','native_files','c64_ai_install','file_copy','__main__'):
-            tree=ast.parse(Path('c64u_browser/'+name+'.py').read_text())
-            self.assertFalse(any(isinstance(n,ast.Name) and n.id=='upload_managed' for n in ast.walk(tree)))
+    def test_composite_routes_select_managed_owners(self):
         from c64u_browser.folder_copy import execute_plan, Plan, Step
         path=self.source()
         for replacement,source_local in ((True,True),(False,False)):
             plan=Plan(steps=[Step('new',str(path),'/USB1/new',False,signature=('old',3) if replacement else None)])
-            with patch('c64u_browser.folder_copy.kind',return_value='file' if replacement else None),patch('c64u_browser.folder_copy.upload_managed',side_effect=AssertionError('managed deferred')) as managed,patch('c64u_browser.folder_copy.replace_file') as replace_file,patch('c64u_browser.folder_copy.copy_files',return_value=('Copied 1 file(s): /USB1/new',None)) as copy:
-                # Supply source and destination kinds independently.
-                with patch('c64u_browser.folder_copy.kind',side_effect=['file','file' if replacement else None]):
-                    report=execute_plan(object(),plan,source_local,False,managed_uploads=True)
-                self.assertFalse(report.error,report.error);managed.assert_not_called()
-                self.assertEqual(replacement,replace_file.called);self.assertEqual(not replacement,copy.called)
+            from types import SimpleNamespace
+            with patch('c64u_browser.folder_copy.replace_managed') as replace,patch('c64u_browser.folder_copy.execute_managed_step',return_value=SimpleNamespace(upload=None)) as composite,patch('c64u_browser.folder_copy.copy_files',side_effect=AssertionError('raw copy')):
+                report=execute_plan(object(),plan,source_local,False)
+                self.assertFalse(report.error,report.error)
+                self.assertEqual(replacement,replace.called)
+                self.assertEqual(not replacement,composite.called)
 
 
 if __name__=='__main__':unittest.main()

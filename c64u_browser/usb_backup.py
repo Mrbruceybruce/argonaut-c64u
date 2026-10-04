@@ -22,7 +22,7 @@ from .jobs import CoreJob, JobCancelled, JobProgress
 from .replacement import signature
 from .scheduler import JobBinding
 from .storage import storage_root
-from .transfers import connect, download
+from .transfers import download
 from .ftp_reads import read_operation, adapter_for
 
 
@@ -320,14 +320,7 @@ class UsbBackupService:
         def listing(path):
             identity=getattr(client,'list_directory_identity',None)
             if identity is not None:return identity(path)
-            # Existing in-memory transports used by deterministic tests contain
-            # ordinary text only. Production UltimateClient always supplies the
-            # octet-preserving identity method.
-            actual,entries=client.list_directory(path.decode('utf-8'))
-            from .api import IdentityEntry
-            return actual.encode('utf-8'),tuple(
-                IdentityEntry(entry.name.encode('utf-8'),entry.kind,entry.size)
-                for entry in entries)
+            raise BrowserError('USB identity requires a byte-preserving identity method.')
 
         def visit(path,components=(),depth=0):
             nonlocal entries_seen,directories_seen
@@ -507,19 +500,7 @@ class UsbBackupService:
                 job.report(JobProgress(phase,base+count,total,'bytes','Verifying USB backup data…'))
             result=adapter.read_into(path,HashSink(),progress=progress,check=job.check_cancel)
             return result.transferred,result.sha256
-        ftp=connect(client);digest=hashlib.sha256();count=0
-        try:
-            expected=ftp.size(path)
-            if expected is None:raise BrowserError('The C64U did not report a file size: '+path)
-            def receive(block):
-                nonlocal count
-                job.check_cancel();digest.update(block);count+=len(block)
-                job.report(JobProgress(phase,base+count,total,'bytes','Verifying USB backup data…'))
-            ftp.retrbinary('RETR '+path,receive)
-            if count!=expected or ftp.size(path)!=expected:
-                raise BrowserError('A C64U source file changed during verification: '+path)
-            return count,digest.hexdigest()
-        finally:ftp.close()
+        raise BrowserError('USB verification requires a Core-managed read adapter.')
 
     def execute_backup(self,plan_id):
         stored=self._take(self._backups,plan_id,'Backup plan')
@@ -743,7 +724,7 @@ class UsbBackupService:
                     steps.append(Step(item.path,source,destination,False,True,
                                       signature(client,False,destination)))
             plan=Plan(steps=steps)
-            report=execute_plan(client,plan,True,False,job.byte_progress('restore'), managed_uploads=True, managed_replacements=True, managed_folders=True)
+            report=execute_plan(client,plan,True,False,job.byte_progress('restore'))
             completed=set(value.rstrip('/') for value in report.completed)
             replaced=tuple(path for path in replacement_set if path in completed)
             added=tuple(path for path in stored.classification.additions if path.rstrip('/') in completed)

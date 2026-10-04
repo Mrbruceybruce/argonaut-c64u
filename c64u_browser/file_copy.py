@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 from .api import BrowserError
 from .files import child
-from .transfers import download, upload, UploadFailure
+from .transfers import download, UploadFailure
 
 
 def local_copy(source, destination, progress):
@@ -52,16 +52,10 @@ def copy_files(client, source_local, parent, names, local, destination, progress
             child('/USB2', name)
             if source_local and local:
                 result = local_copy(Path(parent) / name, Path(destination) / name, progress)
-            elif source_local:
-                result = upload(client, Path(parent) / name, destination, progress)
             elif local:
                 result = download(client, child(parent, name), Path(destination) / name, progress)
             else:
-                # Remote-to-remote uses a verified upload after downloading locally.
-                with tempfile.TemporaryDirectory(prefix='argonaut-copy-') as folder:
-                    staged = Path(folder) / name
-                    download(client, child(parent, name), staged, progress)
-                    result = upload(client, staged, destination, progress)
+                raise BrowserError('Remote destinations require a managed copy plan.')
             results.append(result['path'])
         except Exception as exc:
             if getattr(exc,'cancelled',False):raise

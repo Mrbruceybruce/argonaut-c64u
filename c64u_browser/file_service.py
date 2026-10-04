@@ -308,7 +308,7 @@ class FileService:
             client=self._client((request.source,request.destination),stored.session)
             report=execute_plan(client,plan,request.source.scope==CORE_HOST,
                                 request.destination.scope==CORE_HOST,
-                                job.byte_progress(), managed_uploads=True, managed_replacements=True, managed_folders=True)
+                                job.byte_progress())
             partial=(PartialUpload(FileLocation.c64u(report.partial),
                         stored.session.device_id,stored.session.session_id)
                      if report.partial and stored.session else None)
@@ -363,7 +363,7 @@ class FileService:
                                 stored.session)
             if not local:
                 report=delete_reviewed(client,False,stored.targets,stored.items,
-                                       check=job.check_cancel,managed=True)
+                                       check=job.check_cancel)
                 result=DeleteResult(tuple(report.removed),len(stored.items),
                     str(report.error) if report.error else '',report.stopped_target,
                     report.mutation,report.not_attempted)
