@@ -237,19 +237,17 @@ class FreshFolderCliTests(unittest.TestCase):
             self.assertEqual(1, code); self.assertEqual('published-local-cleanup-failed', record['result']['disposition'])
             self.assertTrue(record['result']['verified'])
 
-    def test_legacy_info_ls_browse_get_routes_unchanged(self):
-        for command in ('info', 'ls', 'browse', 'get'):
-            with self.subTest(command=command):
-                client = Mock(); client.info.return_value = {'ok': True}; client.list_directory.return_value = ('/USB1', [Entry('a','file',3)])
-                argv = ['c64u_browser', '--host', 'example.invalid', '--password', '--port', '123', '--timeout', '7', '--encoding', 'latin-1', command, '/USB1']
-                if command == 'get':argv.append('local')
-                with patch('sys.argv', argv), patch('c64u_browser.__main__.UltimateClient', return_value=client) as factory, \
-                     patch('c64u_browser.__main__.getpass.getpass', return_value='legacy'), patch('builtins.input', return_value='q'), \
-                     patch('c64u_browser.__main__.download', return_value={'path':'local'}) as download, \
-                     redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-                    self.assertEqual(0, main())
-                factory.assert_called_once_with('example.invalid', 'legacy', 123, 7, 'latin-1')
-                self.assertEqual(command == 'get', download.called)
+    def test_legacy_info_route_unchanged(self):
+        client = Mock(); client.info.return_value = {'ok': True}
+        argv = ['c64u_browser', '--host', 'example.invalid', '--password', '--port', '123', '--timeout', '7', '--encoding', 'latin-1', 'info', '/USB1', 'ignored']
+        with patch('sys.argv', argv), patch('c64u_browser.__main__.UltimateClient', return_value=client) as factory, \
+             patch('c64u_browser.__main__.getpass.getpass', return_value='legacy'), \
+             patch('ftplib.FTP', side_effect=AssertionError('FTP forbidden')), \
+             patch('c64u_browser.core.ArgonautCore.connect', side_effect=AssertionError('Core forbidden')), \
+             redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertEqual(0, main())
+        factory.assert_called_once_with('example.invalid', 'legacy', 123, 7, 'latin-1')
+        client.list_directory.assert_not_called()
 
     def test_legacy_required_host_and_profile_rejection(self):
         for argv in (['info'], ['--profile-id', 'a', '--host', 'example.invalid', 'ls']):

@@ -1,19 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Intentional offline failure for exercising the separate AI diagnosis path."""
-import ftplib
-from unittest.mock import patch
-
-from .api import UltimateClient
 from .diagnostics import operation_origin
-from .simulated_c64u import _FTP
+from .simulated_ftp_reads import MemoryReads
 from .test_lab import Check, run_checks
 
 
 def _refused_ftp_login():
-    ftp = _FTP(login_error=ftplib.error_perm('530 Simulated login refusal'))
-    with patch('ftplib.FTP', return_value=ftp):
-        UltimateClient('fixture.invalid').list_directory('/')
+    MemoryReads(failure='authentication-failed').attach().list_directory('/')
 
 
 def run_diagnosis_probe():

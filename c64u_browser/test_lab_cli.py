@@ -9,7 +9,8 @@ from . import development
 from .ai_analysis import analyze_failures
 from .ai_gateway import AIGateway, GatewayConfig, GatewayError
 from .api import BrowserError, safe_argument
-from .hardware_checks import run_hardware_checks
+from .hardware_checks import run_core_hardware_checks
+from .core import ArgonautCore
 from .platform_support import config_base
 from .profiles import Preferences
 from .test_lab import run_default_checks
@@ -87,14 +88,15 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
             profile = (profile_for_id(preferences, args.profile_id)
                        if args.profile_id is not None else
                        profile_for_device(preferences, args.device_id))
-            client = profile.client(password) if profile else None
-            if client is not None:
-                client.timeout = args.timeout
-            result = run_with_history(preferences.path,
-                lambda: run_hardware_checks(client, profile),
-                profile_id=profile.id if profile else None)
+            core = ArgonautCore(preferences=preferences, network_timeout=args.timeout)
+            try:
+                result = run_with_history(preferences.path,
+                    lambda: run_core_hardware_checks(core, profile, password),
+                    profile_id=profile.id if profile else None)
+            finally:
+                core.close()
         except (BrowserError, OSError, ValueError) as exc:
-            print('Test Lab could not start: ' + str(exc), file=stderr)
+            print('Test Lab could not start: configuration or history unavailable.', file=stderr)
             return 3
     output = dict(result['report'])
     if args.suite == 'hardware':

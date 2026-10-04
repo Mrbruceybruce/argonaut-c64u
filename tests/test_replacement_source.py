@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock,patch
 from c64u_browser.api import Entry
+from c64u_browser.simulated_ftp_reads import MemoryReads
 from c64u_browser.folder_copy import build_plan,execute_plan
 
 class ReplacementSourceTests(unittest.TestCase):
@@ -32,6 +33,9 @@ class ReplacementSourceTests(unittest.TestCase):
     client=Mock();client.list_directory.side_effect=listing
     def operate(client,action,path):
      self.assertEqual(action,'mkdir');self.assertNotIn(path,folders);folders.add(path)
+    # Attach a managed download fixture; raw writes remain this policy test's seam.
+    peer=MemoryReads(files={k.encode():v for k,v in data.items()})
+    peer.attach(client)
     parent=Path(tmp) if source_local else '/USB2/source'
     plan=build_plan(client,source_local,parent,['a.png'],False,'/USB2/dest')
     plan.steps.extend(plan.replacements);plan.conflicts=[]

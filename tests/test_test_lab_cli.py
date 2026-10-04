@@ -41,12 +41,12 @@ class HeadlessCliTests(unittest.TestCase):
             output = io.StringIO()
             seen = []
 
-            def hardware(client, profile):
-                seen.append((client.host, profile.id))
+            def hardware(core, profile, password):
+                seen.append((profile.host, profile.id))
                 return fixture_report('pass')
 
             with patch('c64u_browser.test_lab_cli.config_base', return_value=base), patch(
-                    'c64u_browser.test_lab_cli.run_hardware_checks', side_effect=hardware):
+                    'c64u_browser.test_lab_cli.run_core_hardware_checks', side_effect=hardware):
                 code = main(['--suite', 'hardware', '--device-id', 'bravo'], stdout=output)
             self.assertEqual(code, 0)
             self.assertEqual(seen, [('second.invalid', second.id)])
@@ -66,7 +66,7 @@ class HeadlessCliTests(unittest.TestCase):
             preferences.selected_id = first.id
             preferences.save()
             with patch('c64u_browser.test_lab_cli.config_base', return_value=base), patch(
-                    'c64u_browser.test_lab_cli.run_hardware_checks') as hardware:
+                    'c64u_browser.test_lab_cli.run_core_hardware_checks') as hardware:
                 for device_id in ('unknown', 'ALPHA'):
                     with self.subTest(device_id=device_id):
                         output, error = io.StringIO(), io.StringIO()
@@ -94,7 +94,7 @@ class HeadlessCliTests(unittest.TestCase):
                 return 'Check the cable.'
 
             with patch('c64u_browser.test_lab_cli.config_base', return_value=base), patch(
-                    'c64u_browser.test_lab_cli.run_hardware_checks',
+                    'c64u_browser.test_lab_cli.run_core_hardware_checks',
                     return_value=fixture_report('fail')), patch(
                     'c64u_browser.test_lab_cli.AIGateway', return_value=adapter):
                 code = main(['--suite', 'hardware', '--explain-failures',
@@ -123,7 +123,7 @@ class HeadlessCliTests(unittest.TestCase):
                 raise GatewayError('network', 'AI service could not be reached.')
 
             with patch('c64u_browser.test_lab_cli.config_base', return_value=base), patch(
-                    'c64u_browser.test_lab_cli.run_hardware_checks',
+                    'c64u_browser.test_lab_cli.run_core_hardware_checks',
                     return_value=fixture_report('fail')), patch(
                     'c64u_browser.test_lab_cli.AIGateway', return_value=adapter):
                 code = main(['--suite', 'hardware', '--explain-failures',
@@ -145,7 +145,7 @@ class HeadlessCliTests(unittest.TestCase):
             preferences.save()
             output = io.StringIO()
             with patch('c64u_browser.test_lab_cli.config_base', return_value=base), patch(
-                    'c64u_browser.test_lab_cli.run_hardware_checks',
+                    'c64u_browser.test_lab_cli.run_core_hardware_checks',
                     return_value=fixture_report('fail')) as checks, patch(
                     'c64u_browser.test_lab_cli.AIGateway') as gateway:
                 code = main(['--suite', 'hardware', '--explain-failures',
@@ -208,12 +208,12 @@ class HeadlessCliTests(unittest.TestCase):
             output = io.StringIO()
             seen = []
 
-            def hardware(client, selected):
-                seen.append((client.password, selected.id, client.timeout))
+            def hardware(core, selected, password):
+                seen.append((password, selected.id, core._network_timeout))
                 return fixture_report('pass')
 
             with patch('c64u_browser.test_lab_cli.config_base', return_value=base), patch(
-                    'c64u_browser.test_lab_cli.run_hardware_checks', side_effect=hardware):
+                    'c64u_browser.test_lab_cli.run_core_hardware_checks', side_effect=hardware):
                 code = main(['--suite', 'hardware', '--password-stdin', '--timeout', '3'],
                             stdin=io.StringIO('private-secret\n'), stdout=output)
             report = json.loads(output.getvalue())
@@ -256,7 +256,7 @@ class HeadlessCliTests(unittest.TestCase):
             output = io.StringIO()
             with patch('c64u_browser.test_lab_cli.config_base',
                        return_value=base), patch(
-                       'c64u_browser.test_lab_cli.run_hardware_checks',
+                       'c64u_browser.test_lab_cli.run_core_hardware_checks',
                        return_value=fixture_report('pass')):
                 code = main(['--suite', 'hardware'], stdout=output)
             self.assertEqual(code, 0)

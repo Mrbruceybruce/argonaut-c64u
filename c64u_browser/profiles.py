@@ -54,9 +54,6 @@ class Profile:
             raise ConnectionFailure('identity','Confirm this profile’s device in Connections before using automatic connection.')
         return reported
 
-    def client(self, password=''):
-        return UltimateClient(self.host, password, port=self.ftp_port, http_port=self.http_port)
-
 from .app_preferences import defaults, validate
 from .platform_support import config_base
 from . import development

@@ -103,6 +103,19 @@ class UsbBackupTests(unittest.TestCase):
         self.service=UsbBackupService(lambda:self.client,lambda:self.session,self.scheduler)
         self.files=FileService(lambda:self.client,lambda:self.session,
                                scheduler=self.scheduler)
+        # Explicit managed download fixture only; leave legacy restore-policy
+        # doubles and their mutation seams unchanged.
+        from c64u_browser.simulated_ftp_reads import MemoryReads
+        from c64u_browser.transfers import download
+        def managed_download(client, source, destination, progress=lambda n:None, **kwargs):
+            if source in client.fail_paths:raise BrowserError('Simulated read failure.')
+            if source == client.block_path:
+                client.transfer_started.set();client.transfer_release.wait(3)
+            peer = MemoryReads(files={source.encode():client.files[source]})
+            return download(peer.attach(), source, destination, progress, **kwargs)
+        for module in ('usb_backup', 'file_copy'):
+            seam = patch('c64u_browser.'+module+'.download', side_effect=managed_download)
+            seam.start();self.addCleanup(seam.stop)
         # This suite exercises restore policy with an in-memory legacy peer.
         # Supply the explicit upload seam; real managed wire/evidence behavior is
         # covered by test_ftp_uploads, not inferred from this double.

@@ -4,11 +4,12 @@
 from collections import OrderedDict
 from dataclasses import dataclass
 from queue import Empty, Queue
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
+from contextlib import contextmanager
 import time
 
 from .api import BrowserError
-from .jobs import TERMINAL_STATES
+from .jobs import TERMINAL_STATES, CoreJob
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,36 @@ class CoreScheduler:
             job._queue(binding.lane, binding.device_id, binding.session_id)
             queue.put((job, binding))
         return job
+
+    @contextmanager
+    def inline(self, binding):
+        """Reserve a FIFO lane for work in a thread-local diagnostic collector.
+
+        The worker only holds the reservation. The caller owns execution and
+        exceptions, and always releases/drains the reservation before returning.
+        """
+        ready, release = Event(), Event()
+        def reserve(job):
+            ready.set()
+            release.wait()
+        job = CoreJob('diagnostic.reservation', reserve)
+        job.add_listener(lambda event: ready.set() if event.kind == 'finished' else None)
+        self.submit(job, binding)
+        try:
+            ready.wait()
+            self._validate(binding)
+            job.check_cancel()
+            if job.snapshot().state != 'running':
+                raise BrowserError('Diagnostic lane reservation failed.')
+            yield job.check_cancel
+        finally:
+            release.set()
+            while True:
+                try:
+                    job.wait()
+                    break
+                except KeyboardInterrupt:
+                    continue
 
     def _worker(self, lane, queue):
         while True:

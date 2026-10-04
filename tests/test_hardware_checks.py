@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from c64u_browser.api import Entry, UltimateClient
+from c64u_browser.simulated_ftp_reads import MemoryReads
 from c64u_browser.hardware_checks import run_hardware_checks
 from c64u_browser.profiles import Profile
 
@@ -42,20 +43,18 @@ class HardwareChecksTests(unittest.TestCase):
             requests.append((method, path, payload))
             return responses[path]
 
-        ftp = Mock()
-        ftp.pwd.return_value = '/'
-        ftp.mlsd.return_value = [('USB2', {'type': 'dir'})]
+        peer = MemoryReads(rows=b'type=dir; USB2\r\n')
+        peer.attach(client)
         with patch.object(client, '_request_json_impl', side_effect=rest), patch(
-                'c64u_browser.network_identity.peer_mac', return_value=''), patch(
-                'ftplib.FTP', return_value=ftp):
+                'c64u_browser.network_identity.peer_mac', return_value=''):
             report = run_hardware_checks(client, profile)
         self.assertEqual(report['status'], 'pass')
         self.assertEqual([check['status'] for check in report['checks']], ['pass'] * 4)
         self.assertEqual(len(requests), 4)
         self.assertTrue(all(method == 'GET' and payload is None
                             for method, _, payload in requests))
-        ftp.cwd.assert_called_once_with('/')
-        ftp.close.assert_called_once()
+        self.assertEqual([('list', b'/')], peer.calls)
+        self.assertEqual((0, 1), (peer.active, peer.released))
         self.assertEqual(sum(len(check['operations']) for check in report['checks']), 5)
         self.assertNotIn('private', json.dumps(report))
         self.assertNotIn('fixture.invalid', json.dumps(report))

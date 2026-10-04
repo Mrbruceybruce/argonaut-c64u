@@ -68,7 +68,7 @@ class UltimateClient:
         with operation_event('ftp', 'list_directory', 'directory'):
             if self._ftp_reads is not None:
                 return self._ftp_reads.list_directory(path)
-            return self._list_directory(path)
+            raise BrowserError('Managed Core listing requires a read adapter.')
 
     def list_directory_identity(self, path=b'/'):
         """List a directory without interpreting filename octets as text.
@@ -128,41 +128,6 @@ class UltimateClient:
                 kind,
                 f'FTP identity listing failed ({self.host}:{self.port}). '
                 'Check address, FTP service, password and LAN connection.') from exc
-        finally:
-            ftp.close()
-
-    def _list_directory(self, path):
-        safe_argument(path)
-        if not path.startswith('/'):
-            raise BrowserError('Directory path must be absolute, beginning with /.')
-        ftp = ftplib.FTP(timeout=self.timeout, encoding=self.encoding)
-        try:
-            ftp.connect(self.host, self.port)
-            ftp.login('anonymous', self.password)
-            ftp.set_pasv(True)
-            ftp.cwd(path)
-            actual = ftp.pwd()
-            try:
-                rows = list(ftp.mlsd())
-                entries = []
-                for name, facts in rows:
-                    kind = facts.get('type', 'unknown')
-                    if kind in ('cdir', 'pdir'):
-                        continue
-                    size = int(facts['size']) if 'size' in facts else None
-                    entries.append(Entry(name, kind, size))
-            except ftplib.error_perm as exc:
-                if str(exc)[:3] not in ('500', '502', '504'):
-                    raise
-                lines = []
-                ftp.retrlines('LIST', lines.append)
-                entries = [parse_list(line) for line in lines]
-            return actual, sorted(entries, key=lambda e: (e.kind != 'dir', e.name.casefold()))
-        except UnicodeError as exc:
-            raise BrowserError('Filename encoding failed. Retry with --encoding latin-1; byte mapping needs hardware verification.') from exc
-        except (OSError, EOFError, ftplib.Error, ValueError) as exc:
-            kind = 'authentication' if isinstance(exc, ftplib.error_perm) and str(exc).startswith('530') else ('network' if isinstance(exc, (OSError, EOFError)) else 'ftp')
-            raise ConnectionFailure(kind, f'FTP browse failed ({self.host}:{self.port}): {exc}. Check address, FTP service, password and LAN connection.') from exc
         finally:
             ftp.close()
 

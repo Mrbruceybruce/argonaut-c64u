@@ -614,6 +614,7 @@ class ParserTests(unittest.TestCase):
             tree=ast.parse(path.read_text())
             for node in ast.walk(tree):
                 if isinstance(node,ast.ImportFrom):
+                    if path.name == 'simulated_ftp_reads.py' and node.module == 'c64u_ftp_types':continue
                     self.assertNotIn('c64u_ftp',node.module or '')
                 if isinstance(node,ast.Import):
                     self.assertFalse(any('c64u_ftp' in a.name for a in node.names))

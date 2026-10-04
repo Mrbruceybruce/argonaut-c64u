@@ -2,6 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import Mock,patch
+from c64u_browser.simulated_ftp_reads import MemoryReads
 from c64u_browser.api import BrowserError
 from c64u_browser.transfers import upload, download, UploadFailure
 from c64u_browser.file_copy import local_copy
@@ -22,12 +23,11 @@ class CancelTests(TestCase):
             self.assertTrue(report.error);self.assertEqual(report.remaining,['source']);self.assertFalse(report.completed)
     def test_download_cancellation_removes_temp(self):
         with TemporaryDirectory() as d:
-            ftp=Mock();ftp.size.return_value=4
-            ftp.retrbinary.side_effect=lambda cmd,receive:receive(b'data')
+            peer=MemoryReads(files={b'/USB2/a': b'data'})
             def progress(n):self.check()
-            with patch('c64u_browser.transfers.connect',return_value=ftp):
-                with self.assertRaises(BrowserError):download(Mock(),'/USB2/a',Path(d)/'a',progress)
-            self.assertFalse(list(Path(d).iterdir()));ftp.close.assert_called_once()
+            with self.assertRaises(BrowserError):download(peer.attach(),'/USB2/a',Path(d)/'a',progress)
+            self.assertFalse(list(Path(d).iterdir()))
+            self.assertEqual((0,1),(peer.active,peer.released))
     def test_upload_cancel_verification_retains_partial_without_publish(self):
         with TemporaryDirectory() as d:
             source=Path(d)/'a';source.write_bytes(b'data')

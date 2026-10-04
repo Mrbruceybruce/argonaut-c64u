@@ -28,6 +28,15 @@ If the device password is needed, `--password-stdin` reads one line from
 standard input; no password is accepted as a command-line argument or stored
 in preferences. `--timeout N` sets a 1–30 second hardware timeout. Exit codes
 are 0 for pass, 1 for fail, 2 for skip, and 3 for startup or history errors.
+Headless hardware runs establish the normal Core session during
+`hardware.identity` with initial FTP browsing disabled. The first managed FTP
+lease is acquired by `hardware.storage`; an FTP failure belongs to that check,
+while identity and other available REST checks can still pass. Saved bound
+identity is required; no profile binding is changed. The timeout applies to REST
+and all FTP connection/reply/data limits. Without `--password-stdin`, Core uses
+its existing private credential resolution and never prompts. Fleet, watch and
+background runs share this ownership and release each run's Core resources.
+
 An all-skipped run is kept for audit but is ignored as a comparison baseline.
 `--device-id ID` can target a specific C64U through its already saved,
 identity-bound Argonaut Development profile instead of the currently selected
@@ -325,3 +334,19 @@ scenarios, independent readbacks, reviewed disposable cleanup and fresh absence.
 No GUI install-and-pair action, production configuration, service/health change
 or C64 launch was exercised. See [the R4 physical record](R4-MANAGED-C64-AI-INSTALL.md).
 R4 remains uncommitted; stop for final review.
+
+
+### R5 read-only physical qualification — 4 October 2026
+
+The separately authorized R5 physical pass completed Beige before Founder.
+Actual headless `--suite hardware --profile-id ID` runs using their saved
+Development profiles both exited 0, saved history, and passed identity, drives,
+storage and version stability without skips. Storage listed `/` through managed
+MLSD; all FTP events were attributed to `hardware.storage`, with none during
+identity or other checks. Per-run Core sessions stayed stable, terminal leases
+returned to zero and Core shutdown completed. Actual CLI ls/get and independent
+local historical hash checks also passed, with local payload cleanup and no
+remote writes. Send-boundary observations are not packet capture. Exact safe
+identities, paths, hashes, sessions and limitations are in the
+[R5 physical record](R5-CORE-OWNED-HEADLESS-READS.md).
+R5 remains uncommitted/unpushed; stop for final R5 review.

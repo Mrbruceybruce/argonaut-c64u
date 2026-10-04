@@ -2,6 +2,7 @@ import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch, Mock
+from c64u_browser.simulated_ftp_reads import MemoryReads
 from c64u_browser.api import BrowserError
 from c64u_browser.transfers import download, remote_file
 
@@ -15,44 +16,37 @@ class Transfers(unittest.TestCase):
             self.assertEqual(remote_file(path), path)
 
     def test_download_success(self):
-        with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect:
-            ftp = connect.return_value
-            ftp.size.return_value = 3
-            ftp.retrbinary.side_effect = lambda cmd, cb: cb(b'abc')
+        with tempfile.TemporaryDirectory() as directory:
+            peer = MemoryReads(files={b'/USB2/file': b'abc'})
             target = Path(directory)/'file'
-            self.assertEqual(download(Mock(), '/USB2/file', target)['bytes'], 3)
+            self.assertEqual(download(peer.attach(), '/USB2/file', target)['bytes'], 3)
             self.assertEqual(target.read_bytes(), b'abc')
-            self.assertEqual(len(list(Path(directory).iterdir())),1);self.assertTrue(next(Path(directory).iterdir()).samefile(target))
+            self.assertEqual([target], list(Path(directory).iterdir()))
+            self.assertEqual((0, 1), (peer.active, peer.released))
 
     def test_existing_file(self):
-        with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect:
+        with tempfile.TemporaryDirectory() as directory:
+            peer = MemoryReads()
             target = Path(directory)/'file'
             target.write_bytes(b'keep')
-            with self.assertRaises(BrowserError): download(Mock(), '/USB2/file', target)
-            connect.assert_not_called()
+            with self.assertRaises(BrowserError):download(peer.attach(), '/USB2/file', target)
+            self.assertEqual(0, peer.acquired)
             self.assertEqual(target.read_bytes(), b'keep')
 
     def test_interrupted_cleanup(self):
-        with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect:
-            connect.return_value.size.return_value = 3
-            def interrupted(cmd, cb):
-                cb(b'a')
-                raise OSError('disconnected')
-            connect.return_value.retrbinary.side_effect = interrupted
-            with self.assertRaises(BrowserError): download(Mock(), '/USB2/file', Path(directory)/'file')
+        with tempfile.TemporaryDirectory() as directory:
+            peer = MemoryReads(files={b'/USB2/file': b'abc'}, interrupted=True)
+            with self.assertRaises(BrowserError):download(peer.attach(), '/USB2/file', Path(directory)/'file')
             self.assertEqual(list(Path(directory).iterdir()), [])
+            self.assertEqual((0, 1), (peer.active, peer.released))
 
     def test_concurrent_destination(self):
-        with tempfile.TemporaryDirectory() as directory, patch('c64u_browser.transfers.connect') as connect:
+        with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)/'file'
-            connect.return_value.size.return_value = 3
-            def receive(cmd, cb):
-                cb(b'abc')
-                target.write_bytes(b'keep')
-            connect.return_value.retrbinary.side_effect = receive
-            with self.assertRaises(BrowserError): download(Mock(), '/USB2/file', target)
+            peer = MemoryReads(files={b'/USB2/file': b'abc'}, after_read=lambda:target.write_bytes(b'keep'))
+            with self.assertRaises(BrowserError):download(peer.attach(), '/USB2/file', target)
             self.assertEqual(target.read_bytes(), b'keep')
-
+            self.assertEqual([target], list(Path(directory).iterdir()))
 
     def test_direct_upload(self):
         from c64u_browser.transfers import upload

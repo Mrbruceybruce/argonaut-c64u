@@ -12,12 +12,13 @@ current state recorded here.
 - Stable 1.9 is released as `v1.9`. Its release artifacts are immutable.
 - `main` and `v1.9` are not the 1.10 development workspace. Current 1.10 work
   belongs on `development`.
-- Verified post-R3 development authority:
-  `a081b01c4a62198b35b88199c4c8e48f9c535f90`
-  (`Retire R3 compatibility surfaces`). R3 is complete, committed and pushed.
+- Verified post-R4 development authority:
+  `8ac1b24cb70f996b877b3eef81fd1c5817748bff`
+  (`Implement R4 managed C64 AI installation`), parent
+  `a081b01c4a62198b35b88199c4c8e48f9c535f90`. R4 is accepted, committed and pushed.
   On 4 October 2026, HEAD and local `origin/development` matched with divergence
-  `0 0` and a clean worktree before the R4 documentation-only design pass.
-  R2 remains accepted and physically qualified on both C64 Ultimates.
+  `0 0` and a clean worktree before the R5 documentation-only design pass.
+  R2–R4 physical acceptance evidence remains recorded below and in their docs.
 - Argonaut 1.10 direction: **C64U Network Foundation**.
 
 ## Completed FTP work
@@ -411,7 +412,10 @@ were removed and ten added; useful assertions were re-homed or strengthened.
 `git diff --check` passed. Earlier final-review/uncommitted wording in the R3
 record describes historical stages, not current status.
 
-## R4 — physically qualified on both devices; final review pending
+## R4 — accepted, committed and pushed
+
+The following qualification record preserves the pre-commit evidence; the
+post-R4 authority above supersedes its former final-review stop.
 
 [R4 — Managed C64 AI Installation](R4-MANAGED-C64-AI-INSTALL.md) now routes AI
 file work through a single-use Core capability and the captured device's scheduler
@@ -454,4 +458,30 @@ remained. See the R4 physical record for exact roots, identities and hashes.
 Only disposable files and synthetic private configuration were used; deployed
 client, production bridge configuration, pairing/services/health and launch
 were untouched. No commit, push, branch/worktree, package or release was performed.
-**Stop for final R4 review.**
+The final review and subsequent R4 commit/push are complete (authority above).
+
+## R5 — Core-owned headless reads: physically qualified; final review pending
+
+[R5 implementation record](R5-CORE-OWNED-HEADLESS-READS.md) records the approved
+saved-bound-profile CLI ls/get migration, retirement of browse, REST-only info,
+and managed headless Test Lab storage. Core now supports optional initial browsing
+without changing default GUI connection behavior. Identity establishes the session;
+storage performs the first FTP read. Directly obsolete raw listing/download and
+`Profile.client()` are retired; Flash and broader compatibility remain deferred.
+
+Starting implementation RU baseline: **55% remaining**. Deterministic verification:
+normal and optimized suites each **1,123 methods = 1,087 pass + 36 existing skips**;
+104 focused tests, 120 affected regressions, and 17 Offline Test Lab checks passed.
+R5 adds 30 methods to the R4 baseline, with no new skips. See the R5 record for
+commands, corrected iterations, ownership proof and complete changed-file inventory.
+
+**Read-only physically qualified on Beige and Founder on 4 October 2026;
+not committed/pushed. Stop for final R5 review.** Actual bound-profile CLI ls/get
+and all four headless hardware checks passed on both devices. Separate local
+readbacks matched historical sizes/hashes (8,952 and 4 bytes), followed by local
+cleanup. No initial FTP browse, stable per-run sessions, zero terminal leases
+and successful shutdown were observed. No remote writes occurred; evidence is
+send-boundary diagnostics, not packet capture. See the R5 physical record for
+exact profiles, paths, hashes and observer limitations. R4 remains accepted,
+committed and pushed at the authority above. Flash and Network Foundation remain
+incomplete.

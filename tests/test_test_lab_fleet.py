@@ -41,13 +41,13 @@ class FleetTests(unittest.TestCase):
             output = io.StringIO()
             seen = []
 
-            def hardware(client, profile):
+            def hardware(core, profile, password):
                 seen.append(profile.id)
                 return report('fail' if profile.id == second.id else 'pass')
 
             with patch('c64u_browser.test_lab_fleet.config_base', return_value=base), patch(
                     'c64u_browser.test_lab_cli.config_base', return_value=base), patch(
-                    'c64u_browser.test_lab_cli.run_hardware_checks', side_effect=hardware):
+                    'c64u_browser.test_lab_cli.run_core_hardware_checks', side_effect=hardware):
                 code = main([], stdout=output)
             result = json.loads(output.getvalue())
             self.assertEqual(code, 1)

@@ -54,50 +54,20 @@ def _download(client, source, destination, progress, *, preserve_cleanup=False):
     check()
     remote_file(source)
     destination = Path(destination).absolute()
-    temporary = None
-    ftp = None
     try:
         if os.path.lexists(destination):
             raise BrowserError('Destination already exists; nothing was overwritten.')
         adapter = adapter_for(client)
-        if adapter is not None:
-            return _managed_download(adapter, source, destination, progress, check,
-                                     preserve_cleanup=preserve_cleanup)
-        ftp = connect(client)
-        expected = ftp.size(source)
-        if expected is None:
-            raise BrowserError('Server did not provide a file size; download stopped.')
-        digest = hashlib.sha256()
-        count = 0
-        with tempfile.NamedTemporaryFile(dir=destination.parent, prefix='.c64u-', delete=False) as output:
-            temporary = output.name
-            def receive(block):
-                nonlocal count
-                check()
-                output.write(block)
-                digest.update(block)
-                count += len(block)
-                progress(count)
-            ftp.retrbinary('RETR ' + source, receive)
-            output.flush()
-            os.fsync(output.fileno())
-        if count != expected or ftp.size(source) != expected:
-            raise BrowserError('Remote size changed or transfer was incomplete; no destination published.')
-        # Hard-link publication is atomic and refuses even a concurrently created destination.
-        check()
-        publish_new(temporary, destination)
-        return {'path': str(destination), 'bytes': count, 'sha256': digest.hexdigest()}
+        if adapter is None:
+            raise BrowserError('Managed Core download requires a read adapter.')
+        return _managed_download(adapter, source, destination, progress, check,
+                                 preserve_cleanup=preserve_cleanup)
     except (OSError, EOFError, ftplib.Error, ValueError) as exc:
         failure = BrowserError('Download failed during local I/O.' if preserve_cleanup else f'Download failed: {exc}')
         if preserve_cleanup:
             for name in ('local_cleanup', 'download_observation', 'ftp_error'):
                 if hasattr(exc, name):setattr(failure, name, getattr(exc, name))
         raise failure from exc
-    finally:
-        if ftp is not None:
-            ftp.close()
-        if temporary is not None and os.path.exists(temporary):
-            os.unlink(temporary)
 
 
 def _managed_download(adapter, source, destination, progress, check, *, preserve_cleanup=False):

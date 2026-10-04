@@ -16,6 +16,7 @@ from .hardware_checks import run_hardware_checks
 from .profiles import Profile
 from .test_lab import Check, require
 from .transfers import download, upload, UploadFailure
+from .simulated_ftp_reads import MemoryReads
 
 
 class _Response:
@@ -53,44 +54,6 @@ class _RouteOpener(_RestOpener):
     def open(self, request, timeout):
         self.requests.append((request, timeout))
         return _Response(self.responses[urlsplit(request.full_url).path])
-
-
-class _FTP:
-    def __init__(self, rows=(), listing=(), mlsd_error=None, login_error=None):
-        self.rows, self.listing = rows, listing
-        self.mlsd_error, self.login_error = mlsd_error, login_error
-        self.commands = []
-
-    def connect(self, host, port):
-        self.commands.append(('connect', host, port))
-
-    def login(self, user, password):
-        self.commands.append(('login', user, password))
-        if self.login_error:
-            raise self.login_error
-
-    def set_pasv(self, enabled):
-        self.commands.append(('set_pasv', enabled))
-
-    def cwd(self, path):
-        self.commands.append(('cwd', path))
-
-    def pwd(self):
-        return '/Usb1'
-
-    def mlsd(self):
-        self.commands.append(('mlsd',))
-        if self.mlsd_error:
-            raise self.mlsd_error
-        return self.rows
-
-    def retrlines(self, command, callback):
-        self.commands.append(('retrlines', command))
-        for line in self.listing:
-            callback(line)
-
-    def close(self):
-        self.commands.append(('close',))
 
 
 class _TransferFTP:
@@ -175,38 +138,33 @@ def _rest_authentication_failure():
 
 
 def _ftp_mlsd_listing():
-    ftp = _FTP(rows=(('game.d64', {'type': 'file', 'size': '12'}),
-                     ('Usb1', {'type': 'dir'})))
-    with patch('ftplib.FTP', return_value=ftp):
-        actual, entries = UltimateClient('fixture.invalid').list_directory('/Usb1')
+    peer = MemoryReads(rows=b'type=file;size=12; game.d64\r\ntype=dir; Usb1\r\n')
+    actual, entries = peer.attach().list_directory('/Usb1')
     require(actual == '/Usb1', 'FTP actual directory differed')
     require([(entry.name, entry.kind) for entry in entries] == [
         ('Usb1', 'dir'), ('game.d64', 'file')], 'FTP entries differed')
-    require(('cwd', '/Usb1') in ftp.commands, 'FTP did not change directory')
-    require(ftp.commands[-1] == ('close',), 'FTP connection was not closed')
+    require(peer.calls == [('list', b'/Usb1')], 'Wrong directory requested')
+    require(peer.active == 0 and peer.released == 1, 'Lease not released')
 
 
 def _ftp_list_fallback():
-    ftp = _FTP(mlsd_error=ftplib.error_perm('502 Unsupported'), listing=(
-        '-rw-rw-rw- 1 user ftp 12 Sep 07 12:30 My game.d64',))
-    with patch('ftplib.FTP', return_value=ftp):
-        _, entries = UltimateClient('fixture.invalid').list_directory('/Usb1')
+    peer = MemoryReads(dialect='list', rows=
+        b'-rw-rw-rw- 1 user ftp 12 Sep 07 12:30 My game.d64\r\n')
+    _, entries = peer.attach().list_directory('/Usb1')
     require(entries[0].name == 'My game.d64', 'FTP LIST filename differed')
-    require(('retrlines', 'LIST') in ftp.commands, 'FTP LIST fallback did not run')
-    require(ftp.commands[-1] == ('close',), 'FTP connection was not closed')
+    require(peer.active == 0 and peer.released == 1, 'Lease not released')
 
 
 def _ftp_authentication_failure():
-    ftp = _FTP(login_error=ftplib.error_perm('530 Denied'))
-    with patch('ftplib.FTP', return_value=ftp):
-        try:
-            UltimateClient('fixture.invalid', password='private').list_directory('/Usb1')
-        except ConnectionFailure as exc:
-            require(exc.kind == 'authentication', 'FTP authentication category differed')
-        else:
-            raise AssertionError('FTP authentication failure was accepted')
-    require(('mlsd',) not in ftp.commands, 'FTP listed after authentication failed')
-    require(ftp.commands[-1] == ('close',), 'FTP connection was not closed')
+    peer = MemoryReads(failure='authentication-failed')
+    try:
+        peer.attach().list_directory('/Usb1')
+    except ConnectionFailure as exc:
+        require(exc.kind == 'authentication', 'FTP authentication category differed')
+    else:
+        raise AssertionError('FTP authentication failure was accepted')
+    require(not peer.calls, 'FTP listed after authentication failed')
+    require(peer.active == 0 and peer.released == 1, 'Lease not released')
 
 
 def _rest_wrong_device_identity():
@@ -240,14 +198,12 @@ def _complete_read_only_hardware_suite():
             {'b': {'enabled': False, 'type': '1571'}},
         ]},
     })
-    ftp = _FTP(rows=(('Usb1', {'type': 'dir'}),
-                     ('game.d64', {'type': 'file', 'size': '12'})))
+    peer = MemoryReads(rows=b'type=dir; Usb1\r\ntype=file;size=12; game.d64\r\n')
     profile = Profile.new('Expected device', 'fixture.invalid',
                           device_id='expected-device', device_mac='02:15:41:01:02:03')
     with patch('urllib.request.build_opener', return_value=opener), patch(
-            'ftplib.FTP', return_value=ftp), patch(
             'c64u_browser.network_identity.peer_mac', return_value=profile.device_mac):
-        report = run_hardware_checks(UltimateClient('fixture.invalid'), profile)
+        report = run_hardware_checks(peer.attach(), profile)
     require(report['status'] == 'pass' and
             [check['status'] for check in report['checks']] == ['pass'] * 4,
             'Complete simulated hardware run did not pass')
@@ -256,45 +212,39 @@ def _complete_read_only_hardware_suite():
     require([urlsplit(request.full_url).path for request, _ in opener.requests] ==
             ['/v1/version', '/v1/info', '/v1/drives', '/v1/version'],
             'Complete hardware REST sequence differed')
-    require(('cwd', '/') in ftp.commands and ('mlsd',) in ftp.commands and
-            ftp.commands[-1] == ('close',),
+    require(peer.calls == [('list', b'/')] and peer.released == 1 and peer.active == 0,
             'Complete hardware FTP listing differed')
 
 
 def _transfer_download_complete():
     data = b'verified fixture payload'
-    ftp = _TransferFTP({'/USB2/private-game.d64': data})
-    with tempfile.TemporaryDirectory() as directory, patch('ftplib.FTP', return_value=ftp):
+    peer = MemoryReads(files={b'/USB2/private-game.d64': data})
+    with tempfile.TemporaryDirectory() as directory:
         destination = Path(directory) / 'private-download.d64'
-        result = download(UltimateClient('fixture.invalid', password='private'),
-                          '/USB2/private-game.d64', destination)
+        result = download(peer.attach(), '/USB2/private-game.d64', destination)
         require(destination.read_bytes() == data and result['bytes'] == len(data),
                 'FTP download bytes differed')
         require(result['sha256'] == hashlib.sha256(data).hexdigest(),
                 'FTP download digest differed')
-        require(len(list(Path(directory).iterdir())) == 1,
-                'FTP download left a staged file')
-    require(('voidcmd', 'TYPE I') in ftp.commands and
-            ('retrbinary', 'RETR /USB2/private-game.d64') in ftp.commands and
-            ftp.commands[-1] == ('close',),
-            'FTP download did not use and close the binary connection')
+        require(len(list(Path(directory).iterdir())) == 1, 'Staged file remained')
+    require([call[0] for call in peer.calls] == ['size', 'read', 'size'],
+            'Download was not verified')
+    require(peer.active == 0 and peer.released == 1, 'Lease not released')
 
 
 def _transfer_download_interrupt():
-    ftp = _TransferFTP({'/USB2/private-game.d64': b'abc'}, fail_download=True)
-    with tempfile.TemporaryDirectory() as directory, patch('ftplib.FTP', return_value=ftp):
+    peer = MemoryReads(files={b'/USB2/private-game.d64': b'abc'}, interrupted=True)
+    with tempfile.TemporaryDirectory() as directory:
         destination = Path(directory) / 'private-download.d64'
         try:
-            download(UltimateClient('fixture.invalid'),
-                     '/USB2/private-game.d64', destination)
+            download(peer.attach(), '/USB2/private-game.d64', destination)
         except BrowserError:
             pass
         else:
             raise AssertionError('Interrupted FTP download was accepted')
         require(not destination.exists() and not list(Path(directory).iterdir()),
                 'Interrupted FTP download published or left a staged file')
-    require(ftp.commands[-1] == ('close',),
-            'Interrupted FTP download did not close the connection')
+    require(peer.active == 0 and peer.released == 1, 'Lease not released')
 
 
 def _transfer_upload_verified():

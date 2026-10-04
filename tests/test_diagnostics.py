@@ -75,7 +75,8 @@ class DiagnosticEventsTest(unittest.TestCase):
 
     def test_ftp_listing_does_not_record_private_path(self):
         client = UltimateClient('c64u.local')
-        with patch.object(client, '_list_directory', return_value=('/', [])):
+        with patch.object(client, '_ftp_reads') as adapter:
+            adapter.list_directory.return_value = ('/', [])
             client.list_directory('/private/files')
         self.assertEqual(self.event()['target'], 'directory')
         self.assertNotIn('/private/files', self.stream.getvalue())
@@ -92,13 +93,12 @@ class DiagnosticEventsTest(unittest.TestCase):
         self.assertGreaterEqual(rows[-1]['duration_ms'],0)
 
     def test_ftp_download_event_redacts_file_paths_and_preserves_failure(self):
-        with tempfile.TemporaryDirectory() as directory, patch(
-                'c64u_browser.transfers.connect') as connect:
+        from c64u_browser.simulated_ftp_reads import MemoryReads
+        with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / 'private-download.bin'
-            ftp = connect.return_value
-            ftp.size.return_value = 3
-            ftp.retrbinary.side_effect = lambda _command, callback: callback(b'abc')
-            download(Mock(), '/USB2/private-device.bin', destination)
+            peer = MemoryReads(files={b'/USB2/private-device.bin':b'abc'})
+            client = peer.attach()
+            download(client, '/USB2/private-device.bin', destination)
             event = self.event()
             self.assertEqual((event['operation'], event['target'], event['outcome']),
                              ('download', 'file', 'ok'))
@@ -106,9 +106,9 @@ class DiagnosticEventsTest(unittest.TestCase):
             self.assertNotIn('private-download.bin', self.stream.getvalue())
             self.stream.seek(0)
             self.stream.truncate()
-            ftp.retrbinary.side_effect = OSError('private connection detail')
+            peer.after_read = Mock(side_effect=OSError('private connection detail'))
             with self.assertRaises(BrowserError):
-                download(Mock(), '/USB2/private-device.bin', destination.with_name('retry.bin'))
+                download(client, '/USB2/private-device.bin', destination.with_name('retry.bin'))
             self.assertEqual((self.event()['outcome'], self.event()['error_kind']),
                              ('error', 'BrowserError'))
             self.assertNotIn('private connection detail', self.stream.getvalue())

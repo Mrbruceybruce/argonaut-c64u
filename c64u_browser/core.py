@@ -21,15 +21,15 @@ import uuid
 from .api import BrowserError, ConnectionFailure, UltimateClient
 from .credentials import Credentials
 from .c64u_ftp import C64UFtpLeaseManager
-from .c64u_ftp_types import ConnectionBinding, DeviceIdentity, FtpOperationError, ErrorCode
+from .c64u_ftp_types import ConnectionBinding, DeviceIdentity, FtpOperationError, ErrorCode, FtpPolicy
 from .ftp_reads import FtpReadAdapter, adapter_for, read_operation, transport_event
-from .jobs import check_current_job
+from .jobs import check_current_job, CoreJob
 from .discovery import local_networks, standard_scan, subnet_scan
 from .file_service import FileLocation, FileService
 from .game_launch import GameLaunchService
 from .game_library import GameLibraryService
 from .profiles import Preferences, Profile
-from .scheduler import CoreScheduler, DeviceSession
+from .scheduler import CoreScheduler, DeviceSession, JobBinding
 from .sid_jukebox import SidCatalogService
 from .sid_playback import SidJukeboxService
 from .storage import initial_directory
@@ -192,10 +192,15 @@ class ArgonautCore:
                  client_factory: Callable[..., UltimateClient] = UltimateClient,
                  standard_discovery=standard_scan,
                  subnet_discovery=subnet_scan,
-                 networks=local_networks):
+                 networks=local_networks, network_timeout=None):
         self.preferences = preferences or Preferences()
         self._credentials = credentials or Credentials()
         self._client_factory = client_factory
+        self._network_timeout = network_timeout
+        policy = (None if network_timeout is None else FtpPolicy(
+            control_connect=network_timeout, control_reply=network_timeout,
+            data_connect=network_timeout, data_idle=network_timeout,
+            final_reply=network_timeout))
         self._standard_discovery = standard_discovery
         self._subnet_discovery = subnet_discovery
         self._networks = networks
@@ -209,7 +214,7 @@ class ArgonautCore:
         self._listeners = []
         self._pending_ftp = None
         self._ftp_manager = C64UFtpLeaseManager(
-            self._ftp_binding, self._ftp_password, diagnostic=transport_event)
+            self._ftp_binding, self._ftp_password, policy=policy, diagnostic=transport_event)
         self._device_operations = CoreDeviceOperations(self)
         self.scheduler = CoreScheduler(self.device_session)
         from .c64_ai_operation import AIFileService
@@ -403,7 +408,9 @@ class ArgonautCore:
         try:
             return self._client_factory(profile.host, password,
                                         port=profile.ftp_port,
-                                        http_port=profile.http_port)
+                                        http_port=profile.http_port,
+                                        **({} if self._network_timeout is None else
+                                           {"timeout": self._network_timeout}))
         except BrowserError:
             raise
         except Exception as exc:
@@ -496,7 +503,9 @@ class ArgonautCore:
 
     def connect(self, profile, *, entered_password='', remember=False,
                 require_bound=False, bind_identity=False, persist=False,
-                remote_folder=None):
+                remote_folder=None, initial_browse=True):
+        if not initial_browse and remote_folder is not None:
+            raise CoreError('argument', 'An unbrowsed connection cannot specify a folder.')
         try:
             password = self._credential_for(profile, entered_password)
             client = self._new_client(profile, password)
@@ -509,8 +518,10 @@ class ArgonautCore:
                 profile.verify_identity(client.test_connection())
             folder = remote_folder or '/USB2'
             with self._prepare_read_session(client, profile, info) as session_id:
-                with read_operation(client):
-                    path, entries = initial_directory(client, folder)
+                path, entries = '', ()
+                if initial_browse:
+                    with read_operation(client):
+                        path, entries = initial_directory(client, folder)
                 if persist:
                     profile = self.save_profile(profile, entered_password, remember)
                 self._client = client
@@ -616,6 +627,50 @@ class ArgonautCore:
         self._ftp_manager.invalidate(self._device_identity)
         self.scheduler.close()
         self.ai.close()
+
+    def _read(self, session, operation, check=lambda: None):
+        """Shared checked body for scheduled reads and synchronous diagnostics."""
+        def current():
+            check()
+            if session != self.device_session() or not session.session_id:
+                raise CoreError('session', 'The C64U connection changed.')
+        current()
+        client = self._require_client()
+        current()
+        with read_operation(client, current):
+            result = operation(client, current)
+            return result
+
+    def list_directory(self, path='/'):
+        session = self.device_session()
+        job = CoreJob('file.list', lambda job: self._read(session,
+            lambda client, check: client.list_directory(path), job.check_cancel))
+        return self.scheduler.submit(job, JobBinding.device(session))
+
+    def download(self, source, destination, progress=lambda count: None):
+        from .transfers import download
+        session = self.device_session()
+        def task(job):
+            def operation(client, check):
+                def update(count):
+                    check()
+                    progress(count)
+                update.check = check
+                return download(client, source, destination, update, preserve_cleanup=True)
+            return self._read(session, operation, job.check_cancel)
+        return self.scheduler.submit(CoreJob('file.download', task), JobBinding.device(session))
+
+    def diagnostic_rest(self, session, route):
+        if route not in ('drives', 'version'):
+            raise CoreError('argument', 'Unsupported diagnostic read.')
+        with self.scheduler.inline(JobBinding.device(session)) as check:
+            return self._read(session, lambda client, check:
+                client.read_drives() if route == 'drives' else client.read_about('version'), check)
+
+    def diagnostic_listing(self, session, path='/'):
+        # Reserve the same FIFO lane but execute inside the caller's collector.
+        with self.scheduler.inline(JobBinding.device(session)) as check:
+            return self._read(session, lambda client, check: client.list_directory(path), check)
 
     def prepare_fresh_folder_upload(self, source, parent):
         return self.files.prepare_fresh_folder_upload(source, parent)
