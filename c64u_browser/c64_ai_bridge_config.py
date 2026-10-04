@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Private validated configuration for the paired C64 AI listener."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from contextlib import contextmanager
+from functools import wraps
+from threading import RLock
 import ipaddress
 import json
 import os
@@ -11,13 +14,43 @@ import tempfile
 from .ai_gateway import GatewayConfig
 
 
+_GUARDS_LOCK = RLock()
+_GUARDS = {}
+_REVISIONS = {}
+_UNCHECKED = object()
+
+
+def _key(path):return str(Path(path).resolve())
+
+
+@contextmanager
+def configuration_guard(path):
+    key = _key(path)
+    with _GUARDS_LOCK:guard = _GUARDS.setdefault(key, RLock())
+    with guard:yield
+
+
+def guarded_configuration(function):
+    @wraps(function)
+    def guarded(path, *args, **kwargs):
+        with configuration_guard(path):return function(path, *args, **kwargs)
+    return guarded
+
+
+@guarded_configuration
+def configuration_revision(path):
+    try:content = Path(path).read_bytes()
+    except FileNotFoundError:content = None
+    return (_REVISIONS.get(_key(path), 0), content)
+
+
 @dataclass(frozen=True)
 class C64BridgeConfig:
     model: str
     host: str
     port: int
     allowed_clients: tuple
-    token: str
+    token: str = field(repr=False)
 
 
 def validate_bridge_config(value):
@@ -51,7 +84,10 @@ def load_bridge_config(path):
     return validate_bridge_config(json.loads(Path(path).read_text(encoding='utf-8')))
 
 
-def save_bridge_config(path, config):
+@guarded_configuration
+def save_bridge_config(path, config, *, expected_revision=_UNCHECKED, before_publish=None):
+    if expected_revision is not _UNCHECKED and configuration_revision(path) != expected_revision:
+        raise ValueError("Bridge configuration changed; prepare again.")
     if not isinstance(config, C64BridgeConfig):
         raise ValueError('Invalid C64 AI bridge setting.')
     config = validate_bridge_config({
@@ -74,7 +110,12 @@ def save_bridge_config(path, config):
             stream.flush()
             os.fsync(stream.fileno())
         os.chmod(temporary, 0o600)
+        if before_publish is not None:
+            before_publish()
+            if expected_revision is not _UNCHECKED and configuration_revision(path) != expected_revision:
+                raise ValueError('Bridge configuration changed; prepare again.')
         os.replace(temporary, path)
+        _REVISIONS[_key(path)] = _REVISIONS.get(_key(path), 0) + 1
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)

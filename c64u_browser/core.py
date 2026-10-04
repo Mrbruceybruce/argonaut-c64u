@@ -212,6 +212,8 @@ class ArgonautCore:
             self._ftp_binding, self._ftp_password, diagnostic=transport_event)
         self._device_operations = CoreDeviceOperations(self)
         self.scheduler = CoreScheduler(self.device_session)
+        from .c64_ai_operation import AIFileService
+        self.ai = AIFileService(self)
         self.files = FileService(self._require_client,
                                  self.device_session,
                                  scheduler=self.scheduler,
@@ -613,6 +615,7 @@ class ArgonautCore:
         """Release Core execution resources; jobs are not persisted."""
         self._ftp_manager.invalidate(self._device_identity)
         self.scheduler.close()
+        self.ai.close()
 
     def prepare_fresh_folder_upload(self, source, parent):
         return self.files.prepare_fresh_folder_upload(source, parent)

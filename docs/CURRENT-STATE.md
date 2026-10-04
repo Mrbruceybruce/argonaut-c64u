@@ -12,12 +12,12 @@ current state recorded here.
 - Stable 1.9 is released as `v1.9`. Its release artifacts are immutable.
 - `main` and `v1.9` are not the 1.10 development workspace. Current 1.10 work
   belongs on `development`.
-- Verified post-R2 development authority:
-  `13bbc8a85d02cf75b1e58efde4e20b35d575e0df`
-  (`Implement R2 managed CLI fresh-folder upload`). R2 is accepted, physically
-  qualified on both C64 Ultimates, committed and pushed. On 3 October 2026,
-  HEAD and local `origin/development` matched with divergence `0 0` and a clean
-  worktree before the R3 documentation-only design pass.
+- Verified post-R3 development authority:
+  `a081b01c4a62198b35b88199c4c8e48f9c535f90`
+  (`Retire R3 compatibility surfaces`). R3 is complete, committed and pushed.
+  On 4 October 2026, HEAD and local `origin/development` matched with divergence
+  `0 0` and a clean worktree before the R4 documentation-only design pass.
+  R2 remains accepted and physically qualified on both C64 Ultimates.
 - Argonaut 1.10 direction: **C64U Network Foundation**.
 
 ## Completed FTP work
@@ -388,7 +388,7 @@ legacy CLI `ls`/`browse`/`get`, headless Test Lab `hardware.storage`, native Fla
 writes, and AI installation/upgrade. CLI `info` remains an unmanaged REST read,
 not a raw-FTP consumer. Their ownership is unchanged by R3.
 
-**R3 — Compatibility Retirement is implemented; final review pending.**
+**R3 — Compatibility Retirement is complete, committed and pushed.**
 See [R3-COMPATIBILITY-RETIREMENT.md](R3-COMPATIBILITY-RETIREMENT.md) for the
 approved contract, static audit and deterministic evidence. Removed
 `transfers.upload_new_folder`, `_upload_new_folder`, `ConnectionDialog.credential`,
@@ -400,11 +400,58 @@ retains the old fresh-folder name in application source.
 The four unreachable raw read fallbacks and folder-copy compatibility closure
 remain deferred. The four live raw consumer groups listed above remain unchanged.
 Physical qualification is not required because no live transfer workflow changed;
-no C64U was contacted. No next checkpoint, commit or publishing work occurred.
+no C64U was contacted. R3 was committed and pushed as
+`a081b01c4a62198b35b88199c4c8e48f9c535f90`; no package or release was created.
 
 R3 deterministic acceptance: **162 focused methods** (including all 66 R2),
 **257 FTP/USB regression methods**, and **17/17 offline checks** passed.
 Normal and optimized suites each ran **1032 methods: 996 passed, 36 existing
 opt-in display skips, zero failures/errors**. Three obsolete helper-only methods
 were removed and ten added; useful assertions were re-homed or strengthened.
-`git diff --check` passed. Changes remain uncommitted for final review.
+`git diff --check` passed. Earlier final-review/uncommitted wording in the R3
+record describes historical stages, not current status.
+
+## R4 — physically qualified on both devices; final review pending
+
+[R4 — Managed C64 AI Installation](R4-MANAGED-C64-AI-INSTALL.md) now routes AI
+file work through a single-use Core capability and the captured device's scheduler
+lane. Exact-current verification uses full bytes at execution. Missing files use
+3C; recognized same-config ai.1 uses 3D with full-byte predicates at both original
+observations. Generic 3D defaults remain unchanged.
+
+Private pending configuration precedes file work; publication, pairing, service
+activation and health enablement require trustworthy file evidence and matching
+configuration/session immediately before each new consequential command and the
+active-config publication. File success and bridge failure remain separate, with
+safe bridge command outcomes. Eligible retained pending configuration is reviewed
+and reused before token generation; ambiguous/stale/context-mismatched candidates
+stop safely. Every explicit re-entry has fresh Core binding/classification.
+Successful verified commit consumes the private pending copy. Pre-submission
+errors have safe phase categories and no private exception text/chains. Neither
+remote rollback nor automatic replay is introduced. The accepted final-observation-to-rename external-writer window remains.
+
+Corrected deterministic R4 evidence: 160 focused methods, 257 FTP/USB regressions,
+normal and optimized suites each 1093 methods (1057 passed, 36 existing display
+skips), and 17/17 offline checks. This pass adds 17 methods and renames two to
+accurately describe session-field invalidation and mutation-before-reply
+cancellation; no methods were retired and no skips added. Total additions since
+R3 are 61. Historical implementation and review evidence remains in the R4
+record, including failed iterations and exact commands. Static ownership/privacy
+and whitespace checks pass, including untracked files.
+
+`CoreDeviceOperations.open_ftp` is retained: automatic approval review rejected
+its conditional removal because the production `transfers.connect` dynamic call
+remains. AI has no raw/facade transport route. This leaves the conditional
+retirement proof for review, without expanding into other consumers. Flash,
+legacy CLI, headless Test Lab and broader ownership closure remain deferred.
+Authorized controlled physical qualification passed on 4 October 2026: Beige
+`25EA78` under `/USB2`, then Founder `25BE71` under `/SD`. Both passed actual Core
+missing installation, exact-current no-op with zero mutation commands, synthetic
+ai.1 upgrade with both authoritative full-byte matches, foreign/directory
+refusals, independent byte/hash verification, stable session/epoch, zero leases,
+exact reviewed cleanup and fresh absence verification. No staging/backup residue
+remained. See the R4 physical record for exact roots, identities and hashes.
+Only disposable files and synthetic private configuration were used; deployed
+client, production bridge configuration, pairing/services/health and launch
+were untouched. No commit, push, branch/worktree, package or release was performed.
+**Stop for final R4 review.**

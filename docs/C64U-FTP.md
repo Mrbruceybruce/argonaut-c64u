@@ -1333,3 +1333,48 @@ The accepted managed contracts and physical evidence are unchanged. Live CLI
 reads, Test Lab storage, Flash and AI routes remain unchanged; deferred raw read
 fallbacks and folder-copy alternatives remain. No physical qualification is
 required or performed for R3, and no commit or publishing has occurred.
+
+
+## R4 AI route — 4 October 2026, physically qualified; final review pending
+
+R3 is complete at `a081b01c4a62198b35b88199c4c8e48f9c535f90`; its earlier
+final-review wording above is historical. R4 now uses `core.ai.prepare/execute`
+for AI classification, installation and upgrade. Preparation captures a bound
+identity, session/connection epoch, endpoint and concrete managed client. One
+Core device-lane job and outer adapter operation own classification and nested
+3C/3D work. No facade resolution, raw fallback, reconnect or replay authorizes
+execution. Default target remains `/USB2/argonaut-ai.prg`, with explicit controlled
+USB/SD destinations and no automatic fallback.
+
+Exact current full bytes permit a verified no-op. Missing permits only accepted
+3C addition. Exact same-configuration ai.1 permits 3D with the optional original
+validator at both authoritative SIZE/RETR/SIZE observations. Each predicate is
+finalized after final SIZE; independent original hashes/signatures remain.
+Same-size substitution before the first observation leaves only the acknowledged
+staging MKD candidate; mismatch before the second prevents exchange and retains
+accepted evidence. No automatic remote cleanup follows refusal or uncertainty.
+The external-writer window after the final observation remains unchanged.
+
+Results retain publication, cleanup and uncertainty separately. File ownership
+ends before the private configuration/session gate permits bridge work. Local
+temporary cleanup failure holds provisioning without erasing remote success.
+After bounded R4 corrections, normal and optimized deterministic suites each run
+1093 methods (1057 passed, the same 36 display skips); FTP/USB regressions pass
+257. Full-byte validator/3C/3D production code is unchanged by this correction.
+The AI after-acknowledgment test preserves successful publication/replacement and
+holds only the later bridge phase, without mutation replay. Separately authorized
+physical R4 qualification passed on Beige `/USB2` and Founder `/SD`: actual Core
+3C install, exact-current no-op (zero mutation commands), 3D ai.1 upgrade with
+both full-byte predicates, foreign/directory refusals, independent complete
+readbacks, residue-free inspection, stable epochs and zero leases. Reviewed
+deletion removed exactly five disposable items per device and fresh parent
+listings verified absence. See [the R4 physical record](R4-MANAGED-C64-AI-INSTALL.md)
+for identities, roots, hashes, diagnostic counts and limitations. No production
+client/configuration or bridge consequence was touched. Stop for final R4 review.
+
+AI no longer imports/calls legacy upload/replacement or obtains FTP from a
+facade. `transfers.connect` remains, as do Flash, legacy CLI/headless reads and
+deferred compatibility routes. `CoreDeviceOperations.open_ftp` is retained:
+automatic approval review rejected its removal because `transfers.connect`
+retains a production dynamic `client.open_ftp()` call. No broader retirement was
+attempted. See R4's implementation record for this remaining review item.

@@ -106,7 +106,7 @@ def categorized_error(exc):
 
 class CoreJob:
     """One-shot synchronous job whose events are safe for any client adapter."""
-    def __init__(self, operation, task):
+    def __init__(self, operation, task, *, failure_result=None):
         self.id = uuid.uuid4().hex
         self.operation = operation
         self.created_at = time.time()
@@ -114,6 +114,7 @@ class CoreJob:
         self.state = JobState.PENDING
         self.progress = self.result = self.error = None
         self._task = task
+        self._failure_result = failure_result
         self._cancel = Event()
         self._listeners = []
         self._lock = Lock()
@@ -223,12 +224,12 @@ class CoreJob:
                 self.result=result;self.state=JobState.SUCCEEDED
         except JobCancelled as exc:
             with self._lock:
-                self.result=exc.result
+                self.result=(self._failure_result(exc) if self._failure_result else exc.result)
                 self.error=JobError('cancelled',str(exc),False)
                 self.state=JobState.CANCELLED
         except Exception as exc:
             with self._lock:
-                self.result=getattr(exc,'result',None)
+                self.result=(self._failure_result(exc) if self._failure_result else getattr(exc,'result',None))
                 self.error=categorized_error(exc)
                 self.state=JobState.FAILED
         with self._lock:self.finished_at=time.time()

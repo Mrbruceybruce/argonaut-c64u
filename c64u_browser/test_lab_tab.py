@@ -26,7 +26,7 @@ from .c64_ai_bridge_background import (
 from .c64_ai_bridge_background import status as bridge_tests_status
 from .c64_ai_bridge_control import (
     activate_bridge, bridge_status, set_health_monitor_enabled,
-    health_monitor_status, setup_bridge,
+    health_monitor_status,
 )
 from .c64_ai_install import install_and_pair_c64_ai
 from .test_lab_history import run_with_history
@@ -408,26 +408,26 @@ class TestLabTab:
             lambda: run_bridge_checks(self.bridge_path), bridge=True)
 
     def pair_connected_c64(self):
-        client = None if getattr(self.app, 'offline_message', None) else self.app.client
-        profile = self.app.active_profile if client is not None else None
+        profile = None if getattr(self.app, 'offline_message', None) else self.app.active_profile
         model = (self.unattended_model.get_text().strip()
                  or self.model.get_text().strip() or 'gemma3:4b')
 
         def task():
-            if client is None or profile is None:
+            if profile is None:
                 raise BrowserError('Connect an identity-bound C64U before pairing it.')
-            profile.verify_identity(client.test_connection(), require_bound=True)
-            if not self.bridge_path.exists():
-                setup_bridge(self.bridge_path, model, profile.host)
             return install_and_pair_c64_ai(
-                client, self.bridge_path, profile.host)
+                self.app.core.ai, self.bridge_path, profile.host, model=model)
 
         def done(result):
+            if result.bridge_disposition != 'ready':
+                self.app.status.set_text(
+                    'AI file outcome: ' + result.client.disposition +
+                    '; bridge setup held for review. ' + result.client.inspection_message())
+                return
             self.show_bridge_status(result.bridge)
-            action = ('installed and paired' if result.client.installed
-                      else 'verified and paired')
+            action = result.client.action
             self.app.status.set_text(
-                f'The C64 AI client was {action}; the local bridge is ready.')
+                f'The C64 AI client file result is {action}; the local bridge is ready.')
 
         self.app.run(task, done)
 

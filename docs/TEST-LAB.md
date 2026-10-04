@@ -287,3 +287,41 @@ Each run is also saved privately under the development settings directory.
 Argonaut keeps the newest 20 reports and compares check verdicts by stable ID
 to show new failures, resolved failures, and added or removed checks. A failed
 history write does not change the check verdict or prevent JSON export.
+
+
+## R4 C64 AI setup/install boundary
+
+The GUI's setup/install action now privately prepares configuration, then runs
+managed AI file work as one captured Core device-session job. Default destination
+remains `/USB2/argonaut-ai.prg`; there is no automatic SD fallback. Pairing,
+activation and health monitoring are gated on verified-current, acknowledged
+3C publication, or 3D publication with both authoritative ai.1 full-byte matches
+and completed remote cleanup, followed by matching configuration/session checks
+before each consequential command and the final active-config publish.
+
+The UI reports the file disposition separately when bridge setup is held or
+fails. Refusal, incomplete reads, cancellation, stale context, uncertainty and
+local cleanup failure cannot authorize bridge work. Pending private configuration
+is retained after failure. Explicit re-entry reviews and reuses one eligible
+private configuration before generating a token, then binds a fresh Core file
+operation. Ambiguous or stale candidates stop safely for review. Verified bridge
+commit consumes the matching pending copy. Public pre-submission errors contain
+only safe phase/context guidance, with no original private exception chain.
+Acknowledged remote changes are never rolled back or replayed by a bridge retry. No C64 client is launched by installation. Earlier setup ordering
+is historical; the file now precedes bridge consequences.
+
+Headless Test Lab, check roster and offline protocol behavior remain unchanged.
+R4 includes loopback transport/barrier and per-command configuration-gate tests.
+The corrected AI late-cancellation test pauses after the client has consumed the
+successful replies and the managed composite has returned. A separate older test
+covers mutation before reply. Running session-field invalidation is identified as
+such; actual Core reconnect coverage remains in the queued and retained-re-entry
+tests. Command recordings establish the exact effect prefix, including existing
+bridge rollback, without relying on swallowed runner assertions. The offline
+suite remains 17/17. No physical C64U was contacted for the implementation pass.
+Subsequent separately authorized Core file-only physical qualification passed
+on Beige `/USB2` and Founder `/SD` on 4 October 2026, including all five R4
+scenarios, independent readbacks, reviewed disposable cleanup and fresh absence.
+No GUI install-and-pair action, production configuration, service/health change
+or C64 launch was exercised. See [the R4 physical record](R4-MANAGED-C64-AI-INSTALL.md).
+R4 remains uncommitted; stop for final review.

@@ -16,6 +16,7 @@ from . import development
 from .api import BrowserError
 from .c64_ai_bridge_config import (
     C64BridgeConfig, load_bridge_config, save_bridge_config,
+    guarded_configuration, configuration_revision, _UNCHECKED,
 )
 from .c64_ai_chat import MAX_REPLY_BYTES
 from .diagnostics import operation_event
@@ -141,9 +142,11 @@ def health_monitor_status(runner=subprocess.run):
         'stopped', 'Scheduled but stopped · enable alerts to restart monitoring')
 
 
-def set_health_monitor_enabled(enabled, runner=subprocess.run):
+def set_health_monitor_enabled(enabled, runner=subprocess.run, *, consequence_check=lambda: None):
+    consequence_check()
     _reload_user_services(runner)
     command = 'enable' if enabled else 'disable'
+    consequence_check()
     changed = _systemctl(command, runner, HEALTH_TIMER, ('--now',))
     if changed.returncode != 0:
         action = 'enabled' if enabled else 'stopped'
@@ -156,8 +159,8 @@ def set_health_monitor_enabled(enabled, runner=subprocess.run):
     return status
 
 
-def enable_health_monitor(runner=subprocess.run):
-    return set_health_monitor_enabled(True, runner)
+def enable_health_monitor(runner=subprocess.run, *, consequence_check=lambda: None):
+    return set_health_monitor_enabled(True, runner, consequence_check=consequence_check)
 
 
 def _local_model_names():
@@ -250,16 +253,20 @@ def bridge_status(path, runner=subprocess.run, check_model=False,
                         config.allowed_clients, enabled, model_state)
 
 
-def activate_bridge(path, runner=subprocess.run):
+@guarded_configuration
+def activate_bridge(path, runner=subprocess.run, *, consequence_check=lambda: None):
     try:
         load_bridge_config(path)
     except FileNotFoundError as exc:
         raise BrowserError('Set up the private C64 AI bridge before starting it.') from exc
     except (OSError, ValueError) as exc:
         raise BrowserError('The private C64 AI bridge setting could not be read.') from exc
+    consequence_check()
     restarted = _systemctl('restart', runner)
     if restarted.returncode != 0:
+        consequence_check()
         _reload_user_services(runner)
+        consequence_check()
         restarted = _systemctl('restart', runner)
         if restarted.returncode != 0:
             raise BrowserError('The C64 AI bridge could not be started.')
@@ -286,29 +293,56 @@ def local_bridge_host(address, socket_factory=socket.socket):
     return host
 
 
+@guarded_configuration
 def setup_bridge(path, model, address, runner=subprocess.run,
                  socket_factory=socket.socket, token_factory=secrets.token_hex):
     path = Path(path)
     if path.exists():
         raise BrowserError('The private C64 AI bridge is already set up.')
+    address = str(ipaddress.IPv4Address(address))
+    config = C64BridgeConfig(
+        model, local_bridge_host(address, socket_factory), 6464,
+        (address,), token_factory(32).upper())
+    return finish_bridge_setup(path, config, runner,
+                               expected_revision=configuration_revision(path))
+
+
+@guarded_configuration
+def finish_bridge_setup(path, config, runner=subprocess.run, *, expected_revision,
+                        context_check=lambda: None, pending_check=lambda: None, before_publish=None):
+    path = Path(path)
     saved = False
     was_enabled = True
     health_was_enabled = True
+    committed_revision = None
+    def check_committed():
+        if (committed_revision is None or configuration_revision(path) != committed_revision or
+                load_bridge_config(path) != config):
+            raise BrowserError('Bridge configuration changed during activation.')
+        pending_check()
+        context_check()
     try:
-        address = str(ipaddress.IPv4Address(address))
-        config = C64BridgeConfig(
-            model, local_bridge_host(address, socket_factory), 6464,
-            (address,), token_factory(32).upper())
-        save_bridge_config(path, config)
+        pending_check()
+        context_check()
+        save_bridge_config(path, config, expected_revision=expected_revision, before_publish=before_publish)
         saved = True
+        if load_bridge_config(path) != config:
+            raise BrowserError('Bridge configuration changed during commit.')
+        committed_revision = configuration_revision(path)
+        check_committed()
         _reload_user_services(runner)
         was_enabled = _systemctl('is-enabled', runner).returncode == 0
+        check_committed()
         if _systemctl('enable', runner).returncode != 0:
             raise BrowserError('Automatic start could not be enabled for the C64 AI bridge.')
-        status = activate_bridge(path, runner)
+        check_committed()
+        status = activate_bridge(path, runner, consequence_check=check_committed)
+        check_committed()
         health_was_enabled = (
             _systemctl('is-enabled', runner, HEALTH_TIMER).returncode == 0)
-        enable_health_monitor(runner)
+        check_committed()
+        enable_health_monitor(runner, consequence_check=check_committed)
+        check_committed()
         return status
     except Exception:
         if saved:
@@ -327,13 +361,16 @@ def setup_bridge(path, model, address, runner=subprocess.run,
                 except Exception:
                     pass
             try:
-                path.unlink(missing_ok=True)
+                if committed_revision is not None and configuration_revision(path) == committed_revision:
+                    path.unlink(missing_ok=True)
             except OSError:
                 pass
         raise
 
 
-def pair_bridge_address(path, address, runner=subprocess.run):
+@guarded_configuration
+def pair_bridge_address(path, address, runner=subprocess.run, *,
+                        expected_revision=_UNCHECKED, context_check=lambda: None, committed_check=None, before_publish=None):
     """Add one verified device address without exposing or rotating the token."""
     try:
         address = str(ipaddress.IPv4Address(address))
@@ -345,19 +382,34 @@ def pair_bridge_address(path, address, runner=subprocess.run):
         raise BrowserError('Set up the private C64 AI bridge before pairing a C64U.') from exc
     except (OSError, ValueError) as exc:
         raise BrowserError('The private C64 AI bridge setting could not be read.') from exc
+    revision = configuration_revision(path)
+    if expected_revision is not _UNCHECKED and revision != expected_revision:
+        raise BrowserError('Bridge configuration changed; prepare again.')
+    context_check()
     if address in config.allowed_clients:
+        if committed_check is not None:committed_check(config, revision)
         return bridge_status(path, runner)
     if len(config.allowed_clients) >= 4:
         raise BrowserError('The C64 AI bridge already has four paired addresses.')
     updated = replace(config, allowed_clients=config.allowed_clients + (address,))
+    committed_revision = None
     try:
-        save_bridge_config(path, updated)
+        context_check()
+        save_bridge_config(path, updated, expected_revision=revision, before_publish=before_publish)
+        if load_bridge_config(path) != updated:
+            raise BrowserError('Bridge configuration changed during commit.')
+        committed_revision = configuration_revision(path)
+        context_check()
+        if (configuration_revision(path) != committed_revision or
+                load_bridge_config(path) != updated):
+            raise BrowserError('Bridge configuration changed before restart.')
+        if committed_check is not None:committed_check(updated, committed_revision)
         restarted = _systemctl('restart', runner)
         if restarted.returncode != 0:
             raise BrowserError('The C64 AI bridge could not restart with the new pairing.')
     except Exception:
         try:
-            save_bridge_config(path, config)
+            save_bridge_config(path, config, expected_revision=committed_revision)
             _systemctl('restart', runner)
         except Exception:
             pass
@@ -365,7 +417,7 @@ def pair_bridge_address(path, address, runner=subprocess.run):
     status = bridge_status(path, runner)
     if status.state != 'ready':
         try:
-            save_bridge_config(path, config)
+            save_bridge_config(path, config, expected_revision=committed_revision)
             _systemctl('restart', runner)
         except Exception:
             pass

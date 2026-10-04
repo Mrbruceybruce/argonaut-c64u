@@ -1,23 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
-"""Generate, verify, and conservatively install the paired C64 AI client."""
+"""Safe AI installation results and file-before-bridge orchestration."""
 from dataclasses import dataclass
-from hashlib import sha256
-import ipaddress
-from pathlib import Path
 import subprocess
-import tempfile
 
-from .api import BrowserError
 from .c64_ai_client import render_chat_client, render_legacy_chat_client
-from .c64_ai_bridge_config import load_bridge_config
-from .c64_ai_bridge_control import activate_bridge, pair_bridge_address
 from .c64_ai_launch import CLIENT_PATH
 from .c64_basic import tokenize_basic_v2
-from .files import inspect
-from .folder_copy import Step
-from .replacement import replace_file
-from .transfers import download, upload
 
 
 @dataclass(frozen=True)
@@ -26,70 +15,146 @@ class ClientInstallResult:
     installed: bool
     size: int
     sha256: str
+    classification: str = 'unverified'
+    action: str = 'not-completed'
+    disposition: str = 'not-completed'
+    device_id: str = ''
+    session_id: str = ''
+    epoch: str = ''
+    address: str = ''
+    port: int = 0
+    preparation_id: str = ''
+    config_id: str = ''
+    current_verification: object = None
+    legacy_eligibility: tuple = ()
+    upload: object = None
+    replacement: object = None
+    transport_error: object = None
+    cancellation_phase: str | None = None
+    cancellation_requested: bool = False
+    cancellation_observed: bool = False
+    cancellation_deferred: bool = False
+    local_cleanup: str = 'unneeded'
+    local_cleanup_error: str | None = None
+    reason: str | None = None
+
+    @property
+    def permits_provisioning(self):
+        if (self.local_cleanup == 'failed' or self.cancellation_requested or
+                self.cancellation_observed):return False
+        if self.disposition == 'verified-current':
+            return bool(self.current_verification and
+                        self.current_verification.status == 'full-byte-match')
+        if self.disposition == 'installed':
+            e = self.upload
+            return bool(e and e.disposition == 'published' and e.readback == 'passed' and
+                        e.size == 'passed' and e.publication and e.publication['outcome'] == 'completed')
+        if self.disposition == 'upgraded':
+            e = self.replacement
+            return bool(e and e.publication == 'completed' and e.cleanup == 'completed' and
+                len(self.legacy_eligibility) == 2 and
+                tuple(item.slot for item in self.legacy_eligibility) == ('original-before', 'original-after') and
+                all(item.status == 'full-byte-match' for item in self.legacy_eligibility))
+        return False
+
+    def inspection_message(self):
+        if self.replacement:return self.replacement.inspection_message()
+        if self.upload:return self.upload.inspection_message()
+        return ('File outcome: ' + self.disposition + '. Prepare a new operation to inspect; '
+                'this result does not authorize replay or cleanup.')
 
 
 @dataclass(frozen=True)
 class ClientProvisionResult:
     bridge: object
     client: ClientInstallResult
+    bridge_disposition: str = 'not-started'
+    reason: str | None = None
+    pending_id: str | None = None
+    bridge_commands: tuple = ()
 
 
 def build_c64_ai_client(config):
-    source = render_chat_client(config.host, config.port, config.token)
-    return tokenize_basic_v2(source)
+    return tokenize_basic_v2(render_chat_client(config.host, config.port, config.token))
 
 
 def _build_legacy_c64_ai_client(config):
-    source = render_legacy_chat_client(config.host, config.port, config.token)
-    return tokenize_basic_v2(source)
+    return tokenize_basic_v2(render_legacy_chat_client(config.host, config.port, config.token))
 
 
-def install_c64_ai_client(client, config, path=CLIENT_PATH):
-    """Install when absent and safely upgrade Argonaut's exact ai.1 client."""
-    program = build_c64_ai_client(config)
-    digest = sha256(program).hexdigest()
-    entry = inspect(client, path)
-    if entry is not None and entry.kind != 'file':
-        raise BrowserError('The Argonaut AI client path on USB2 is not a file.')
-    with tempfile.TemporaryDirectory(prefix='argonaut-c64-ai-') as folder:
-        local = Path(folder) / Path(path).name
-        if entry is not None:
-            download(client, path, local)
-            existing = local.read_bytes()
-            if existing == program:
-                return ClientInstallResult(path, False, len(program), digest)
-            if existing != _build_legacy_c64_ai_client(config):
-                raise BrowserError(
-                    'The existing USB2 Argonaut AI client differs from this pairing. '
-                    'Keep or rename it in Files before installing the paired client.')
-            local.write_bytes(program)
-            replace_file(client, Step(
-                Path(path).name, local, path, False, True,
-                (entry.name, entry.size)), True, False, lambda _count: None)
-            return ClientInstallResult(path, True, len(program), digest)
-        local.write_bytes(program)
-        result = upload(client, local, str(Path(path).parent).replace('\\', '/'))
-    if (result.get('path') != path or result.get('bytes') != len(program)
-            or result.get('sha256') != digest or result.get('verified') is not True):
-        raise BrowserError('The uploaded C64 AI client could not be verified.')
-    return ClientInstallResult(path, True, len(program), digest)
+def install_c64_ai_client(service, config, path=CLIENT_PATH, *, address):
+    """File-only synchronous convenience over the Core scheduled capability."""
+    return service.execute(service.prepare(config, address, path)).wait().result
 
 
-def install_and_pair_c64_ai(client, config_path, address,
-                            runner=subprocess.run):
-    """Install the matching client, pair its fixed address, and leave ready."""
+def install_and_pair_c64_ai(service, config_path, address, runner=subprocess.run,
+                            *, model='gemma3:4b', cancelled=lambda: False):
+    from .c64_ai_preparation import prepare_bridge, finalize_bridge
+    from .c64_ai_bridge_config import configuration_guard
+    def cancellation_pending():
+        try:return bool(cancelled())
+        except Exception:return True
+    # Raise outside the original handler: even __context__ must contain no private I/O.
+    handle = None
+    phase = 'context'
     try:
-        address = str(ipaddress.IPv4Address(address))
-        config = load_bridge_config(config_path)
-    except (OSError, ValueError) as exc:
-        raise BrowserError('The private bridge setting or C64U address is invalid.') from exc
-    if (address not in config.allowed_clients
-            and len(config.allowed_clients) >= 4):
-        raise BrowserError('The C64 AI bridge already has four paired addresses.')
-    installed = install_c64_ai_client(client, config)
-    status = pair_bridge_address(config_path, address, runner)
-    if status.state == 'stopped':
-        status = activate_bridge(config_path, runner)
-    if status.state != 'ready':
-        raise BrowserError('The C64 AI bridge is not ready after pairing.')
-    return ClientProvisionResult(status, installed)
+        context = service.preparation_context(address)
+        phase = 'configuration'
+        prepared = prepare_bridge(config_path, model, address, device_id=context.device_id)
+        with configuration_guard(config_path):
+            prepared.validate()
+            phase = 'generation'
+            handle = service.prepare(prepared.config, address, config_id=prepared.identity,
+                                     config_check=prepared.validate, expected_session=context)
+            phase = 'validation'
+            prepared.validate()
+        phase = 'submission'
+        job = service.execute(handle, cancel_requested=cancellation_pending())
+    except Exception:
+        if handle is not None:
+            try:service.discard(handle)
+            except Exception:pass
+    else:
+        phase = None
+    if phase is not None:
+        from .api import BrowserError
+        raise BrowserError('AI ' + phase + ' could not complete; review private configuration and device context.') from None
+    while True:
+        try:
+            snapshot = job.wait(.1)
+            break
+        except TimeoutError:
+            if cancellation_pending():job.request_cancel()
+    file = snapshot.result
+    pending_id = prepared.identity if prepared.pending else None
+    if not file.permits_provisioning or cancellation_pending():
+        return ClientProvisionResult(None, file, 'held', 'file-gate', pending_id)
+    def bridge_context():
+        from .jobs import JobCancelled
+        if cancellation_pending():raise JobCancelled()
+        service.validate_result_context(file)
+    commands = []
+    def recorded_runner(args, **kwargs):
+        consequential = args[2] in ('daemon-reload', 'enable', 'disable', 'start', 'stop', 'restart')
+        command = (args[2], 'health' if args[-1].endswith('health.timer') else 'bridge')
+        outcome = 'unknown'
+        try:
+            response = runner(args, **kwargs)
+            outcome = 'completed' if response.returncode == 0 else 'failed'
+            return response
+        finally:
+            if consequential:commands.append((*command, outcome))
+    try:
+        with configuration_guard(config_path):
+            prepared.validate()
+            service.validate_result_context(file)
+            if cancellation_pending():
+                return ClientProvisionResult(None, file, 'cancelled', 'pre-bridge', pending_id)
+            bridge = finalize_bridge(prepared, recorded_runner,
+                                     context_check=bridge_context)
+        return ClientProvisionResult(bridge, file, 'ready', bridge_commands=tuple(commands))
+    except Exception as exc:
+        disposition = 'cancelled' if getattr(exc, 'cancelled', False) else 'failed'
+        reason = ('configuration-changed' if getattr(exc, 'code', None) == 'ai-configuration' else
+                  'stale-context' if getattr(exc, 'code', None) == 'ai-context' else 'bridge-failed')
+    return ClientProvisionResult(None, file, disposition, reason, pending_id, tuple(commands))

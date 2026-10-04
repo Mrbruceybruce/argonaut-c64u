@@ -99,25 +99,70 @@ unavailable service manager, or setup that has not been completed. The status
 includes the local model, listener address, and paired-address count. The
 private token is never returned to the interface. **Start bridge**, **Retry
 bridge**, and **Restart bridge** provide recovery without a terminal. **Install
-& pair C64U** first
-re-verifies the active profile against the live device, then adds only that
-fixed IPv4 address while preserving the existing token. A failed restart
-restores the prior private pairing file and restarts the previous bridge.
+& pair C64U** captures the already identity-bound Core session and fixed IPv4
+address. It completes managed file work before pairing or activation; it does
+not perform an unscheduled facade connection probe. A failed pairing restart
+retains the bridge helper's rollback behavior and the separate file result.
 
-**Install & pair C64U** generates the private interactive client with
-Argonaut's built-in Commodore BASIC V2 tokenizer. Its output is byte-identical
-to the hardware-tested `petcat` build, so no emulator or external tokenizer is
-required. If `/USB2/argonaut-ai.prg` exists, Argonaut downloads it and requires
-an exact match; it never overwrites a different file. An absent client is
-uploaded through the existing staged, checksum-verified transfer path.
+The private client is generated with Argonaut's built-in Commodore BASIC V2
+tokenizer; generation and the verified `petcat` fixture are unchanged. At
+`/USB2/argonaut-ai.prg`, exact current full bytes produce an execution-verified
+no-op. Missing files use managed 3C addition. Only exact same-config ai.1 can
+upgrade through 3D: fresh full-byte sinks must match at both authoritative
+original observations, after each complete SIZE/RETR/SIZE read. Preliminary
+classification and equal hashes alone never grant upgrade eligibility. Foreign,
+empty, non-file and unverified content cannot authorize overwrite. The accepted
+external-writer window after the final observation still exists.
 
-On a fresh Debian Development installation, **Set up & install C64 AI** derives
-the computer address used to reach the connected identity-bound C64U, creates a
-private random token, starts the packaged per-user bridge service, installs the
-matching C64 program, and leaves the bridge ready. The development Debian
-package supplies the bridge launcher and systemd user unit. Ollama, the chosen
-downloaded model, and a narrow TCP 6464 firewall allowance remain explicit
-computer prerequisites; installation does not silently alter them.
+On first setup, Argonaut privately prepares the host, endpoint and random token
+in a separate pending directory/file (0700/0600), outside the active service
+configuration path. No pair, enable/start/restart, health activation or client
+launch occurs before trustworthy file evidence and the configuration/session
+gate. Finalization reuses that exact token and endpoint. Supported configuration
+writers share a narrow guard and revision checks; this is not an interprocess
+lock against arbitrary external writers. R4 checks immediately before active
+configuration publication and each new service command, including activation
+retry/reload and health timer `enable --now`. Status observation cannot authorize
+activation after a detectable configuration edit. Existing bridge rollback policy
+is preserved; safe command outcomes retain completed steps even if a later step
+is cancelled. No atomicity against edits between a final check and one system
+call is claimed.
+
+Refused, failed, cancelled or uncertain file work leaves active configuration
+untouched and retains pending configuration for review. Completed replacement
+publication with incomplete remote cleanup blocks provisioning. Local temporary
+cleanup failure also holds provisioning while preserving remote success. Later
+bridge failure or cancellation retains file history and the pending token;
+bridge recovery cannot replay an acknowledged upload. A new explicit file
+attempt first reviews any retained preparation before token generation. Reuse
+requires one private, owned 0700/0600 candidate with valid schema and provenance,
+matching physical device/address, route host, model, endpoint and exact retained
+file revision, with no active configuration conflict. Missing provenance (including
+older R4 pending files), edits, corruption, insecure permissions or ambiguous
+candidates stop for local review without rotating a token or deleting anything.
+A fresh Core session-bound operation reclassifies the remote file; re-entry is
+not resume. Successful verified bridge commit removes only the matching pending
+config, provenance and empty preparation directory. Cleanup failure reports a safe
+failure and preserves completed file/service evidence; conflicting active/pending
+state requires review. No remote rollback or automatic cleanup is performed.
+
+The entire public preparation/generation/submission boundary reports safe phase
+categories without original exception text, private paths or exception chains.
+Unused Core handles are discarded on failures, including timer/submission setup.
+
+The development Debian package supplies the bridge launcher and systemd user
+unit. Ollama, the chosen downloaded model, and a narrow TCP 6464 firewall
+allowance remain explicit computer prerequisites. Launch/runtime/chat behavior
+is unchanged. R4 bounded corrections passed verification and were approved for
+physical qualification. Separately authorized Core file-only qualification
+passed on Beige `/USB2` and Founder `/SD` on 4 October 2026, including verified
+install/no-op/ai.1 upgrade, refusal preservation, zero leaked leases, reviewed
+cleanup and independent absence. Only synthetic private configuration was used;
+no production configuration, pairing, services, health or launch was exercised.
+See [the R4 physical record](R4-MANAGED-C64-AI-INSTALL.md). Stop for final R4 review;
+implementation remains uncommitted.
+
+The following device installation notes are historical, preceding R4.
 
 The second identity-bound C64U, `C64-Ultimate-7F01C9` at `192.168.68.70`, was
 then installed and paired through this workflow. Its optional DMA text service

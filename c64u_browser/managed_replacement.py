@@ -45,6 +45,7 @@ class ReplacementEvidence:
     error_category: str | None = None
     transport_error: dict | None = None
     local_cleanup: dict | None = None
+    original_eligibility: tuple | None = None
 
 
     def inspection_message(self):
@@ -103,7 +104,7 @@ class _Discard:
     def write(self, block):return len(block)
 
 
-def replace_managed(client, step, source_local, progress, *, validate=None):
+def replace_managed(client, step, source_local, progress, *, validate=None, original_validator_factory=None):
     """One file/lease. Legacy replacement consumers must opt in explicitly.
 
     None primitive/observation fields mean unattempted. Path records are last
@@ -120,6 +121,24 @@ def replace_managed(client, step, source_local, progress, *, validate=None):
     adapter = adapter_for(client)
     temporary_resource = None
     primary = None
+
+    def original(slot):
+        nonlocal evidence
+        if original_validator_factory is None:
+            return adapter.read_into(step.destination, _Discard(), check=check)
+        sink = original_validator_factory(slot)
+        # An interrupted observation stays unverified, even if RETR completed.
+        evidence = replace(evidence, original_eligibility=(
+            (evidence.original_eligibility or ()) + (sink.observation(),)))
+        result = adapter.read_into(step.destination, sink, check=check)
+        observation = sink.observation(result)
+        evidence = replace(evidence, original_eligibility=(
+            evidence.original_eligibility[:-1] + (observation,)))
+        field = 'original_before' if slot == 'original-before' else 'original_after'
+        evidence = replace(evidence, **{field: dict(bytes=result.transferred, sha256=result.sha256)})
+        if observation.status != 'full-byte-match':
+            raise BrowserError('Original content is not eligible for this replacement.')
+        return result
 
     def mutation(field, verb, path, target=None):
         nonlocal evidence
@@ -145,7 +164,7 @@ def replace_managed(client, step, source_local, progress, *, validate=None):
                 created = operate_managed(client, 'mkdir', directory, check=check)
                 evidence = replace(evidence, mkdir=created.completed[0], acknowledged=('mkdir',))
                 evidence = replace(evidence, phase='original-before')
-                first = adapter.read_into(step.destination, _Discard(), check=check)
+                first = original('original-before')
                 evidence = replace(evidence, original_before=dict(bytes=first.transferred, sha256=first.sha256),
                                    phase='staging')
                 source = Path(step.source)
@@ -160,7 +179,7 @@ def replace_managed(client, step, source_local, progress, *, validate=None):
                 evidence = replace(evidence, signature_after=observed)
                 if observed != step.signature:raise BrowserError('Replacement target changed during copy.')
                 evidence = replace(evidence, phase='original-after')
-                second = adapter.read_into(step.destination, _Discard(), check=check)
+                second = original('original-after')
                 evidence = replace(evidence, original_after=dict(bytes=second.transferred, sha256=second.sha256))
                 if first.sha256 != second.sha256:
                     raise BrowserError('Replacement target contents changed during copy.')

@@ -2,6 +2,13 @@
 
 ## Status, authority and decision
 
+**Completion clarification, 4 October 2026:** R3 is complete, committed and
+pushed as `a081b01c4a62198b35b88199c4c8e48f9c535f90`
+(`Retire R3 compatibility surfaces`). HEAD and local `origin/development` were
+reverified equal with zero divergence and a clean worktree before R4 design.
+The final-review/uncommitted statements below are preserved historical evidence
+from the design/implementation passes, not the present status.
+
 Approved contract implemented, 3 October 2026. **Implemented; final review pending.**
 This implementation pass stops for review with uncommitted source, tests and
 bounded documentation changes. No physical qualification, live-consumer migration,
