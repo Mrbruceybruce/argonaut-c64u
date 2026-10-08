@@ -74,6 +74,17 @@ class RecoverySessionTests(unittest.TestCase):
         self.assertEqual('', app.core.device_session().session_id)
         self.assertTrue(recovery.offline)
 
+    def test_admission_contention_does_not_invalidate_session(self):
+        app = FakeApp()
+        recovery = recovery_for(app)
+        original = app.core.device_session()
+        recovery.accept(CoreError('admission_busy', 'Operation running.'),
+                        was_offline=True)
+        self.assertEqual(original, app.core.device_session())
+        self.assertFalse(app.lost)
+        self.assertFalse(recovery.paused)
+        self.assertGreater(recovery.next_check, 0)
+
     def test_identity_failure_is_not_retried(self):
         app = FakeApp()
         recovery = recovery_for(app)

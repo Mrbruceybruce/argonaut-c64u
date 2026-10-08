@@ -10,7 +10,7 @@ import time
 import uuid
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, GLib, Gdk, Gio, Graphene
+from gi.repository import Gtk, GLib, Gdk, Gio, Graphene, Pango
 from .api import BrowserError, ConnectionFailure
 from .files import child
 from .navigation import History
@@ -19,11 +19,11 @@ from .storage_ui import DriveButtons
 from .folder_copy import completed_roots
 from .file_service import FileLocation, CopyRequest
 from .usb_backup import BackupRequest
-from .core import ArgonautCore
+from .core import ArgonautCore, CoreError
 from .connection_dialog import ConnectionDialog
 from .settings_tab import SettingsTab
 from .drives_tab import DrivesTab
-from .machine_tab import MachineTab
+from .power_dialog import UltimatePower
 from .recovery import Recovery
 from .sid_jukebox_tab import SidJukeboxTab
 from .streams_tab import StreamsTab
@@ -151,17 +151,26 @@ class Browser(Gtk.Application):
         self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         outer.append(self.controls)
         connection = Gtk.Box(spacing=8)
+        self.connection_header = connection
         self.controls.append(connection)
         self.connection_label = Gtk.Label(xalign=0, hexpand=True, wrap=True)
+        self.connection_label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        self.connection_label.set_width_chars(10)
         connection.append(self.connection_label)
         from .app_preferences import show_preferences
-        self.quick_connect_button = self.button(
-            connection, 'Quick Connect', self.quick_connect)
-        self.quick_connect_button.set_tooltip_text(
-            'Connect to the last-used device profile')
-        self.button(connection, 'Preferences…', lambda: show_preferences(self))
-        self.disconnect_button = self.button(
-            connection, 'Disconnect', self.disconnect_device)
+        self.reconnect_button = self.button(connection, 'Reconnect', self.reconnect_device)
+        self.reconnect_button.set_tooltip_text('Reconnect the active device, or the selected saved connection when disconnected')
+        self.disconnect_button = self.button(connection, 'Disconnect', self.disconnect_device)
+        self.settings_button = self.button(connection, 'Settings', lambda: show_preferences(self))
+        self.ultimate_power = UltimatePower(self)
+        self.power_button = Gtk.Button()
+        icon = Gtk.Image.new_from_file(str(ASSETS / 'commodore-c-equals.svg'))
+        icon.set_pixel_size(24)
+        self.power_button.set_child(icon)
+        self.power_button.set_tooltip_text('Ultimate Power\nPower, reset, and memory actions for the connected C64 Ultimate.')
+        self.power_button.update_property([Gtk.AccessibleProperty.LABEL], ['Ultimate Power'])
+        self.power_button.connect('clicked', lambda *_: self.ultimate_power.show())
+        connection.append(self.power_button)
         self.tabs = Gtk.Notebook(vexpand=True)
         self.controls.append(self.tabs)
         files = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -203,8 +212,6 @@ class Browser(Gtk.Application):
         self.tabs.append_page(self.settings_tab.box, Gtk.Label(label='Ultimate Menu'))
         self.drives_tab=DrivesTab(self)
         self.tabs.append_page(self.drives_tab.box,Gtk.Label(label='Drives'))
-        self.machine_tab=MachineTab(self)
-        self.tabs.append_page(self.machine_tab.box,Gtk.Label(label='Machine'))
         self.sid_jukebox_tab=SidJukeboxTab(self)
         self.tabs.append_page(
             self.sid_jukebox_tab.box,Gtk.Label(label='SID Jukebox'))
@@ -218,14 +225,14 @@ class Browser(Gtk.Application):
             self.test_lab_tab = TestLabTab(self)
             self.tabs.append_page(self.test_lab_tab.box, Gtk.Label(label='Test Lab'))
         self.tabs.connect('switch-page', lambda _, page, index: self.settings_tab.load_if_needed() if index == 1 else self.drives_tab.load_if_needed() if index == 2 else None)
-        self.status = Gtk.Label(label='Open Preferences → Device details to select or discover a C64 Ultimate.', xalign=0, wrap=True, selectable=True)
+        self.status = Gtk.Label(label='Open Settings → Device details to select or discover a C64 Ultimate.', xalign=0, wrap=True, selectable=True)
         outer.append(self.status)
         self.cancel_button = self.button(actions, 'Cancel transfer', self.cancel_transfer)
         self.cancel_button.set_sensitive(False)
         self.cancel_button.set_halign(Gtk.Align.START)
         # Keep the Files action row reachable while a transfer is running.
         self.busy_controls = [connection, panes, usb_actions, self.partial_button,
-            self.settings_tab.box, self.drives_tab.box, self.machine_tab.box,
+            self.settings_tab.box, self.drives_tab.box,
             self.streams_tab.box]
         self.busy_controls.extend(self.sid_jukebox_tab.busy_controls)
         self.busy_controls.extend(self.game_library_tab.busy_controls)
@@ -377,7 +384,8 @@ class Browser(Gtk.Application):
         except OSError as exc: self.status.set_text(str(exc))
 
     def run(self, task, done):
-        if self.busy: return
+        """Schedule worker work; return whether submission was accepted."""
+        if self.busy: return False
         self.busy = True
         sensitivity = [(widget, widget.get_sensitive()) for widget in self.busy_controls]
         for widget, _ in sensitivity: widget.set_sensitive(False)
@@ -391,7 +399,7 @@ class Browser(Gtk.Application):
             try: done(error)
             except Exception: pass
             self.status.set_text(str(error))
-            return
+            return False
         def finish():
             self.busy = False
             for widget, sensitive in sensitivity: widget.set_sensitive(sensitive)
@@ -404,6 +412,7 @@ class Browser(Gtk.Application):
                 self.status.set_text(str(exc))
             return False
         future.add_done_callback(lambda _: GLib.idle_add(finish))
+        return True
 
     def open_connections(self):
         if self.busy: return
@@ -425,28 +434,55 @@ class Browser(Gtk.Application):
         if hasattr(self,'usb_backup_button'):
             self.usb_backup_button.set_sensitive(self.client is not None)
             self.usb_restore_button.set_sensitive(self.client is not None)
-        self.quick_connect_button.set_sensitive(self.active_profile is None)
+        self.reconnect_button.set_sensitive(not self.busy and not (self.recovery and self.recovery.inflight)
+                                            and self.reconnect_available())
         self.disconnect_button.set_sensitive(self.active_profile is not None)
         if hasattr(self, 'remote_new_d64_button'):
             self.remote_new_d64_button.set_sensitive(self.client is not None)
         if hasattr(self, 'test_lab_tab'):
             self.test_lab_tab.connection_changed()
 
-    def quick_connect(self):
-        """Connect to the selected (last-used) profile without opening Preferences."""
-        if self.busy or self.active_profile:
-            return
+    def reconnect_available(self):
+        if self.active_profile:return True
+        selected = self.core.selected_profile()
+        return bool(selected and (selected.device_id or selected.device_mac))
+
+    def reconnect_device(self):
+        if self.busy or (self.recovery and self.recovery.inflight):return
         if self.preferences_error:
-            self.status.set_text(self.preferences_error)
+            self.status.set_text(self.preferences_error);return
+        if not self.reconnect_available():
+            self.status.set_text('Select and verify a saved connection in Settings → Device details first.')
             return
-        profile = self.core.selected_profile()
-        if not profile:
-            self.status.set_text(
-                'Choose or create a device profile before using Quick Connect.')
-            self.open_connections()
-            return
-        self.run(lambda: self.core.connect_selected(require_bound=True),
-                 self.activate_connection)
+        active = self.active_profile is not None
+        # Share Recovery's in-flight gate; GTK serializes this with its timer.
+        self.recovery.inflight = True
+        self.update_connection_header()
+        def task():
+            try:
+                if active:return self.core.reconnect(getattr(self, 'remote_root', '/USB2'))
+                return self.core.connect_selected(require_bound=True)
+            except Exception as exc:return exc
+        def done(result):
+            self.recovery.inflight = False
+            if isinstance(result, Exception):
+                self.status.set_text(str(result))
+                if active:self.recovery.accept(result, was_offline=True)
+            elif active:
+                self.recovery.paused = False
+                self.recovery.accept(result, was_offline=True)
+            else:
+                self.activate_connection(result)
+                self.status.set_text('Connected to the selected C64U. Password storage unchanged.')
+            self.update_connection_header()
+        try:
+            if self.run(task, done) is False:
+                self.recovery.inflight = False
+                self.update_connection_header()
+        except Exception:
+            self.recovery.inflight = False
+            self.update_connection_header()
+            self.status.set_text('Could not start reconnect. No automatic retry was requested.')
 
     def activate_connection(self, result):
         self.offline_message=None
@@ -461,7 +497,7 @@ class Browser(Gtk.Application):
         self.settings_tab.bind(client)
         self.settings_tab.box.set_sensitive(True)
         self.drives_tab.bind(client)
-        self.machine_tab.bind(client)
+        self.ultimate_power.bind(client)
         self.sid_jukebox_tab.bind(True)
         self.streams_tab.bind(client)
         self.game_library_tab.bind(True)
@@ -472,8 +508,12 @@ class Browser(Gtk.Application):
 
     def disconnect_device(self):
         if self.busy: return
+        try:
+            self.core.disconnect()
+        except CoreError as exc:
+            if exc.code != 'admission_busy':raise
+            self.status.set_text(str(exc));return
         if self.recovery:self.recovery.cancel()
-        self.core.disconnect()
         self.offline_message=None
         self.client = self.active_profile = self.device_info = None
         self.drive_bars[False].refresh()
@@ -484,7 +524,7 @@ class Browser(Gtk.Application):
         self.settings_tab.bind(None)
         self.settings_tab.box.set_sensitive(True)
         self.drives_tab.bind(None)
-        self.machine_tab.bind(None)
+        self.ultimate_power.bind(None)
         self.sid_jukebox_tab.bind(False)
         self.streams_tab.bind(None)
         self.game_library_tab.bind(False)
@@ -499,10 +539,10 @@ class Browser(Gtk.Application):
         self.rpath.set_text('')
         self.update_history_buttons()
         # Retain local drafts, but block sending their old snapshot after reconnect.
-        self.settings_tab.client=None;self.settings_tab.requires_refresh=True
-        self.settings_tab.rows.set_sensitive(False)
+        self.settings_tab.client=None
+        self.settings_tab.require_fresh_settings()
         self.settings_tab.box.set_sensitive(False)
-        self.drives_tab.bind(None);self.machine_tab.bind(None)
+        self.drives_tab.bind(None);self.ultimate_power.bind(None)
         self.sid_jukebox_tab.bind(False)
         self.streams_tab.bind(None)
         self.game_library_tab.bind(False)
@@ -515,10 +555,11 @@ class Browser(Gtk.Application):
         self.file_clipboard = None
         self.histories[False] = History(result.remote_path)
         self.show_remote(result.listing)
-        self.settings_tab.client=client;self.settings_tab.loaded=False
-        self.settings_tab.box.set_sensitive(True);self.settings_tab.update_edit_buttons()
+        self.settings_tab.client=client
+        self.settings_tab.require_fresh_settings()
+        self.settings_tab.box.set_sensitive(True)
         self.settings_tab.heading.set_text('Reconnected. '+('Discard retained edits, then reload settings.' if self.settings_tab.pending or self.settings_tab.drafts else 'Reload settings before editing or saving.'))
-        self.drives_tab.bind(client);self.machine_tab.bind(client)
+        self.drives_tab.bind(client);self.ultimate_power.bind(client)
         self.sid_jukebox_tab.bind(True)
         self.streams_tab.bind(client)
         self.game_library_tab.bind(True)
@@ -838,7 +879,7 @@ class Browser(Gtk.Application):
         payload = self.drag_payload
         if self.busy or not payload or value != payload[0] or local == payload[1]: return False
         if not self.client:
-            self.status.set_text('Open Preferences → Device details and connect to a C64U first.'); return False
+            self.status.set_text('Open Settings → Device details and connect to a C64U first.'); return False
         row = listing.get_row_at_y(int(y))
         destination = self.local if local else self.remote
         if row and row.item[1]:

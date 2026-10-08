@@ -154,7 +154,7 @@ def run(package_metadata, report_path):
             app.activate()
             _require(bool(app.window), 'ui.main_window',
                      'The main window did not open.', checks)
-            _require(app.quick_connect_button.get_label() == 'Quick Connect' and
+            _require(app.reconnect_button.get_label() == 'Reconnect' and
                      not app.disconnect_button.get_sensitive() and
                      app.new_d64_button.get_tooltip_text() == 'New D64 disk…' and
                      app.remote_new_d64_button.get_tooltip_text() ==
@@ -162,7 +162,7 @@ def run(package_metadata, report_path):
                      not app.remote_new_d64_button.get_sensitive() and
                      app.tabs.get_tab_label_text(app.settings_tab.box) ==
                      'Ultimate Menu',
-                     'ui.quick_connect',
+                     'ui.connection_header',
                      'Main-window connection or disk controls are incorrect.', checks)
             _require(app.file_pane_labels[True].get_text() == 'Local files · Active' and
                      app.file_pane_labels[False].get_text() == 'C64 Ultimate files' and
@@ -413,7 +413,7 @@ def run(package_metadata, report_path):
                          preferences_dialog.connections.fields[
                              'case_edition'].get_editable(),
                          'development.preferences_ui',
-                         'Development Preferences layout is incorrect.', checks)
+                         'Development Settings layout is incorrect.', checks)
                 _require(app.streams_tab.text_return.get_active() and
                          isinstance(app.streams_tab.zoom, Gtk.Label) and
                          not app.preferences.app_options['replay_enabled'] and

@@ -1,5 +1,235 @@
 # Current development state
 
+## B4 — bounded physical acceptance passed; publication approved, not executed
+
+**APPROVE COMMIT/PUSH — not executed.** The approved bounded physical acceptance
+used this current worktree through `./run-development`, not the installed package.
+Starting HEAD/local origin was `9d0c543b7f7497428463a4890098fae6c30d937b`, divergence
+0 0, empty index; pending scope was 19 files (+1359/-142). The following acceptance
+supersedes earlier B4 review/physical-pending stop markers without rewriting history.
+
+Development session-only mode connected once through the normal saved connection
+flow to **C64 Founders / Founder 25BE71**, firmware 1.1.0, API 0.1. The user entered
+the password locally; persistence controls were hidden and storage was unchanged.
+One explicit Reconnect preserved the active profile, host and verified identity,
+created a new session and completed without duplicate reconnect/recovery.
+
+Read-only Ultimate Menu loading returned 213 settings in 17 sections before
+Reconnect. Afterward the stale rows, Apply and Save to Flash were disabled, with
+truthful reload guidance and the Core connection valid. A deliberate read-only
+reload restored fresh rows/normal eligibility. No edits, Apply or Flash save.
+
+Header order, original blue/red 24-pixel Commodore artwork, Settings title/pages,
+and keyboard traversal through all four actions passed. The user verified the
+Ultimate Power hover tooltip and that the physical C64U stayed normal. Ultimate
+Power exposed only Reset/Reboot; both real confirmations opened and were CANCELLED.
+Zero machine-command submissions, no unexpected recovery. Machine and Quick Connect
+were absent; saved connection management remained available in Device details.
+
+Header remained usable without overlap/clipping at actual sizes 1121x850 and
+1300x1000. A requested 900-pixel width was constrained by the existing full-window
+minimum; smaller-width header evidence remains the prior offline GTK qualification.
+Normal close exited the Development process and cleared all session credentials;
+no recovery worker remained. Observation tooling/screenshots stayed outside the
+repository. Production/test files were unchanged by physical acceptance.
+
+No device configuration/storage/power mutation, stream, discovery/scan, command
+execution or repeated qualification. Prior 207 focused and 16 offline GTK results
+remain unchanged; suites were not rerun. Streaming remains **OPEN / intermittent /
+instrumented**. Section H remains pending broader power/memory capability review.
+Only this status and the roadmap were updated; no staging/publication/package work.
+
+**Stale Flash confirmation correction implemented; pending final B4 re-review.**
+Final narrow review exposed an already-open Save to Flash confirmation surviving
+loss/restoration: Core's reusable facade passed the dialog identity check, while
+the final callback omitted the freshness guard. `save_to_flash` now rechecks
+`requires_refresh` in that callback before worker submission, refusing with reload
+guidance. It preserves stale settings/drafts and the valid restored Core session;
+no worker, reload, retry or replacement confirmation is started on refusal.
+The existing fresh-confirmation behavior is unchanged. No separate settings
+version token exists; the correction uses the established authoritative gate.
+
+Four new offline real-GTK regressions passed: old confirmation across loss/recovery,
+old confirmation across actual connected Reconnect, retained drafts, and a fresh
+confirmation executing exactly once. Stale tests repeat the real dialog response
+and verify zero submissions/writes. All **207 focused B4/settings/Flash tests**
+and **16 explicit offline GTK checks** passed, no skips. Production amendment is
+three lines in SettingsTab only; Core/scheduler/recovery and other B4 contracts
+are unchanged. No broad suite rerun or device contact. Earlier evidence below
+remains history. **READY FOR FINAL B4 RE-REVIEW**; physical acceptance stays
+blocked until review approves this correction.
+
+**Fresh-settings correction implemented; pending compact B4 re-review.** The
+compact review found that connected Reconnect bypassed the loss callback which
+previously established Ultimate Menu's stale-settings gate. Restoration displayed
+reload guidance but could leave Apply and Save to Flash enabled. The existing
+`requires_refresh` transition is now centralized in
+`SettingsTab.require_fresh_settings()` and invoked on both loss and restoration.
+It retains drafts/pending edits, disables stale rows and recalculates actions;
+the restored Core session remains valid. Existing Apply/apply-reviewed/Flash
+controller guards refuse stale operations. Discard followed by a fresh reload
+clears the gate normally; no draft replay or automatic discard occurs. Even with
+no edits, Save to Flash remains unavailable until reload.
+
+Correction verification: four new offline real-GTK regressions exercise actual
+connected Reconnect and loss/recovery, each with/without drafts, including stale
+programmatic action refusal, retained edits, discard/reload and session validity.
+All **159 focused tests** passed (the previous 146-test B4 set plus configuration
+and settings-safety tests), followed by all **12 explicit offline GTK checks**,
+with no skips. GTK traps Python socket connections. No Core/scheduler/recovery,
+Reset/Reboot, credential, discovery, header layout or asset changes in this
+correction. Earlier broad prerequisite evidence remains applicable and was not
+rerun. No device contact. **READY FOR B4 RE-REVIEW**; physical acceptance remains
+pending, and the earlier B4 review stop below is superseded by this re-review gate.
+
+**APPROVE PREREQUISITE — B4 MAY RESUME.** Final compact re-review of the amended
+Reset/Reboot prerequisite passed before B4 implementation. Its immutable target,
+one-shot response before destruction/scheduling, failed-handoff disposal, privately
+retained transport, atomic admission/dispatch, nonblocking GTK handoff and no-replay
+contracts remain intact. Admission → device reservation has no reverse waiting
+path: session transitions refuse contention. Earlier prerequisite stop markers
+below record the review history and are superseded by this final-review result.
+No physical qualification was required for that deterministic race correction.
+
+B4 started at HEAD = local `origin/development` =
+`9d0c543b7f7497428463a4890098fae6c30d937b`, parent
+`b075bddd795b1b104dc5632477444bd85bb7ba39`, subject
+`Refine Device Details connection profile layout`; divergence `0 0`, empty index,
+and exactly nine pending prerequisite files (+595/-27), including its new test.
+
+Header is now **Reconnect → Disconnect → Settings → original blue/red Commodore
+C= icon**. Quick Connect's button and route are retired; two obsolete lifecycle
+tests were replaced by eight explicit Reconnect routing tests. Connected or
+retained-offline Reconnect invokes existing Core reconnect for the ACTIVE profile,
+ignoring unrelated selection. Disconnected Reconnect uses Core connect-selected
+with required saved identity binding; absent/unbound selection refuses. The GUI
+shares Recovery's in-flight guard, refuses concurrent attempts, and sends results
+through existing recovery/activation paths. Neither route persists credentials.
+Core/session/scheduler/recovery implementations are unchanged by B4 itself.
+
+The Settings header, dialog title, messages and related navigation guidance use
+Settings; General / Device details / About and persistence semantics are unchanged.
+Internal preferences APIs retain their names. Feature-specific legacy wording
+outside this header/dialog scope, including Streams, was not edited.
+
+Ultimate Power is an icon-only global button with accessible name `Ultimate Power`
+and tooltip `Ultimate Power` / `Power, reset, and memory actions for the connected
+C64 Ultimate.` It opens a closeable/reopenable dialog containing only Reset C64
+and Reboot C64 plus the existing operational explanation. Machine contained no
+other operation and its top-level tab/module/routes are retired. The reviewed
+command handler moved structurally unchanged into `power_dialog.UltimatePower`;
+all 22 machine-safety tests now exercise that class. Real GTK button-route tests
+also prove cancellation, exactly-once dispatch, stale refusal and failed-handoff
+cleanup. No expanded F1 commands; section H remains deferred.
+
+Asset: `c64u_browser/assets/commodore-c-equals.svg`, the unchanged 454-byte Commons
+`Commodore C= logo.svg` by Alien426, canvas crop by DigitalIceAge. CC BY-SA 4.0;
+source/revision/license links and trademark/public-release review note are bundled
+in `assets/COMMODORE-ATTRIBUTION.txt`. Original blue/red paths, no fonts, no recolor.
+GTK loads it through module-relative ASSETS at a verified 24×24 allocation. Native
+SVG decoding passed. Debian copies the complete asset directory; Windows/macOS
+specifications include it likewise. No manifest redesign or package build.
+
+Verification: **146 focused/affected tests passed**, including 22 machine safety,
+eight Reconnect, lifecycle, Core, recovery, scheduler, API machine routes,
+credential/device-details, discovery, connection layout and preferences/channel
+regressions. **Eight explicit offline real-GTK checks passed**, with Python socket
+connections trapped, testing widget order, accessible label assignment, SVG decode,
+header keyboard traversal and non-overlap at 640/740/900 widths, existing Settings
+pages, Power close/reopen, action keyboard access and actual button safety routes.
+These display checks live in `tests/b4_gtk_check.py` and are invoked explicitly;
+no default-suite skips were added. Two existing display-test tab indices now resolve
+the Streams page by widget, avoiding a stale numeric index after Machine removal.
+
+Commands: `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=tests python3 -m unittest
+ test_header_navigation test_machine_safety test_app_lifecycle test_recovery
+ test_core test_scheduler test_drives test_connections test_connection_layout
+ test_device_details test_package_credential_channel test_app_preferences`;
+`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=tests python3 -m unittest b4_gtk_check`.
+The first GTK run exposed delayed destroy-signal cleanup of the Power dialog;
+explicit response/close-request cleanup fixed it before the passing rerun.
+The unchanged prerequisite full-suite/Offline Test Lab evidence below remains
+prior evidence, not a new B4 full-suite result. B4 is presentation/wiring only.
+
+No C64U contact. Physical acceptance remains pending: inspect header/icon and
+Settings, explicitly Reconnect once and verify identity/status, open Ultimate
+Power, and CANCEL both confirmations. Executing either hardware command requires
+separate explicit authorization. Streaming remains **OPEN / intermittent /
+instrumented**. Test Lab/Developer Mode, expanded section H and later roadmap work
+are unchanged. No staging, commit, push, package, tag or release. **READY FOR B4
+REVIEW**; stop before physical acceptance or publication.
+
+## B4 prerequisite — Machine confirmation safety, pending review
+
+**Amended after compact review — pending final re-review:** a failure before
+Core execution could retain the confirmation target. The response handler now
+marks itself one-shot before dialog destruction or scheduling, discards the target
+on synchronous handoff errors and terminal completion, and rejects all repeated
+responses. `Browser.run` now explicitly returns submission acceptance/refusal;
+refusal discards authorization without recovery. Core's reviewed binding, admission,
+reservation and uncertain-outcome lifecycle are unchanged.
+
+Five new regressions cover both Reset and Reboot: actual worker-submission failure
+and old-callback reuse, synchronous handoff exception, busy submission refusal,
+dialog-destruction exception, and reentrant destruction/double response with an
+accepted deferred worker. All five passed, then all **22 machine-safety tests**
+and **48 directly related Core/scheduler/recovery/API-route/connection/layout tests**
+passed without skips. Syntax and whitespace passed. Earlier full normal/optimized,
+credential and Offline Test Lab results below remain prior evidence, not reruns
+of this amendment. No device contact or broader B4 work. **PREREQUISITE READY FOR
+FINAL RE-REVIEW**; B4 stays paused.
+
+B4 inspection exposed a pre-existing Reset/Reboot race: confirmation retained
+Core's reusable facade, so recovery could replace the intended session before
+confirmation and the old dialog would dispatch through the replacement transport.
+The explicitly approved prerequisite correction is implemented and deterministically
+verified; broader B4 implementation remains paused pending review.
+
+Starting authority: HEAD = local `origin/development` =
+`9d0c543b7f7497428463a4890098fae6c30d937b`, parent
+`b075bddd795b1b104dc5632477444bd85bb7ba39`, subject
+`Refine Device Details connection profile layout`; divergence `0 0`, clean index
+and worktree. That layout checkpoint is published; its older publication-pending
+wording below is historical.
+
+Confirmation now captures a frozen, single-use Core target: action, physical-device
+session, profile ID, host and opaque token. Core privately retains the exact client;
+no transport or credential is returned to GTK. Cancellation discards the target.
+Core validates session, profile, target identity and exact client before dispatch.
+A per-Core nonblocking admission gate is shared with connect, reconnect, disconnect
+and connection-loss transitions, covering validation through command outcome.
+The existing `CoreScheduler.inline` / `JobBinding.device` reservation serializes
+machine commands with device jobs; its new opt-in busy refusal does not queue a
+machine action behind existing work. Default FIFO diagnostic behavior is unchanged.
+GTK only captures the target and submits worker work; it never waits on admission.
+
+Both Reset and Reboot consume the target on admission/refusal/uncertainty. Stale
+confirmation reports `Connection changed. Reset was not sent.` (or Reboot).
+The unguarded machine route on the reusable facade is removed. Existing API
+allowlisting and post-command recovery remain; contention is not a network loss.
+Disconnect refuses contention without cancelling the recovery watch. Late command
+completion cannot invalidate a newer session. No automatic command replay exists.
+
+Verification: 109 focused/affected methods passed (machine confirmation, Core,
+scheduler, recovery, API, connection/layout and R5 diagnostic reservation tests);
+52 credential/device-details/channel checks passed. Normal and optimized full
+suites each ran **1,253 methods: 1,217 passed, 36 unchanged display skips**.
+Seventeen new machine regressions plus one recovery regression; no tests removed
+and no new skips. Offline Test Lab passed **17/17**. Syntax and whitespace checks
+passed. Deterministic cases cover cancellation, stale and reused sessions/bindings,
+worker admission races, busy lane/recovery refusal, no redirection at dispatch,
+nonblocking callbacks, and no replay after uncertain responses.
+
+The initial sandbox full run hit 660 loopback-socket permission errors. With local
+fixture sockets permitted, two R5 diagnostic observer tests exposed an optional
+argument compatibility regression; preserving the original default submission call
+resolved it before the passing focused and full reruns. No C64U was contacted.
+No physical acceptance is needed for this prerequisite. No header, logo, Settings,
+Machine-tab removal, new power command, streaming, credential or discovery change.
+Streaming remains **OPEN / intermittent / instrumented**. No staging, commit,
+push, package, tag or release. **PREREQUISITE READY FOR REVIEW**; resume B4 only
+once this correction passes review.
+
 ## Device Details / connection-profile layout — accepted, publication pending (7 October 2026)
 
 Starting authority: HEAD = local `origin/development` =

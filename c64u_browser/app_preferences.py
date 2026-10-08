@@ -68,7 +68,7 @@ def show_preferences(app, page=0):
     if existing is not None:
         existing.pages.set_current_page(page);existing.present();return existing
     prefs=app.preferences
-    dialog=Gtk.Dialog(title='Argonaut Preferences',transient_for=app.window,modal=True)
+    dialog=Gtk.Dialog(title='Argonaut Settings',transient_for=app.window,modal=True)
     dialog.add_button('Close',Gtk.ResponseType.CLOSE)
     app.preferences_dialog=dialog
     dialog.set_default_size(740,680)
@@ -139,7 +139,7 @@ def show_preferences(app, page=0):
             box.append(Gtk.Label(
                 label='Core-host parent folder for individual self-contained USB/SD backups.',
                 wrap=True,xalign=0))
-    note=Gtk.Label(label='General settings save automatically. Undo restores the values from when Preferences opened. Restore defaults keeps connection profiles and C64U settings.',wrap=True,xalign=0);box.append(note)
+    note=Gtk.Label(label='General settings save automatically. Undo restores the values from when Settings opened. Restore defaults keeps connection profiles and C64U settings.',wrap=True,xalign=0);box.append(note)
     error=Gtk.Label(wrap=True,xalign=0);box.append(error)
     dialog.general_message=error
     def general_message(message,failed=False):
@@ -158,7 +158,7 @@ def show_preferences(app, page=0):
             for key,entry in folders.items():entry.set_text(folder_values[key])
         finally:updating[0]=False
 
-    def auto_save_general(message='Preferences saved automatically.'):
+    def auto_save_general(message='Settings saved automatically.'):
         if updating[0]:return True
         if app.busy:return False
         values={key:entry.get_text().strip() for key,entry in folders.items()}
@@ -181,7 +181,7 @@ def show_preferences(app, page=0):
             prefs.app_options=old
             for key,value in oldfolders.items():setattr(prefs,key,value)
             show_general(old,oldfolders)
-            general_message('Could not save preferences: '+str(exc),True);return False
+            general_message('Could not save settings: '+str(exc),True);return False
         tab=app.streams_tab;tab.set_zoom(prefs.app_options['preview_scale']);tab.apply_scale()
         tab.audio.set_active(prefs.app_options['preview_audio'])
         tab.set_replay_enabled(prefs.app_options['replay_enabled'])
@@ -192,7 +192,7 @@ def show_preferences(app, page=0):
             app.refresh_local()
         if developer_was_enabled != developer_is_enabled:
             general_message(
-                'Preferences saved automatically. Restart Argonaut to apply Developer Mode.')
+                'Settings saved automatically. Restart Argonaut to apply Developer Mode.')
             if developer_was_enabled and not developer_is_enabled:
                 def stopped(result):
                     app.status.set_text(
@@ -220,7 +220,7 @@ def show_preferences(app, page=0):
     def restore_defaults(*_):
         existing=getattr(dialog,'restore_prompt',None)
         if existing:existing.present();return
-        prompt=Gtk.Dialog(title='Restore default preferences?',
+        prompt=Gtk.Dialog(title='Restore default settings?',
                           transient_for=dialog,modal=True)
         dialog.restore_prompt=prompt
         prompt.add_button('Cancel',Gtk.ResponseType.CANCEL)
@@ -235,7 +235,7 @@ def show_preferences(app, page=0):
             prompt.destroy();dialog.restore_prompt=None
             if code==Gtk.ResponseType.OK:
                 show_general(defaults(),{key:'' for key in folders})
-                if auto_save_general('Default preferences restored.'):
+                if auto_save_general('Default settings restored.'):
                     app.window.set_default_size(1200,850)
         prompt.connect('response',decided)
         prompt.connect('close-request',

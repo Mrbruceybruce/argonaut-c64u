@@ -7,6 +7,8 @@ clients must call the same application operations instead of owning an
 ``UltimateClient`` themselves.
 """
 from contextlib import contextmanager
+from functools import wraps
+from threading import Lock
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
@@ -54,6 +56,26 @@ class CoreError(BrowserError):
     def as_dict(self):
         return {'code': self.code, 'message': str(self),
                 'retryable': self.retryable}
+
+
+def _session_change(method):
+    """Session replacement and machine dispatch share a fail-fast gate."""
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        with self._session_admission():
+            self._machine_targets.clear()
+            return method(self, *args, **kwargs)
+    return guarded
+
+
+@dataclass(frozen=True)
+class MachineTarget:
+    """Non-secret, single-use confirmation; transport stays private to Core."""
+    action: str
+    session: DeviceSession
+    profile_id: str
+    host: str
+    token: str
 
 
 @dataclass(frozen=True)
@@ -130,7 +152,6 @@ class CoreDeviceOperations:
     def set_drive_type(self, *args, **kwargs): return self._client().set_drive_type(*args, **kwargs)
     def apply_configuration(self, *args, **kwargs): return self._client().apply_configuration(*args, **kwargs)
     def save_configuration(self, *args, **kwargs): return self._client().save_configuration(*args, **kwargs)
-    def machine_action(self, *args, **kwargs): return self._client().machine_action(*args, **kwargs)
     def run_prg(self, *args, **kwargs): return self._client().run_prg(*args, **kwargs)
     def write_memory(self, *args, **kwargs): return self._client().write_memory(*args, **kwargs)
     def play_sid(self, *args, **kwargs): return self._client().play_sid(*args, **kwargs)
@@ -191,6 +212,8 @@ class ArgonautCore:
         self._networks = networks
         self._session_passwords = {}
         self.preferences_error = None
+        self._session_gate = Lock()
+        self._machine_targets = {}
         self._client = None
         self._active_profile = None
         self._device_info = None
@@ -517,6 +540,7 @@ class ArgonautCore:
         return next((row.current for row in Configuration(client).settings(
             'U64 Specific Settings') if row.name == 'C64U Model'), 'Not reported')
 
+    @_session_change
     def connect(self, profile, *, entered_password='', remember=False,
                 require_bound=False, bind_identity=False, persist=False,
                 remote_folder=None, initial_browse=True):
@@ -561,7 +585,11 @@ class ArgonautCore:
         return self.connect(profile, require_bound=require_bound,
                             remote_folder=folder)
 
+    @_session_change
     def mark_connection_lost(self, message=''):
+        self._mark_connection_lost(message)
+
+    def _mark_connection_lost(self, message):
         if not self._active_profile: return
         self._client = None
         self._end_session()
@@ -587,6 +615,7 @@ class ArgonautCore:
             raise CoreError(exc.kind, str(exc),
                             retryable=exc.kind in ('host', 'network')) from exc
 
+    @_session_change
     def reconnect(self, remote_folder='/USB2'):
         if not self._active_profile:
             raise CoreError('session', 'No C64U session is available to reconnect.')
@@ -605,11 +634,11 @@ class ArgonautCore:
         reported = info.get('info', {}).get('unique_id')
         if not (profile.device_id or profile.device_mac):
             if not expected:
-                self.mark_connection_lost('No device ID was available to verify reconnection.')
+                self._mark_connection_lost('No device ID was available to verify reconnection.')
                 raise CoreError('identity',
                     'No device ID was available to verify reconnection. Connect manually.')
             if reported != expected:
-                self.mark_connection_lost('A different device answered at this address.')
+                self._mark_connection_lost('A different device answered at this address.')
                 raise CoreError('identity',
                     'A different device answered at this address. Connect manually.')
         try:
@@ -626,12 +655,70 @@ class ArgonautCore:
         self._emit('reconnected', data={'host': profile.host})
         return result
 
+    @_session_change
     def disconnect(self):
         profile_id = self._active_profile.id if self._active_profile else ''
         self._client = self._active_profile = self._device_info = None
         self._end_session(keep_device=False)
         self._emit('disconnected', data={'profile_id': profile_id},
                    profile_id=profile_id)
+
+    @contextmanager
+    def _session_admission(self):
+        # Never wait on GTK, a scheduler worker, or another network operation.
+        if not self._session_gate.acquire(blocking=False):
+            raise CoreError('admission_busy',
+                            'Connection operation already running. Action was not sent.')
+        try:
+            yield
+        finally:
+            self._session_gate.release()
+
+    def prepare_machine_command(self, action):
+        if action not in ('reset', 'reboot'):
+            raise CoreError('argument', 'Unsupported machine action.')
+        with self._session_admission():
+            client = self._require_client()
+            session = self.device_session()
+            JobBinding.device(session)
+            target = MachineTarget(action, session, self._active_profile.id,
+                                   client.host, uuid.uuid4().hex)
+            # Bound abandoned confirmations without retaining unlimited transports.
+            if len(self._machine_targets) >= 32:
+                self._machine_targets.pop(next(iter(self._machine_targets)))
+            self._machine_targets[target.token] = (target, client)
+            return target
+
+    def discard_machine_command(self, target):
+        # Dict removal is nonblocking; cancellation never touches the device.
+        self._machine_targets.pop(target.token, None)
+
+    def execute_machine_command(self, target):
+        """Worker-only: refuse contention, validate once, dispatch once to A.
+
+        The existing physical-device lane excludes device jobs. The session gate
+        excludes connect/reconnect/disconnect for the complete dispatch/outcome.
+        No transport is resolved through the reusable UI facade.
+        """
+        try:
+            with self._session_admission():
+                entry = self._machine_targets.pop(target.token, None)
+                def validate():
+                    if (entry is None or entry[0] is not target or
+                            target.session != self.device_session() or
+                            not self._active_profile or
+                            target.profile_id != self._active_profile.id or
+                            entry[1] is not self._client):
+                        raise CoreError('session', 'Connection changed. ' +
+                                        target.action.title() + ' was not sent.')
+                validate()
+                with self.scheduler.inline(JobBinding.device(target.session),
+                                           reject_busy=True):
+                    validate()
+                    return entry[1].machine_action(target.action)
+        finally:
+            # Admission refusals and uncertain responses consume the authority too.
+            self.discard_machine_command(target)
 
     def _require_client(self):
         if self._client is None:
@@ -640,6 +727,7 @@ class ArgonautCore:
 
     def close(self):
         """Release Core execution resources; jobs are not persisted."""
+        self._machine_targets.clear()
         try:
             self._ftp_manager.invalidate(self._device_identity)
             self.scheduler.close()

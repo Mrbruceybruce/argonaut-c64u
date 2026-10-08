@@ -55,7 +55,7 @@ class PreferencesUI(unittest.TestCase):
         self.assertTrue(tab.text_return.get_active());self.assertIsInstance(tab.zoom,self.Gtk.Label)
         buttons=[w for w in self.walk(tab.box) if isinstance(w,self.Gtk.Button)]
         plus=next(w for w in buttons if w.get_label()=='+');minus=next(w for w in buttons if w.get_label()=='−')
-        self.app.tabs.set_current_page(5);self.pump()
+        self.app.tabs.set_current_page(self.app.tabs.page_num(self.app.streams_tab.box));self.pump()
         before=(self.app.window.get_width(),self.app.window.get_height())
         for _ in range(6):plus.emit('clicked')
         self.assertEqual(tab.zoom.get_text(),'300%');self.assertFalse(plus.get_sensitive())
@@ -953,7 +953,7 @@ class PreferencesUI(unittest.TestCase):
         from c64u_browser.api import BrowserError
         from unittest.mock import Mock
         tab=self.app.streams_tab;tab.client=Mock();tab.text_input.set_text('PRINT "HELLO"')
-        self.app.tabs.set_current_page(5);self.pump()
+        self.app.tabs.set_current_page(self.app.tabs.page_num(self.app.streams_tab.box));self.pump()
         self.app.run=lambda task,done:done(task())
         with patch('c64u_browser.keyboard_input.send_text',return_value=14) as send, \
                 patch.object(tab.text_input, 'grab_focus',

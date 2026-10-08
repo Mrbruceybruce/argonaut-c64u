@@ -152,12 +152,63 @@ so it is deliberately unchanged by this component layout pass.
 
 ### 4. Global header/navigation cleanup
 
-Settled order: `[ Reconnect ] [ Disconnect ] [ Settings ] [ ⏻ ]`.
-Rename Preferences to Settings, right of Disconnect. Far-right power is icon-only,
-with hover title `Ultimate Power` and description
-`Power, reset, and memory actions for the connected C64 Ultimate.`
-It opens the global Power & Reset dialog. Verify physical F1 action API support
-before exposing actions. Machine tab removal remains conditional on coverage (H).
+**Bounded physical acceptance passed; commit/push approved, not executed.**
+Current `./run-development` worktree connected to saved C64 Founders / Founder
+25BE71 in session-only Development mode. One Reconnect preserved active identity;
+previously loaded Ultimate Menu settings became stale with rows/Apply/Flash gated,
+and read-only reload restored usability. Settings, original blue/red icon, tooltip
+(user-confirmed), keyboard access, Machine/Quick Connect retirement and modest
+resize passed. Actual widths were 1121 and 1300 pixels; the full-window minimum
+constrained the smaller requested width. Reset and Reboot confirmations were both
+cancelled: zero machine commands and no device mutation. Normal close cleared
+session credentials and exited. Prior 207 focused / 16 GTK evidence is unchanged;
+no suites rerun. Streaming stays OPEN/intermittent/instrumented; H stays pending.
+This acceptance supersedes the historical B4 review/pending markers below.
+
+Compact B4 review exposed a connected-Reconnect stale-settings gate defect.
+The narrow correction now shares the existing refresh gate across loss and
+restoration: retain drafts, block stale editing/Apply/Flash even without edits,
+and require the existing discard/reload flow while keeping Core connected.
+159 focused tests and 12 offline real-GTK checks pass, including four new real
+restoration-path regressions. **Pending compact B4 re-review before physical
+acceptance.** Broader prerequisite evidence remains unchanged; no device contact.
+
+Final narrow review additionally found an already-open Save to Flash confirmation
+could bypass the gate after restoration. Its final callback now rechecks freshness
+before submission. Four new real-dialog regressions prove stale refusal after
+recovery/Reconnect (including repeated responses and retained drafts), and exactly
+one save while fresh. 207 focused tests and 16 offline GTK checks pass, no skips.
+**Pending final B4 re-review; physical acceptance remains blocked until approval.**
+No other B4 behavior or later scope changes; no device contact.
+
+Final amended prerequisite review: **APPROVE PREREQUISITE — B4 MAY RESUME**.
+The one-shot, exact-session Reset/Reboot admission path is preserved unchanged
+in the global dialog. See CURRENT-STATE for prerequisite review/test history.
+
+Settled and implemented order: `[ Reconnect ] [ Disconnect ] [ Settings ] [ C= ]`.
+Connected Reconnect targets the active identity-bound profile; disconnected
+Reconnect targets the selected saved bound profile. Missing/unbound selection and
+busy recovery refuse. Existing Core/recovery machinery owns connection semantics;
+no credential persistence. Quick Connect's old route is retired.
+
+Settings replaces user-facing Preferences in the header/dialog without redesigning
+its pages. Far-right Ultimate Power uses the original blue/red Commodore SVG,
+24 px, icon-only with accessible name `Ultimate Power` and tooltip description
+`Power, reset, and memory actions for the connected C64 Ultimate.` Source/license
+(CC BY-SA 4.0) and trademark review note are bundled alongside the asset.
+
+Ultimate Power contains only the existing Reset C64 / Reboot C64 operations.
+Machine removal is earned: no other live functionality existed, both operations
+retain confirmations, captured-session safety, recovery/reporting and keyboard
+access, and actual GTK button-route regressions pass. No duplicate Machine tab.
+Broader physical F1 capabilities remain H; Test Lab relocation remains I.
+
+146 focused/affected tests and eight explicit offline real-GTK checks passed;
+no new skips and no device contact. Existing full prerequisite evidence was not
+rerun for this presentation/wiring change. Normal resource inclusion covers SVG
+and attribution without a package build. Before physical acceptance, stop for B4
+review. Later acceptance should reconnect once and CANCEL Reset/Reboot prompts;
+executing a hardware command requires separate authorization.
 
 ### 5. Contextual operation status/cancellation
 
@@ -295,11 +346,11 @@ must finish before implementation.
 
 ## H. Machine / global power controls
 
-The current Machine tab is reported underutilized (Reset/Reboot only). Physical
+B4 retired the Reset/Reboot-only Machine tab after safe global migration. Physical
 F1 Power & Reset offers more, including Reboot C64, Reboot C64 (Mem), Power Off,
 Power Cycle, Save C64 Memory, and Save REU Memory. Do not simply expand Machine:
-the settled destination is global header `⏻`, hover `Ultimate Power`, opening
-Power & Reset. Verify safe API support for each action before exposure.
+the settled destination is the global Commodore C= icon, hover `Ultimate Power`,
+opening Ultimate Power. B4 exposes only the existing Reset/Reboot pair. Verify safe API support for each action before exposure.
 Power Off likely needs deliberate confirmation; confirm its exact interaction in
 review. Remove Machine only if global controls cover all useful existing actions.
 

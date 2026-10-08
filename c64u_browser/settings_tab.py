@@ -88,6 +88,13 @@ class SettingsTab:
         self.pending={};self.drafts={};self.errors={};self.update_edit_buttons()
         self.heading.set_text('Choose Reload from C64U to browse settings.' if client else 'Connect to a C64 Ultimate to browse settings.')
 
+    def require_fresh_settings(self):
+        """Retain drafts while gating the snapshot from the previous session."""
+        self.loaded=False
+        self.requires_refresh=True
+        self.rows.set_sensitive(False)
+        self.update_edit_buttons()
+
     def load_if_needed(self):
         if self.client and not self.loaded:self.reload()
 
@@ -251,6 +258,9 @@ class SettingsTab:
         if not self.client or self.requires_refresh or self.app.busy:return
         client=self.client
         def confirmed():
+            if self.requires_refresh:
+                self.app.status.set_text('Settings changed or the connection was restored. Reload settings before saving to Flash.')
+                return
             if self.pending or self.drafts:
                 self.app.status.set_text('Apply your changes or choose Discard edits before saving to flash.')
                 return

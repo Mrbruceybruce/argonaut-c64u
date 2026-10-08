@@ -59,6 +59,11 @@ class Recovery:
 
     def accept(self, result, was_offline):
         if isinstance(result,Exception):
+            if isinstance(result, CoreError) and result.code == 'admission_busy':
+                # Another admitted operation owns the session. No wire failure
+                # occurred, so do not invalidate that operation's binding.
+                self.next_check=time.monotonic()+5
+                return
             # One busy C64U can transiently time out a read-only REST probe
             # while an FTP-backed Core job is active.  Confirm a retryable
             # health failure before replacing the transport/session; a real

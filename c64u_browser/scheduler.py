@@ -55,12 +55,16 @@ class CoreScheduler:
         self._lock = Lock()
         self._closed = False
 
-    def submit(self, job, binding):
+    def submit(self, job, binding, *, reject_busy=False):
         with self._lock:
             if self._closed: raise BrowserError('Core is shutting down.')
             self._cleanup_locked()
-            self._jobs[job.id] = job
             queue = self._lanes.get(binding.lane)
+            if reject_busy and queue is not None and queue.unfinished_tasks:
+                error = BrowserError('Device operation already running. Action was not sent.')
+                error.code = 'admission_busy'
+                raise error
+            self._jobs[job.id] = job
             if queue is None:
                 queue = Queue()
                 self._lanes[binding.lane] = queue
@@ -72,7 +76,7 @@ class CoreScheduler:
         return job
 
     @contextmanager
-    def inline(self, binding):
+    def inline(self, binding, *, reject_busy=False):
         """Reserve a FIFO lane for work in a thread-local diagnostic collector.
 
         The worker only holds the reservation. The caller owns execution and
@@ -84,7 +88,10 @@ class CoreScheduler:
             release.wait()
         job = CoreJob('diagnostic.reservation', reserve)
         job.add_listener(lambda event: ready.set() if event.kind == 'finished' else None)
-        self.submit(job, binding)
+        if reject_busy:
+            self.submit(job, binding, reject_busy=True)
+        else:
+            self.submit(job, binding)
         try:
             ready.wait()
             self._validate(binding)

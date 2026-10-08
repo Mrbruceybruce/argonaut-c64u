@@ -1,0 +1,15 @@
+Commodore C= logo.svg
+Creator: Alien426 (2018); canvas crop: DigitalIceAge (9 April 2022).
+Source: https://commons.wikimedia.org/wiki/File:Commodore_C%3D_logo.svg
+Source revision: https://commons.wikimedia.org/w/index.php?title=File:Commodore_C%3D_logo.svg&oldid=866569315
+Original: https://upload.wikimedia.org/wikipedia/commons/2/23/Commodore_C%3D_logo.svg
+License: Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Included unchanged (454 bytes); original blue #002255 / red #ff0000.
+Only its filename and display size in Argonaut differ. No fonts are included.
+This artwork retains its separate CC BY-SA 4.0 license; the application code
+remains GPL-3.0-or-later. Attribution is bundled alongside the artwork.
+Commodore branding may be trademark-protected. The copyright license does not
+grant trademark rights or imply endorsement. Trademark use remains a public-release
+review item; this inclusion is for the explicitly approved local B4 interface.

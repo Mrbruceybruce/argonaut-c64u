@@ -85,32 +85,6 @@ class Lifecycle(unittest.TestCase):
         self.assertTrue(Browser.close(app))
         app.pool.shutdown.assert_not_called();app.quit.assert_not_called()
 
-    def test_quick_connect_uses_last_profile_and_checks_identity(self):
-        profile=Mock(id='profile-id')
-        preferences=SimpleNamespace(
-            selected=lambda:profile,
-            app_options={'remember_folders':True,
-                         'remote_folders':{'profile-id':'/USB1'}})
-        result=Mock()
-        core=Mock();core.connect_selected.return_value=result
-        app=SimpleNamespace(
-            busy=False,active_profile=None,preferences_error=None,
-            preferences=preferences,core=core,status=Mock(),activate_connection=Mock(),
-            open_connections=Mock())
-        app.run=lambda task,done:done(task())
-        Browser.quick_connect(app)
-        core.connect_selected.assert_called_once_with(require_bound=True)
-        app.activate_connection.assert_called_once_with(result)
-        app.open_connections.assert_not_called()
-
-    def test_quick_connect_without_profile_opens_device_details(self):
-        app=SimpleNamespace(
-            busy=False,active_profile=None,preferences_error=None,
-            core=SimpleNamespace(selected_profile=lambda:None),status=Mock(),
-            open_connections=Mock())
-        Browser.quick_connect(app)
-        app.open_connections.assert_called_once_with()
-        self.assertIn('Choose or create',app.status.set_text.call_args.args[0])
 
 
 @unittest.skipIf(Browser is None, 'GTK runtime unavailable')
