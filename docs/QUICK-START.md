@@ -91,7 +91,9 @@ Right-click a selected item to act on the selection. **Delete…**, **Delete
 selected…**, or the Delete key opens a confirmation with the deletion preview.
 Deletion is permanent and can include folder contents.
 
-**Cancel transfer** stops an active transfer. Completed files may remain.
+The bottom status area shows **Cancel** while the current operation can be cancelled.
+Click once to request cancellation; **Cancelling…** remains until the operation ends.
+Read the final result: completed files may remain, including after late cancellation.
 If an upload is interrupted, read the result and use **Delete partial upload…**
 when available before retrying. A replacement error may identify staging or
 backup paths; inspect those paths before retrying.

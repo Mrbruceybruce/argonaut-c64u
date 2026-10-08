@@ -538,6 +538,7 @@ class MutationRoutingTests(unittest.TestCase):
         exec(compile(ast.Module(body=[method],type_ignores=[]),'<gui-rename>','exec'),namespace)
         browser=Mock();browser.remote='/USB1';browser.local=Path('/tmp');browser.client=object()
         browser.prompt.side_effect=lambda *a,**k:a[2]('New')
+        browser.run_file_job.side_effect=lambda submit,done:submit()
         namespace['rename_item'](browser,False,'Test')
         browser.core.files.rename.assert_called_once_with(FileLocation.c64u('/USB1/Test'),'New')
         browser.run_file_job.assert_called_once();browser.run.assert_not_called()
@@ -557,6 +558,7 @@ class MutationRoutingTests(unittest.TestCase):
         browser.core.device_session.return_value=binding
         browser.core.files.rename.return_value.snapshot.return_value=binding
         browser.prompt.side_effect=lambda *a,**k:a[2]('New')
+        browser.run_file_job.side_effect=lambda submit,done:submit()
         namespace['rename_item'](browser,False,'Test')
         done=browser.run_file_job.call_args.args[1]
         result=SimpleNamespace(state='succeeded',device_id='device-A',session_id='session-A',

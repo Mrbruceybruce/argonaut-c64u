@@ -44,8 +44,6 @@ class SidJukeboxTab:
         self.validate_button = app.button(actions, 'Validate', self.validate)
         self.relink_button = app.button(actions, 'Locate/Relink…', self.relink)
         self.remove_button = app.button(actions, 'Remove from Jukebox…', self.remove)
-        self.cancel_button = app.button(actions, 'Cancel operation', self.cancel_operation)
-        self.cancel_button.set_sensitive(False)
 
         pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL,
                          vexpand=True, hexpand=True)
@@ -274,7 +272,7 @@ class SidJukeboxTab:
                       and snapshot.playlist_id == self.client.playlist_id
                       and not self.job_busy)
         self.previous_button.set_sensitive(navigation);self.next_button.set_sensitive(navigation)
-        self.shuffle.set_sensitive(navigation);self.cancel_button.set_sensitive(self.job_busy)
+        self.shuffle.set_sensitive(navigation)
         self.search.set_sensitive(not self.job_busy);self.favorites.set_sensitive(not self.job_busy)
         self.sort_choice.set_sensitive(not self.job_busy);self.list.set_sensitive(not self.job_busy)
         self.subtune.set_sensitive(single and not self.job_busy)
@@ -304,19 +302,17 @@ class SidJukeboxTab:
                 self.client.playlist_blocked_reason() or 'Connect to a C64U to play.')
         else:self.play_button.set_tooltip_text(None)
 
-    def _run_job(self, job, finished):
-        self.job_busy = True;self._update_actions()
-        def event(update):
-            progress = update.job.progress
-            if update.kind == 'progress' and progress and progress.message:
-                GLib.idle_add(lambda:(self._show(progress.message),False)[1])
-        job.add_listener(event)
+    def _run_job(self, submit, finished, *, started=None, failed=None):
+        def accepted(job):
+            self.active_job = job
+            self.job_busy = True;self._update_actions()
+            if started is not None:started(job)
         def done(snapshot):
+            self.active_job = None
             self.job_busy = False;self._update_actions();finished(snapshot)
-        self.app.run_file_job(job, done)
+        return self.app.run_file_job(submit, done, started=accepted,
+            failed=failed or (lambda exc:self._show(str(exc))))
 
-    def cancel_operation(self):
-        if self.job_busy:self.app.cancel_transfer()
 
     def _library_key_pressed(self,_controller,keyval,_keycode,_state):
         if keyval not in (Gdk.KEY_Return,Gdk.KEY_KP_Enter):return False
@@ -478,15 +474,14 @@ class SidJukeboxTab:
                 f'Added {added} SID tune(s).' +
                 (f' {len(failures)} file(s) were not added: {failures[0]}' if failures else ''))
             return
-        try:job=self.client.add_core_host(paths[index])
-        except Exception as exc:
-            self._add_local_paths(paths,index+1,added,failures+(str(exc),));return
+        job=lambda: self.client.add_core_host(paths[index])
         def finished(snapshot):
             if snapshot.state!='succeeded':
                 self._add_local_paths(paths,index+1,added,failures+(error_text(snapshot.error),));return
             created=bool(snapshot.result.created)
             self._add_local_paths(paths,index+1,added+created,failures)
-        self._run_job(job,finished)
+        self._run_job(job,finished,failed=lambda exc:self._add_local_paths(
+            paths,index+1,added,failures+(str(exc),)))
 
     def _selected_remote_source(self):
         rows=self.app.rlist.get_selected_rows()
@@ -504,14 +499,13 @@ class SidJukeboxTab:
         self.add_c64u_path(device_id,path)
 
     def add_c64u_path(self, device_id, path):
-        try:job=self.client.add_c64u(device_id,path)
-        except Exception as exc:self._show(str(exc));return False
+        job=lambda: self.client.add_c64u(device_id,path)
         self._show('Validating C64U SID…')
         def finished(snapshot):
             if snapshot.state!='succeeded':self._show(error_text(snapshot.error));return
             self.client.select(snapshot.result.tune.id);self.refresh(True)
             self._show('C64U SID is available in SID Jukebox.')
-        self._run_job(job,finished);return True
+        return self._run_job(job,finished)
 
     def remove(self):
         tune=self.client.selected()
@@ -532,8 +526,7 @@ class SidJukeboxTab:
         dialog.connect('response',response);dialog.present()
 
     def validate(self):
-        try:job=self.client.validate()
-        except Exception as exc:self._show(str(exc));return
+        job=lambda: self.client.validate()
         self._show('Validating SID source…')
         def finished(snapshot):
             if snapshot.state!='succeeded':self._show(error_text(snapshot.error));return
@@ -566,13 +559,12 @@ class SidJukeboxTab:
         def response(_,code):
             file=chooser.get_file();chooser.destroy();self.chooser=None
             if code!=Gtk.ResponseType.ACCEPT or not file or not file.get_path():return
-            try:job=self.client.prepare_relink_core_host(file.get_path())
-            except Exception as exc:self._show(str(exc));return
+            job=lambda: self.client.prepare_relink_core_host(file.get_path())
             self._run_job(job,self._relink_prepared)
         chooser.connect('response',response);chooser.show()
 
     def _prepare_relink_c64u(self):
-        try:device_id,path=self._selected_remote_source();job=self.client.prepare_relink_c64u(device_id,path)
+        try:device_id,path=self._selected_remote_source();job=lambda: self.client.prepare_relink_c64u(device_id,path)
         except Exception as exc:self._show(str(exc));return
         self._run_job(job,self._relink_prepared)
 
@@ -590,8 +582,7 @@ class SidJukeboxTab:
         def response(widget,code):
             widget.destroy()
             if code!=Gtk.ResponseType.OK:return
-            try:job=self.client.execute_relink(preview.plan_id,not preview.content_matches)
-            except Exception as exc:self._show(str(exc));return
+            job=lambda: self.client.execute_relink(preview.plan_id,not preview.content_matches)
             self._run_job(job,lambda result:(self.refresh(True),self._show(
                 'SID Relink completed.' if result.state=='succeeded' else error_text(result.error))))
         dialog.connect('response',response);dialog.present()
@@ -814,8 +805,7 @@ class SidJukeboxTab:
 
     def play(self):
         if not self.client.can_play_playlist(self.connected):return
-        try:job=self.client.prepare_playlist_play()
-        except Exception as exc:self._show(str(exc));return
+        job=lambda: self.client.prepare_playlist_play()
         self.refresh_playlist_items();self._update_actions()
         self._show('Preparing SID playback…');self._run_job(job,self._play_prepared)
 
@@ -833,8 +823,7 @@ class SidJukeboxTab:
             widget.destroy()
             if code!=Gtk.ResponseType.OK:
                 self.client.discard_play(preview.plan_id);self._show('Playback cancelled before sending a command.');return
-            try:job=self.client.execute_play(preview.plan_id)
-            except Exception as exc:self._show(str(exc));return
+            job=lambda: self.client.execute_play(preview.plan_id)
             self._run_job(job,self._play_finished)
         dialog.connect('response',response);dialog.present()
 
@@ -845,8 +834,7 @@ class SidJukeboxTab:
         self._show(error_text(snapshot.error));self._sync_playback_state();self._update_actions()
 
     def _transition(self,direction):
-        try:job=self.client.previous() if direction=='previous' else self.client.next()
-        except Exception as exc:self._show(getattr(exc,'args',(str(exc),))[0]);self._sync_playback_state();self._update_actions();return
+        job=lambda: self.client.previous() if direction=='previous' else self.client.next()
         self._show(('Previous' if direction=='previous' else 'Next')+' SID…')
         def finished(snapshot):
             if snapshot.state!='succeeded':self._show(error_text(snapshot.error))
@@ -854,7 +842,9 @@ class SidJukeboxTab:
             else:
                 self._show('Command accepted — audible playback not verified.')
             self._sync_playback_state();self._update_actions()
-        self._run_job(job,finished)
+        def failed(exc):
+            self._show(str(exc));self._sync_playback_state();self._update_actions()
+        self._run_job(job,finished,failed=failed)
 
     def previous(self):self._transition('previous')
     def next(self):self._transition('next')

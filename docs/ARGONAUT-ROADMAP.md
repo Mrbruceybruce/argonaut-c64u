@@ -212,10 +212,34 @@ executing a hardware command requires separate authorization.
 
 ### 5. Contextual operation status/cancellation
 
-Preserve managed cancellation safety. Replace permanent/generic Cancel Operation
-controls with contextual status/progress, for example `Uploading … 42% [Cancel]`
-or `Cancel Backup`. Integrate with useful bottom status reporting rather than
-scattering generic controls. This changes presentation, not cancellation policy.
+**Foreground-admission prerequisite APPROVED; B5 reviewed and physically accepted.**
+One Browser-managed foreground operation is reserved before submission, with busy
+attempts refused without queueing. Cancellation retains admission until terminal
+cleanup. The short ownership mutex never spans submission/execution/cancellation.
+CoreScheduler's independent local/device lanes and service semantics are unchanged.
+
+The bottom presenter now owns IDLE/RUNNING/CANCELLATION_REQUESTED/TERMINAL for the
+admitted job/token. One contextual **Cancel** replaces permanent Files/SIDJuke/Game
+Library controls. Bulk Import keeps **Cancel import**, sharing the same view and
+one-shot cancellation authority. Cancelling remains sticky against delayed progress
+and ordinary messages; stale callbacks cannot affect a newer job. Completion/fallback
+uses authoritative results and preserves existing nuanced consequence handlers.
+Phase text/counts/optional totals are shown without invented percentages. Ordinary
+workers have no new cancellation; noncancellable foreground presentation hides Cancel.
+
+446 focused/affected tests and 17 offline GTK checks passed with no skips; compact
+review reran 40 focused tests and eight offline GTK checks successfully.
+Bounded physical acceptance then passed using the current `./run-development`
+worktree and saved C64 Founders profile. One existing 993,232-byte Lykia CRT on USB1
+was downloaded toward temporary local storage and cancelled once through global
+Cancel. Bruce visually confirmed sticky Cancelling (too brief for automated sampling).
+The authoritative result reported zero completed and one unfinished, cancelled by
+request; local staging was cleaned. Read-only browsing and ordinary status recovered,
+Cancel stayed absent, and normal Quit exited cleanly. No remote mutation or stream.
+Details and physical-observation limitations are in CURRENT-STATE.
+
+**Stop for publication; do not execute commit/push without publication instructions.**
+Streaming remains OPEN / intermittent / instrumented. Do not advance to B6 yet.
 
 ### 6. Packaging spit-shine
 

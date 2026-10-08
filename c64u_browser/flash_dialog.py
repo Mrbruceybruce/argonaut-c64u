@@ -57,8 +57,9 @@ class FlashFiles:
    else:done(result)
   self.app.run(caught,finish)
  def run_core_job(self,job,done):
-  if self.app.busy or self.tab.client is not self.client:return
-  self.controls.set_sensitive(False);self.status.set_text('Working…')
+  if self.tab.client is not self.client:return
+  def started(_job):
+   self.controls.set_sensitive(False);self.status.set_text('Working…')
   def finish(snapshot):
    self.controls.set_sensitive(True)
    if self.tab.client is not self.client:
@@ -66,7 +67,8 @@ class FlashFiles:
     summary=evidence.message()+' ' if evidence is not None else ''
     self.status.set_text(summary+'Connection changed. Close and reopen Flash files.');return
    done(snapshot)
-  self.app.run_file_job(job,finish)
+  return self.app.run_file_job(job,finish,started=started,
+   failed=lambda exc:self.status.set_text(str(exc)))
  def refresh(self,after=None):
   if self.app.busy:return
   folder=self.folder()
@@ -104,7 +106,7 @@ class FlashFiles:
  def prepare(self,path,remote):
   folder=self.folder();name=Path(path).name
   source=FileLocation.c64u(path) if remote else FileLocation.core_host(path)
-  job=self.app.core.files.prepare_native_upload(source,folder,name)
+  job=lambda: self.app.core.files.prepare_native_upload(source,folder,name)
   def done(snapshot):
    if snapshot.state!='succeeded':self.status.set_text(snapshot.error.message);return
    preview=snapshot.result
@@ -118,7 +120,7 @@ class FlashFiles:
     def uploaded(destination):
      self.refresh(after=lambda:self.tab.reload() if not self.tab.pending and not self.tab.drafts else None)
      self.app.status.set_text(destination.message)
-    upload=self.app.core.files.execute_native_upload(preview.plan_id)
+    upload=lambda: self.app.core.files.execute_native_upload(preview.plan_id)
     def finished(result):
      if result.state=='succeeded':uploaded(result.result)
      else:self.status.set_text(result.result.message if result.result else result.error.message)
@@ -136,7 +138,7 @@ class FlashFiles:
    if code!=Gtk.ResponseType.ACCEPT or not file:return
    path=file.get_path()
    if not path:self.status.set_text('Choose a local file.');return
-   job=self.app.core.files.save_native_copy(
+   job=lambda: self.app.core.files.save_native_copy(
     FileLocation.c64u(source),FileLocation.core_host(path))
    def done(result):
     if result.state=='succeeded':self.status.set_text('Copy saved: '+result.result['destination'].path)

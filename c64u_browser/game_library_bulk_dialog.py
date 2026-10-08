@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Thin GTK review client for Core-owned Game Library Bulk Import."""
-from gi.repository import GLib, Gtk
+from gi.repository import Gtk
 
 from .game_library_client import (
-    BULK_FILTERS, BulkReviewState, bulk_progress_text, client_error_text,
+    BULK_FILTERS, BulkReviewState, client_error_text,
 )
 
 
@@ -173,9 +173,7 @@ class BulkImportDialog:
             self.dialog.destroy();return
         if code != Gtk.ResponseType.OK:
             if self.executing:
-                self.tab.cancel_operation()
-                self.progress.set_text('Cancelling Bulk Import…')
-                self.cancel_button.set_sensitive(False)
+                self.cancel_import()
                 return
             self.client.discard_bulk_import(self.preview.plan_id)
             self.dialog.destroy();return
@@ -183,21 +181,24 @@ class BulkImportDialog:
         try:
             selection = self.client.select_bulk_candidates(
                 self.preview, self.state.selected_ids())
-            job = self.client.execute_bulk_import(selection)
+            job = lambda: self.client.execute_bulk_import(selection)
         except Exception as exc:
             self.progress.set_text(str(exc) + ' Scan the folder or files again.')
             self.import_button.set_sensitive(False)
             return
-        self.executing = True;self._set_review_sensitive(False)
-        self._update_import();self.cancel_button.set_label('Cancel import')
-        self.progress.set_text('Starting reviewed Bulk Import…')
-        def event(update):
-            progress = update.job.progress
-            if update.kind == 'progress' and progress:
-                GLib.idle_add(self.progress.set_text,
-                              bulk_progress_text(progress))
-        job.add_listener(event)
-        self.tab._run_job(job, self._finished)
+        def started(active_job):
+            self.cancel_import = self.tab.app.job_cancel_callback(active_job)
+            self.executing = True;self._set_review_sensitive(False)
+            self._update_import();self.cancel_button.set_label('Cancel import')
+            self.progress.set_text('Starting reviewed Bulk Import…')
+            def presentation(view):
+                self.progress.set_text(view.message)
+                self.cancel_button.set_sensitive(view.cancel_available)
+            self.tab.app.operation.subscribe(active_job, presentation)
+        def failed(exc):
+            self.progress.set_text(str(exc) + ' Scan the folder or files again.')
+            self.import_button.set_sensitive(False)
+        self.tab._run_job(job, self._finished, started=started, failed=failed)
 
     def _finished(self, snapshot):
         self.executing = False;self.finished = True

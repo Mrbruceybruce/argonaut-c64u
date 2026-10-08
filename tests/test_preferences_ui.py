@@ -152,12 +152,12 @@ class PreferencesUI(unittest.TestCase):
                     (('entries_observed',count*10),)))
                 if release.wait(.08):break
             release.wait(2);job.check_cancel();return 'verified'
-        job=scheduler.submit(CoreJob('game-library.launch-preview',verify),
+        submit=lambda:scheduler.submit(CoreJob('game-library.launch-preview',verify),
                              JobBinding.core_host())
         heartbeat=self.GLib.timeout_add(
             20,lambda:(ticks.append(time.monotonic()) or True))
         try:
-            self.app.run_file_job(job,finished.append)
+            self.app.run_file_job(submit,finished.append)
             self.assertTrue(entered.wait(1));self.pump_for(.25)
             self.assertTrue(self.app.busy)
             self.assertGreaterEqual(len(ticks),5)
@@ -230,9 +230,11 @@ class PreferencesUI(unittest.TestCase):
         tab=self.app.sid_jukebox_tab;job=Mock()
         with patch.object(tab.client,'can_play_playlist',return_value=True), \
              patch.object(tab.client,'prepare_playlist_play',return_value=job), \
-             patch.object(tab,'_run_job') as run:
+             patch.object(tab,'_run_job',side_effect=lambda submit,done,**kwargs:submit()) as run:
             tab.play()
-        run.assert_called_once_with(job,tab._play_prepared)
+        run.assert_called_once()
+        self.assertTrue(callable(run.call_args.args[0]))
+        self.assertEqual(tab._play_prepared,run.call_args.args[1])
         self.assertEqual('Preparing SID playback…',tab.message.get_text())
         self.assertEqual('Preparing SID playback…',self.app.status.get_text())
 
@@ -377,7 +379,7 @@ class PreferencesUI(unittest.TestCase):
         self.assertEqual(second.id,tab.client.selected_id)
         self.assertEqual(initial,tab.now_playing_heading.get_text())
 
-        with patch.object(tab,'_run_job') as run:
+        with patch.object(tab,'_run_job',side_effect=lambda submit,done,**kwargs:submit()) as run:
             tab.play()
         run.assert_called_once()
         args=playback.prepare_play.call_args.args
@@ -479,7 +481,7 @@ class PreferencesUI(unittest.TestCase):
         tab.shuffle.set_active(False);self.pump()
         playback.set_shuffle.assert_called_with(False)
         self.assertEqual(editing,tab._selected_playlist_ids())
-        with patch.object(tab,'_run_job') as run:
+        with patch.object(tab,'_run_job',side_effect=lambda submit,done,**kwargs:submit()) as run:
             tab.next()
         playback.next.assert_called_once_with();run.assert_called_once()
 
@@ -550,9 +552,11 @@ class PreferencesUI(unittest.TestCase):
         job=Mock()
         with patch.object(tab.client,'can_launch',return_value=True), \
              patch.object(tab.client,'prepare_launch',return_value=job), \
-             patch.object(tab,'_run_job') as run:
+             patch.object(tab,'_run_job',side_effect=lambda submit,done,**kwargs:submit()) as run:
             tab.launch()
-        run.assert_called_once_with(job,tab._launch_prepared)
+        run.assert_called_once()
+        self.assertTrue(callable(run.call_args.args[0]))
+        self.assertEqual(tab._launch_prepared,run.call_args.args[1])
         self.assertEqual('Preparing launch preview…',tab.message.get_text())
         self.assertEqual('Preparing launch preview…',self.app.status.get_text())
 
@@ -623,21 +627,23 @@ class PreferencesUI(unittest.TestCase):
         with patch.object(self.app.core,'device_session',return_value=DeviceSession(
                 'id:C64-A','session-1')), \
              patch.object(tab.client,'scan_c64u_sources',return_value=job) as scan, \
-             patch.object(tab,'_start_bulk_scan') as start:
+             patch.object(tab,'_start_bulk_scan',side_effect=lambda submit:submit()) as start:
             tab.add_c64u()
         scan.assert_called_once_with(
             'id:C64-A',('/USB2/Games/one.d64','/USB2/Games/two.crt'))
-        start.assert_called_once_with(job)
+        start.assert_called_once()
+        self.assertTrue(callable(start.call_args.args[0]))
         with patch.object(self.app.core,'device_session',return_value=DeviceSession(
                 'id:C64-A','session-1')), \
              patch.object(tab.client,'scan_c64u_folder',return_value=job) as scan, \
-             patch.object(tab,'_start_bulk_scan') as start:
+             patch.object(tab,'_start_bulk_scan',side_effect=lambda submit:submit()) as start:
             options=tab.scan_c64u_folder('/USB2/Games')
             options.recursive.set_active(True)
             options.response(self.Gtk.ResponseType.OK);self.pump()
         scan.assert_called_once_with(
             'id:C64-A','/USB2/Games',recursive=True)
-        start.assert_called_once_with(job)
+        start.assert_called_once()
+        self.assertTrue(callable(start.call_args.args[0]))
 
     def test_game_library_bulk_review_selection_filter_and_execution(self):
         from unittest.mock import Mock,patch
@@ -687,7 +693,7 @@ class PreferencesUI(unittest.TestCase):
         from unittest.mock import Mock,patch
         from c64u_browser.game_library import GameLibraryError
         tab=self.app.game_library_tab;job=Mock()
-        with patch.object(tab,'_run_job') as run:
+        with patch.object(tab,'_run_job',side_effect=lambda submit,done,**kwargs:submit()) as run:
             tab._start_bulk_scan(job)
         run.assert_called_once_with(job,tab._bulk_scanned)
         self.assertEqual('Scanning Game Library candidates…',tab.message.get_text())
@@ -704,7 +710,7 @@ class PreferencesUI(unittest.TestCase):
         dialog.dialog.response(self.Gtk.ResponseType.OK);self.pump()
         self.assertIn('Scan the folder or files again',dialog.progress.get_text())
         dialog.executing=True
-        with patch.object(tab,'cancel_operation') as cancel:
+        with patch.object(dialog,'cancel_import',create=True,return_value=True) as cancel:
             dialog.dialog.response(self.Gtk.ResponseType.CANCEL)
         cancel.assert_called_once_with()
         dialog.finished=True;dialog.dialog.destroy();tab.client=old

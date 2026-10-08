@@ -3,6 +3,8 @@ from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from unittest.mock import Mock,patch
 from c64u_browser.api import BrowserError
+from c64u_browser.foreground import ForegroundSlot
+from c64u_browser.operation_status import OperationPresentation
 
 # Importing GTK types does not create windows or connect to a device.
 try:
@@ -30,22 +32,24 @@ class Lifecycle(unittest.TestCase):
 
     def test_file_job_completion_snapshot_recovers_a_missed_finish_event(self):
         running=SimpleNamespace(state='running')
-        succeeded=SimpleNamespace(state='succeeded',result='done')
+        succeeded=SimpleNamespace(state='succeeded',result='done',error=None)
         job=Mock(operation='sid-jukebox.next',id='job')
-        job.snapshot.side_effect=(running,running,succeeded)
+        job.snapshot.side_effect=(running,running,succeeded,succeeded)
         job.wait.side_effect=AssertionError('GTK must not synchronously wait')
         job.add_listener=Mock()  # Deliberately never delivers the finish event.
         control=Mock();control.get_sensitive.return_value=True
         app=SimpleNamespace(busy=False,busy_controls=[control],status=Mock(),
-                            transfer_job=None,cancel_button=Mock())
-        app.begin_file_job=lambda value:Browser.begin_file_job(app,value)
-        app.end_file_job=lambda:Browser.end_file_job(app)
+                            transfer_job=None,cancel_button=Mock(),foreground=ForegroundSlot())
+        app.operation=OperationPresentation(lambda view:app.status.set_text(view.message))
+        app.bind_job_cancel=Mock()
+        app.begin_file_job=lambda value,token,cancellable=True:Browser.begin_file_job(app,value,token,cancellable)
+        app.end_file_job=lambda value,token:Browser.end_file_job(app,value,token)
         done=Mock();timer=[]
         with patch('c64u_browser.gui.GLib.timeout_add',
                    side_effect=lambda _delay,callback:timer.append(callback)), \
              patch('c64u_browser.gui.GLib.idle_add',
                    side_effect=lambda callback,*args:callback(*args)):
-            Browser.run_file_job(app,job,done)
+            Browser.run_file_job(app,lambda:job,done)
             self.assertTrue(app.busy);self.assertTrue(timer[0]())
             self.assertFalse(timer[0]())
         self.assertFalse(app.busy);self.assertIsNone(app.transfer_job)

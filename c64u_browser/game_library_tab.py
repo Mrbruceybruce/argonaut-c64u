@@ -61,9 +61,6 @@ class GameLibraryTab:
         self.remove_button = app.button(
             actions, 'Remove from library…', self.remove)
         self.launch_button = app.button(actions, 'Review & Launch…', self.launch)
-        self.cancel_button = app.button(
-            actions, 'Cancel operation', self.cancel_operation)
-        self.cancel_button.set_sensitive(False)
 
         pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL,
                          vexpand=True, hexpand=True)
@@ -271,7 +268,6 @@ class GameLibraryTab:
         self.scan_c64u_button.set_sensitive(self.connected and not self.job_busy)
         self.launch_button.set_sensitive(
             self.client.can_launch(self.connected) and not self.job_busy)
-        self.cancel_button.set_sensitive(self.job_busy)
         self.search.set_sensitive(not self.job_busy)
         self.favorites.set_sensitive(not self.job_busy)
         self.list.set_sensitive(not self.job_busy)
@@ -279,14 +275,17 @@ class GameLibraryTab:
         self.favorite.set_sensitive(selected and not self.job_busy)
         self.notes.set_sensitive(selected and not self.job_busy)
 
-    def _run_job(self, job, finished):
-        self.job_busy = True;self._update_actions()
+    def _run_job(self, submit, finished, *, started=None, failed=None):
+        def accepted(job):
+            self.active_job = job
+            self.job_busy = True;self._update_actions()
+            if started is not None:started(job)
         def done(snapshot):
+            self.active_job = None
             self.job_busy = False;self._update_actions();finished(snapshot)
-        self.app.run_file_job(job, done)
+        return self.app.run_file_job(submit, done, started=accepted,
+            failed=failed or (lambda exc:self._show(str(exc))))
 
-    def cancel_operation(self):
-        if self.job_busy:self.app.cancel_transfer()
 
     def _favorite_toggled(self, button):
         if self.loading_details or not self.client.selected():return
@@ -339,11 +338,7 @@ class GameLibraryTab:
             self.refresh(False)
             self._show(add_results_text(results, failures))
             return
-        try:job = self.client.add_core_host(paths[index])
-        except Exception as exc:
-            self._add_local_paths(
-                paths, index + 1, results, failures + (str(exc),))
-            return
+        job = lambda: self.client.add_core_host(paths[index])
         def finished(snapshot):
             if snapshot.state != 'succeeded':
                 self._add_local_paths(
@@ -352,7 +347,8 @@ class GameLibraryTab:
                 return
             self._add_local_paths(
                 paths, index + 1, results + (snapshot.result,), failures)
-        self._run_job(job, finished)
+        self._run_job(job, finished, failed=lambda exc:self._add_local_paths(
+            paths, index + 1, results, failures + (str(exc),)))
 
     def _selected_remote_source(self):
         rows = self.app.rlist.get_selected_rows()
@@ -384,9 +380,9 @@ class GameLibraryTab:
         try:
             device_id, paths = self._selected_remote_files()
             if len(paths) > 1:
-                job = self.client.scan_c64u_sources(device_id, paths)
+                job = lambda: self.client.scan_c64u_sources(device_id, paths)
                 self._start_bulk_scan(job);return
-            job = self.client.add_c64u(device_id, paths[0])
+            job = lambda: self.client.add_c64u(device_id, paths[0])
         except Exception as exc:self._show(str(exc));return
         def finished(snapshot):
             if snapshot.state != 'succeeded':
@@ -431,7 +427,7 @@ class GameLibraryTab:
             self._scan_options(
                 'Scan local folder for games', path,
                 lambda recursive:self._start_bulk_scan(
-                    self.client.scan_core_host_folder(
+                    lambda: self.client.scan_core_host_folder(
                         path, recursive=recursive)))
         chooser.connect('response', response);chooser.show()
 
@@ -457,12 +453,12 @@ class GameLibraryTab:
         return self._scan_options(
             'Scan C64U folder for games', path,
             lambda recursive:self._start_bulk_scan(
-                self.client.scan_c64u_folder(
+                lambda: self.client.scan_c64u_folder(
                     device_id, path, recursive=recursive)))
 
     def _start_bulk_scan(self, job):
-        self._run_job(job, self._bulk_scanned)
-        self._show('Scanning Game Library candidates…')
+        if self._run_job(job, self._bulk_scanned):
+            self._show('Scanning Game Library candidates…')
 
     def _bulk_scanned(self, snapshot):
         if snapshot.state != 'succeeded':
@@ -494,8 +490,7 @@ class GameLibraryTab:
         dialog.connect('response', answered);dialog.present()
 
     def validate(self):
-        try:job = self.client.validate()
-        except Exception as exc:self._show(str(exc));return
+        job = lambda: self.client.validate()
         def finished(snapshot):
             if snapshot.state != 'succeeded':
                 self._show(client_error_text(snapshot.error));return
@@ -509,7 +504,7 @@ class GameLibraryTab:
         if record.source.scope == C64U:
             try:
                 device_id, path = self._selected_remote_source()
-                job = self.client.prepare_relink_c64u(device_id, path)
+                job = lambda: self.client.prepare_relink_c64u(device_id, path)
             except Exception as exc:self._show(str(exc));return
             self._run_job(job, self._relink_prepared);return
         if self.chooser:return
@@ -524,8 +519,7 @@ class GameLibraryTab:
             if code != Gtk.ResponseType.ACCEPT or not file:return
             path = file.get_path()
             if not path:return
-            try:job = self.client.prepare_relink_core_host(path)
-            except Exception as exc:self._show(str(exc));return
+            job = lambda: self.client.prepare_relink_core_host(path)
             self._run_job(job, self._relink_prepared)
         chooser.connect('response', response);chooser.show()
 
@@ -550,9 +544,8 @@ class GameLibraryTab:
         def answered(widget, code):
             widget.destroy()
             if code != Gtk.ResponseType.OK:return
-            try:job = self.client.execute_relink(
+            job = lambda: self.client.execute_relink(
                 preview.plan_id, not preview.content_matches)
-            except Exception as exc:self._show(str(exc));return
             def finished(result):
                 if result.state != 'succeeded':
                     self._show(client_error_text(result.error));return
@@ -587,10 +580,9 @@ class GameLibraryTab:
 
     def launch(self):
         if not self.client.can_launch(self.connected):return
-        try:job = self.client.prepare_launch()
-        except Exception as exc:self._show(str(exc));return
-        self._run_job(job, self._launch_prepared)
-        self._show('Preparing launch preview…')
+        job = lambda: self.client.prepare_launch()
+        if self._run_job(job, self._launch_prepared):
+            self._show('Preparing launch preview…')
 
     def _launch_prepared(self, snapshot):
         if snapshot.state != 'succeeded':
@@ -622,8 +614,7 @@ class GameLibraryTab:
             if code != Gtk.ResponseType.OK:
                 self.client.discard_launch(preview.plan_id)
                 self._show('Launch cancelled before sending a command.');return
-            try:job = self.client.execute_launch(preview.plan_id)
-            except Exception as exc:self._show(str(exc));return
+            job = lambda: self.client.execute_launch(preview.plan_id)
             self._run_job(job, self._launch_finished)
         dialog.connect('response', answered);dialog.present()
 

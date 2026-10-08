@@ -12,6 +12,8 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib, Gdk, Gio, Graphene, Pango
 from .api import BrowserError, ConnectionFailure
+from .foreground import ForegroundSlot
+from .operation_status import OperationPresentation
 from .files import child
 from .navigation import History
 from .storage import storage_root, discover
@@ -69,6 +71,7 @@ class Browser(Gtk.Application):
         self.client = None
         self.busy = False
         self.transfer_job = None
+        self.foreground = ForegroundSlot()
         self.drag_payload = None
         self.file_clipboard = None
         self.histories = {True: History(self.local), False: History(self.remote)}
@@ -225,12 +228,18 @@ class Browser(Gtk.Application):
             self.test_lab_tab = TestLabTab(self)
             self.tabs.append_page(self.test_lab_tab.box, Gtk.Label(label='Test Lab'))
         self.tabs.connect('switch-page', lambda _, page, index: self.settings_tab.load_if_needed() if index == 1 else self.drives_tab.load_if_needed() if index == 2 else None)
-        self.status = Gtk.Label(label='Open Settings → Device details to select or discover a C64 Ultimate.', xalign=0, wrap=True, selectable=True)
-        outer.append(self.status)
-        self.cancel_button = self.button(actions, 'Cancel transfer', self.cancel_transfer)
-        self.cancel_button.set_sensitive(False)
-        self.cancel_button.set_halign(Gtk.Align.START)
-        # Keep the Files action row reachable while a transfer is running.
+        self.status_row = Gtk.Box(spacing=8)
+        self.status_label = Gtk.Label(xalign=0, wrap=True, selectable=True, hexpand=True)
+        self.status_row.append(self.status_label);outer.append(self.status_row)
+        self.cancel_button = self.button(self.status_row, 'Cancel', lambda:None)
+        self.cancel_button.update_property([Gtk.AccessibleProperty.LABEL], ['Cancel'])
+        self.cancel_button.set_visible(False);self.cancel_button.set_sensitive(False)
+        self.operation = OperationPresentation(self.render_operation,
+            lambda:diagnostic_event('gtk','operation_presentation','client','invalid'))
+        # Ordinary status writers share the same precedence gate as managed jobs.
+        self.status = self.operation
+        self.status.set_text('Open Settings → Device details to select or discover a C64 Ultimate.')
+        # The contextual bottom Cancel remains outside disabled feature controls.
         self.busy_controls = [connection, panes, usb_actions, self.partial_button,
             self.settings_tab.box, self.drives_tab.box,
             self.streams_tab.box]
@@ -385,7 +394,8 @@ class Browser(Gtk.Application):
 
     def run(self, task, done):
         """Schedule worker work; return whether submission was accepted."""
-        if self.busy: return False
+        if self.busy or (getattr(self, 'foreground', None) is not None
+                         and self.foreground.token is not None): return False
         self.busy = True
         sensitivity = [(widget, widget.get_sensitive()) for widget in self.busy_controls]
         for widget, _ in sensitivity: widget.set_sensitive(False)
@@ -405,7 +415,6 @@ class Browser(Gtk.Application):
             for widget, sensitive in sensitivity: widget.set_sensitive(sensitive)
             try: done(future.result())
             except Exception as exc:
-                self.end_file_job()
                 if isinstance(exc, ConnectionFailure) and exc.kind in ('host', 'network', 'authentication') and self.recovery:
                     self.recovery.lost(str(exc))
                     if exc.kind=='authentication':self.recovery.paused=True
@@ -691,31 +700,53 @@ class Browser(Gtk.Application):
             self.status.set_text('Completed: ' + str(result))
         self.run(lambda: self.client.list_directory(self.remote), refreshed)
 
-    def cancel_transfer(self):
-        if self.transfer_job:
-            if self.transfer_job.operation.startswith('game-library.launch'):
-                service=self.core.game_launch
-            elif self.transfer_job.operation.startswith('game-library.'):
-                service=self.core.game_library
-            elif self.transfer_job.operation.startswith('sid-jukebox.'):
-                service=self.core.sid_jukebox
-            elif self.transfer_job.operation.startswith('usb.'):
-                service=self.core.usb
-            else:service=self.core.files
-            service.cancel(self.transfer_job.id)
-            self.cancel_button.set_sensitive(False)
-            self.status.set_text('Cancelling transfer… waiting for the current network operation to return.')
+    def render_operation(self, view):
+        self.status_label.set_text(view.message)
+        if not view.cancel_available and self.cancel_button.has_focus():
+            if not self.tabs.child_focus(Gtk.DirectionType.TAB_FORWARD):
+                self.status_label.grab_focus()
+        self.cancel_button.set_sensitive(view.cancel_available)
+        self.cancel_button.set_visible(view.cancel_available)
 
-    def begin_file_job(self, job):
+    def job_cancel_callback(self, job):
+        token = self.foreground.token
+        # Capture authority now, never look up a replacement at invocation time.
+        return lambda: self.cancel_transfer(job, token)
+
+    def bind_job_cancel(self, button, job):
+        previous = getattr(button, '_foreground_cancel_handler', None)
+        if previous is not None:button.disconnect(previous)
+        cancel = self.job_cancel_callback(job)
+        button._foreground_cancel_handler = button.connect('clicked', lambda *_:cancel())
+        return cancel
+
+    def cancel_transfer(self, job, token):
+        if not self.foreground.owns(token, job) or self.transfer_job is not job:
+            return False
+        if job.snapshot().state in ('succeeded', 'failed', 'cancelled'):return False
+        def send():
+            if job.operation.startswith('game-library.launch'):service=self.core.game_launch
+            elif job.operation.startswith('game-library.'):service=self.core.game_library
+            elif job.operation.startswith('sid-jukebox.'):service=self.core.sid_jukebox
+            elif job.operation.startswith('usb.'):service=self.core.usb
+            else:service=self.core.files
+            return service.cancel(job.id)
+        return self.operation.request_cancel(job, token, send)
+
+    def begin_file_job(self, job, token, cancellable=True):
+        if not self.foreground.owns(token, job) or self.transfer_job is not None:
+            raise RuntimeError('Foreground job has no exclusive reservation.')
+        self.transfer_job = job
         self.busy = True
         self._file_job_sensitivity = [(widget, widget.get_sensitive())
                                       for widget in self.busy_controls]
         for widget, _ in self._file_job_sensitivity:widget.set_sensitive(False)
-        self.transfer_job = job
-        self.cancel_button.set_sensitive(True)
-        self.status.set_text('Working…')
+        self.bind_job_cancel(self.cancel_button, job)
+        self.operation.begin(job, token, cancellable)
         def event(update):
             progress=update.job.progress
+            if update.kind=='cancel-requested':
+                GLib.idle_add(self.operation.cancelling,job,token)
             if update.kind=='progress' and progress:
                 queued=time.monotonic()
                 def show():
@@ -724,28 +755,63 @@ class Browser(Gtk.Application):
                         'gtk','job_progress_delivery','client',
                         'delayed' if delay>500 else 'ok',duration_ms=delay,
                         details=(('delayed',delay>500),),job_id=job.id,
-                        phase=progress.phase)
-                    message = job_progress_message(job.operation, progress)
-                    if self.transfer_job is job:self.status.set_text(message)
+                        phase=job.operation)
+                    if self.foreground.owns(token, job):
+                        self.operation.progress(job,token,progress,job_progress_message)
                     return False
                 GLib.idle_add(show)
         job.add_listener(event)
         return job
 
-    def end_file_job(self):
+    def end_file_job(self, job, token):
+        if not self.foreground.owns(token, job) or self.transfer_job is not job:
+            return False
+        if job.snapshot().state not in ('succeeded', 'failed', 'cancelled'):
+            return False
         self.transfer_job = None
         self.busy = False
-        for widget, sensitive in getattr(self,'_file_job_sensitivity',()):
-            widget.set_sensitive(sensitive)
-        self._file_job_sensitivity = ()
-        self.cancel_button.set_sensitive(False)
+        try:
+            for widget, sensitive in getattr(self,'_file_job_sensitivity',()):
+                try:widget.set_sensitive(sensitive)
+                except Exception:pass  # Destroyed presentation cannot retain ownership.
+            try:self.cancel_button.set_sensitive(False)
+            except Exception:pass
+        finally:
+            self._file_job_sensitivity = ()
+            self.foreground.release(token, job)
+        return True
 
-    def run_file_job(self, job, done):
-        self.begin_file_job(job)
+    def run_file_job(self, submit, done, *, started=None, failed=None, cancellable=True):
+        """Admit before calling a service. Never accept an already-submitted job.
+
+        UI launchers supply a factory containing only service submission. Internal
+        Core/background work does not use this Browser slot. Existing ordinary
+        Browser workers remain mutually exclusive through their busy guard.
+        """
+        if not callable(submit):
+            raise TypeError('Foreground submission requires a job factory.')
+        token = None if self.busy else self.foreground.reserve()
+        if token is None:
+            self.status.set_text('Another operation is already in progress.')
+            return False
+        self.busy = True
+        try:
+            job = submit()
+            if job is None or job is False:
+                raise BrowserError('The operation was not submitted.')
+        except Exception as exc:
+            if not self.foreground.release(token):return False
+            self.busy = False
+            if failed is not None:failed(exc)
+            else:self.status.set_text(str(exc))
+            return False
+        self.foreground.bind(token, job)
+        # Install completion observation before touching feature widgets. A
+        # presentation failure must never abandon a successfully submitted job.
         delivered = [False]
         def finish(snapshot,queued=None,source='event'):
             if delivered[0]:return False
-            if self.transfer_job is not job:return False
+            if not self.foreground.owns(token, job):return False
             delay=0 if queued is None else (time.monotonic()-queued)*1000
             diagnostic_event(
                 'gtk','job_completion_delivery','client',
@@ -753,15 +819,21 @@ class Browser(Gtk.Application):
                 details=(('delayed',delay>500),('source',source)),
                 job_id=job.id,phase=job.operation)
             delivered[0] = True
-            self.end_file_job()
+            if not self.end_file_job(job, token):return False
+            self.operation.finish(job, token, snapshot)
             try:done(snapshot)
-            except Exception as exc:self.status.set_text(str(exc))
+            except Exception as exc:
+                if self.foreground.token is None:self.status.set_text(str(exc))
             return False
         def observe(event):
             if event.kind=='finished':
                 GLib.idle_add(finish,event.job,time.monotonic(),'event')
         job.add_listener(observe)
+        # Binding/observer registration precedes all potentially fallible UI work.
+        try:self.begin_file_job(job, token, cancellable)
+        except Exception as exc:self.status.set_text(str(exc))
         snapshot=job.snapshot()
+        if snapshot.state=='cancel-requested':self.operation.cancelling(job,token)
         if snapshot.state in ('succeeded','failed','cancelled'):
             GLib.idle_add(finish,snapshot)
         # Core's snapshot is authoritative. Polling it is a completion-event
@@ -773,6 +845,10 @@ class Browser(Gtk.Application):
                 finish(current,None,'snapshot-fallback');return False
             return True
         GLib.timeout_add(250,observe_snapshot)
+        if started is not None:
+            try:started(job)
+            except Exception as exc:self.status.set_text(str(exc))
+        return True
 
     def clicked(self, listing, local, gesture, count, x, y):
         if self.busy or count != 1: return
@@ -935,8 +1011,7 @@ class Browser(Gtk.Application):
             if not destination:self.status.set_text('Choose a local backup destination.');return
             request=BackupRequest(FileLocation.c64u(volume),paths,
                                   FileLocation.core_host(destination))
-            try:job=self.core.usb.prepare_backup(request)
-            except BrowserError as exc:self.status.set_text(str(exc));return
+            job=lambda: self.core.usb.prepare_backup(request)
             def prepared(snapshot):
                 if snapshot.state!='succeeded':
                     self.status.set_text(snapshot.error.message);return
@@ -957,8 +1032,7 @@ class Browser(Gtk.Application):
                     if answer!=Gtk.ResponseType.OK:
                         self.core.usb.discard_plan(preview.plan_id)
                         self.status.set_text('USB backup cancelled before copying.');return
-                    try:execution=self.core.usb.execute_backup(preview.plan_id)
-                    except BrowserError as exc:self.status.set_text(str(exc));return
+                    execution=lambda: self.core.usb.execute_backup(preview.plan_id)
                     self.run_file_job(execution,self.usb_backup_finished)
                 dialog.connect('response',confirmed);dialog.present()
             self.run_file_job(job,prepared)
@@ -988,9 +1062,8 @@ class Browser(Gtk.Application):
             if code!=Gtk.ResponseType.ACCEPT or not file:return
             folder=file.get_path()
             if not folder:self.status.set_text('Choose a local backup folder.');return
-            try:job=self.core.usb.prepare_restore(FileLocation.core_host(folder),
+            job=lambda: self.core.usb.prepare_restore(FileLocation.core_host(folder),
                                                    FileLocation.c64u(volume))
-            except BrowserError as exc:self.status.set_text(str(exc));return
             self.run_file_job(job,self.restore_preview)
         chooser.connect('response',response);chooser.show()
 
@@ -1021,9 +1094,8 @@ class Browser(Gtk.Application):
             if answer not in (Gtk.ResponseType.OK,Gtk.ResponseType.APPLY):
                 self.core.usb.discard_plan(preview.plan_id)
                 self.status.set_text('USB restore cancelled before writing.');return
-            try:job=self.core.usb.execute_restore(
+            job=lambda: self.core.usb.execute_restore(
                 preview.plan_id,replace=answer==Gtk.ResponseType.APPLY)
-            except BrowserError as exc:self.status.set_text(str(exc));return
             self.run_file_job(job,self.usb_restore_finished)
         dialog.connect('response',confirmed);dialog.present()
 
@@ -1070,8 +1142,7 @@ class Browser(Gtk.Application):
         request=CopyRequest(source,names,target)
         def transfer(preview,decision):
             if self.busy or (not (local and source_local) and self.client is not client): return
-            try:job=self.core.files.execute_copy(preview.plan_id,decision)
-            except BrowserError as exc:self.status.set_text(str(exc));return
+            job=lambda: self.core.files.execute_copy(preview.plan_id,decision)
             def finished(snapshot):
                 result=snapshot.result
                 if result is None:
@@ -1143,8 +1214,7 @@ class Browser(Gtk.Application):
                     self.core.files.discard_plan(preview.plan_id)
                     self.status.set_text('Copy cancelled; nothing copied.')
             dialog.connect('response', response); dialog.present()
-        try:job=self.core.files.prepare_copy(request)
-        except BrowserError as exc:self.status.set_text(str(exc));return
+        job=lambda: self.core.files.prepare_copy(request)
         self.run_file_job(job,checked)
 
     def copy_report(self, report):
@@ -1163,7 +1233,7 @@ class Browser(Gtk.Application):
         if not local and not self.client: raise BrowserError('Connect first.')
         def submit(name):
             location=FileLocation.core_host(parent) if local else FileLocation.c64u(parent)
-            job=self.core.files.create_folder(location,name)
+            job=lambda: self.core.files.create_folder(location,name)
             def done(snapshot):
                 if snapshot.state=='succeeded':self.completed(snapshot.result.path)
                 else:self.status.set_text(snapshot.error.message)
@@ -1429,9 +1499,8 @@ class Browser(Gtk.Application):
                 self.run(task, self.completed)
                 return
             client = self.client
-            job = self.core.files.rename(FileLocation.c64u(target), new)
-            submitted = job.snapshot()
-            device_id, session_id = submitted.device_id, submitted.session_id
+            job = lambda: self.core.files.rename(FileLocation.c64u(target), new)
+            device_id = session_id = None
             def same_session():
                 current = self.core.device_session()
                 return (self.client is not None and current.device_id == device_id
@@ -1439,6 +1508,8 @@ class Browser(Gtk.Application):
             def refresh_current():
                 return same_session() and self.remote == parent
             def done(snapshot):
+                nonlocal device_id, session_id
+                device_id, session_id = snapshot.device_id, snapshot.session_id
                 if snapshot.state == 'succeeded':
                     if not same_session():
                         self.status.set_text('Rename completed on the previous connection.')
@@ -1513,8 +1584,7 @@ class Browser(Gtk.Application):
             if not local and self.client is not client:
                 self.status.set_text('Connection changed. Review the deletion again.');return
             preview = reviewed[0]
-            try:job=self.core.files.execute_delete(preview.plan_id)
-            except BrowserError as exc:self.status.set_text(str(exc));return
+            job=lambda: self.core.files.execute_delete(preview.plan_id)
             def done(snapshot):
                 result=snapshot.result
                 if result is None:
@@ -1544,13 +1614,11 @@ class Browser(Gtk.Application):
             label.set_text(device+'\n\nDelete permanently: '+str(len(preview.items))+' items, including folder contents?\n\n'+'\n'.join(i.path+('/' if i.kind=='dir' else '') for i in preview.items))
             button.set_sensitive(bool(preview.items))
         locations=tuple(FileLocation.core_host(path) if local else FileLocation.c64u(path) for path in targets)
-        try:
-            job=(self.core.files.prepare_partial_delete(partial) if partial else
+        job=(lambda: self.core.files.prepare_partial_delete(partial) if partial else
                  self.core.files.prepare_delete(locations))
-        except BrowserError as exc:
-            label.set_text('Could not prepare deletion: '+str(exc)+'\n\nNothing was deleted. Close this dialog and try again.')
-            return dialog
-        self.run_file_job(job,prepared)
+        self.run_file_job(job,prepared,failed=lambda exc:label.set_text(
+            'Could not prepare deletion: '+str(exc)+
+            '\n\nNothing was deleted. Close this dialog and try again.'))
         return dialog
 
     def prompt(self, title, text, callback, initial='', exact_confirmation=None, action_label='OK'):

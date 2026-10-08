@@ -1,5 +1,174 @@
 # Current development state
 
+## B5 — contextual operation status/cancellation, physically accepted
+
+**B5 REVIEW AND BOUNDED PHYSICAL ACCEPTANCE PASSED.** The foreground-admission
+prerequisite and B5 remain uncommitted. Compact review passed with 40 focused tests
+and eight offline GTK checks, no skips. Streaming remains **OPEN / intermittent /
+instrumented**. Publication is the next review gate; no publication was performed.
+
+One GTK-independent Browser presenter owns IDLE, RUNNING,
+CANCELLATION_REQUESTED and TERMINAL views for the admitted job/token. The compact
+bottom status row has one contextual **Cancel**, absent when unavailable. Files,
+SIDJuke and Game Library permanent Cancel controls are retired. Bulk Import retains
+its modal **Cancel import**, subscribing to the same view and cancellation authority.
+Both routes consume one request before invoking the existing service; accepted
+cancellation stays sticky until authoritative completion and retains foreground
+admission. Refusal/error is reported without claiming acceptance or automatic retry.
+
+Progress uses service phase text and truthful counts/optional totals, with no
+percentage or progress bar. Ordinary status cannot replace an active operation or
+Cancelling. Identity checks reject stale progress/cancel/completion; the existing
+completion fallback remains. Terminal messages and existing feature consequence
+handlers retain publication/cleanup/uncertain-outcome distinctions. After terminal
+completion the next ordinary message replaces status, following the existing
+lifetime convention. Malformed progress yields generic diagnostic evidence and
+safe text; no raw malformed payload is logged. Current managed Core jobs retain
+existing cooperative cancellation; explicit noncancellable presentation is supported,
+and ordinary workers gain no cancellation. Core, scheduler, recovery and services
+are unchanged; independent scheduler lanes are preserved.
+
+Deterministic evidence: 446 focused/affected tests and 17 offline real-GTK checks
+passed, no skips. Coverage includes known/unknown counts, malformed progress,
+noncancellable jobs, sticky one-shot cancellation, stale SID progress and retained
+live callbacks, foreground retention, completion/fallback races, terminal consequences,
+modal/global synchronization, keyboard focus recovery, transfers, native Flash,
+SID/Game/Bulk workflows, USB backup/restore and late-publication cleanup semantics.
+No full normal/optimized suites were rerun. Global Cancel has accessible name Cancel;
+GTK checks exercise focus while visible and recovery when unavailable/terminal.
+
+Physical acceptance used `./run-development` from the current modified source
+worktree, with Development identity verified, and the saved C64 Founders profile
+(firmware 1.1.0 / API 0.1). Initial authentication required Bruce to enter a
+session-only credential through normal Device details; no credential was recorded.
+Bruce assisted with file-pane navigation where desktop accessibility was incomplete.
+
+Exactly one remote-to-local download was started: the existing
+`/USB1/GAMES/NTSC & PAL/Lykia - The Lost Island/Lykia - The Lost Island.crt`
+(993,232 bytes), to an empty local `/tmp/argonaut-b5-acceptance-*` directory.
+Idle Files had neither permanent Cancel transfer nor contextual Cancel. During the
+managed copy, the bottom presenter showed Preparing copy, Copying, then truthful
+Transferred byte counts without percentages, with contextual Cancel available.
+One global Cancel activation was issued after byte progress. Bruce visually
+confirmed Cancelling appeared and did not revert before the terminal result.
+Automated accessibility sampling did not capture that brief intermediate state;
+its sticky-state physical evidence is Bruce's direct observation, supported by the
+deterministic regressions, not an inferred screenshot or sampled status.
+
+Authoritative terminal text: "0 items completed; 0 skipped; 1 unfinished. Stopped:
+Operation cancelled by request." Cancel disappeared. The temporary destination
+was empty, including no staging file, consistent with managed-download cleanup.
+A subsequent ordinary read-only remote refresh succeeded; ordinary Connected status
+returned and no stale progress/Cancel reappeared. Brief keyboard navigation caused
+no observed error; no UI hang or GTK warning/error was emitted during this run.
+The accessibility Cancel activation did not establish keyboard focus on that button;
+focused-control disappearance remains covered by the prior offline GTK checks.
+Normal application Quit exited with status 0; no Development worker/process remained.
+Core.close clears session credentials; process exit removed the in-memory session.
+
+No remote mutation, second download, stream, hardware command, or unrelated physical
+qualification occurred. Production and tests were unchanged during acceptance;
+only these acceptance notes and the roadmap were updated. Starting cumulative scope
+was 17 files, +1230/-177 against published B4
+`5cb37571fa5192d71b012aa57027cc3d9459a518`; the index remains empty. No staging,
+commit, push, package, tag, release or later-roadmap work. Stop for publication.
+
+## B5 prerequisite history — now approved
+
+The following records the prerequisite before final approval and before B5
+implementation; its old review gate and permanent-button references are historical.
+
+Compact prerequisite review found two blockers: live Cancel handlers could resolve
+replacement jobs, and the admission mutex was held for the entire operation. Both
+approved narrow corrections are implemented. Files/SID/Game button signal handlers
+now capture the admitted job and reservation, replace their previous live binding,
+and validate authority before cancellation. Bulk Import captures the same authority
+for its modal route. Terminal invalidation makes retained callbacks harmless even
+when their widgets survive; no fallback to the current job exists. Repeated requests
+for the same active job retain existing cooperative service semantics.
+
+The mutex now protects only in-memory reserve/bind/inspect/release transitions.
+State/token retain exclusive ownership between transitions. Submission, execution,
+UI callbacks and service cancellation run outside the mutex. Admission acquisition
+is nonblocking; a second request refuses based on RESERVED/ACTIVE state without
+queueing. Failed reservation release and active terminal release require matching
+identity; active release additionally requires the matching job. A stale failure
+handler cannot clear a replacement operation's busy state or status. Synchronous
+submission has no normal path that invalidates its own reservation before binding.
+
+New deterministic checks retain actual registered permanent-button and modal
+callbacks, verify current cancellation still works, and prove stale/repeated handlers
+leave replacement jobs RUNNING with zero cancellation calls. Short-mutex tests
+inspect availability during RESERVED, ACTIVE, submission, execution and cancellation;
+existing barrier/reentrant races still prove exclusive admission. CoreScheduler and
+service execution/cancellation contracts remain unchanged. No presenter, button
+retirement, sticky Cancelling state or Bulk Import presentation redesign was added.
+
+Starting authority: HEAD = local origin/development =
+`5cb37571fa5192d71b012aa57027cc3d9459a518`, parent
+`9d0c543b7f7497428463a4890098fae6c30d937b`, subject
+`Refine global navigation and session-safe machine controls`; divergence 0 0,
+clean worktree/index. B4 is published; its older pre-publication text below is history.
+
+Inspection proved that independent foreground submissions could replace Browser's
+single tracked job, leaving the original running without its completion/cancel route.
+Bruce approved ONE Browser-managed foreground operation at a time, with refusal
+before service submission and no automatic queue. This is a Browser admission policy;
+CoreScheduler's independent local-computer/device execution lanes are unchanged.
+
+Foreground means managed jobs presented through Browser.run_file_job: Files copy,
+delete, folder/rename, USB backup/restore, native Flash file operations, SID catalog
+and playback jobs, Game Library catalog/scan/relink/launch, and Bulk Import execution.
+Preparation and execution acquire separately; reviews hold no reservation. Existing
+sequential multi-file additions continue through terminal callbacks. Bulk Import is
+one scan job followed, after review, by one execution job, not concurrent children.
+Ordinary Browser.run workers keep their existing mutual busy exclusion and cannot
+enter during a reservation; no new cancellation is exposed for them. Recovery,
+internal/background work, synchronous metadata editing and Core scheduling are unchanged.
+
+The small ForegroundSlot uses nonblocking admission and an opaque reservation identity.
+GTK owns binding/release. Browser reserves and marks busy before invoking a submission
+factory, then binds its returned job. Busy/reserved attempts refuse without invoking
+the factory. Submission failure/refusal releases the reservation before error handling.
+Inspected service/client paths return the scheduler's job directly; no fallible UI
+work remains between scheduling and returning that handle. No ambiguous post-submit
+exception path was found in those launchers.
+
+All managed launch boundaries now defer service calls, including delayed Game Library
+and SID choosers, USB review/choosers, Files confirmations, SID/Game launch/relink,
+Flash upload/save and Bulk Import. Completion observation is installed before feature
+presentation. Cancellation retains ownership until authoritative terminal state.
+Normal completion and the existing 250-ms snapshot fallback release only their own
+reservation; stale completion/progress cannot clear or overwrite a newer job. Tab
+cancellation passes its admitted job identity. SID and Bulk Import queued progress
+check active-job identity. Existing consequence reporting and service cancellation
+semantics remain intact. No new polling, queue, timeout/retry or execution policy.
+
+Verification: **221 focused tests passed**, including **21 new admission regressions**,
+plus **14 explicit/affected offline GTK checks**, no skips. Coverage includes atomic
+concurrent/reentrant admission, zero second submission, submission failure/refusal,
+late completion/progress/cancel, cancellation retention, missed-event fallback,
+delayed SID/Game chooser acceptance, USB/SID/Game/Flash/Files confirmations,
+Bulk Import refusal and actual execution, sequential additions, and independent
+Core local/device execution. Development GTK checks use synthetic/local fixtures;
+Python socket connections are trapped. Real chooser response signals and continued
+GTK heartbeat passed. Cancel controls remain in their existing locations.
+
+Focused modules: test_foreground_admission, test_app_lifecycle, test_ftp_mutations,
+test_game_library_client, test_sid_jukebox_client, test_jobs, test_scheduler,
+test_machine_safety, test_header_navigation, test_usb_backup_preferences,
+test_game_library_bulk, test_sid_playback, test_game_launch, test_cancel_copy.
+GTK: foreground_gtk_check plus nine affected PreferencesUI methods covering the
+heartbeat, SID preparation/cursor behavior, Game launch/batch addition, and Bulk Import.
+Initial fixture assumptions were updated for deferred factories; local fake FTP
+sockets required sandbox permission. Final checks pass; no tests were removed.
+
+Syntax, tracked and explicit-untracked whitespace, file modes and bounded added-line
+privacy checks passed. Worktree contains only this prerequisite; index remains empty.
+No physical qualification is required. No device contact, staging, commit/push,
+packaging, tag/release or later-roadmap work. Streaming remains OPEN / intermittent /
+instrumented. Stop for compact prerequisite re-review before starting the B5 presenter.
+
 ## B4 — bounded physical acceptance passed; publication approved, not executed
 
 **APPROVE COMMIT/PUSH — not executed.** The approved bounded physical acceptance
