@@ -8,7 +8,8 @@ from .platform_support import portable_root
 
 class Credentials:
     def __new__(cls):
-        if development.enabled() or portable_root() is not None:return SessionCredentials()
+        if development.enabled():return SessionCredentials('Development')
+        if portable_root() is not None:return SessionCredentials('Portable')
         if sys.platform == "darwin":
             from .macos_credentials import MacOSCredentials
             return MacOSCredentials()
@@ -35,6 +36,12 @@ class Credentials:
         except Exception as exc:
             raise BrowserError('GNOME keyring could not be accessed. Unlock it or use a session-only password.') from exc
 
+    def exists(self, profile_id):
+        """Search item metadata only: never unlock or load a secret."""
+        if self.error: raise BrowserError(self.error)
+        return bool(self.call(self.secret.password_search_sync, self.schema,
+                              {'profile-id': profile_id}, self.secret.SearchFlags.NONE, None))
+
     def get(self, profile_id):
         if self.error: raise BrowserError(self.error)
         return self.call(self.secret.password_lookup_sync, self.schema, {'profile-id': profile_id}, None) or ''
@@ -54,6 +61,8 @@ class SessionCredentials:
     """Portable profiles never read or write the host credential store."""
     error=None
     session_only=True
+    def __init__(self, mode='Portable'):self.mode=mode
+    def exists(self,profile_id):return False
     def get(self,profile_id):return ''
     def set(self,profile_id,password):raise BrowserError('This mode keeps passwords for this session only.')
     def delete(self,profile_id):pass

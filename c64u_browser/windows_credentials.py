@@ -21,6 +21,15 @@ class WindowsCredentials:
         self.dll.CredFree.argtypes=[c.c_void_p];self.dll.CredFree.restype=None
     def target(self,key):return 'Argonaut/profile/'+str(key)
     def failed(self):raise BrowserError('Windows Credential Manager failed (error '+str(c.get_last_error())+').')
+    def exists(self,key):
+        """Approved Win32 exception: never dereference the returned credential."""
+        ptr=c.POINTER(Credential)()
+        if not self.dll.CredReadW(self.target(key),1,0,c.byref(ptr)):
+            if c.get_last_error()==1168:return False
+            self.failed()
+        try:return True
+        finally:self.dll.CredFree(ptr)
+
     def get(self,key):
         ptr=c.POINTER(Credential)()
         if not self.dll.CredReadW(self.target(key),1,0,c.byref(ptr)):

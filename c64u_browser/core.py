@@ -23,7 +23,7 @@ from .c64u_ftp import C64UFtpLeaseManager
 from .c64u_ftp_types import ConnectionBinding, DeviceIdentity, FtpOperationError, ErrorCode, FtpPolicy
 from .ftp_reads import FtpReadAdapter, adapter_for, read_operation, transport_event
 from .jobs import check_current_job, CoreJob
-from .discovery import local_networks, standard_scan, subnet_scan
+from .discovery import local_networks, standard_scan, subnet_scan, validate_subnet
 from .file_service import FileLocation, FileService
 from .game_launch import GameLaunchService
 from .game_library import GameLibraryService
@@ -301,6 +301,18 @@ class ArgonautCore:
         return getattr(self._credentials, 'session_only', False) is True
 
     @property
+    def credential_mode(self):
+        return getattr(self._credentials, 'mode', 'Portable') if self.credentials_session_only else 'Installed'
+
+    def has_saved_credential(self, profile):
+        """Boolean only, bound to an exact saved connection; no secret lookup."""
+        if self.credentials_session_only:return False
+        old=next((p for p in self.preferences.profiles if p.id == profile.id), None)
+        if not old or (old.host,old.http_port,old.ftp_port) != (profile.host,profile.http_port,profile.ftp_port):
+            return False
+        return self._credentials.exists(profile.id) is True
+
+    @property
     def device_info(self):
         return _public_info(self._device_info) if self._device_info else None
 
@@ -411,10 +423,14 @@ class ArgonautCore:
         return ''
 
     def forget_credential(self, profile_id):
-        self._credentials.delete(profile_id)
+        if not self.credentials_session_only:self._credentials.delete(profile_id)
         self._session_passwords.pop(profile_id, None)
 
     def save_profile(self, profile, entered_password='', remember=False):
+        # Deliberate offline profile editing; no implicit authentication.
+        return self._save_profile(profile, entered_password, 'remember' if remember else 'forget')
+
+    def _save_profile(self, profile, entered_password='', credential_action='keep'):
         profile.validate()
         prefs = self.preferences
         old = next((item for item in prefs.profiles if item.id == profile.id), None)
@@ -422,8 +438,6 @@ class ArgonautCore:
             profile.host, profile.http_port, profile.ftp_port)
         if changed:
             profile = replace(profile, id=Profile.new(profile.name, profile.host).id)
-        if remember and entered_password:
-            self._credentials.set(profile.id, entered_password)
         before, selected = prefs.profiles, prefs.selected_id
         prefs.profiles = [profile if item.id == (old.id if old else profile.id)
                           else item for item in before]
@@ -435,6 +449,16 @@ class ArgonautCore:
             raise
         if entered_password:
             self._session_passwords[profile.id] = entered_password
+        if not self.credentials_session_only:
+            try:
+                if credential_action == 'remember' and entered_password:
+                    self._credentials.set(profile.id, entered_password)
+                elif credential_action == 'forget':
+                    self._credentials.delete(profile.id)
+            except BrowserError as exc:
+                error=CoreError('credentials', 'Profile saved, but the password storage change failed. '+str(exc))
+                error.saved_profile_id=profile.id
+                raise error from exc
         self._emit('profile-saved', data={'profile_id': profile.id},
                    profile_id=profile.id)
         return profile
@@ -455,9 +479,16 @@ class ArgonautCore:
         self._emit('profile-deleted', data={'profile_id': profile_id},
                    profile_id=profile_id)
 
-    def discover(self, *, subnet=''):
+    def discovery_networks(self):
+        return tuple(self._networks())
+
+    def discover(self, *, subnet='', progress=None, found=None):
         if subnet:
-            return tuple(self._subnet_discovery(subnet)), (
+            subnet=str(validate_subnet(subnet, self._networks()))
+            callbacks={}
+            if progress is not None:callbacks['progress']=progress
+            if found is not None:callbacks['found']=found
+            return tuple(self._subnet_discovery(subnet, **callbacks)), (
                 'Controlled LAN scan complete.',), ()
         known = [(p.host, p.http_port) for p in self.preferences.profiles]
         candidates, notes = self._standard_discovery(known_hosts=known)
@@ -508,7 +539,7 @@ class ArgonautCore:
                     with read_operation(client):
                         path, entries = initial_directory(client, folder)
                 if persist:
-                    profile = self.save_profile(profile, entered_password, remember)
+                    profile = self._save_profile(profile, entered_password, 'keep')
                 self._client = client
                 self._active_profile = profile
                 self._device_info = copy.deepcopy(info)
@@ -609,9 +640,12 @@ class ArgonautCore:
 
     def close(self):
         """Release Core execution resources; jobs are not persisted."""
-        self._ftp_manager.invalidate(self._device_identity)
-        self.scheduler.close()
-        self.ai.close()
+        try:
+            self._ftp_manager.invalidate(self._device_identity)
+            self.scheduler.close()
+            self.ai.close()
+        finally:
+            self._session_passwords.clear()
 
     def _read(self, session, operation, check=lambda: None):
         """Shared checked body for scheduled reads and synchronous diagnostics."""

@@ -1,4 +1,3 @@
-import sys
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Connection UI delegates transport, discovery and persistence to shared components."""
@@ -6,15 +5,23 @@ from gi.repository import Gtk, GLib
 from .api import BrowserError
 from .core import CoreError
 from .profiles import Profile
-from .discovery import preferred_subnet
+from .discovery import preferred_subnet, validate_subnet
 
 class ConnectionDialog:
     def __init__(self, app, window=None):
         self.app = app
         self.current_id = None
+        self._credential_state='UNKNOWN'
+        self._credential_pending=False
+        self._credential_generation=0
+        self._closed=False
+        self._networks=None
+        self._scanning=False
+        self._scan_generation=0
         self.window = window or Gtk.Window(title='Argonaut — Connections', transient_for=app.window, modal=True)
         if window is None:self.window.set_default_size(680,650)
-        self.window.connect('close-request', lambda *_: app.busy)
+        self.window.connect('close-request', self.close_requested)
+        self.window.connect('unrealize', self.window_closed)
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         for side in ('top','bottom','start','end'): getattr(outer,'set_margin_'+side)(16)
         page_scroll=Gtk.ScrolledWindow();page_scroll.set_overlay_scrolling(False);page_scroll.set_child(outer)
@@ -25,15 +32,23 @@ class ConnectionDialog:
         self.saved.connect('changed', self.selected)
         row = Gtk.Box(spacing=8); self.controls.append(row); row.append(self.saved)
         app.button(row,'New profile',self.new)
-        app.button(row,'Save device profile',self.save)
+        app.button(row,'Save Profile',self.save)
         app.button(row,'Delete profile',self.delete)
-        self.controls.append(Gtk.Label(label='Discovered devices — password-protected candidates require identification',xalign=0,wrap=True))
-        self.devices = Gtk.ListBox(); self.devices.connect('row-selected',self.discovered)
-        scroll = Gtk.ScrolledWindow(min_content_height=110); scroll.set_child(self.devices); self.controls.append(scroll)
-        row = Gtk.Box(spacing=8); self.controls.append(row)
-        app.button(row,'Scan again',lambda: self.scan(False))
-        self.subnet = Gtk.Entry(placeholder_text='Local subnet, e.g. 192.168.68.0/22',hexpand=True); row.append(self.subnet)
-        app.button(row,'Scan subnet',lambda:self.scan(True))
+        self.controls.append(Gtk.Label(label='Network Discovery',xalign=0))
+        row=Gtk.Box(spacing=8);self.controls.append(row)
+        app.button(row,'Discover',lambda:self.scan(False))
+        row=Gtk.Box(spacing=8);self.controls.append(row)
+        row.append(Gtk.Label(label='Subnet',xalign=0))
+        self.subnet=Gtk.Entry(placeholder_text='192.168.68.0/24',hexpand=True);row.append(self.subnet)
+        self.scan_subnet_button=app.button(row,'Scan Subnet',lambda:self.scan(True))
+        self.scan_subnet_button.set_sensitive(False)
+        self.subnet_validation=Gtk.Label(xalign=0,wrap=True);self.controls.append(self.subnet_validation)
+        self.subnet.connect('changed',self.validate_subnet_field)
+        self.scan_progress=Gtk.ProgressBar(show_text=True);self.scan_progress.set_visible(False)
+        self.controls.append(self.scan_progress)
+        self.devices=Gtk.ListBox();self.devices.connect('row-selected',self.discovered)
+        scroll=Gtk.ScrolledWindow(min_content_height=110);scroll.set_child(self.devices);self.controls.append(scroll)
+        self._candidate_rows={}
         self.fields = {}
         for key,label,default in [('name','Profile name',''),('host','Hostname / IP',''),('http','REST port','80'),('ftp','FTP port','21')]:
             row = Gtk.Box(spacing=8); self.controls.append(row)
@@ -57,26 +72,128 @@ class ConnectionDialog:
         self.fields['name'].connect('changed',lambda *_:self.details_profile.set_text('Profile: '+(self.fields['name'].get_text() or 'New profile')))
         self.fields['host'].connect('changed',lambda *_:self.model.set_text('Not read'))
         self.controls.append(details_box)
-        self.password = Gtk.PasswordEntry(show_peek_icon=True,placeholder_text='Network password (blank: use saved password)')
-        self.controls.append(self.password)
-        self.remember = Gtk.CheckButton(label='Store entered password in '+('Windows Credential Manager' if sys.platform=='win32' else 'macOS Keychain' if sys.platform=='darwin' else 'GNOME keyring'))
+        row=Gtk.Box(spacing=8);self.controls.append(row)
+        row.append(Gtk.Label(label='Password',width_chars=15,xalign=0))
+        self.password=Gtk.PasswordEntry(show_peek_icon=True,hexpand=True,placeholder_text='Network password')
+        row.append(self.password)
+        self.credential_status=Gtk.Label(xalign=0,wrap=True);self.controls.append(self.credential_status)
+        row=Gtk.Box(spacing=8);self.controls.append(row)
+        self.remember=Gtk.CheckButton(label='Remember password');row.append(self.remember)
+        self.forget_button=app.button(row,'Forget Password',self.forget)
+        self.retry_credential_button=app.button(row,'Retry credential check',self.refresh_credential_state)
+        self.retry_credential_button.set_visible(False)
         if app.core.credentials_session_only:
-            self.remember.set_label("Portable mode: passwords stay in this session only")
-            self.remember.set_sensitive(False)
-        self.remember.set_halign(Gtk.Align.START)
-        self.controls.append(self.remember)
+            self.remember.set_visible(False);self.remember.set_sensitive(False)
+            self.forget_button.set_visible(False);self.forget_button.set_sensitive(False)
+        self.password.connect('changed',lambda *_:self.paint_credential_state())
+        for key in ('host','http','ftp'):
+            self.fields[key].connect('changed',lambda *_:self.refresh_credential_state())
         self.auto = Gtk.CheckButton(label='Connect automatically at startup when this profile is selected')
         self.auto.set_halign(Gtk.Align.START)
         self.controls.append(self.auto)
         row = Gtk.Box(spacing=8); self.controls.append(row)
         app.button(row,'Test connection',self.test)
         app.button(row,'Connect',self.connect)
-        app.button(row,'Forget saved password',self.forget)
         self.password.connect('activate',lambda *_:self.connect())
         self.status = Gtk.Label(label='Scan for devices or enter a hostname and ports manually.',wrap=True,xalign=0,selectable=True)
         outer.append(self.status)
         self.reload()
+        self._background(self.app.core.discovery_networks,self.networks_loaded)
         if window is None:self.window.present()
+
+    def close_requested(self, *_):
+        # Preferences may veto closing to offer Save / Discard / Keep editing.
+        return self.app.busy
+
+    def window_closed(self, *_):
+        self._closed=True
+        self._credential_generation+=1
+
+    def _background(self, task, done):
+        # Auxiliary metadata work must not block GTK or claim the connection busy state.
+        try:future=self.app.pool.submit(task)
+        except RuntimeError:
+            done(BrowserError('Could not check local state. Close and reopen Argonaut.'));return
+        def finish():
+            if self._closed:return False
+            try:value=future.result()
+            except Exception as exc:value=exc
+            done(value)
+            return False
+        future.add_done_callback(lambda _:GLib.idle_add(finish))
+
+    def paint_credential_state(self):
+        saved=self._credential_state == 'PRESENT' and not self.password.get_text()
+        self.password.set_property('placeholder-text','••••••••' if saved else 'Network password')
+        if self.app.core.credentials_session_only:
+            self.credential_status.set_text(self.app.core.credential_mode+' mode — passwords are session-only.')
+        elif self._credential_state == 'UNKNOWN':
+            self.credential_status.set_text('Checking saved-password status…' if self._credential_pending else
+                'Unable to determine saved-password status. Retry credential check before saving this profile.')
+        else:
+            self.credential_status.set_text('Saved password available' if saved else
+                'Entered password overrides saved/session password.' if self.password.get_text() else '')
+
+    def refresh_credential_state(self):
+        self._credential_pending=not self.app.core.credentials_session_only
+        self._credential_generation+=1
+        generation=self._credential_generation
+        self._credential_state='UNKNOWN'
+        self.remember.set_inconsistent(not self.app.core.credentials_session_only)
+        self.remember.set_sensitive(False)
+        self.forget_button.set_sensitive(False)
+        self.retry_credential_button.set_visible(False)
+        self.paint_credential_state()
+        if self.app.core.credentials_session_only:return
+        def begin():
+            if self._closed or generation != self._credential_generation:return False
+            try:profile=self.profile()
+            except BrowserError:
+                self._credential_pending=False
+                self.retry_credential_button.set_visible(True)
+                self.paint_credential_state()
+                return False
+            def done(value):
+                if generation != self._credential_generation:return
+                self._credential_pending=False
+                self.forget_button.set_sensitive(bool(self.current_id))
+                if type(value) is not bool:
+                    self.retry_credential_button.set_visible(True)
+                    self.paint_credential_state()
+                    return
+                self._credential_state='PRESENT' if value else 'ABSENT'
+                self.remember.set_inconsistent(False)
+                self.remember.set_sensitive(True)
+                self.remember.set_active(value)
+                self.paint_credential_state()
+                # Async initial indication is baseline state, not an unsaved user edit.
+                self._saved_fields=(*self._saved_fields[:-1],self.remember.get_active())
+            self._background(lambda:self.app.core.has_saved_credential(profile),done)
+            return False
+        GLib.timeout_add(150,begin)
+
+    def networks_loaded(self, value):
+        if isinstance(value,Exception):
+            self._networks=()
+            self.subnet_validation.set_text(str(value))
+            self.scan_subnet_button.set_sensitive(False)
+            return
+        self._networks=tuple(value)
+        if not self.subnet.get_text():
+            self.subnet.set_text(preferred_subnet(self._networks,[self.fields['host'].get_text().strip()]))
+        self.validate_subnet_field()
+
+    def validate_subnet_field(self, *_):
+        try:
+            if self._networks is None:raise ValueError('Reading local IPv4 networks…')
+            network=validate_subnet(self.subnet.get_text().strip(),self._networks)
+        except ValueError as exc:
+            self.scan_subnet_button.set_sensitive(False)
+            self.subnet_validation.set_text(str(exc))
+            return None
+        self.scan_subnet_button.set_sensitive(not self._scanning)
+        self.subnet_validation.set_text(str(network)+' · '+str(len(tuple(network.hosts())))+' addresses to probe')
+        return str(network)
 
     def read_model(self):
         try:p=self.profile()
@@ -101,6 +218,7 @@ class ConnectionDialog:
         self.model.set_text('Not read')
         self.auto.set_active(profile.auto_connect); self.password.set_text(''); self.remember.set_active(False)
         self.mark_clean()
+        self.refresh_credential_state()
 
     def new(self):
         self.current_id = None
@@ -110,6 +228,7 @@ class ConnectionDialog:
         self.model.set_text('Not read')
         self.auto.set_active(False); self.password.set_text(''); self.remember.set_active(False)
         self.mark_clean()
+        self.refresh_credential_state()
 
     def snapshot(self):
         return (tuple((key,field.get_text()) for key,field in self.fields.items()),
@@ -141,7 +260,17 @@ class ConnectionDialog:
         def finish(result):
             self.controls.set_sensitive(True)
             if hasattr(self,'window') and hasattr(self.window,'pages'):self.window.pages.set_sensitive(True)
-            if isinstance(result,Exception): self.status.set_text(str(result))
+            if getattr(self,'_scanning',False):
+                self._scanning=False
+                self.validate_subnet_field()
+                if isinstance(result,Exception):self.scan_progress.set_text('Search failed')
+            if isinstance(result,Exception):
+                if isinstance(result,CoreError) and getattr(result,'saved_profile_id',None):
+                    # The profile file succeeded but the independent native store failed.
+                    # Keep the typed edit for retry and bind it to the already saved ID.
+                    self.current_id=result.saved_profile_id
+                    self.app.update_connection_header()
+                self.status.set_text(str(result))
             else: done(result)
         def caught():
             try: return task()
@@ -166,12 +295,20 @@ class ConnectionDialog:
         return self.app.core.save_profile(p,entered,remember)
 
     def save(self, after=None):
+        if self._credential_pending:
+            self.status.set_text('Checking saved password state. Please try Save Profile again in a moment.');return
+        if not self.app.core.credentials_session_only and self._credential_state == 'UNKNOWN':
+            self.status.set_text('Unable to determine saved-password status. Retry credential check before saving this profile.');return
         try: p = self.profile()
         except BrowserError as exc: self.status.set_text(str(exc)); return
         entered, remember = self.password.get_text(), self.remember.get_active()
         def done(p):
             self.current_id=p.id; self.reload(); self.app.update_connection_header()
-            password_note=('Password saved in the system credential store.' if remember else 'Entered password is available for this session only.') if entered else 'Saved password unchanged.'
+            password_note=(self.app.core.credential_mode+' mode — passwords are session-only.'
+                if self.app.core.credentials_session_only else
+                'Password saved in the system credential store (not authentication-tested).'
+                if remember and entered else 'Saved password unchanged.' if remember else
+                'Stored password removed. Session password may remain until Forget Password or exit.')
             self.status.set_text('Profile saved. '+password_note)
             if after:after()
         self.submit(lambda:self.persist(p,entered,remember),done)
@@ -179,7 +316,7 @@ class ConnectionDialog:
     def connect(self):
         try: p = self.profile()
         except BrowserError as exc: self.status.set_text(str(exc)); return
-        entered, remember = self.password.get_text(), self.remember.get_active()
+        entered = self.password.get_text()
         def task():return self.app.core.test_profile(p,entered)
         def done(result):
             info=result.device_info;reported=result.reported_device_id
@@ -187,12 +324,12 @@ class ConnectionDialog:
                 def finish_task():
                     folder=self.app.preferences.app_options['remote_folders'].get(p.id,'/USB2') if self.app.preferences.app_options['remember_folders'] else '/USB2'
                     return self.app.core.connect(p,entered_password=entered,
-                        remember=remember,bind_identity=True,persist=True,
+                        remember=False,bind_identity=True,persist=True,
                         remote_folder=folder)
                 def connected(result):
                     self.app.activate_connection(result)
                     self.current_id=result.profile.id;self.reload()
-                    if hasattr(self.window,'pages'):self.status.set_text('Connected · Profile saved.')
+                    if hasattr(self.window,'pages'):self.status.set_text('Connected · Authenticated. Connection profile updated; password storage unchanged.')
                     else:self.window.destroy()
                 self.submit(finish_task,connected)
             if p.device_id or p.device_mac:finish_connection();return
@@ -208,23 +345,57 @@ class ConnectionDialog:
             dialog.connect('response',response);dialog.present()
         self.submit(task,done)
 
+    def add_candidate(self, candidate):
+        key=(candidate.host,candidate.port)
+        row=self._candidate_rows.get(key)
+        if row is None:
+            row=Gtk.ListBoxRow();self._candidate_rows[key]=row;self.devices.append(row)
+        row.candidate=candidate
+        name=candidate.info.get('info',candidate.info.get('ident',{})).get('hostname','Candidate')
+        row.set_child(Gtk.Label(label=f'{name} · {candidate.host}:{candidate.port} · {candidate.status}\n{candidate.source}',xalign=0,wrap=True))
+
     def scan(self, fallback):
-        subnet = self.subnet.get_text().strip()
-        if fallback and not subnet:
-            self.status.set_text('Enter one connected local subnet. At most 1024 addresses, eight probes at a time.'); return
+        if self.app.busy:return
+        subnet=self.validate_subnet_field() if fallback else ''
+        if fallback and subnet is None:return
+        if fallback:self.subnet.set_text(subnet)
+        self._scanning=True
+        self._scan_generation+=1
+        generation=self._scan_generation
+        self._candidate_rows={}
+        while self.devices.get_first_child():self.devices.remove(self.devices.get_first_child())
+        self.scan_progress.set_visible(True);self.scan_progress.set_fraction(0)
+        self.scan_progress.set_text('Scanning '+subnet+'…' if fallback else 'Discovering network connections…')
+        def deliver(callback,*args):
+            def update():
+                if not self._closed and generation == self._scan_generation and self._scanning:callback(*args)
+                return False
+            GLib.idle_add(update)
+        def progress(completed,total):
+            self.scan_progress.set_fraction(completed/total if total else 1)
+            self.scan_progress.set_text(f'{completed}/{total} addresses checked · {completed*100//total if total else 100}%')
+        if not fallback:
+            def pulse():
+                if self._closed or generation != self._scan_generation or not self._scanning:return False
+                self.scan_progress.pulse();return True
+            GLib.timeout_add(100,pulse)
         def task():
-            return self.app.core.discover(subnet=subnet if fallback else '')
+            callbacks={'progress':lambda n,total:deliver(progress,n,total),
+                       'found':lambda candidate:deliver(self.add_candidate,candidate)} if fallback else {}
+            return self.app.core.discover(subnet=subnet,**callbacks)
         def done(result):
             candidates,notes,networks=result
-            if not self.subnet.get_text():
-                hosts = [self.fields['host'].get_text().strip()] + [c.host for c in candidates]
-                self.subnet.set_text(preferred_subnet(networks, hosts))
-            while self.devices.get_first_child(): self.devices.remove(self.devices.get_first_child())
-            for candidate in candidates:
-                row=Gtk.ListBoxRow(); row.candidate=candidate
-                name = candidate.info.get('info',candidate.info.get('ident',{})).get('hostname','Candidate')
-                row.set_child(Gtk.Label(label=f'{name} · {candidate.host}:{candidate.port} · {candidate.status}\n{candidate.source}',xalign=0,wrap=True)); self.devices.append(row)
-            self.status.set_text(' '.join(notes)+(' No verified devices found; manual connection and explicit subnet scanning remain available.' if not candidates else ' Select a device to fill its address.'))
+            if not fallback:
+                self._networks=tuple(networks)
+                if not self.subnet.get_text():
+                    hosts=[self.fields['host'].get_text().strip()]+[c.host for c in candidates]
+                    self.subnet.set_text(preferred_subnet(networks,hosts))
+            for candidate in candidates:self.add_candidate(candidate)
+            self.scan_progress.set_fraction(1)
+            message=f'Search complete — {len(self._candidate_rows)} network connections found'
+            self.scan_progress.set_text('100% · '+message if fallback else message)
+            self.status.set_text(message+'. '+' '.join(notes))
+            self.validate_subnet_field()
         self.submit(task,done)
 
     def discovered(self, listing, row):
@@ -238,7 +409,17 @@ class ConnectionDialog:
         profile_id=self.current_id
         def task():
             self.app.core.forget_credential(profile_id)
-        self.submit(task,lambda _:self.status.set_text('Saved password removed. The current connection remains active until you disconnect.'))
+        def done(_):
+            self._credential_generation+=1
+            self._credential_state='ABSENT'
+            self._credential_pending=False
+            self.remember.set_inconsistent(False)
+            self.remember.set_sensitive(not self.app.core.credentials_session_only)
+            self.retry_credential_button.set_visible(False)
+            self.password.set_text('');self.remember.set_active(False)
+            self.paint_credential_state()
+            self.status.set_text('Stored and session password removed. The current connection remains active until you disconnect.')
+        self.submit(task,done)
 
     def delete(self):
         if not self.current_id:return

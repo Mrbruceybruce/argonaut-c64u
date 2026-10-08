@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Bruce Marcus
 """Bounded standard queries and optional local subnet probing; never sends credentials."""
 from dataclasses import dataclass, field
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import ipaddress
 import json
 import socket
@@ -235,19 +235,40 @@ def preferred_subnet(networks, hosts=()):
     return networks[0] if len(networks) == 1 else ''
 
 
-def subnet_scan(cidr):
-    network = ipaddress.ip_network(cidr, strict=True)
+def validate_subnet(cidr, networks=None):
+    """Normalize IPv4 CIDR, retaining the existing local /22-or-smaller policy."""
+    if '/' not in cidr or not cidr.rsplit('/',1)[1].isascii() or not cidr.rsplit('/',1)[1].isdigit():
+        raise ValueError('Enter an IPv4 subnet with a prefix, e.g. 192.168.68.0/24.')
+    try:network = ipaddress.ip_network(cidr, strict=False)
+    except ValueError as exc:
+        raise ValueError('Enter a valid IPv4 subnet, e.g. 192.168.68.0/24.') from exc
     if network.version != 4 or network.num_addresses > 1024 or not network.is_private:
         raise ValueError('Choose a private IPv4 LAN of /22 or smaller (at most 1024 addresses).')
-    if not any(network.subnet_of(ipaddress.ip_network(n)) for n in local_networks()):
+    if networks is not None and not any(network.subnet_of(ipaddress.ip_network(n)) for n in networks):
         raise ValueError('Choose a subnet on a currently connected local interface.')
+    return network
+
+
+def subnet_scan(cidr, *, progress=None, found=None):
+    network = validate_subnet(cidr, local_networks())
     def probe(host):
         try:
             with socket.create_connection((str(host),80), timeout=.25): pass
         except OSError: return None
         return verify(Candidate(str(host),80,'LAN probe'))
+    hosts=tuple(network.hosts())
+    total=len(hosts)
+    results=[]
+    if progress:progress(0,total)
     with ThreadPoolExecutor(max_workers=8) as pool:
-        return [r for r in pool.map(probe, network.hosts()) if r is not None]
+        futures=[pool.submit(probe, host) for host in hosts]
+        for completed,future in enumerate(as_completed(futures),1):
+            candidate=future.result()
+            if candidate is not None:
+                results.append(candidate)
+                if found:found(candidate)
+            if progress:progress(completed,total)
+    return results
 
 if __name__ == '__main__':
     from dataclasses import asdict

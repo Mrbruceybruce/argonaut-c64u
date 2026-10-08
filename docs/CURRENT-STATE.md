@@ -1,5 +1,55 @@
 # Current development state
 
+## Device Details stabilization — publication gate passed (7 October 2026)
+
+Credential UX and Discover / Scan Subnet are implemented against published
+`17ad4e2bb7acd441560a3160fbcc224d13d30536`, preserving the pending roadmap.
+Test/Connect never persist passwords; Save Profile owns the Remember decision,
+including removing the exact-profile stored password when unchecked. Fixed saved
+indication uses a boolean existence boundary, including the explicitly approved
+Windows opaque-buffer exception. UNKNOWN blocks Save before persistence; deliberate
+retry preserves edits without replaying Save. Development and Portable are session-only.
+
+Compact re-review passed; all 109 focused tests passed again. Earlier broad suites
+remain historical evidence, not rerun results. User-authorized `./run-development`
+physical acceptance passed with existing profiles: Founder typed-password Test,
+Connect, one visible HTTP 403 rejection, restored valid authentication, and clean
+session clearing across normal close/restart. Development labels and hidden/disabled
+persistence controls were verified, with no credential-store calls.
+
+One Discover found two network connections. One `192.168.68.0/24` scan within the
+host's actual connected `/22` completed with 254-host progress to 100%, finding
+Beige. Password-protected Founder was retained by Discover's Ident advertisement
+but excluded by the existing credential-free subnet verification policy. Invalid
+input started no scan; GTK remained responsive. No device mutations or lingering
+acceptance processes. See [detailed evidence and limitations](DEVICE-DETAILS-STABILIZATION.md).
+
+Installed native Secret Service/macOS/Windows store acceptance remains later
+packaging/release work. The installed Debian package was not rebuilt or replaced;
+this qualifies the current source worktree using supported Development semantics.
+Streaming P0 remains **OPEN / intermittent / instrumented**, untouched.
+**APPROVE COMMIT/PUSH — not executed.** Index empty; no staging, commit, push,
+package, tag, release or next-roadmap work. Include the reviewed pending roadmap
+consolidation with its narrow current-state updates in the same coherent commit.
+Earlier documentation-only statements below record the preceding consolidation.
+
+## Roadmap consolidation — documentation only, pending review
+
+[ARGONAUT-ROADMAP.md](ARGONAUT-ROADMAP.md) consolidates the current product
+priorities, settled walkthrough decisions, deferred scope, and open investigations.
+It supersedes older next-work sequencing, not historical qualification evidence.
+No roadmap implementation or item #1 diagnosis has begun in this pass.
+
+Verified consolidation baseline: HEAD = local `origin/development` =
+`17ad4e2bb7acd441560a3160fbcc224d13d30536`, parent
+`f9457acd3bcef4269d9d98e95ef3c6dc33f90ff1`, subject
+`Close FTP ownership compatibility paths`; divergence `0 0`, initially clean.
+FTP ownership closure is published and complete; earlier uncommitted/review
+wording below is historical. Do not reopen ownership work without evidence.
+Per the current handoff, local Debian `argonaut-c64u-development` `1.10~dev1`
+was built from that exact commit for walkthrough; ignored packaging output stays
+out of Git. No public 1.10 release/tag yet. Stop for Bruce/ChatGPT roadmap review.
+
 ## Authority and workspace
 
 This document describes the current accepted development state and next work.

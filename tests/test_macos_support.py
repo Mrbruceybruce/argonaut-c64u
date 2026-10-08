@@ -22,7 +22,9 @@ class MacSupport(unittest.TestCase):
         c.backend.get_password.return_value = 'value'
         self.assertEqual(c.get('profile'), 'value')
         c.set('profile', 'replacement')
-        c.delete('profile')
+        with patch.object(c,'exists',return_value=True) as exists:
+            c.delete('profile')
+        exists.assert_called_once_with('profile')
         c.backend.set_password.assert_called_once_with(c.service, 'profile', 'replacement')
         c.backend.delete_password.assert_called_once_with(c.service, 'profile')
 
@@ -30,7 +32,9 @@ class MacSupport(unittest.TestCase):
         c = self.backend()
         c.backend.get_password.return_value = None
         self.assertEqual(c.get('absent'), '')
-        c.delete('absent')
+        with patch.object(c,'exists',return_value=False) as exists:
+            c.delete('absent')
+        exists.assert_called_once_with('absent')
         c.backend.delete_password.assert_not_called()
         c.backend.set_password.side_effect = RuntimeError('denied')
         with self.assertRaises(BrowserError):
