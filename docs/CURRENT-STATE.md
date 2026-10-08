@@ -1,5 +1,95 @@
 # Current development state
 
+## Device Details / connection-profile layout — accepted, publication pending (7 October 2026)
+
+Starting authority: HEAD = local `origin/development` =
+`b075bddd795b1b104dc5632477444bd85bb7ba39`, parent
+`17ad4e2bb7acd441560a3160fbcc224d13d30536`, subject
+`Stabilize Device Details credentials and discovery`; divergence `0 0`, clean
+worktree and empty index. That credential/discovery checkpoint is published;
+its older pre-publication wording below is historical. Its contracts stay intact.
+
+The current selector contains only saved Core profiles (ID/name), not a mixture
+of machines and discovery candidates. Selection copies that profile into the
+form and reconstructs exact-bound credential state. Discovery has a separate
+address/port result list; selection starts an unsaved form, without binding an
+advertised device ID or automatically saving. Existing profile semantics remain:
+rename/metadata edits retain ID; host/port changes follow Core's new-ID rule;
+New clears the editor; Delete removes the selected profile through the same Core
+path and disconnects it if active. No persistence or confirmation policy changed.
+
+Layout now reads identity/details → credentials → status/errors → Network
+Discovery → Saved Network Connections/profile actions → separate Test/Connect.
+The saved selector moved from the top to the bottom; it is labeled Connection.
+New / Save Profile / Delete Profile share one group, with Test / Connect separate.
+Read-only Saved device ID describes the existing binding, not live verification.
+Saved, new and discovered-unsaved editing states are explicit. Ethernet/Wi-Fi
+remain separate network profiles for a physical C64 Ultimate. Quick Connect is
+owned by the global header in gui.py; its planned removal stays with header cleanup.
+
+Validation: **117 focused tests passed** (109 preserved plus eight layout/controller
+regressions). Real GTK offline construction, rendered-layout inspection and keyboard
+traversal passed in Installed, Development and Portable modes with synthetic profiles,
+fake stores and mocked network enumeration. Password Enter still invokes Connect;
+no persistence action is a window default. The initial new-test run exposed a fixture
+method-binding error; it was corrected before the passing run. Broad suites were
+not rerun: production edits are widget construction and presentation-state labels.
+Authentication/persistence/discovery execution bodies and existing tests are unchanged.
+
+Small user-authorized physical/UI acceptance subsequently passed through the current
+worktree's `./run-development`, build `b075bddd795b-modified`, using the existing
+Development configuration and Founder profile. The installed Debian package was
+not used or rebuilt. Starting acceptance inventory was exactly the reviewed four
+files, +344/-44; index empty, authority and divergence unchanged.
+
+Acceptance observations:
+
+- At normal 740×680 Device Details size, identity/details → credentials → safe
+  status → discovery → saved connections → Test/Connect remained clearly grouped.
+  Vertical scrolling is required; this is a long form, with no overlap or broken
+  grouping observed. Saved Network Connections / Connection and the separate
+  profile-action and connection-action groups were clear.
+- Founder `.69` populated the saved name, endpoint and stored ID `25BE71`, with
+  `Editing saved connection: C64 Founders`. New showed the unsaved state; returning
+  to the existing profile left the preferences file byte-for-byte unchanged.
+  No Save Profile, Delete Profile or new-profile persistence was exercised.
+- The exact Development session-only text was visible; Remember/Forget remained
+  hidden and disabled. The user entered the valid password locally; no secret
+  text was printed or saved in acceptance artifacts.
+- Real GTK forward-Tab traversal reached name, host, ports, identity/metadata,
+  model controls, Password, status, Discover, subnet/Scan Subnet, discovery area,
+  saved selector, New/Save/Delete, automatic-connect, Test and Connect in visual
+  order. Read-only/selectable and composite-widget focus stops also occurred;
+  no focus trap or unexpected jump back to an upper control was observed.
+- One PasswordEntry activation (the Enter action) invoked Connect. The normal
+  Core path verified Founder `25BE71`, hostname `C64-Ultimate-2B02C3`, firmware
+  `1.1.0`, API `0.1`. Status explicitly said `Connected · Authenticated. Connection
+  profile updated; password storage unchanged.` A separate Test ran once and
+  succeeded. No second Connect was performed.
+- Discover ran once, remained responsive and completed with `2 network connections
+  found`: verified Beige `.70:80` / `25EA78`; password-required Founder `.69:80`
+  advertisement. Saved selection, form name/host and typed input remained intact;
+  results stayed separate from saved profiles. No Scan Subnet invocation occurred.
+- Device Details was rendered and inspected at 640×600, 740×680 and 900×850 while
+  the main app was also resized smaller/larger. Labels/results wrapped readably,
+  buttons did not overlap, no horizontal clipping was seen, and saved connections
+  and Test/Connect remained reachable. Normal size was restored before closing.
+- Normal close cleared the session dictionary; no Development GUI/discovery
+  worker remained. Credential backend method counters stayed at zero. The external
+  observer attempted one snapshot after the dialog was destroyed; that observer-only
+  error did not affect normal app exit (exit 0) or cleanup verification.
+
+This was automated inspection of the real desktop GTK workflow with user-entered
+credentials; focus traversal and PasswordEntry activation used GTK's own APIs.
+No device configuration/storage/power changes, stream, subnet scan, repeated 403
+or credential-state qualification, or broad test rerun occurred. Screenshots and
+observer data stayed outside the repository. Production/test file hashes remained
+unchanged throughout acceptance; only these current-state/roadmap notes were updated.
+
+**APPROVE COMMIT/PUSH — not executed.** Index remains empty. No staging, commit,
+push, package, tag, release or next-roadmap work. Streaming remains
+**OPEN / intermittent / instrumented**. Historical R4–R6/FTP records are untouched.
+
 ## Device Details stabilization — publication gate passed (7 October 2026)
 
 Credential UX and Discover / Scan Subnet are implemented against published

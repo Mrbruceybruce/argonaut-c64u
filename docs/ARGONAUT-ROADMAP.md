@@ -1,5 +1,16 @@
 # Argonaut roadmap
 
+**7 October 2026 layout follow-up:** broader B3 Device Details grouping and saved
+network-connection/profile relocation passed review and small physical/UI acceptance against
+published credential/discovery checkpoint `b075bddd795b1b104dc5632477444bd85bb7ba39`.
+117 focused tests and offline real-GTK checks passed before acceptance. The current
+Development worktree then passed saved-profile/New-return, keyboard, Password Enter,
+one Test, one Discover and resize checks on Founder; no subnet scan or device mutation.
+**Commit/push approved, not executed.** Production/tests were unchanged by acceptance.
+Credential/discovery contracts remain unchanged. Quick Connect removal belongs to
+B4 header cleanup and is not included. Streaming remains OPEN / intermittent /
+instrumented. See CURRENT-STATE for scope, acceptance observations and limitations.
+
 **7 October 2026 update:** B2 credentials and the bounded Discover / Scan Subnet
 portion of B3 passed compact review and bounded Development physical acceptance.
 Publication is approved but not executed. UNKNOWN blocks persistence until an
@@ -123,14 +134,21 @@ and normalizes IPv4 CIDR, requires a connected private LAN and at most 1,024
 addresses, gates invalid input, reports actual completed-host progress, displays
 incremental subnet results, and counts network connections. Existing prepopulation
 is retained without overwriting input. No cancellation framework or physical-device
-grouping was added. The remaining layout work below stays deferred.
+grouping was added. The following layout follow-up does not change those contracts.
 
-Saved entries are network **connections**, not physical machines: one C64U may
-have Ethernet and Wi-Fi entries. Move the saved-connection dropdown and profile
-management toward the bottom near connection actions, with clear profile versus
-connection grouping. Investigate Scan Again versus Scan Subnet before renaming or
-consolidating. Do not call the entire area FTP Connection: Argonaut uses multiple
-services to connect to a C64 Ultimate. **Remove Quick Connect.**
+**Layout follow-up reviewed and physically accepted:** saved entries are network
+**connections**, not physical machines; one C64U may have Ethernet and Wi-Fi entries.
+The selector contains saved profiles only. Device identity/details, credentials,
+status/errors, and Network Discovery are visually separated. Saved Network
+Connections now sits toward the bottom with a Connection selector and grouped
+New / Save Profile / Delete Profile actions; Test / Connect is a separate row.
+Saved versus new/discovered-unsaved form state is explicit. The saved device ID is
+read-only binding metadata, not a new physical-device grouping model. Existing
+selection, identity, save/delete, credential and discovery semantics are preserved.
+
+Argonaut connects using multiple services; this area is not called FTP Connection.
+**Remove Quick Connect** remains settled but belongs to the global header (B4),
+so it is deliberately unchanged by this component layout pass.
 
 ### 4. Global header/navigation cleanup
 
