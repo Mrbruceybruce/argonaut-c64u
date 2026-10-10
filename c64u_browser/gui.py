@@ -934,8 +934,10 @@ class Browser(Gtk.Application):
                             lambda: action(lambda: self.open_disk_image(local, name)))
             if (not multiple and not local and not directory and
                     name.casefold().endswith(('.d64', '.g64', '.d71', '.g71', '.d81'))):
+                from .drives_selection import remote_selection
+                mount_selection=remote_selection(posixpath.join(self.remote,name),self.core.device_session())
                 self.button(box, 'Mount…',
-                            lambda: action(lambda: self.open_mount_in_drives(name)))
+                            lambda: action(lambda: self.open_mount_in_drives(mount_selection)))
             if not multiple and not local and not directory and name.lower().endswith('.sid'):
                 client=self.client;path=posixpath.join(self.remote,name)
                 def open_sid():
@@ -979,14 +981,11 @@ class Browser(Gtk.Application):
         popover.connect('closed', closed)
         popover.popup()
 
-    def open_mount_in_drives(self, name):
-        """Open Drives with one remote image prepared for Drive A."""
-        if not self.client:
-            raise BrowserError('Connect first.')
-        if not name.casefold().endswith(('.d64', '.g64', '.d71', '.g71', '.d81')):
-            raise BrowserError('Choose a D64, G64, D71, G71 or D81 image.')
-        path = posixpath.join(self.remote, name)
-        self.drives_tab.select_image(path, 'a')
+    def open_mount_in_drives(self, selection):
+        """Use the captured Files reference, not a later Files path or session."""
+        from .drives_selection import validate_selection
+        validate_selection(selection,self.core.device_session())
+        self.drives_tab.select_image(selection, 'a')
         self.tabs.set_current_page(self.tabs.page_num(self.drives_tab.box))
 
     def drag_prepare(self, listing, local, x, y):

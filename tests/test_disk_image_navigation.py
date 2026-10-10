@@ -1,3 +1,5 @@
+from c64u_browser.drives_selection import remote_selection
+from c64u_browser.scheduler import DeviceSession
 import unittest
 import tempfile
 from pathlib import Path
@@ -62,13 +64,17 @@ class DiskImageNavigationTests(unittest.TestCase):
         tabs.page_num.return_value = 2
         app = SimpleNamespace(client=object(), remote='/USB2/GAMES',
                               drives_tab=drives, tabs=tabs)
-        Browser.open_mount_in_drives(app, 'DEMO.D81')
-        drives.select_image.assert_called_once_with('/USB2/GAMES/DEMO.D81', 'a')
+        session=DeviceSession('device','session')
+        app.core=SimpleNamespace(device_session=lambda:session)
+        selection=remote_selection('/USB2/GAMES/DEMO.D81',session)
+        Browser.open_mount_in_drives(app, selection)
+        drives.select_image.assert_called_once_with(selection, 'a')
         tabs.set_current_page.assert_called_once_with(2)
 
     def test_mount_rejects_a_non_disk_file(self):
         app = SimpleNamespace(client=object(), remote='/USB2',
-                              drives_tab=Mock(), tabs=Mock())
+                              drives_tab=Mock(), tabs=Mock(),
+                              core=SimpleNamespace(device_session=lambda:DeviceSession('device','session')))
         with self.assertRaisesRegex(BrowserError, 'D64, G64, D71, G71 or D81'):
             Browser.open_mount_in_drives(app, 'README.TXT')
 
@@ -83,8 +89,12 @@ class DiskImageNavigationTests(unittest.TestCase):
     def test_drive_selection_prepares_path_without_mounting(self):
         path = Mock()
         message = Mock()
-        tab = SimpleNamespace(cards={'a': {'path': path}}, message=message)
-        DrivesTab.select_image(tab, '/USB2/GAME.D64', 'a')
+        session=DeviceSession('device','session')
+        tab = SimpleNamespace(cards={'a': {'path': path}}, message=message,
+                              app=SimpleNamespace(core=SimpleNamespace(device_session=lambda:session)))
+        selection=remote_selection('/USB2/GAME.D64',session)
+        DrivesTab.select_image(tab, selection, 'a')
+        self.assertIs(selection,tab.cards['a']['selection'])
         path.set_text.assert_called_once_with('/USB2/GAME.D64')
         path.grab_focus.assert_called_once_with()
         self.assertIn('selected for Drive A', message.set_text.call_args.args[0])

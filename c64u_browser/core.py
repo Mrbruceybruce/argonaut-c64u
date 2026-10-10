@@ -720,6 +720,32 @@ class ArgonautCore:
             # Admission refusals and uncertain responses consume the authority too.
             self.discard_machine_command(target)
 
+    def execute_drive_image(self, selection, drive, mode='readonly', *, run=False):
+        """Existing desktop worker only; bind the complete action to one session.
+
+        The session guard prevents replacement during dispatch/read/DMA/status.
+        The existing device lane refuses conflicting work; no new UI job model.
+        """
+        from .drives_selection import validate_selection
+        from .disk_run import mount_and_run, validate_path
+        with self._session_admission():
+            session = self.device_session()
+            validate_selection(selection, session)
+            if drive not in ('a', 'b') or mode not in ('readonly', 'readwrite', 'unlinked'):
+                raise CoreError('argument', 'Unsupported drive or access mode.')
+            if run:
+                if drive != 'a':raise CoreError('argument', 'Mount & Run requires Drive A.')
+                validate_path(selection.path)
+            client = self._require_client()
+            with self.scheduler.inline(JobBinding.device(session), reject_busy=True) as check:
+                validate_selection(selection, self.device_session())
+                if run:
+                    with read_operation(client, check):
+                        mount_and_run(client, selection.path)
+                else:
+                    client.mount_disk(drive, selection.path, mode)
+                return client.read_drives()
+
     def _require_client(self):
         if self._client is None:
             raise CoreError('session', 'Connect to a C64U first.')
