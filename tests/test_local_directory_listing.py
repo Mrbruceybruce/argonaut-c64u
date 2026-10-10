@@ -29,7 +29,7 @@ class LocalDirectoryListing(unittest.TestCase):
             fake = SimpleNamespace(
                 local=tmp,
                 preferences=SimpleNamespace(app_options={'show_hidden_local': True}),
-                llist=Mock(),
+                llist=Mock(**{'get_selected_rows.return_value': ()}),
                 lpath=Mock(),
                 drive_bars={True: Mock()},
                 status=Mock(),
@@ -53,7 +53,7 @@ class LocalDirectoryListing(unittest.TestCase):
             fake = SimpleNamespace(
                 local=tmp,
                 preferences=SimpleNamespace(app_options={'show_hidden_local': False}),
-                llist=Mock(), lpath=Mock(), drive_bars={True: Mock()},
+                llist=Mock(**{'get_selected_rows.return_value': ()}), lpath=Mock(), drive_bars={True: Mock()},
                 status=Mock(), populate=Mock())
 
             self.assertTrue(Browser.refresh_local(fake))
@@ -66,6 +66,37 @@ class LocalDirectoryListing(unittest.TestCase):
             self.assertEqual({entry[0] for entry in entries},
                              {'ordinary.txt', '.secret', '.folder'})
 
+    def test_refresh_restores_surviving_selected_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / 'keep.txt').write_text('selected')
+            (tmp / 'other.txt').write_text('unselected')
+            selected = [SimpleNamespace(item=('keep.txt', False, 8)),
+                        SimpleNamespace(item=('removed.txt', False, 0))]
+            listing = Mock(**{'get_selected_rows.return_value': selected})
+            rebuilt = []
+
+            def populate(target, entries):
+                self.assertIs(target, listing)
+                rebuilt[:] = [Mock(item=entry) for entry in entries]
+                for index, row in enumerate(rebuilt):
+                    row.get_next_sibling.return_value = (
+                        rebuilt[index + 1] if index + 1 < len(rebuilt) else None)
+                listing.get_first_child.return_value = rebuilt[0]
+
+            fake = SimpleNamespace(
+                local=tmp, _local_listing_path=tmp,
+                preferences=SimpleNamespace(app_options={'show_hidden_local': False}),
+                llist=listing, lpath=Mock(), drive_bars={True: Mock()},
+                status=Mock(), populate=Mock(side_effect=populate))
+
+            self.assertTrue(Browser.refresh_local(fake))
+            listing.get_selected_rows.assert_called_once_with()
+            listing.unselect_all.assert_called_once_with()
+            listing.select_row.assert_called_once_with(rebuilt[0])
+            self.assertEqual(rebuilt[0].item[0], 'keep.txt')
+            fake.status.set_text.assert_not_called()
+
     def test_directory_itself_unreadable_still_reports_status(self):
         # A genuine directory-level failure (permission denied, the path
         # having been removed out from under us, etc.) is a different
@@ -74,7 +105,7 @@ class LocalDirectoryListing(unittest.TestCase):
         fake = SimpleNamespace(
             local=missing,
             preferences=SimpleNamespace(app_options={'show_hidden_local': False}),
-            llist=Mock(),
+            llist=Mock(**{'get_selected_rows.return_value': ()}),
             lpath=Mock(),
             drive_bars={True: Mock()},
             status=Mock(),
