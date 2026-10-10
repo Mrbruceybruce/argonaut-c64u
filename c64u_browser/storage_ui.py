@@ -4,7 +4,7 @@ from .platform_support import local_roots, contains_path
 """Compact storage selectors for mounted local volumes and C64U media."""
 from pathlib import Path
 from gi.repository import Gtk,Gio,Pango
-from .storage import storage_root
+from .storage import recognized_root, root_presentation
 
 class DriveButtons:
  def __init__(self,app,local):
@@ -24,7 +24,7 @@ class DriveButtons:
    for mount in self.monitor.get_mounts():
     path=mount.get_root().get_path()
     if path and path not in seen:
-     locations.append((mount.get_name(),path,'drive-removable-media-symbolic'));seen.add(path)
+     locations.append((mount.get_name(),path,'argonaut-usb-symbolic'));seen.add(path)
    self.paths=[path for _,path,_ in locations]
    current=str(self.app.local)
    matches=[p for p in self.paths if contains_path(p,current)]
@@ -33,8 +33,8 @@ class DriveButtons:
   else:
    roots=getattr(self.app.client,'storage_roots',[]) if self.app.client else []
    if not isinstance(roots,list):roots=[]
-   locations=[(path[1:],path,'media-flash-sd-mmc-symbolic' if path=='/SD' else 'drive-removable-media-symbolic') for path in roots]
-   selected=storage_root(self.app.remote)
+   locations=[(root_presentation(path)[0],path,root_presentation(path)[1]) for path in roots if recognized_root(path)==path]
+   selected=recognized_root(self.app.remote)
   for name,path,icon in locations:
    button=Gtk.Button();content=Gtk.Box(spacing=4)
    content.append(Gtk.Image.new_from_icon_name(icon))
@@ -44,4 +44,4 @@ class DriveButtons:
    if path==selected:button.add_css_class('suggested-action')
    button.connect('clicked',lambda _,target=path:self.app.navigate(self.local,target))
    self.box.append(button)
-  if not locations:self.box.append(Gtk.Label(label='No USB/SD drives found. Use Refresh to scan.',wrap=True,xalign=0))
+  if not locations:self.box.append(Gtk.Label(label='No storage locations found. Use Refresh to scan.',wrap=True,xalign=0))

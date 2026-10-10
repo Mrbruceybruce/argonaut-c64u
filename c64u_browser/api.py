@@ -111,6 +111,8 @@ class UltimateClient:
         return self._request_json('PUT',self.drive_route(drive,action))
 
     def mount_disk(self, drive, path, mode='readonly'):
+        from .storage import require_file_operation
+        require_file_operation(path)
         safe_argument(path)
         if not path.startswith('/') or '..' in path.split('/'):
             raise BrowserError('Use an absolute C64U image path without parent traversal.')
@@ -123,6 +125,8 @@ class UltimateClient:
         """Ask supported C64U firmware to create a standard blank D64."""
         if not isinstance(path, str) or not isinstance(disk_name, str):
             raise BrowserError('Choose a C64U filename and disk name.')
+        from .storage import require_file_operation
+        require_file_operation(path)
         safe_argument(path)
         safe_argument(disk_name)
         parts = path.split('/')
@@ -139,6 +143,8 @@ class UltimateClient:
 
     def run_crt(self, path):
         """Start a CRT already present on C64U storage."""
+        from .storage import require_file_operation
+        require_file_operation(path)
         safe_argument(path)
         if (not path.startswith('/') or '..' in path.split('/')
                 or not path.casefold().endswith('.crt')):
@@ -265,6 +271,8 @@ class UltimateClient:
         return self._request_json('PUT','/v1/machine:'+action)
 
     def run_prg(self, path):
+        from .storage import require_file_operation
+        require_file_operation(path)
         safe_argument(path)
         if (not isinstance(path, str) or not path.startswith('/')
                 or any(part in ('.', '..') for part in path.split('/'))
@@ -295,6 +303,8 @@ class UltimateClient:
         return parameters
 
     def play_sid(self, path, song=None):
+        from .storage import require_file_operation
+        require_file_operation(path)
         parameters=self.sid_parameters(path,song)
         return self._request_json('PUT','/v1/runners:sidplay?'+urlencode(parameters))
 

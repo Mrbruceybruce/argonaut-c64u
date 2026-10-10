@@ -271,6 +271,46 @@ Streaming remains OPEN / intermittent / instrumented.
 
 ## C. Files / storage UX
 
+Approved bounded checkpoints:
+
+- **C0 — Conventional file selection and activation:** implemented/deterministically
+  verified, final re-review and combined read-only physical acceptance passed;
+  pending commit/push.
+  Native GTK multiple selection/theme highlighting, independent panes, focus,
+  nonselectable parent rows and refresh retention are retained or corrected.
+  Optional read-only live Nautilus activation policy uses a modifier/drag-safe
+  adapter; GTK continues owning selection. Existing operation safety is unchanged.
+  Compact review's rapid click-then-drag blocker is corrected: pointer activation
+  waits for a qualified release; Enter stays immediate and GTK owns selection.
+  28 C0 checks (eight new regressions), 33 affected tests and 16 C1/B5 GTK checks
+  passed after correction, no skips; the prior broader affected evidence remains.
+  Bruce approved the native selection/highlighting on actual GNOME Wayland using
+  source Development and C64 Founders. Selection, keyboard, right-click, canceled
+  rapid drag and normal shutdown passed without transfer or remote mutation.
+  GNOME policy stayed double; physical single-click remains unqualified.
+  Full acceptance evidence and limitations are in CURRENT-STATE.
+- **C1 — Storage roots and safe browsing:** implemented/deterministically verified,
+  compact-review and read-only physical acceptance passed; pending commit/push.
+  Advertised exact
+  USB/SD/Flash/Temp locations are visible. Flash/Temp directory browsing uses the
+  existing managed listing, independently of USB/SD operation authorization.
+  No generic Flash/Temp copy, download, mutation, backup or launch capability is
+  added; separate validated R6 Flash workflows remain available. Unavailable roots
+  report errors rather than empty success. 444 focused tests and 16 offline GTK
+  checks passed, no skips. Physical USB/SD, Flash carts/html/roms and empty Temp
+  browsing passed; Bruce approved icons and read-only restrictions. Unavailable-root
+  faults were not induced. Acceptance changed documentation only; limitations are
+  recorded in CURRENT-STATE.
+- **C2 — Storage & Backups relocation:** pending; dedicated Storage & Backups page
+  is the approved destination. Existing USB/SD controls remain in Files until C2.
+- **C3 — Flash/Temp managed operations:** mutation policy and implementation pending.
+- **C4 — Files polish and acceptance:** pending.
+
+Section C is **not complete**. C1 browsing-only restrictions do not replace the
+settled longer-term Flash/Temp direction below. Shared picker remains Section D.
+Streaming remains **OPEN / intermittent / instrumented**.
+
+
 **Settled, recovered decision: expose Flash and Temp as first-class locations
 alongside SD and USB. Do not omit them from subsequent designs.**
 

@@ -16,7 +16,8 @@ from .foreground import ForegroundSlot
 from .operation_status import OperationPresentation
 from .files import child
 from .navigation import History
-from .storage import storage_root, discover
+from .file_selection import ClickPolicy, FileListActivation
+from .storage import storage_root, recognized_root, discover, browse_directory, root_presentation
 from .storage_ui import DriveButtons
 from .folder_copy import completed_roots
 from .file_service import FileLocation, CopyRequest
@@ -78,6 +79,7 @@ class Browser(Gtk.Application):
         self.history_buttons = {}
         self.file_pane_boxes = {}
         self.file_pane_labels = {}
+        self.remote_file_actions = []
         self.active_file_pane = True
         self.core = ArgonautCore().load()
         # Transitional aliases keep presentation-only preferences and existing
@@ -194,18 +196,13 @@ class Browser(Gtk.Application):
         panes.set_vexpand(True)
         files.append(panes)
         self.controls.set_vexpand(True)
+        self.file_click_policy = ClickPolicy()
         self.lpath, self.llist = self.pane(panes, True)
         self.rpath, self.rlist = self.pane(panes, False)
         css = Gtk.CssProvider()
         css.load_from_data(
             b'.argonaut-file-pane { border: 2px solid transparent; border-radius: 6px; padding: 4px; }\n'
-            b'.argonaut-file-pane-active { border-color: #3584e4; }\n'
-            b'.argonaut-file-pane-inactive button { opacity: 0.78; }\n'
-            b'.argonaut-file-pane-inactive button:disabled { opacity: 0.45; }\n'
-            b'.argonaut-file-pane-inactive button.suggested-action { background-image: none; background-color: #77767b; color: #ffffff; }\n'
-            b'.argonaut-file-pane-inactive entry { background-color: alpha(@window_fg_color, 0.06); }\n'
-            b'.argonaut-file-pane-inactive row:selected { background-color: #5e5c64; color: #ffffff; }\n'
-            b'.argonaut-file-pane-inactive row:selected label { color: #ffffff; }\n'
+            b'.argonaut-file-pane-active { border-color: alpha(@theme_selected_bg_color, 0.55); }\n'
             b'.argonaut-error-message { color: #c01c28; font-size: 1.083333em; }')
         Gtk.StyleContext.add_provider_for_display(
             self.window.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
@@ -261,7 +258,7 @@ class Browser(Gtk.Application):
         pane_click.connect(
             'pressed', lambda *_: self.set_active_file_pane(local))
         box.add_controller(pane_click)
-        label = Gtk.Label(label='Local files' if local else 'C64 Ultimate files', xalign=0)
+        label = Gtk.Label(label='This Computer' if local else 'C64 Ultimate', xalign=0)
         box.add_css_class('argonaut-file-pane')
         self.file_pane_boxes[local] = box
         self.file_pane_labels[local] = label
@@ -273,9 +270,12 @@ class Browser(Gtk.Application):
         forward = self.icon_button(toolbar, 'Forward', 'go-next-symbolic', lambda: self.history_move(local, 1))
         self.history_buttons[local] = (back, forward)
         self.icon_button(toolbar, 'Refresh', 'view-refresh-symbolic', self.refresh_local if local else self.refresh_remote)
-        self.icon_button(toolbar, 'Copy', 'edit-copy-symbolic', lambda: self.copy_selection(local))
-        self.icon_button(toolbar, 'Paste', 'edit-paste-symbolic', lambda: self.paste_files(local))
-        self.icon_button(toolbar, 'New folder…', 'folder-new-symbolic', lambda: self.new_folder(local))
+        action_button = self.icon_button(toolbar, 'Copy', 'edit-copy-symbolic', lambda: self.copy_selection(local))
+        if not local:self.remote_file_actions.append(action_button)
+        action_button = self.icon_button(toolbar, 'Paste', 'edit-paste-symbolic', lambda: self.paste_files(local))
+        if not local:self.remote_file_actions.append(action_button)
+        action_button = self.icon_button(toolbar, 'New folder…', 'folder-new-symbolic', lambda: self.new_folder(local))
+        if not local:self.remote_file_actions.append(action_button)
         if local:
             self.new_d64_button = self.icon_button(
                 toolbar, 'New D64 disk…', 'document-new-symbolic', self.new_d64)
@@ -283,11 +283,16 @@ class Browser(Gtk.Application):
             self.remote_new_d64_button = self.icon_button(
                 toolbar, 'New D64 disk on C64U…', 'document-new-symbolic',
                 self.new_remote_d64)
+            self.remote_file_actions.append(self.remote_new_d64_button)
         drives=DriveButtons(self,local);self.drive_bars[local]=drives
         box.append(drives.box)
         path = Gtk.Entry()
         path.connect('activate', lambda entry: self.navigate(local, entry.get_text()))
         box.append(path)
+        if not local:
+            self.storage_description = Gtk.Label(xalign=0, wrap=True)
+            self.storage_description.set_visible(False)
+            box.append(self.storage_description)
         self.update_history_buttons()
         mouse = Gtk.GestureClick(button=0)
         mouse.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
@@ -299,14 +304,9 @@ class Browser(Gtk.Application):
         mouse.connect('pressed', side_button)
         box.add_controller(mouse)
         listing = Gtk.ListBox(selection_mode=Gtk.SelectionMode.MULTIPLE)
-        listing.set_activate_on_single_click(False)
-        listing.connect('row-activated', lambda _, row: self.activate_row(local, row))
+        listing.file_activation = FileListActivation(
+            listing, self.file_click_policy, lambda row: self.activate_row(local, row))
         scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
-        activate_pane = Gtk.GestureClick(button=1)
-        activate_pane.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        activate_pane.connect(
-            'pressed', lambda *_: self.activate_file_pane_pointer(local))
-        scroll.add_controller(activate_pane)
         listing.set_vexpand(True)
         click = Gtk.GestureClick(button=3)
         click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
@@ -317,9 +317,10 @@ class Browser(Gtk.Application):
         listing.add_controller(keys)
         focus = Gtk.EventControllerFocus()
         focus.connect('enter', lambda *_: self.set_active_file_pane(local))
-        listing.add_controller(focus)
+        box.add_controller(focus)
         source = Gtk.DragSource(actions=Gdk.DragAction.COPY)
         source.connect('prepare', lambda _, x, y: self.drag_prepare(listing, local, x, y))
+        source.connect('drag-begin', lambda *_: listing.file_activation.cancel())
         source.connect('drag-end', lambda *_: setattr(self, 'drag_payload', None))
         listing.add_controller(source)
         target = Gtk.DropTarget.new(str, Gdk.DragAction.COPY)
@@ -338,7 +339,7 @@ class Browser(Gtk.Application):
                 'argonaut-file-pane-inactive' if active else 'argonaut-file-pane-active')
             box.add_css_class(
                 'argonaut-file-pane-active' if active else 'argonaut-file-pane-inactive')
-            base = 'Local files' if pane_local else 'C64 Ultimate files'
+            base = 'This Computer' if pane_local else 'C64 Ultimate'
             self.file_pane_labels[pane_local].set_text(
                 base + (' · Active' if active else ''))
 
@@ -347,10 +348,13 @@ class Browser(Gtk.Application):
         self.set_active_file_pane(local)
 
     def populate(self, listing, entries):
+        adapter = getattr(listing, 'file_activation', None)
+        if adapter is not None:adapter.cancel()
         while listing.get_first_child(): listing.remove(listing.get_first_child())
         for name, directory, size in [('..', True, 0)] + entries:
             row = Gtk.ListBoxRow()
             row.item = (name, directory)
+            row.set_selectable(name != '..')
             label = Gtk.Label(label=f'{"📁" if directory else "  "}  {name}    {"" if directory else str(size) + " bytes"}', xalign=0)
             label.set_margin_top(7)
             label.set_margin_bottom(7)
@@ -368,7 +372,9 @@ class Browser(Gtk.Application):
                 listing.select_row(row)
             row = row.get_next_sibling()
 
-    def refresh_local(self, select=()):
+    def refresh_local(self, select=None):
+        if select is None:
+            select = tuple(row.item[0] for row in self.llist.get_selected_rows()) if getattr(self, '_local_listing_path', None) == self.local else ()
         try:
             entries = []
             show_hidden = bool(self.preferences.app_options.get(
@@ -387,6 +393,7 @@ class Browser(Gtk.Application):
                     entries.append((p.name, False, 0))
             self.populate(self.llist, sorted(entries, key=lambda e: (not e[1], e[0].casefold())))
             Browser.select_names(self, self.llist, select)
+            self._local_listing_path = self.local
             self.lpath.set_text(str(self.local))
             self.drive_bars[True].refresh()
             return True
@@ -447,7 +454,7 @@ class Browser(Gtk.Application):
                                             and self.reconnect_available())
         self.disconnect_button.set_sensitive(self.active_profile is not None)
         if hasattr(self, 'remote_new_d64_button'):
-            self.remote_new_d64_button.set_sensitive(self.client is not None)
+            self.update_storage_actions()
         if hasattr(self, 'test_lab_tab'):
             self.test_lab_tab.connection_changed()
 
@@ -582,27 +589,53 @@ class Browser(Gtk.Application):
                  self.activate_connection)
         return False
 
-    def show_remote(self, result, select=()):
+    def show_remote(self, result, select=None):
+        identity = (self.client, result[0])
+        if select is None:
+            select = tuple(row.item[0] for row in self.rlist.get_selected_rows()) if getattr(self, '_remote_listing_identity', None) == identity else ()
         self.remote, entries = result
         if self.active_profile and self.preferences.app_options['remember_folders']:
             self.preferences.app_options['remote_folders'][self.active_profile.id]=self.remote;self.save_app_preferences()
-        self.remote_root=storage_root(self.remote) or '/'
+        self.remote_root=recognized_root(self.remote) or '/'
         self.drive_bars[False].refresh()
         self.rpath.set_text(self.remote)
+        self.update_storage_actions()
         self.populate(self.rlist, [(e.name, e.kind == 'dir', e.size or 0) for e in entries])
         Browser.select_names(self, self.rlist, select)
+        self._remote_listing_identity = identity
         self.status.set_text('Connected · ' + self.remote)
         self.update_history_buttons()
+
+    def update_storage_actions(self):
+        allowed = self.client is not None and storage_root(self.remote) is not None
+        for button in self.remote_file_actions:button.set_sensitive(allowed)
+        self.usb_backup_button.set_sensitive(allowed)
+        self.usb_restore_button.set_sensitive(allowed)
+        description = root_presentation(self.remote)[2] if self.client else ''
+        self.storage_description.set_text(description)
+        self.storage_description.set_visible(bool(description))
+
+    def files_operation_allowed(self, local):
+        if local:return True
+        if self.client is not None and storage_root(self.remote):return True
+        self.status.set_text('Flash and Temp support directory browsing only in Files. Choose USB/SD for file operations.')
+        return False
 
     def refresh_remote(self):
         if not self.client:self.status.set_text('Connect first.');return
         client=self.client;path=self.remote
         def task():
-            roots=discover(client)
-            if storage_root(path) not in roots:return ('/',[])
-            return client.list_directory(path)
+            try:
+                roots=discover(client)
+                if recognized_root(path) not in roots:
+                    if path == '/' and not roots:return ('/', [])
+                    raise BrowserError('Storage location unavailable: '+path+'. Select an available location.')
+                return browse_directory(client,path)
+            except Exception as exc:return exc
         def done(result):
             if self.client is client:
+                self.drive_bars[False].refresh()
+                if isinstance(result,Exception):raise result
                 self.show_remote(result)
                 if result[0]=='/':self.status.set_text('Select an available drive above the path.')
         self.run(task,done)
@@ -633,7 +666,7 @@ class Browser(Gtk.Application):
                 self.lpath.set_text(str(old))
                 self.status.set_text('Choose an existing local folder.'); return
             self.local = candidate
-            if self.refresh_local():
+            if self.refresh_local(select=()):
                 if self.preferences.app_options['remember_folders']:
                     self.preferences.app_options['local_folder']=str(candidate);self.save_app_preferences()
                 history.visit(candidate, offset)
@@ -642,16 +675,16 @@ class Browser(Gtk.Application):
                 self.local = old
                 self.lpath.set_text(str(old))
         elif self.client:
-            if not storage_root(target):
-                self.status.set_text('Choose a USB or SD drive above the path.'); return
+            if not recognized_root(target):
+                self.status.set_text('Choose an exact USB, SD, Flash or Temp path above.'); return
             if '..' in target.split('/'):
                 self.status.set_text('Use the parent folder row to navigate.'); return
             client = self.client
             def loaded(result):
                 if self.client is not client: return
                 history.visit(result[0], offset)
-                self.show_remote(result)
-            self.run(lambda: client.list_directory(target), loaded)
+                self.show_remote(result, select=())
+            self.run(lambda: browse_directory(client,target), loaded)
 
     def activate_row(self, local, row):
         self.menu_token = None
@@ -659,9 +692,10 @@ class Browser(Gtk.Application):
         if name == '..':
             self.navigate(local, str(self.local.parent) if local else (posixpath.dirname(self.remote) if self.remote != self.remote_root else self.remote_root))
         elif directory: self.navigate(local, str(self.local / name) if local else posixpath.join(self.remote, name))
-        elif name.casefold().endswith(('.d64', '.d71', '.d81')): self.open_disk_image(local, name)
+        elif self.files_operation_allowed(local) and name.casefold().endswith(('.d64', '.d71', '.d81')): self.open_disk_image(local, name)
 
     def open_disk_image(self, local, name):
+        if not self.files_operation_allowed(local):return
         if self.busy:return
         from .disk_image_io import read_local_disk_image, read_remote_disk_image
         source = self.local / name if local else posixpath.join(self.remote, name)
@@ -851,6 +885,8 @@ class Browser(Gtk.Application):
         return True
 
     def clicked(self, listing, local, gesture, count, x, y):
+        adapter = getattr(listing, 'file_activation', None)
+        if adapter is not None:adapter.cancel()
         if self.busy or count != 1: return
         self.set_active_file_pane(local)
         gesture.set_state(Gtk.EventSequenceState.CLAIMED)
@@ -863,6 +899,7 @@ class Browser(Gtk.Application):
         self.menu(listing, local, row, x, y)
 
     def menu(self, listing, local, row, x, y):
+        if not self.files_operation_allowed(local):return
         if getattr(self, 'popover', None): self.popover.popdown()
         popover = Gtk.Popover()
         self.popover = popover
@@ -939,9 +976,11 @@ class Browser(Gtk.Application):
         self.tabs.set_current_page(self.tabs.page_num(self.drives_tab.box))
 
     def drag_prepare(self, listing, local, x, y):
+        adapter = getattr(listing, 'file_activation', None)
+        if adapter is not None:adapter.cancel()
         self.menu_token = None
         self.set_active_file_pane(local)
-        if self.busy: return None
+        if self.busy or not self.files_operation_allowed(local): return None
         row = listing.get_row_at_y(int(y))
         if row is None or row.item[0] == '..': return None
         rows = listing.get_selected_rows()
@@ -953,6 +992,7 @@ class Browser(Gtk.Application):
 
     def dropped(self, listing, local, value, x, y):
         payload = self.drag_payload
+        if not self.files_operation_allowed(local):return False
         if self.busy or not payload or value != payload[0] or local == payload[1]: return False
         if not self.client:
             self.status.set_text('Open Settings → Device details and connect to a C64U first.'); return False
@@ -980,6 +1020,7 @@ class Browser(Gtk.Application):
         return False
 
     def copy_selection(self, local):
+        if not self.files_operation_allowed(local):return
         if self.busy: return
         rows = (self.llist if local else self.rlist).get_selected_rows()
         if not rows or any(r.item[0] == '..' for r in rows):
@@ -1122,6 +1163,7 @@ class Browser(Gtk.Application):
         dialog.connect('response',lambda widget,_:widget.destroy());dialog.present()
 
     def paste_files(self, local):
+        if not self.files_operation_allowed(local):return
         if self.busy: return
         if not self.file_clipboard:
             self.status.set_text('Copy files or folders in Argonaut first.'); return
@@ -1134,6 +1176,9 @@ class Browser(Gtk.Application):
                         self.local if local else self.remote, self.client)
 
     def start_copy(self, source_local, parent, names, local, destination, client):
+        if ((not source_local and not storage_root(str(parent))) or
+                (not local and not storage_root(str(destination)))):
+            self.status.set_text('Flash and Temp support directory browsing only in Files.');return
         names = tuple(names)
         source=(FileLocation.core_host(parent) if source_local else
                 FileLocation.c64u(parent))
@@ -1229,6 +1274,7 @@ class Browser(Gtk.Application):
         dialog.present()
 
     def new_folder(self, local):
+        if not self.files_operation_allowed(local):return
         parent = self.local if local else self.remote
         if not local and not self.client: raise BrowserError('Connect first.')
         def submit(name):
@@ -1361,6 +1407,7 @@ class Browser(Gtk.Application):
 
     def new_remote_d64(self):
         """Create and verify a blank D64 using the connected C64U API."""
+        if not self.files_operation_allowed(False):return
         if self.busy or getattr(self, 'remote_d64_create_prompt', None) is not None:
             return
         if not self.client:
@@ -1487,6 +1534,7 @@ class Browser(Gtk.Application):
         return dialog
 
     def rename_item(self, local, name):
+        if not self.files_operation_allowed(local):return
         parent = self.local if local else self.remote
         target = parent / name if local else child(parent, name)
         def submit(new):
@@ -1543,10 +1591,12 @@ class Browser(Gtk.Application):
         self.prompt('Rename', 'New name:', submit, name, action_label='Rename')
 
     def delete_item(self, local, name):
+        if not self.files_operation_allowed(local):return
         target=self.local/name if local else child(self.remote,name)
         return self.delete_dialog(local,[target],self.client)
 
     def delete_selected(self,local):
+        if not self.files_operation_allowed(local):return
         if self.busy:return
         listing=self.llist if local else self.rlist
         names=[r.item[0] for r in listing.get_selected_rows() if r.item[0]!='..']
@@ -1666,6 +1716,8 @@ class Browser(Gtk.Application):
         if self.busy:
             self.status.set_text('Wait for the current operation to finish before closing.')
             return True
+        policy = getattr(self, 'file_click_policy', None)
+        if policy is not None:policy.close()
         if self.recovery:self.recovery.close()
         if getattr(self, 'test_lab_tab', None): self.test_lab_tab.stop_schedule()
         disable_private_log(getattr(self, 'operation_log', None))

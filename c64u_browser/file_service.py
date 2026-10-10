@@ -13,6 +13,7 @@ import uuid
 from threading import Lock
 
 from .api import BrowserError
+from .storage import require_file_operation
 from .deletion import prepare as prepare_deletion, delete_reviewed
 from .files import child, operate_managed
 from .ftp_reads import read_operation, adapter_for
@@ -270,6 +271,8 @@ class FileService:
         source_local=self._local(request.source);destination_local=self._local(request.destination)
         session=self._session((request.source,request.destination))
         def task(job):
+            if not source_local:require_file_operation(request.source.path, parent=True)
+            if not destination_local:require_file_operation(request.destination.path, parent=True)
             client=self._client((request.source,request.destination),session)
             plan=build_plan(client,source_local,request.source.path,request.names,
                             destination_local,request.destination.path,job.check_cancel)
@@ -341,6 +344,8 @@ class FileService:
         targets=tuple(item.path for item in locations)
         session=expected_session or self._session(locations)
         def task(job):
+            if not local:
+                for path in targets:require_file_operation(path)
             client=self._client(locations,session);job.check_cancel()
             with read_operation(client, job.check_cancel):
                 items=prepare_deletion(client,local,targets,job.check_cancel)
@@ -379,7 +384,9 @@ class FileService:
         return self._job('file.delete.execute',task,session=stored.session)
 
     def create_folder(self, parent, name):
-        local=self._local(parent);session=self._session((parent,))
+        local=self._local(parent)
+        if not local:require_file_operation(parent.path, parent=True)
+        session=self._session((parent,))
         child('/USB2',name)
         target=str(Path(parent.path)/name) if local else child(parent.path,name)
         def task(job):
@@ -403,6 +410,7 @@ class FileService:
             raise BrowserError('This rename operation requires a C64U source.')
         session=self._session((source,))
         def task(job):
+            require_file_operation(source.path)
             client=self._client((source,),session)
             return self._managed_mutation(client,'rename',source.path,
                                           new_name=new_name,check=job.check_cancel)

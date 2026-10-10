@@ -9,15 +9,15 @@ class Storage(unittest.TestCase):
   client=Mock()
   client.list_directory.side_effect=lambda path:(path,[Entry(n,'dir',None) for n in names]+[Entry('USB9','file',4)] if path=='/' else [])
   return client
- def test_discovery_excludes_internal_and_files(self):
+ def test_discovery_includes_internal_but_excludes_files(self):
   client=self.client(['Flash','Temp','USB0','USB2','SD','USBbad'])
-  self.assertEqual(discover(client),['/SD','/USB0','/USB2'])
-  self.assertEqual(client.storage_roots,['/SD','/USB0','/USB2'])
+  self.assertEqual(discover(client),['/Flash','/SD','/Temp','/USB0','/USB2'])
+  self.assertEqual(client.storage_roots,['/Flash','/SD','/Temp','/USB0','/USB2'])
  def test_initial_preference_and_fallback(self):
   self.assertEqual(initial_directory(self.client(['USB2','USB0']))[0],'/USB2')
   self.assertEqual(initial_directory(self.client(['USB2','USB0']),'/USB0')[0],'/USB0')
   self.assertEqual(initial_directory(self.client(['USB0']))[0],'/USB0')
-  self.assertEqual(initial_directory(self.client(['Flash'])),('/',[]))
+  self.assertEqual(initial_directory(self.client(['Flash'])),('/Flash',[]))
  def test_roots_cannot_be_deleted(self):
   client=Mock()
   for root in ('/','/USB0','/USB2','/SD'):

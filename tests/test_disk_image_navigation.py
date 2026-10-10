@@ -22,28 +22,36 @@ class DiskImageNavigationTests(unittest.TestCase):
         app.rlist.grab_focus.assert_not_called()
 
     def test_double_click_opens_d64_instead_of_treating_it_as_folder(self):
-        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock())
+        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock(),
+                              client=object(), remote='/USB2')
+        app.files_operation_allowed = lambda local: Browser.files_operation_allowed(app, local)
         row = SimpleNamespace(item=('GAME.D64', False))
         Browser.activate_row(app, True, row)
         app.open_disk_image.assert_called_once_with(True, 'GAME.D64')
         app.navigate.assert_not_called()
 
     def test_double_click_opens_d71_instead_of_treating_it_as_folder(self):
-        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock())
+        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock(),
+                              client=object(), remote='/USB2')
+        app.files_operation_allowed = lambda local: Browser.files_operation_allowed(app, local)
         row = SimpleNamespace(item=('DOUBLE.D71', False))
         Browser.activate_row(app, False, row)
         app.open_disk_image.assert_called_once_with(False, 'DOUBLE.D71')
         app.navigate.assert_not_called()
 
     def test_double_click_opens_d81_instead_of_treating_it_as_folder(self):
-        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock())
+        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock(),
+                              client=object(), remote='/USB2')
+        app.files_operation_allowed = lambda local: Browser.files_operation_allowed(app, local)
         row = SimpleNamespace(item=('THREE.D81', False))
         Browser.activate_row(app, True, row)
         app.open_disk_image.assert_called_once_with(True, 'THREE.D81')
         app.navigate.assert_not_called()
 
     def test_other_files_are_not_opened_as_disk_images(self):
-        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock())
+        app = SimpleNamespace(menu_token='old', open_disk_image=Mock(), navigate=Mock(),
+                              client=object(), remote='/USB2')
+        app.files_operation_allowed = lambda local: Browser.files_operation_allowed(app, local)
         Browser.activate_row(app, True, SimpleNamespace(item=('GAME.PRG', False)))
         app.open_disk_image.assert_not_called()
         app.navigate.assert_not_called()

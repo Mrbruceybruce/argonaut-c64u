@@ -1,5 +1,195 @@
 # Current development state
 
+## C0 — Conventional file selection and activation: accepted, pending publication
+
+C0 passed final narrow re-review and combined read-only C0/C1 physical acceptance.
+C0 and C1 are **accepted, pending commit/push**. Section C is not complete;
+C2/C3/C4 remain pending.
+Starting authority was published HEAD/local origin/development
+`c26da8e73b6e8604895ba9da67a32b099c900629`, divergence 0 0, empty index, with
+exactly 15 pending C1 files (+559/-51). C1 production/tests/assets are preserved
+byte-for-byte except the necessary shared Files presentation changes in gui.py.
+
+Both Files panes retain Gtk.ListBox MULTIPLE selection. GTK owns Ctrl toggling,
+Shift ranges, Ctrl+A, arrow navigation and theme-native highlighting. Hard-coded
+inactive selection colors are removed; the theme-colored border and Active label
+identify the active pane. Focus tracking now covers path entries and toolbar
+controls as well as lists. Pointer motion does not change focus or the active pane.
+The parent row remains activatable but is nonselectable, including with Ctrl+A.
+Plain empty-background clicks clear only that pane; background dragging does not.
+
+Optional read-only Nautilus click-policy compatibility supports single/double and
+live changes; missing/invalid/unreadable preferences fall back to double. Argonaut
+never writes this desktop setting. GTK's single-click property stays disabled:
+the small activation adapter lets GTK complete native selection, then dispatches
+one qualified plain single/double-click activation after release. Modifiers, right-click, drag,
+replaced rows, navigation, policy changes and canceled/stale sequences cannot
+trigger that deferred activation. Double-click and Enter retain existing directory,
+parent and disk-viewer meanings; no automatic mount/launch/transfer is introduced.
+
+Same-directory refresh retains surviving selected names. Navigation clears
+selection, and remote preservation also requires the same client and exact path.
+Pane selections remain independent; clipboard/operation targets remain separately
+captured. Existing context menus, COPY-only internal cross-pane dragging, reviewed
+delete/rename, C1 storage authorization and B5 cancellation contracts are retained.
+No Core, FTP, session or managed operation execution code changed for C0.
+
+Initial verification: **20 C0 checks, 140 focused/affected existing tests, and the same 16
+C1/B5 offline GTK checks passed, no skips**. C0 uses real X11/XTest pointer/key
+sequences and memory-only GSettings, including native drag/drop, modifiers, parent
+navigation, refresh, focus, text Ctrl+A, context menus and captured operation
+routing. Fixtures forbid device connections; backend tests allow synthetic loopback
+only. The 16 GTK checks again emitted two GtkText focus-out warnings, matching the
+previous baseline count; focus assertions passed. C0's X11 run emitted none, which
+does not establish that the native-backend warning is fixed. No upstream GTK fix
+or full-application test rerun was attempted.
+
+Compact C0 review found a missing rapid click-then-drag case: GTK emitted native
+activation on the second button-down before drag recognition. The approved narrow
+correction suppresses pointer-origin native activation and dispatches only after
+a qualifying release (count 1 for single mode, count 2 for double mode), once GTK
+has completed selection. The existing UI-idle boundary adds no timer or arbitrary
+wait. Enter remains synchronous. Drag/cancellation, modifiers, row replacement,
+root/client transitions and mismatched rows discard pending pointer activation.
+Only file_selection.py changed in production; GUI, C1 authorization, Core, FTP,
+scheduler and foreground execution remain byte-identical to the reviewed baseline.
+
+Correction verification: **28 C0 GTK checks (including eight new real-pointer
+regressions), 33 affected selection/navigation/Files/C1 tests, and 16 C1/B5 GTK
+checks passed, no skips**. Rapid select-click followed immediately by dragging
+both a directory and disk-image row produces zero activation, navigation or viewer
+opening while a drag begins with the correct captured source. Completed single
+and double clicks activate once after release; no third click or timer is needed.
+Canceled/rebuilt-row/root-client-change cases activate zero times. Existing COPY
+routing and Flash/Temp restrictions pass. The C1/B5 run again emitted two GtkText
+focus-out warnings with passing focus assertions; these remain a nonblocking
+limitation, not an upstream GTK fix. No broad application suites were rerun.
+
+### Combined C0/C1 physical acceptance — 2026-10-10
+
+Accepted on the actual GNOME Wayland desktop using source `./run-development`,
+not the installed dev2 package. HEAD/local origin/development remained
+`c26da8e73b6e8604895ba9da67a32b099c900629`, divergence 0 0, index empty;
+starting scope was exactly 18 files (+1288/-70). The saved C64 Founders profile
+connected with firmware 1.1.0 / API 0.1; Bruce confirmed device identity and entered
+session-only credentials directly in the app.
+
+Bruce explicitly approved the visual appearance: familiar GNOME Files selection,
+clear active pane, no clipping/overlap. He confirmed single-click selection,
+double-click directory opening, Ctrl toggle, Shift range, Ctrl+A excluding `..`,
+arrows/Enter, path-entry Ctrl+A and independent pane selections. Right-click on
+selected groups, unselected rows and empty background passed. Selected-group and
+rapid click-then-drag gestures did not activate or start a transfer; drags were
+canceled without a cross-pane drop. Refresh retained selections; directory and
+parent navigation cleared them. No focus trap, unexpected scrolling or freeze was
+reported. GNOME click-policy was `double` and was not changed.
+
+USB1 and SD listings/navigation worked, including the existing SD/arm2sid path;
+normal SD file controls remained available but were not invoked. Accessible root
+labels matched /USB1, /SD, /Flash and /Temp. Bruce approved the USB thumb-drive,
+SD-card, internal-storage and memory icons. Flash exposed its actual carts, html
+and roms directories; Bruce confirmed browsing all three with clear paths.
+Flash/Temp generic file controls were unavailable. Temp displayed its temporary
+RAM-disk description without a persistence promise; its current listing was empty
+apart from `..`, so no Temp child-directory traversal was exercised.
+
+Normal window-close shutdown exited Development with code 0 and no remaining
+Argonaut GUI process. The application runtime log was empty: no GTK focus warning,
+traceback or other logged error occurred in this session. The two existing offline
+GtkText focus-out warnings remain a documented nonblocking limitation. Based on
+the performed actions and Bruce's confirmation, no transfer, remote mutation or
+machine command was invoked; this was not a packet-level network audit.
+
+Limits: physical single-click mode remains unqualified; existing deterministic
+single-click evidence applies. No unavailable-root fault was induced because all
+advertised roots were available; deterministic error-path tests remain the evidence.
+No writes, deletes, restores, mount/launch, reboot or persistence experiments were
+performed. Other themes/platforms and cross-pane transfer execution were not tested.
+Existing 28 C0 GTK, 33 affected and 16 C1/B5 GTK passing checks (no skips) were not
+rerun. Production, test and asset hashes were unchanged by acceptance; only this
+file and ARGONAUT-ROADMAP were updated. No staging, commit, push, package or release
+occurred. C2/C3/C4 and D/E remain untouched. C0/C1 are approved for a separately
+executed, allowlisted commit/push; Section C is not complete.
+
+## C1 — Storage roots and safe browsing: accepted, pending publication
+
+C1 is implemented, deterministically verified, compact-review approved and
+**read-only physical acceptance passed; pending commit/push**. See the combined
+acceptance record above. Section C is not complete.
+Starting HEAD/local origin/development was
+`c26da8e73b6e8604895ba9da67a32b099c900629`, parent
+`627698b1dd0a3e0a7ebd7b9384a86b0332a507eb`, subject
+`Polish Debian development packaging`; divergence 0 0, clean index/worktree.
+
+Discovery recognizes only advertised exact directory roots `/USB[digits]`, `/SD`,
+`/Flash`, `/Temp`. `recognized_root` classifies browsing paths; `storage_root`
+retains the USB/SD operation gate, with absolute-path, component, control-character
+and backslash validation. Visibility does not confer file-operation permission.
+The existing managed directory-listing adapter supports arbitrary Flash/Temp
+subdirectories, including Flash/html; exact returned paths are checked. No FTP
+ownership, scheduler, service execution or cancellation redesign was needed.
+USB/SD startup preference/fallback remains ahead of newly visible internal roots.
+
+Files keeps its two panes, labeled This Computer and C64 Ultimate. Flash and Temp
+have concise contextual descriptions. Temp says RAM Disk and temporary storage;
+it promises neither reboot erasure nor persistence. System solid-state artwork
+represents Flash. Three small symbolic vectors represent SD cards, USB thumb drives
+and RAM because the installed theme lacks suitable symbols. Accessible location
+labels remain. Local mounted-media buttons use the thumb-drive symbol; local
+filesystem behavior is unchanged.
+
+C1 is directory browsing only for Flash/Temp in Files: Copy, Paste, folder/D64
+creation and mutation/launch context actions are unavailable. Keyboard, drag,
+direct handlers and captured copy targets enforce the same policy. Core file
+services independently refuse generic Flash/Temp copy, delete, rename and folder
+creation; REST create/mount/path-based launch operations enforce the storage gate
+at execution, separate from syntax-only SID parameter validation. Existing job
+failure timing is retained. Storage roots themselves cannot be renamed/deleted or
+used as replacement files. No generic internal download route is added.
+
+The separate R6 native Flash upload, save-copy, configuration-preview and reviewed
+exact-file cleanup contracts are unchanged. USB/SD backup/restore remains scoped
+and in its current Files location. No C2/C3 operations are introduced. Existing
+two-pane COPY-only dragging remains; external/same-pane drops are not added.
+B5 foreground admission/global contextual cancellation is unchanged.
+
+Unreadable or redirected roots report errors, never successful empty listings.
+Refresh updates discovered location buttons even when the current root disappears;
+the previous listing/path remain with the error, rather than becoming an empty
+success. Connection failure classification is preserved. No polling is added.
+
+Verification: **444 focused/affected deterministic tests and 16 explicit offline
+GTK checks passed, no skips.** Coverage includes exact discovery/path mappings,
+arbitrary Flash/Temp managed listings on a synthetic loopback server, permission
+refusal before device access, root/traversal protection, REST launch/create guards,
+USB/SD transfers/deletion/replacement/backup, R6 publication/cleanup, session safety,
+foreground/cancellation, GTK history/parent navigation, unavailable-root reporting,
+icons/action sensitivity, keyboard/context/Paste/drop parity, retained USB folder
+confirmation targets, resize/focus sanity and existing USB D64 conflict handling.
+The runner refused non-loopback networking; GTK fixtures trapped connections and
+used temporary preferences. GTK emitted two GtkText focus-out warnings during the
+test run; assertions passed, so this is not evidence of warning-free physical UX.
+
+Initial sandbox runs could not open loopback sockets or the display. Reruns used
+the required local permissions. Earlier iterations corrected obsolete hidden-Flash
+test expectations, navigation fixtures, asynchronous root-refusal timing and a
+syntax-only SID validation regression. No assertions were skipped or removed to
+obtain the final results. Syntax/whitespace and bounded change review passed.
+
+Combined read-only physical acceptance passed as recorded above. Hardware mutation
+workflows were not exercised; Files retains the C1 browsing-only restrictions.
+
+- C2: dedicated Storage & Backups page relocation pending.
+- C3: Flash/Temp managed mutation policy pending.
+- C4: final Files polish and acceptance pending.
+- Shared file picker remains D; no D/E implementation.
+
+The implementation/test pass made no C64U contact; the subsequent authorized
+acceptance used read-only connection/browsing as recorded above. No staging, commit,
+push, package or release occurred. Test Lab and Streams implementation is unchanged. Streaming remains **OPEN / intermittent /
+instrumented**.
+
+
 ## B6 — Debian Development package accepted and installed
 
 B6 implementation and compact review passed; local archive/self-test/offline smoke
