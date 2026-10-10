@@ -1,5 +1,83 @@
 # Current development state
 
+## C4 — Bounded Files polish: physical acceptance passed, publication pending
+
+Starting HEAD/local origin/development:
+`c62e345ec3e6b6dea193fd7ab3e6da6129d9589d`, divergence 0 0, clean index/worktree.
+C4 retains the two Gtk.ListBox panes and native selection/activation. Filename
+labels ellipsize within the pane with separately right-aligned byte sizes; full
+names remain available through tooltips and accessible row labels. Both path
+entries and file lists now have explicit This Computer / C64 Ultimate names.
+
+Menu and Shift+F10 open the existing context menu without activation or selection
+changes. Dismissal restores focus; selected groups retain their existing actions.
+Partial-upload recovery is hidden unless its captured device/session matches the
+current connection; confirmation and Core cleanup authorization remain unchanged.
+Files wording uses This Computer and C64 Ultimate. Disconnected storage prompts
+for a connection; connected storage with no discovered roots prompts Refresh.
+Empty directory listings and unavailable-root error behavior are unchanged.
+
+Only GTK presentation and focused tests change. Core/services, C0 activation,
+C1 storage authorization, C2 backup UI retirement, C3 Flash/Temp browsing-only
+policy, R6 and B5 foreground ownership/cancellation remain unchanged. No device
+contact, staging, commit, push, package or release is part of this implementation.
+C4 compact review and GNOME Wayland physical acceptance passed; publication
+remains pending. Section C is not complete.
+
+Verification: 93 affected unit tests passed, no skips. The combined GTK run passed
+48 checks; after the final dialog-focus guard, 21 directly affected GTK checks
+passed, including six C4 checks. Together with the 28 C0 checks this covers 49
+distinct GTK checks, no skips. Coverage includes bounded names/aligned sizes,
+accessible properties, real Menu/Shift+F10/Escape input, selection preservation,
+dialog focus, recovery session visibility, root wording, C1/C3 restrictions,
+C2 control absence and B5 behavior. An isolated fake-device render confirmed
+1057x672 (GTK minimum when requesting 900x650), 1200x850 and 1600x1000 layouts.
+Fixtures used temporary preferences, memory GSettings and blocked device access;
+unit networking was synthetic loopback only. One known GtkText focus-out warning
+appeared in the final GTK run with passing assertions. Actual GNOME Wayland and
+screen-reader acceptance were not part of that offline run. No broad application
+suite was run.
+
+### C4 physical acceptance — 2026-10-10
+
+Compact review approved the exact six-file implementation (+271/-33). Acceptance
+used source `./run-development` from the active Development worktree, explicitly
+with the Wayland backend on the actual GNOME Wayland desktop. Starting and ending
+HEAD/local origin/development were `c62e345ec3e6b6dea193fd7ab3e6da6129d9589d`,
+divergence 0 0, empty index. The six approved pending files were unchanged through
+shutdown; only this file and ARGONAUT-ROADMAP were subsequently updated to record
+acceptance. No installed package was used or built.
+
+Bruce connected normally with session-only credentials entered in the app and
+confirmed C64 Founders through the acceptance checklist. He reported passes for
+normal/smaller/larger layouts, pane labels/toolbars, aligned sizes, bounded long
+filenames and the full-name tooltip, and hidden inactive partial-upload recovery.
+Single/double-click behavior, native highlighting, Ctrl/Shift/Ctrl+A, arrows/Enter,
+independent pane selections, keyboard context menus, Escape and focus return passed.
+The Menu-key item was conditional on availability; separate key availability was
+not recorded. Right-click selected-group/unselected-row/background checks and
+canceled selected-group/rapid click-then-drag checks passed without transfer.
+
+USB, SD, Flash and Temp root browsing, icons, labels/descriptions, Flash/Temp
+unavailable generic operation controls, bottom status and absence of local Cancel
+controls passed the user checklist. No mutation or mount action was requested.
+Bruce confirmed normal Quit and no transfer, remote mutation, mount, reset/reboot
+or Save Flash action during acceptance. The launched process exited with code 0;
+a process check found no remaining Argonaut GUI process. Its runtime log was empty,
+with no logged GTK warning or traceback in this physical session.
+
+Limits: these visual/interaction results are user-reported, not a packet-level
+network audit. Accessible property presence/full-name assignment retains source
+and offline-test evidence; no independent physical accessibility-property audit
+or screen-reader certification was performed. Canceled drags do not qualify actual
+transfers. No remote mutation, active recovery target, failed-upload recovery or
+unavailable-root fault was deliberately exercised. The known offline focus-out
+warning remains a nonblocking limitation. No broad tests were rerun for acceptance.
+
+C4 is approved for publication following its separate publication safety gates.
+Section C is not complete until C4 publication is complete. No staging, commit,
+push, package, release or C5/D/E work occurred in this acceptance pass.
+
 ## C3 — Flash/Temp design review complete: current policy retained
 
 The C3 design review is complete. Bruce approved retaining the published C1
@@ -31,12 +109,13 @@ authorization, file-service permissions, C0 selection, C1 browsing and B5 operat
 handling are unchanged. This closure changes documentation only; validation is
 limited to documentation consistency and hygiene, with no device contact.
 
-C4 — final Files polish and acceptance — remains pending and has not begun.
+C4 review and physical acceptance passed; publication remains pending; see above.
 Section C is not complete. Shared file-picker work remains Section D; no D/E work
 is included in this closure.
 
-## C2 — Redundant Backup/Restore UI removed: pending review
+## C2 — Redundant Backup/Restore UI removed: published
 
+Published in `9dbbb29d3e95876464b9081701d19993085a1ef9`.
 Bruce approved retiring the dedicated Backup/Restore interface after the bounded
 storage benchmarks. No replacement Storage & Backups tab or dialog is planned.
 The preferred bulk-media workflow is preparation on a PC/Mac with the source
@@ -268,9 +347,9 @@ obtain the final results. Syntax/whitespace and bounded change review passed.
 Combined read-only physical acceptance passed as recorded above. Hardware mutation
 workflows were not exercised; Files retains the C1 browsing-only restrictions.
 
-- C2: dedicated backup UI retired by the later approved decision; review pending.
+- C2: dedicated backup UI retired; published in `9dbbb29d3e95`.
 - C3: design review complete; current C1 policy retained, generic mutation deferred.
-- C4: final Files polish and acceptance pending.
+- C4: bounded polish reviewed and physically accepted; publication pending.
 - Shared file picker remains D; no D/E implementation.
 
 The implementation/test pass made no C64U contact; the subsequent authorized

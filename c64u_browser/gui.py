@@ -176,6 +176,7 @@ class Browser(Gtk.Application):
         self.partial_upload=None
         self.partial_button=self.button(actions,'Delete partial upload…',self.delete_partial)
         self.partial_button.set_sensitive(False)
+        self.partial_button.set_visible(False)
         panes = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         panes.set_position(490)
         panes.set_shrink_start_child(False)
@@ -268,12 +269,14 @@ class Browser(Gtk.Application):
                 toolbar, 'New D64 disk…', 'document-new-symbolic', self.new_d64)
         else:
             self.remote_new_d64_button = self.icon_button(
-                toolbar, 'New D64 disk on C64U…', 'document-new-symbolic',
+                toolbar, 'New D64 disk on C64 Ultimate…', 'document-new-symbolic',
                 self.new_remote_d64)
             self.remote_file_actions.append(self.remote_new_d64_button)
         drives=DriveButtons(self,local);self.drive_bars[local]=drives
         box.append(drives.box)
         path = Gtk.Entry()
+        path.update_property([Gtk.AccessibleProperty.LABEL],
+                             ['This Computer path' if local else 'C64 Ultimate path'])
         path.connect('activate', lambda entry: self.navigate(local, entry.get_text()))
         box.append(path)
         if not local:
@@ -291,6 +294,8 @@ class Browser(Gtk.Application):
         mouse.connect('pressed', side_button)
         box.add_controller(mouse)
         listing = Gtk.ListBox(selection_mode=Gtk.SelectionMode.MULTIPLE)
+        listing.update_property([Gtk.AccessibleProperty.LABEL],
+                                ['This Computer files' if local else 'C64 Ultimate files'])
         listing.file_activation = FileListActivation(
             listing, self.file_click_policy, lambda row: self.activate_row(local, row))
         scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
@@ -342,10 +347,20 @@ class Browser(Gtk.Application):
             row = Gtk.ListBoxRow()
             row.item = (name, directory)
             row.set_selectable(name != '..')
-            label = Gtk.Label(label=f'{"📁" if directory else "  "}  {name}    {"" if directory else str(size) + " bytes"}', xalign=0)
-            label.set_margin_top(7)
-            label.set_margin_bottom(7)
-            row.set_child(label)
+            content = Gtk.Box(spacing=8)
+            content.set_margin_top(7)
+            content.set_margin_bottom(7)
+            content.append(Gtk.Label(label='📁' if directory else '  '))
+            label = Gtk.Label(label=name, xalign=0, hexpand=True,
+                              ellipsize=Pango.EllipsizeMode.MIDDLE, width_chars=1)
+            label.set_tooltip_text(name)
+            content.append(label)
+            size_label = Gtk.Label(label='' if directory else f'{size:,} bytes', xalign=1)
+            content.append(size_label)
+            row.set_tooltip_text(name)
+            row.update_property([Gtk.AccessibleProperty.LABEL],
+                                [name if directory else f'{name}, {size:,} bytes'])
+            row.set_child(content)
             listing.append(row)
 
     def select_names(self, listing, names):
@@ -424,7 +439,17 @@ class Browser(Gtk.Application):
         from .app_preferences import show_preferences
         show_preferences(self,page=1)
 
+    def update_partial_recovery(self):
+        partial = self.partial_upload
+        session = self.core.device_session() if partial is not None else None
+        available = (partial is not None and self.client is not None and
+                     session.device_id == partial.device_id and
+                     session.session_id == partial.session_id)
+        self.partial_button.set_visible(available)
+        self.partial_button.set_sensitive(available and not self.busy)
+
     def update_connection_header(self):
+        self.update_partial_recovery()
         selected = self.core.selected_profile()
         if self.active_profile:
             info = self.device_info['info']
@@ -880,7 +905,7 @@ class Browser(Gtk.Application):
             if row: listing.select_row(row)
         self.menu(listing, local, row, x, y)
 
-    def menu(self, listing, local, row, x, y):
+    def menu(self, listing, local, row, x, y, *, restore_focus=None):
         if not self.files_operation_allowed(local):return
         if getattr(self, 'popover', None): self.popover.popdown()
         popover = Gtk.Popover()
@@ -896,6 +921,9 @@ class Browser(Gtk.Application):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         popover.set_child(box)
         def action(fn):
+            nonlocal restore_focus
+            # An action may open a dialog; do not restore list focus afterward.
+            restore_focus = None
             popover.popdown()
             self.guarded(fn)
         if row:
@@ -941,10 +969,14 @@ class Browser(Gtk.Application):
             if local:
                 self.button(box, 'New D64 disk…', lambda: action(self.new_d64))
             else:
-                self.button(box, 'New D64 disk on C64U…',
+                self.button(box, 'New D64 disk on C64 Ultimate…',
                             lambda: action(self.new_remote_d64))
         self.button(box, 'Paste', lambda: action(lambda: self.paste_files(local)))
-        popover.connect('closed', lambda widget: widget.unparent())
+        def closed(widget):
+            widget.unparent()
+            if restore_focus is not None and restore_focus.get_root() is self.window:
+                restore_focus.grab_focus()
+        popover.connect('closed', closed)
         popover.popup()
 
     def open_mount_in_drives(self, name):
@@ -977,7 +1009,7 @@ class Browser(Gtk.Application):
         if not self.files_operation_allowed(local):return False
         if self.busy or not payload or value != payload[0] or local == payload[1]: return False
         if not self.client:
-            self.status.set_text('Open Settings → Device details and connect to a C64U first.'); return False
+            self.status.set_text('Open Settings → Device details and connect to a C64 Ultimate first.'); return False
         row = listing.get_row_at_y(int(y))
         destination = self.local if local else self.remote
         if row and row.item[1]:
@@ -990,7 +1022,31 @@ class Browser(Gtk.Application):
         self.start_copy(source_local, parent, names, local, destination, self.client)
         return True
 
+    def keyboard_file_menu(self, local):
+        if self.busy:return
+        listing = self.llist if local else self.rlist
+        focus = self.window.get_focus()
+        row = focus if isinstance(focus, Gtk.ListBoxRow) else (
+            focus.get_ancestor(Gtk.ListBoxRow) if focus else None)
+        selected = listing.get_selected_rows()
+        # Keep the selected group intact; an unselected focus row is not a target.
+        if row not in selected:row = selected[0] if selected else None
+        if row is None and focus is not None and isinstance(focus, Gtk.ListBoxRow):
+            if focus.item[0] == '..':return
+        x, y = 0, 0
+        if row is not None:
+            point = Graphene.Point();point.init(0, row.get_height())
+            valid, point = row.compute_point(listing, point)
+            if not valid:return
+            x, y = point.x, point.y
+        self.set_active_file_pane(local)
+        self.menu(listing, local, row, x, y, restore_focus=focus)
+
     def file_key(self, local, key, state):
+        if key == Gdk.KEY_Menu or (key == Gdk.KEY_F10 and
+                state & Gdk.ModifierType.SHIFT_MASK and not state &
+                (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK)):
+            self.keyboard_file_menu(local);return True
         if key == Gdk.KEY_Delete and not state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK):
             self.delete_selected(local); return True
         if state & Gdk.ModifierType.CONTROL_MASK:
@@ -1050,7 +1106,7 @@ class Browser(Gtk.Application):
                     self.copy_report(result)
                 if partial:
                     self.partial_upload = partial
-                    self.partial_button.set_sensitive(True)
+                    self.update_partial_recovery()
                 local_selection = ()
                 if source_local and Path(parent).resolve() == self.local.resolve():
                     local_selection = copied
@@ -1076,7 +1132,7 @@ class Browser(Gtk.Application):
                             remote_selection + copied))
                     if listing is not None and self.client is current:
                         self.show_remote(listing, remote_selection)
-                    self.status.set_text(message + (' · Could not refresh C64U: ' + error if error else ''))
+                    self.status.set_text(message + (' · Could not refresh C64 Ultimate: ' + error if error else ''))
                 self.run(refresh, refreshed)
             self.run_file_job(job,finished)
         def checked(snapshot):
@@ -1161,7 +1217,7 @@ class Browser(Gtk.Application):
         disk_id.connect('changed', uppercase_entry)
         self.d64_create_entries = (filename, disk_name, disk_id)
         for label, entry in (
-                ('Local filename:', filename),
+                ('This Computer filename:', filename),
                 ('C64 disk name (up to 16 characters):', disk_name),
                 ('C64 disk ID (exactly 2 characters or none):', disk_id)):
             content.append(Gtk.Label(label=label, xalign=0))
@@ -1265,7 +1321,7 @@ class Browser(Gtk.Application):
             self.status.set_text('Connect first.')
             return
         dialog = Gtk.Dialog(
-            title='Create blank D64 on C64U', transient_for=self.window, modal=True)
+            title='Create blank D64 on C64 Ultimate', transient_for=self.window, modal=True)
         self.remote_d64_create_prompt = dialog
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
         create = dialog.add_button('Create disk', Gtk.ResponseType.OK)
@@ -1274,13 +1330,13 @@ class Browser(Gtk.Application):
             orientation=Gtk.Orientation.VERTICAL, spacing=8,
             margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
         content.append(Gtk.Label(
-            label='The C64U will create a standard 35-track image in:\n' + self.remote,
+            label='The C64 Ultimate will create a standard 35-track image in:\n' + self.remote,
             xalign=0, wrap=True))
         filename = Gtk.Entry(text='new-disk.d64', hexpand=True)
         disk_name = Gtk.Entry(text='UNTITLED', max_length=16, hexpand=True)
         from .text_input import uppercase_entry
         disk_name.connect('changed', uppercase_entry)
-        content.append(Gtk.Label(label='C64U filename:', xalign=0))
+        content.append(Gtk.Label(label='C64 Ultimate filename:', xalign=0))
         content.append(filename)
         content.append(Gtk.Label(
             label='C64 disk name (up to 16 characters):', xalign=0))
@@ -1311,7 +1367,7 @@ class Browser(Gtk.Application):
             if conflict:
                 feedback.add_css_class('argonaut-error-message')
                 feedback.set_text(
-                    'That filename already exists on the C64U. '
+                    'That filename already exists on the C64 Ultimate. '
                     'Choose another filename; nothing will be overwritten.')
             else:
                 feedback.remove_css_class('argonaut-error-message')
@@ -1370,12 +1426,12 @@ class Browser(Gtk.Application):
                 self.remote_d64_create_prompt = None
                 if self.client is not client:
                     self.status.set_text(
-                        'Connection changed after D64 creation; refresh the C64U folder.')
+                        'Connection changed after D64 creation; refresh the C64 Ultimate folder.')
                     return
                 listing, created_leaf = result
                 self.show_remote(listing, (created_leaf,))
                 self.status.set_text(
-                    'Created and verified a standard blank D64 on the C64U; '
+                    'Created and verified a standard blank D64 on the C64 Ultimate; '
                     'the new image is selected.')
             self.run(task, done)
 
@@ -1458,7 +1514,7 @@ class Browser(Gtk.Application):
     def delete_partial(self):
         if self.busy or not self.partial_upload:return
         if not self.client:
-            self.status.set_text('Connect to the original C64U session before deleting this partial upload.');return
+            self.status.set_text('Connect to the original C64 Ultimate session before deleting this partial upload.');return
         return self.delete_dialog(False,[self.partial_upload.location.path],self.client,
                                   partial=self.partial_upload)
 
@@ -1470,7 +1526,7 @@ class Browser(Gtk.Application):
         dialog.add_button('Cancel',Gtk.ResponseType.CANCEL)
         button=dialog.add_button('Delete',Gtk.ResponseType.OK);button.add_css_class('destructive-action')
         dialog.set_default_response(Gtk.ResponseType.CANCEL)
-        device='This computer' if local else 'C64U '+client.host
+        device='This Computer' if local else 'C64 Ultimate '+client.host
         label=Gtk.Label(label='Preparing the deletion list…',xalign=0,yalign=0,wrap=True,selectable=True)
         button.set_sensitive(False)
         reviewed = []
@@ -1491,7 +1547,7 @@ class Browser(Gtk.Application):
                 if result is None:
                     self.status.set_text(snapshot.error.message);return
                 if partial and snapshot.state=='succeeded':
-                    self.partial_upload=None;self.partial_button.set_sensitive(False)
+                    self.partial_upload=None;self.update_partial_recovery()
                 message=result.message
                 self.refresh_local();self.status.set_text(message)
                 if not local and self.client is client:

@@ -44,4 +44,8 @@ class DriveButtons:
    if path==selected:button.add_css_class('suggested-action')
    button.connect('clicked',lambda _,target=path:self.app.navigate(self.local,target))
    self.box.append(button)
-  if not locations:self.box.append(Gtk.Label(label='No storage locations found. Use Refresh to scan.',wrap=True,xalign=0))
+  if not locations:
+   message = ('Connect to a C64 Ultimate in Settings → Device details to browse storage.'
+              if not self.local and self.app.client is None else
+              'No storage locations found. Use Refresh to check again.')
+   self.box.append(Gtk.Label(label=message,wrap=True,xalign=0))

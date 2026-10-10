@@ -302,7 +302,7 @@ Approved bounded checkpoints:
   browsing passed; Bruce approved icons and read-only restrictions. Unavailable-root
   faults were not induced. Acceptance changed documentation only; limitations are
   recorded in CURRENT-STATE.
-- **C2 — Remove redundant Backup/Restore UI:** implemented, pending review.
+- **C2 — Remove redundant Backup/Restore UI:** published in `9dbbb29d3e95`.
   This approved product decision supersedes the dedicated Storage & Backups page.
   Files backup/restore controls and unreachable UI callbacks are removed; no new
   backup tab, dialog or alternative entry point is planned. Ordinary copying,
@@ -315,15 +315,29 @@ Approved bounded checkpoints:
   Incremental USB/SD backup and PC-created baseline adoption are deferred
   indefinitely. Flash backup remains a possible future feature requiring separate
   feasibility/safety review; Flash restore is unapproved. No Temp backup expansion.
-  94 focused tests and 44 offline GTK checks passed, no skips; C2 awaits review.
+  94 focused tests and 44 offline GTK checks passed, no skips; C2 is published.
 - **C3 — Flash/Temp operations design review:** complete; Bruce approved retaining
   current C1 behavior as the final current policy. No production implementation or
   additional generic Files operations are approved. Generic Flash/Temp mutation is
   deferred; specialized Flash workflows remain separate and unchanged.
-- **C4 — Files polish and acceptance:** pending.
+- **C4 — Files polish and acceptance:** compact review and physical acceptance
+  passed; publication pending.
+  Filename labels are bounded with aligned sizes and full-name tooltips/accessibility.
+  Menu/Shift+F10 opens existing context actions without changing selection;
+  dismissal restores focus. Path/list accessible names, contextual recovery
+  visibility and Files terminology/disconnected wording are refined. Core,
+  C0/C1/C2/C3 and B5 contracts are preserved. 93 affected unit tests and 49
+  distinct offline GTK checks passed, no skips; evidence and warning limits are
+  recorded in CURRENT-STATE. Bruce passed the read-only checklist on actual GNOME
+  Wayland using source Development and C64 Founders: layout/long-name tooltips,
+  native selection, keyboard menus/focus, right-click, canceled drags, roots/icons,
+  Flash/Temp restrictions and normal shutdown. Exit code 0, no remaining GUI
+  process and an empty runtime log were verified. No transfers or remote mutations
+  were exercised; accessibility and recovery limitations are in CURRENT-STATE.
 
-Section C is **not complete**: C4 Files polish and acceptance remains pending and
-has not begun. Shared picker remains Section D.
+Section C is **not complete** until C4 publication is complete. C4 publication
+requires its separate safety gates; no staging, commit or push occurred in acceptance.
+Shared picker remains Section D.
 Streaming remains **OPEN / intermittent / instrumented**.
 
 **Approved C3 closure: retain current C1 Flash/Temp behavior.** This supersedes

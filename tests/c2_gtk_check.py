@@ -48,7 +48,7 @@ class BackupUiRetirement(unittest.TestCase):
         for label in ('Copy','Paste','Rename…','Delete…','Open disk image','Mount…'):self.assertIn(label,labels)
         app.popover.popdown();self.fixture.pump()
         tips=[w.get_tooltip_text() for w in self.fixture.walk(app.tabs.get_nth_page(0)) if isinstance(w,Gtk.Button)]
-        for tip in ('Copy','Paste','New folder…','New D64 disk on C64U…'):self.assertIn(tip,tips)
+        for tip in ('Copy','Paste','New folder…','New D64 disk on C64 Ultimate…'):self.assertIn(tip,tips)
 
     def test_partial_upload_recovery_keeps_exact_target(self):
         app=self.app
