@@ -117,17 +117,16 @@ Run `python3 -m c64u_browser.gui` in a graphical desktop session.
 python3 -m unittest discover -s tests -p 'test_*.py'
 python3 -m c64u_browser.test_lab
 python3 -m c64u_browser.test_lab --suite hardware  # optional, read-only C64U checks
-python3 packaging/build_deb.py --version 1.8 --output dist
 ```
 
 The Test Lab emits structured results for offline checks and opt-in, read-only
 C64U checks. See [Test Lab foundation](docs/TEST-LAB.md) for reports, credentials,
 and automation exit codes.
 
-The build command above labels the package 1.8; use the intended version for
-the source being built. See [build and release guidance](docs/RELEASING.md) for
-workflow selection and the pending 1.9 platform gate, and
-[1.8 release notes](packaging/RELEASE-1.8.md) for the stable baseline.
+For the current local Debian Development package, use the single authoritative
+[1.10 Development build procedure](docs/RELEASING.md#local-debian-development-build).
+Stable remains [1.9](packaging/RELEASE-1.9.md); Development packages are isolated,
+use session-only credentials, and are not a public Stable 1.10 release.
 The [C64U freeze reported during an Undo test involving SuperCPU Detect](https://github.com/Mrbruceybruce/argonaut-c64u/issues/1) remains unresolved.
 Other firmware versions may expose different capabilities.
 

@@ -2,6 +2,8 @@
 """Explicit opt-in identity for the separate development launcher."""
 import os
 
+VERSION = '1.10-dev'
+
 def enabled():
     return os.environ.get('ARGONAUT_DEVELOPMENT') == '1'
 

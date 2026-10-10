@@ -1,11 +1,87 @@
 # Current development state
 
-## B5 — contextual operation status/cancellation, physically accepted
+## B6 — Debian Development package accepted and installed
 
-**B5 REVIEW AND BOUNDED PHYSICAL ACCEPTANCE PASSED.** The foreground-admission
-prerequisite and B5 remain uncommitted. Compact review passed with 40 focused tests
-and eight offline GTK checks, no skips. Streaming remains **OPEN / intermittent /
-instrumented**. Publication is the next review gate; no publication was performed.
+B6 implementation and compact review passed; local archive/self-test/offline smoke
+acceptance passed. Bruce subsequently confirmed installation of the reviewed dev2 package.
+Stable stays 1.9. Source Development now displays `1.10-dev` with the existing
+checkout/build identity. The reviewed, installed local Debian package is `1.10~dev2`,
+displaying `1.10-dev2`; no public Stable 1.10 tag/release is implied.
+
+Debian Development deliberately selects maintained `RELEASE-DEVELOPMENT.md` and
+fails before staging if it is missing. Stable note selection and strict release
+checks remain separate. The builder exposes staging for deterministic tests without
+running dpkg. Package self-test verifies Debian version/notes identity and current
+resources, including Commodore SVG/attribution and B5 modules; existing credential
+isolation checks remain intact. General module/asset-copy coverage is tested.
+
+README, DEVELOPMENT and RELEASING now distinguish released Stable 1.9 from current
+1.10 Development. The single local build command is in RELEASING. Historical
+notes/screenshots are retained. The shared `1.8-replay.3` packaging workflow is
+explicitly deferred and must not be dispatched as current 1.10 guidance. No
+Windows/macOS packaging changed; the shared source Development label changes there
+naturally. Public-release trademark review remains pending.
+
+Verification: 52 focused Debian staging/package/version/channel/credential/resource
+and Stable-contract tests passed with no skips. The existing full GTK package
+self-test also passed 49 checks against temporary staged Development modules and
+metadata, with isolated configuration and socket connections forbidden. Its notes
+lookup was redirected to the temporary staged documentation directory; no archive
+was built, installed or represented as final package acceptance. Version reported
+`1.10-dev2` with the current commit plus `-modified`. Syntax, whitespace, modes,
+bounded secret scan and current documentation references were checked.
+
+Compact review confirmed the exact 13-file implementation scope (+376/-86) and
+reran 52 focused tests successfully. Review approved B6 package acceptance. Exactly
+one local Debian Development package was built using the documented command:
+
+- Artifact: `/tmp/argonaut-b6-dev2/argonaut-c64u-development_1.10~dev2_all.deb`
+- Size: 3,837,840 bytes.
+- SHA-256: `cd647750ae1cc4a134e55111def695e89302544b49252af5d3843e5885d0c329`
+- Control: `argonaut-c64u-development`, `1.10~dev2`, architecture `all`.
+- Stamp: display `1.10-dev2`, Development true, build
+  `627698b1dd0a3e0a7ebd7b9384a86b0332a507eb-modified`.
+
+This is the reviewed uncommitted B6 worktree on published B5, not a published B6
+commit. Archive inspection matched all application modules/assets against the
+reviewed worktree, including B5 modules and Commodore SVG/attribution. Active notes
+matched RELEASE-DEVELOPMENT.md byte-for-byte and by stamped SHA-256; no old 0.1.0
+notes were selected. Desktop entry and launchers use Development identities.
+
+The extracted archive's actual launcher and unmodified packaged self-test ran in
+a read-only filesystem namespace, with extracted application/docs/launcher mounted
+at their normal paths, fresh XDG configuration, and a separate network namespace.
+All 49 packaged checks passed. The first harness attempt lacked writable temporary
+storage; supplying an isolated TMPDIR fixed the test environment without changing
+or rebuilding the package. Read-only desktop isolation emitted dconf/GVFS warnings;
+they did not fail the self-test and are not evidence of an installed-package fault.
+
+A separate launch of the extracted package passed the minimal offline smoke:
+Development title; About `1.10-dev2` and matching modified build stamp; disconnected
+idle status with no stale Cancel; session-only credential messaging; B5 imports;
+and Commodore SVG decoding (130 x 122). Settings closed and normal Quit exited 0.
+No C64U, stream, native Stable keyring persistence test or external network was used.
+
+Only CURRENT-STATE and roadmap changed after the reviewed build; implementation,
+tests and packaged resources stayed unchanged. Bruce subsequently installed the
+reviewed `1.10~dev2` package. Read-only closure verification confirms installed
+`1.10~dev2`, display `1.10-dev2`, and the original B5-plus-modified build stamp.
+All 122 installed application modules/assets and Development notes match current
+source byte-for-byte. The offline smoke above used the extracted package; no new
+installed-app launch is claimed. The temporary archive directory is gone; no
+rebuild or reinstall was needed. Source publication follows the final review and
+remote-base safety gates. Stable remains 1.9; public 1.10, cross-platform qualification,
+shared-workflow modernization and trademark-release review remain future work.
+Streaming remains **OPEN / intermittent / instrumented**.
+
+## B5 — contextual operation status/cancellation, published
+
+**B5 COMPLETE AND PUBLISHED** at `627698b1dd0a3e0a7ebd7b9384a86b0332a507eb`,
+parent `5cb37571fa5192d71b012aa57027cc3d9459a518`, subject
+`Centralize foreground operation status and cancellation`. Publication verified
+local/remote equality, divergence 0 0 and clean index/worktree; 17 files, +1267/-177.
+Compact review passed with 40 focused tests and eight offline GTK checks, no skips.
+Streaming remains **OPEN / intermittent / instrumented**.
 
 One GTK-independent Browser presenter owns IDLE, RUNNING,
 CANCELLATION_REQUESTED and TERMINAL views for the admitted job/token. The compact
@@ -68,10 +144,11 @@ Core.close clears session credentials; process exit removed the in-memory sessio
 
 No remote mutation, second download, stream, hardware command, or unrelated physical
 qualification occurred. Production and tests were unchanged during acceptance;
-only these acceptance notes and the roadmap were updated. Starting cumulative scope
+only these acceptance notes and the roadmap were updated at that time. Starting cumulative scope
 was 17 files, +1230/-177 against published B4
 `5cb37571fa5192d71b012aa57027cc3d9459a518`; the index remains empty. No staging,
-commit, push, package, tag, release or later-roadmap work. Stop for publication.
+commit, push, package, tag, release or later-roadmap work occurred during acceptance.
+The subsequent approved B5 publication is recorded above.
 
 ## B5 prerequisite history — now approved
 

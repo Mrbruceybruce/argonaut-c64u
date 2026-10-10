@@ -1,28 +1,42 @@
 #!/usr/bin/python3
 """Build a Debian binary package using only Python and dpkg-deb."""
-import argparse,os,shutil,subprocess,tempfile,json,sys
+import argparse,hashlib,os,shutil,subprocess,tempfile,json,sys
 from build_metadata import metadata
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from c64u_browser.release import VERSION
-p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=ROOT);p.add_argument('--output',type=Path,default=Path('dist'));p.add_argument('--version',default=VERSION);p.add_argument('--development',action='store_true');p.add_argument('--release',action='store_true');args=p.parse_args()
-source=args.source.resolve();assets=Path(__file__).resolve().parent;out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
-version=args.version
-app_name='argonaut-development' if args.development else 'argonaut'
-package='argonaut-c64u-development' if args.development else 'argonaut-c64u'
-build=metadata(source,version.replace('~','-'),args.release)
-if args.development:build['development']=True
-commit=build['build']
-if commit.endswith('-modified'):commit=commit[:-9]
-try:
- epoch=int(subprocess.check_output(['git','-C',str(source),'show','-s','--format=%ct',commit],text=True).strip())
-except (OSError,subprocess.CalledProcessError,ValueError):
- if args.release:raise SystemExit('Could not derive SOURCE_DATE_EPOCH from release commit')
- epoch=int(os.environ.get('SOURCE_DATE_EPOCH','0'))
-if args.release and os.environ.get('SOURCE_DATE_EPOCH') not in (None,str(epoch)):
- raise SystemExit('SOURCE_DATE_EPOCH does not match the immutable release commit')
-with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
- root=Path(temp)
+
+def release_notes_path(assets, version, development=False, release=False):
+ if development:
+  path=assets/'RELEASE-DEVELOPMENT.md'
+  if not path.is_file():raise ValueError('Missing required Development release notes')
+  return path
+ path=assets/f'RELEASE-{version}.md'
+ if path.is_file():return path
+ if release:raise ValueError(f'Missing release notes: {path}')
+ return assets/'RELEASE-NOTES.md'
+
+
+def stage_package(source, root, version, development=False, release=False):
+ """Populate a temporary package tree; no dpkg invocation or installation."""
+ source=Path(source).resolve();root=Path(root);assets=source/'packaging'
+ if development and release:raise ValueError('Development and Stable release modes are separate')
+ notes=release_notes_path(assets,version,development,release).read_text()
+ app_name='argonaut-development' if development else 'argonaut'
+ package='argonaut-c64u-development' if development else 'argonaut-c64u'
+ build=metadata(source,version.replace('~','-'),release)
+ if development:build['development']=True
+ build.update(package_format='deb',package_version=version,
+              release_notes_sha256=hashlib.sha256(notes.encode()).hexdigest())
+ commit=build['build']
+ if commit.endswith('-modified'):commit=commit[:-9]
+ try:
+  epoch=int(subprocess.check_output(['git','-C',str(source),'show','-s','--format=%ct',commit],text=True).strip())
+ except (OSError,subprocess.CalledProcessError,ValueError):
+  if release:raise SystemExit('Could not derive SOURCE_DATE_EPOCH from release commit')
+  epoch=int(os.environ.get('SOURCE_DATE_EPOCH','0'))
+ if release and os.environ.get('SOURCE_DATE_EPOCH') not in (None,str(epoch)):
+  raise SystemExit('SOURCE_DATE_EPOCH does not match the immutable release commit')
  def write(name,text,mode=0o644):
   path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(text);path.chmod(mode)
  for file in sorted((source/'c64u_browser').glob('*.py')):
@@ -31,18 +45,18 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
  write(f'usr/lib/{app_name}/c64u_browser/_build.json',json.dumps(build))
  write(f'usr/bin/{app_name}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/launch.py "$@"\n',0o755)
  launch=('import json,os,sys\nfrom pathlib import Path\n'+
-         ('os.environ["ARGONAUT_DEVELOPMENT"]="1"\n' if args.development else '')+
+         ('os.environ["ARGONAUT_DEVELOPMENT"]="1"\n' if development else '')+
          f'sys.path.insert(0, "/usr/lib/{app_name}")\nimport c64u_browser\nmetadata_path=Path(c64u_browser.__file__).parent/"_build.json"\npackage_metadata=json.loads(metadata_path.read_text())\n'+
          'if "--self-test" in sys.argv:\n from c64u_browser.package_self_test import run\n run(package_metadata,sys.argv[sys.argv.index("--self-test")+1])\nelse:\n from c64u_browser.gui import main\n main()\n')
  write(f'usr/lib/{app_name}/launch.py',launch)
- identity='os.environ["ARGONAUT_DEVELOPMENT"]="1"\n' if args.development else ''
+ identity='os.environ["ARGONAUT_DEVELOPMENT"]="1"\n' if development else ''
  def tool(script,module,name):
   executable=app_name+'-'+name
   write(f'usr/bin/{executable}', f'#!/bin/sh\ncd "$HOME" || exit 1\nexec /usr/bin/python3 -I /usr/lib/{app_name}/{script}.py "$@"\n',0o755)
   write(f'usr/lib/{app_name}/{script}.py', f'import os,sys\n{identity}sys.path.insert(0, "/usr/lib/{app_name}")\nfrom c64u_browser.{module} import main\nraise SystemExit(main())\n')
   return executable
  config_name=app_name
- development_env='Environment=ARGONAUT_DEVELOPMENT=1' if args.development else ''
+ development_env='Environment=ARGONAUT_DEVELOPMENT=1' if development else ''
  bridge_name=tool('bridge','c64_ai_bridge_cli','ai-bridge')
  bridge_unit=app_name+'-c64-ai-bridge.service'
  unit=(source/'packaging/linux/argonaut-c64-ai-bridge.service').read_text()
@@ -71,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
  fleet_timer=(source/'packaging/linux/argonaut-test-lab-fleet.timer').read_text().replace('@SERVICE_UNIT@',fleet_unit)
  write('usr/lib/systemd/user/'+app_name+'-test-lab-fleet.timer',fleet_timer)
  desktop=(assets/'desktop/argonaut.desktop').read_text().replace('Exec=argonaut','Exec='+app_name).replace('Icon=argonaut','Icon='+app_name)
- if args.development:desktop=desktop.replace('Name=Argonaut','Name=Argonaut Development '+version.replace('~','-'))
+ if development:desktop=desktop.replace('Name=Argonaut','Name=Argonaut Development '+version.replace('~','-'))
  write(f'usr/share/applications/{app_name}.desktop',desktop)
  for size in (16,24,32,48,64,128,256,512,1024):
   destination=root/f'usr/share/icons/hicolor/{size}x{size}/apps/{app_name}.png'
@@ -84,11 +98,7 @@ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
   evidence_path=Path(evidence)
   if not evidence_path.is_file():raise SystemExit('Build evidence file is missing')
   write(f'usr/share/doc/{package}/BUILD-EVIDENCE.txt',evidence_path.read_text())
- release_notes=assets/f'RELEASE-{version}.md'
- if not release_notes.is_file():
-  if args.release:raise SystemExit(f'Missing release notes: {release_notes}')
-  release_notes=assets/'RELEASE-NOTES.md'
- write(f'usr/share/doc/{package}/RELEASE-NOTES.md',release_notes.read_text())
+ write(f'usr/share/doc/{package}/RELEASE-NOTES.md',notes)
  write(f'usr/share/doc/{package}/copyright',(source/'COPYRIGHT').read_text() + '\nLicense: GPL-3.0-or-later. Full license: LICENSE in this directory.\n')
  size=sum(f.stat().st_size for f in root.rglob('*') if f.is_file())//1024+1
  write('DEBIAN/control',f'''Package: {package}
@@ -107,4 +117,21 @@ Description: GTK desktop controller and file manager for C64 Ultimate
  Uses the system Python 3 and GTK 4 runtime.
 ''')
  for f in root.rglob('*'):os.utime(f,(epoch,epoch))
- subprocess.run(['dpkg-deb','--root-owner-group','--build',str(root),str(out/f'{package}_{version}_all.deb')],check=True,env={**os.environ,'SOURCE_DATE_EPOCH':str(epoch)})
+ return package,epoch
+
+
+def main():
+ p=argparse.ArgumentParser()
+ p.add_argument('--source',type=Path,default=ROOT)
+ p.add_argument('--output',type=Path,default=Path('dist'))
+ p.add_argument('--version',default=VERSION)
+ p.add_argument('--development',action='store_true')
+ p.add_argument('--release',action='store_true')
+ args=p.parse_args()
+ with tempfile.TemporaryDirectory(prefix='argonaut-deb-') as temp:
+  package,epoch=stage_package(args.source,temp,args.version,args.development,args.release)
+  out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
+  subprocess.run(['dpkg-deb','--root-owner-group','--build',temp,str(out/f'{package}_{args.version}_all.deb')],check=True,env={**os.environ,'SOURCE_DATE_EPOCH':str(epoch)})
+
+
+if __name__=='__main__':main()

@@ -1,13 +1,48 @@
 # Build and release guidance
 
 Stable downloads are on the [Releases page](https://github.com/Mrbruceybruce/argonaut-c64u/releases).
-The currently published baseline is [1.8](../packaging/RELEASE-1.8.md).
-Stable 1.9 feature implementation and Linux acceptance are complete, but the
-consolidated Debian, Windows, Apple Silicon, and Intel Mac qualification gate has
-not yet passed. Do not describe 1.9 as published until the exact final bytes have
-completed that gate and publication is separately approved.
+The published Stable baseline is [1.9](../packaging/RELEASE-1.9.md); its tag and
+release artifacts are immutable. Current development targets 1.10. No public
+Stable 1.10 tag or release exists.
 
-## Stable 1.9 private qualification workflow
+## Local Debian Development build
+
+The following is the authoritative local build example, for the separately
+approved B6 package acceptance after implementation review:
+
+```sh
+python3 packaging/build_deb.py --development --version '1.10~dev2' --output /tmp/argonaut-b6-dev2
+```
+
+This creates an `argonaut-c64u-development` package; it does not install or publish
+it. Debian version ordering is `1.9 < 1.10~dev1 < 1.10~dev2 < 1.10`. Its application
+menu/About version is `1.10-dev2`; source Development is `1.10-dev`. The packaged
+build identity records the source commit, including `-modified` for pending changes.
+Stable's version contract remains 1.9; `--development` does not itself select a
+package version. Do not combine Development with Stable `--release` mode.
+
+Development uses separate application, configuration and service identities,
+session-only credentials, and no installed Stable keyring access. Notes deliberately
+come from `packaging/RELEASE-DEVELOPMENT.md`; a missing file fails the build rather
+than falling back to historical notes. The archive includes all normal application
+modules and assets, including B4 SVG/attribution and B5 foreground/presenter modules.
+
+At acceptance, inspect archive/control/desktop metadata, notes, modules and assets;
+run the packaged self-test in an isolated Development context; then perform an
+offline launch/About/status smoke check. Installation/upgrade needs separate approval.
+Do not contact a C64U, start a stream, tag or publish. Public-release review of
+Commodore branding remains pending. Streaming remains OPEN / intermittent /
+instrumented; packaging acceptance does not qualify it.
+
+The shared `development-packages.yml` still stamps `1.8-replay.3`, includes historical
+notes, and has an optional publisher. It is **not** the current 1.10 procedure:
+do not dispatch it for B6. Modernization is deferred to later release/automation
+work, as are Windows/macOS packaging changes and 1.10 cross-platform qualification.
+
+## Historical Stable 1.9 private qualification contract
+
+The following records the qualification architecture used for the now-published
+1.9 baseline. It is retained reference, not a new publication instruction.
 
 Stable 1.9 uses `.github/workflows/stable-1.9.yml`. It builds all platforms from
 one required full Git commit ID. The source job verifies that its checkout equals
@@ -16,8 +51,8 @@ that ID; every downstream job checks out the resolved ID, and
 
 The workflow does not publish, tag, create a GitHub Release, or request signing
 credentials. It produces private Actions artifacts for the consolidated platform
-gate. Final publication is a later, explicitly approved operation performed only
-after the exact assembled bytes have passed qualification. Rebuilding any payload
+gate. For that process, final publication required separate approval after the exact
+assembled bytes passed qualification. Rebuilding any payload
 changes those bytes and requires renewed qualification.
 
 `c64u_browser/release.py` is the authoritative Stable 1.9 contract:
@@ -25,7 +60,7 @@ changes those bytes and requires renewed qualification.
 - display, Debian, Windows product and macOS short version: `1.9`;
 - Windows numeric file/product version: `1.9.0.0`;
 - macOS bundle build version: `10900`;
-- intended future tag: `v1.9`;
+- published tag: `v1.9`;
 - notes: `packaging/RELEASE-1.9.md`;
 - exact eight-payload allowlist used by final assembly.
 
@@ -77,24 +112,21 @@ to disable Gatekeeper globally.
 | Workflow | Purpose and current behavior |
 | --- | --- |
 | `test-lab.yml` | Regression checks on pushes and pull requests targeting `development`, plus manual dispatch. Runs offline Test Lab and unit tests; retains a report. |
-| `development-packages.yml` | Builds Debian, Windows, and both Mac architectures from one resolved `development` commit. It remains a Development-package workflow and is not the Stable 1.9 qualification contract. |
-| `stable-1.8.yml` | Historical/current published Stable 1.8 packaging baseline. It is not a Stable 1.9 workflow. |
+| `development-packages.yml` | Builds Debian, Windows, and both Mac architectures from one resolved `development` commit. Historical `1.8-replay.3` recipe; deferred and not current 1.10 guidance. Do not dispatch for B6. |
+| `stable-1.8.yml` | Historical Stable 1.8 packaging baseline. It is not a Stable 1.9 workflow. |
 
 Selecting a different dispatch branch does not convert an older workflow into a
 1.9 builder. Keep any legacy publishing input disabled; the 1.9 workflow has no
 publication path.
 
-Use the private 1.9 workflow and retained regression checks, then record physical
-acceptance on Debian, Windows, Apple Silicon, and Intel Mac. Hosted checks alone
-do not establish physical acceptance. The historical replay checklist in
-[DEVELOPMENT-TEST.md](DEVELOPMENT-TEST.md) is reference material, not the 1.9
-platform gate.
+The historical 1.9 gate required exact-artifact qualification and physical
+acceptance on Debian, Windows, Apple Silicon and Intel Mac; hosted checks alone
+did not establish physical acceptance. [DEVELOPMENT-TEST.md](DEVELOPMENT-TEST.md)
+records the earlier replay test period and is not current 1.10 release guidance.
 
-For local non-release builds, pass the intended version explicitly to
-`packaging/build_deb.py --version VERSION` or
-`packaging/build_metadata.py --version VERSION`. Release-mode builds additionally
-require the exact clean source commit contract. See the
-[README](../README.md#build-and-test) and [macOS build guide](MACOS-BUILD.md).
+For current local Debian Development builds use the procedure above. Retained
+Stable release-mode builders still require the exact clean source commit and
+Stable 1.9 contract. The [macOS build guide](MACOS-BUILD.md) remains outside B6.
 
 ## Retired manual recipes
 

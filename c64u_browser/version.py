@@ -15,5 +15,5 @@ def build_info():
         return data
     except (OSError, ValueError):
         if development.enabled():
-            return {'version':VERSION+'-dev','build':os.environ.get('ARGONAUT_DEV_BUILD','development checkout')}
+            return {'version':development.VERSION,'build':os.environ.get('ARGONAUT_DEV_BUILD','development checkout')}
         return {'version': VERSION, 'build': 'source checkout (unpackaged)'}

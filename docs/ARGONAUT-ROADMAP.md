@@ -212,7 +212,8 @@ executing a hardware command requires separate authorization.
 
 ### 5. Contextual operation status/cancellation
 
-**Foreground-admission prerequisite APPROVED; B5 reviewed and physically accepted.**
+**B5 COMPLETE / PUBLISHED** at `627698b1dd0a3e0a7ebd7b9384a86b0332a507eb`.
+Foreground-admission prerequisite and contextual presenter passed review and physical acceptance.
 One Browser-managed foreground operation is reserved before submission, with busy
 attempts refused without queueing. Cancellation retains admission until terminal
 cleanup. The short ownership mutex never spans submission/execution/cancellation.
@@ -238,15 +239,35 @@ request; local staging was cleaned. Read-only browsing and ordinary status recov
 Cancel stayed absent, and normal Quit exited cleanly. No remote mutation or stream.
 Details and physical-observation limitations are in CURRENT-STATE.
 
-**Stop for publication; do not execute commit/push without publication instructions.**
-Streaming remains OPEN / intermittent / instrumented. Do not advance to B6 yet.
+Publication verified local/remote equality, divergence 0 0 and clean worktree.
+Streaming remains OPEN / intermittent / instrumented. B6 is the current section.
 
 ### 6. Packaging spit-shine
 
-The local Debian `1.10~dev1` package works structurally per the walkthrough.
-Development currently falls back to old `0.1.0` release notes; fix before public
-release. Some packaging/build docs are stale and need reconciliation in later
-work. No public 1.10 tag/release exists; this pass does not build or package.
+**Review and local package acceptance PASSED; reviewed dev2 installed.**
+Stable remains 1.9; source Development is `1.10-dev`. Reviewed, installed local Debian
+Development version is `1.10~dev2`, displaying `1.10-dev2`. Development uses explicit
+maintained notes with missing-note failure instead of the historical 0.1.0 fallback.
+Stable release checks and Development isolation/session-only credentials remain.
+General module/asset staging and package self-test cover current B4/B5 resources.
+
+Current packaging/build docs are reconciled, with one local build command in
+RELEASING; historical evidence is preserved. Shared `1.8-replay.3` workflow
+modernization is deferred; do not dispatch it for B6. Windows/macOS packaging,
+public Stable 1.10 and trademark-release review remain future work.
+52 focused tests and 49 offline staged-runtime GTK self-test checks passed; no skips.
+Compact review reran 52 focused tests. Exactly one local `1.10~dev2` Development
+archive was built and inspected; extracted-package self-test passed all 49 checks
+in an isolated offline namespace. Offline Development/About/status/session-credential
+smoke, Commodore SVG decoding and normal Quit passed. Build stamp is published B5
+`627698b1dd0a3e0a7ebd7b9384a86b0332a507eb-modified`, not a published B6 commit.
+Artifact size/hash and isolation limitations are recorded in CURRENT-STATE.
+Bruce subsequently confirmed installation of the reviewed `1.10~dev2` package.
+Read-only closure checks confirm its version and all 122 modules/assets plus notes
+match current source. The offline smoke above was on the extracted package.
+Source publication follows final review and remote-base safety gates; no rebuild,
+reinstall, device contact or workflow dispatch is part of closure.
+Streaming remains OPEN / intermittent / instrumented.
 
 ## C. Files / storage UX
 

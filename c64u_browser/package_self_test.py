@@ -86,6 +86,33 @@ def _check_credential_channel(package_metadata, checks):
              'The credential backend does not match the package channel.', checks)
 
 
+def _check_debian_package(package_metadata, checks, module_root=None, doc_root=None):
+    """Check installed Debian notes and identity without network or user settings."""
+    if package_metadata.get('package_format') != 'deb':
+        return  # Other platform package contracts are unchanged.
+    import hashlib
+    from . import development
+    module_root = Path(module_root) if module_root is not None else Path(__file__).parent
+    dev = package_metadata.get('development', False)
+    package = 'argonaut-c64u-development' if dev else 'argonaut-c64u'
+    doc_root = Path(doc_root) if doc_root is not None else Path('/usr/share/doc') / package
+    version = package_metadata.get('package_version')
+    _require(isinstance(version, str) and
+             version.replace('~', '-') == package_metadata.get('version') and
+             (not dev or package_metadata['version'].startswith(development.VERSION)),
+             'package.debian_identity', 'Debian version/channel mismatch.', checks)
+    notes = doc_root / 'RELEASE-NOTES.md'
+    _require(notes.is_file(), 'package.release_notes', 'Package notes are missing.', checks)
+    contents = notes.read_bytes()
+    _require(hashlib.sha256(contents).hexdigest() == package_metadata.get('release_notes_sha256') and
+             (not dev or contents.startswith(b'# Argonaut Development')),
+             'package.release_notes_content', 'Package notes do not match the selected channel.', checks)
+    required = ('foreground.py', 'operation_status.py', 'assets/commodore-c-equals.svg',
+                'assets/COMMODORE-ATTRIBUTION.txt')
+    _require(all((module_root / name).is_file() for name in required),
+             'package.current_resources', 'Required current modules or resources are missing.', checks)
+
+
 def run(package_metadata, report_path):
     checks = []
     app = None
@@ -108,6 +135,7 @@ def run(package_metadata, report_path):
         from .version import ASSETS, build_info
 
         _check_credential_channel(package_metadata, checks)
+        _check_debian_package(package_metadata, checks)
         root = portable_root()
         if root:
             config_name = ('argonaut-development'
