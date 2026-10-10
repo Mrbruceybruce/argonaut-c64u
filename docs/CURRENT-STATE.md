@@ -1,10 +1,63 @@
 # Current development state
 
-## C0 — Conventional file selection and activation: accepted, pending publication
+## C2 — Redundant Backup/Restore UI removed: pending review
+
+Bruce approved retiring the dedicated Backup/Restore interface after the bounded
+storage benchmarks. No replacement Storage & Backups tab or dialog is planned.
+The preferred bulk-media workflow is preparation on a PC/Mac with the source
+library retained there; ordinary Argonaut Files copying remains supported.
+
+Starting HEAD/local origin/development was
+`4b77705510d99af2cba940064cfd7ca987a25082`, divergence 0 0, clean index/worktree.
+C0/C1 are published and complete at that checkpoint. C2 removes the Files
+`Back up USB/SD…` and `Restore USB/SD…` buttons, their row, chooser/review/result
+callbacks, chooser helper and obsolete sensitivity/busy-control references.
+Files now contains contextual partial-upload recovery above the normal two panes;
+B5 status and contextual Cancel remain at the bottom of the main window.
+
+Settings no longer displays the unused USB/SD backup-root editor. Its stored
+`usb_backup_root` value, config round-trip and Core accessor remain compatible;
+ordinary Settings edits, Undo and Restore defaults must preserve this hidden value.
+All backup/restore Core/service methods and existing service regressions remain.
+No managed FTP, scheduler, session binding, replacement, cancellation, cleanup,
+C0 selection or C1 storage-authorization implementation changed.
+
+The controlled Founder benchmark observed comparable 16 MiB reads of 0.357 MiB/s
+on SD, 0.489 on USB1 and 0.488 on USB0. These are measurements from one device,
+firmware and workload, not universal media specifications. USB3.2 media showed no
+meaningful network read advantage. Small-file overhead was substantial. File
+modification timestamps advanced on tested same-size replacements, but directory
+timestamps did not track child changes; apparent two-second granularity and a
+clock offset further limit metadata-only conclusions. The earlier benchmark used
+separately approved temporary content and verified its removal on all three roots.
+This implementation pass makes no device contact.
+
+Verification: **94 focused tests and 44 explicit offline GTK checks passed, no
+skips**. The focused run covers retained backup/restore services, partial-upload
+and replacement consequence reporting, legacy preferences, foreground admission,
+operation status, C1 managed restrictions and disk-image navigation. GTK checks
+cover removal/no replacement entry point, two-pane layout at 900x650 and 1200x850,
+keyboard traversal, Copy/Paste upload/download routing, context/disk actions,
+partial-upload recovery, hidden preference survival through settings/defaults,
+C0 pointer/key/drag behavior and C1/B5 nonregression. Tests used fake devices,
+loopback-only networking and an isolated nested X11 display with memory GSettings.
+The initial restricted run could not open local test sockets; the permitted rerun
+passed. GTK emitted one GtkText focus-out warning with passing focus assertions;
+this remains a nonblocking limitation, not an upstream GTK fix. No broad
+normal/optimized suite or physical acceptance was run.
+
+Incremental USB/SD backup and PC-created baseline adoption are deferred indefinitely.
+Flash backup is only a possible future feature requiring separate feasibility and
+safety review; Flash restore is unapproved. No Temp backup expansion is planned.
+C3/C4 remain pending; Section C is not complete. D/E, Test Lab and Streams work are
+out of scope. Streaming remains **OPEN / intermittent / instrumented**.
+
+
+## C0 — Conventional file selection and activation: published
 
 C0 passed final narrow re-review and combined read-only C0/C1 physical acceptance.
-C0 and C1 are **accepted, pending commit/push**. Section C is not complete;
-C2/C3/C4 remain pending.
+C0 and C1 are **published and complete** at `4b77705510d99af2cba940064cfd7ca987a25082`.
+Section C is not complete; see C2 above, with C3/C4 still pending.
 Starting authority was published HEAD/local origin/development
 `c26da8e73b6e8604895ba9da67a32b099c900629`, divergence 0 0, empty index, with
 exactly 15 pending C1 files (+559/-51). C1 production/tests/assets are preserved
@@ -111,10 +164,10 @@ file and ARGONAUT-ROADMAP were updated. No staging, commit, push, package or rel
 occurred. C2/C3/C4 and D/E remain untouched. C0/C1 are approved for a separately
 executed, allowlisted commit/push; Section C is not complete.
 
-## C1 — Storage roots and safe browsing: accepted, pending publication
+## C1 — Storage roots and safe browsing: published
 
 C1 is implemented, deterministically verified, compact-review approved and
-**read-only physical acceptance passed; pending commit/push**. See the combined
+**read-only physical acceptance passed; published in 4b77705510d9**. See the combined
 acceptance record above. Section C is not complete.
 Starting HEAD/local origin/development was
 `c26da8e73b6e8604895ba9da67a32b099c900629`, parent
@@ -148,8 +201,8 @@ failure timing is retained. Storage roots themselves cannot be renamed/deleted o
 used as replacement files. No generic internal download route is added.
 
 The separate R6 native Flash upload, save-copy, configuration-preview and reviewed
-exact-file cleanup contracts are unchanged. USB/SD backup/restore remains scoped
-and in its current Files location. No C2/C3 operations are introduced. Existing
+exact-file cleanup contracts are unchanged. At the C1 checkpoint, USB/SD backup/restore remained scoped
+and in Files; C2 above retires that UI while preserving its services. No C2/C3 operations are introduced. Existing
 two-pane COPY-only dragging remains; external/same-pane drops are not added.
 B5 foreground admission/global contextual cancellation is unchanged.
 
@@ -179,7 +232,7 @@ obtain the final results. Syntax/whitespace and bounded change review passed.
 Combined read-only physical acceptance passed as recorded above. Hardware mutation
 workflows were not exercised; Files retains the C1 browsing-only restrictions.
 
-- C2: dedicated Storage & Backups page relocation pending.
+- C2: dedicated backup UI retired by the later approved decision; review pending.
 - C3: Flash/Temp managed mutation policy pending.
 - C4: final Files polish and acceptance pending.
 - Shared file picker remains D; no D/E implementation.

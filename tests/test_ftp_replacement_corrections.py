@@ -128,20 +128,12 @@ class CorrectionTests(unittest.TestCase):
                 self.check_summary(result.details(),e,mode)
                 self.assertIsNone(result.partial_upload);self.assertIsNone(result.partial_path)
 
-    def test_usb_restore_actual_presentation_uses_core_details(self):
-        # Execute the actual GTK completion method without importing/starting GTK.
-        tree=ast.parse(Path('c64u_browser/gui.py').read_text())
-        method=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='usb_restore_finished')
-        namespace={};exec(compile(ast.Module(body=[method],type_ignores=[]),'gui.py','exec'),namespace)
+    def test_usb_restore_retains_core_consequence_details(self):
         for mode in ('unknown','refused','delete','rmdir'):
             with self.subTest(mode=mode):
                 e=self.evidence(mode)
                 result=RestoreResult((),(),(),(),(),('a',),0,failure=str(ReplacementFailure(e)),replacements=(e,))
-                browser=SimpleNamespace(status=Mock(),partial_button=Mock(),client=None,usb_report=Mock())
-                namespace['usb_restore_finished'](browser,SimpleNamespace(result=result,state='failed'))
-                details=browser.usb_report.call_args.args[2]
-                self.assertEqual(result.details(),details);self.check_summary(details,e,mode)
-                browser.partial_button.set_sensitive.assert_not_called()
+                self.check_summary(result.details(),e,mode)
                 self.assertIsNone(result.partial_upload)
 
     def test_ordinary_partial_upload_reporting_unchanged(self):

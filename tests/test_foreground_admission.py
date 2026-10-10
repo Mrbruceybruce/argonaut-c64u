@@ -204,15 +204,10 @@ class Admission(unittest.TestCase):
         exec(compile(ast.Module(body=[response],type_ignores=[]),filename,'exec'),namespace)
         return namespace[callback]
 
-    def test_delayed_usb_restore_game_launch_and_sid_play_confirmations(self):
+    def test_delayed_game_launch_and_sid_play_confirmations(self):
         from gi.repository import Gtk
         a=self.start()
-        self.app.core.usb=Mock();self.app.usb_restore_finished=Mock()
         preview=SimpleNamespace(plan_id='reviewed')
-        confirmed=self.callback('gui.py','restore_preview','confirmed',
-            {'self':self.app,'preview':preview,'Gtk':Gtk})
-        confirmed(Mock(),Gtk.ResponseType.OK)
-        self.app.core.usb.execute_restore.assert_not_called()
         for cls,filename,method,callback,execute,finish in (
             (GameLibraryTab,'game_library_tab.py','_launch_prepared','answered','execute_launch','_launch_finished'),
             (SidJukeboxTab,'sid_jukebox_tab.py','_play_prepared','response','execute_play','_play_finished')):

@@ -34,8 +34,6 @@ class StorageGtk(unittest.TestCase):
             self.assertTrue(theme.has_icon(root_presentation(root)[1]))
             expected=root not in ('/Flash','/Temp')
             for button in self.app.remote_file_actions:self.assertEqual(expected,button.get_sensitive())
-            self.assertEqual(expected,self.app.usb_backup_button.get_sensitive())
-            self.assertEqual(expected,self.app.usb_restore_button.get_sensitive())
             self.assertEqual(not expected,self.app.storage_description.get_visible())
         self.show('/USB1')
         self.assertTrue(all(b.get_sensitive() for b in self.app.remote_file_actions))

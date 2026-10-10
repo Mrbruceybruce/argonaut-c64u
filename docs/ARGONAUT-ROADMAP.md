@@ -275,7 +275,7 @@ Approved bounded checkpoints:
 
 - **C0 — Conventional file selection and activation:** implemented/deterministically
   verified, final re-review and combined read-only physical acceptance passed;
-  pending commit/push.
+  published and complete in `4b77705510d9`.
   Native GTK multiple selection/theme highlighting, independent panes, focus,
   nonselectable parent rows and refresh retention are retained or corrected.
   Optional read-only live Nautilus activation policy uses a modifier/drag-safe
@@ -290,7 +290,8 @@ Approved bounded checkpoints:
   GNOME policy stayed double; physical single-click remains unqualified.
   Full acceptance evidence and limitations are in CURRENT-STATE.
 - **C1 — Storage roots and safe browsing:** implemented/deterministically verified,
-  compact-review and read-only physical acceptance passed; pending commit/push.
+  compact-review and read-only physical acceptance passed; published and complete
+  in `4b77705510d9`.
   Advertised exact
   USB/SD/Flash/Temp locations are visible. Flash/Temp directory browsing uses the
   existing managed listing, independently of USB/SD operation authorization.
@@ -301,8 +302,20 @@ Approved bounded checkpoints:
   browsing passed; Bruce approved icons and read-only restrictions. Unavailable-root
   faults were not induced. Acceptance changed documentation only; limitations are
   recorded in CURRENT-STATE.
-- **C2 — Storage & Backups relocation:** pending; dedicated Storage & Backups page
-  is the approved destination. Existing USB/SD controls remain in Files until C2.
+- **C2 — Remove redundant Backup/Restore UI:** implemented, pending review.
+  This approved product decision supersedes the dedicated Storage & Backups page.
+  Files backup/restore controls and unreachable UI callbacks are removed; no new
+  backup tab, dialog or alternative entry point is planned. Ordinary copying,
+  managed transfers and contextual partial-upload recovery remain supported.
+  Tested Core/service implementations and legacy backup-root configuration remain;
+  the unused backup-root editor is hidden from Settings.
+  Controlled Founder 16 MiB reads measured SD 0.357, USB1 0.489 and USB0 0.488 MiB/s;
+  these workload-specific observations are not hardware specifications. Bruce
+  prefers preparing bulk removable media and retaining source libraries on PC/Mac.
+  Incremental USB/SD backup and PC-created baseline adoption are deferred
+  indefinitely. Flash backup remains a possible future feature requiring separate
+  feasibility/safety review; Flash restore is unapproved. No Temp backup expansion.
+  94 focused tests and 44 offline GTK checks passed, no skips; C2 awaits review.
 - **C3 — Flash/Temp managed operations:** mutation policy and implementation pending.
 - **C4 — Files polish and acceptance:** pending.
 
