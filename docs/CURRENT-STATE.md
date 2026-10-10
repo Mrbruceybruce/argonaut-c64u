@@ -1,6 +1,21 @@
 # Current development state
 
-## C4 — Bounded Files polish: physical acceptance passed, publication pending
+## Published checkpoint reconciliation
+
+Section C is complete. C4 was published in
+`43a3f6ae28e41a6a3a3a6ae604e281d3062eb11e` (`Polish Files user experience`).
+
+The shared picker remains Section D. Its foundation and SIDJuke migration are
+complete and published in `fbb974c7ef04ab539188de232817189e6c55d566`
+(`Integrate SIDJuke with shared file picker`). Remaining consumer migrations are
+pending; their order and bounded scope require separate design review. Section D
+is not complete. This reconciliation starts no further D implementation or E work.
+
+Historical acceptance records below are preserved, including their test counts,
+limitations and statements that publication had not yet occurred during those
+passes. Those historical stop markers do not override the published status above.
+
+## C4 — Bounded Files polish: published; Section C complete
 
 Starting HEAD/local origin/development:
 `c62e345ec3e6b6dea193fd7ab3e6da6129d9589d`, divergence 0 0, clean index/worktree.
@@ -21,8 +36,8 @@ Only GTK presentation and focused tests change. Core/services, C0 activation,
 C1 storage authorization, C2 backup UI retirement, C3 Flash/Temp browsing-only
 policy, R6 and B5 foreground ownership/cancellation remain unchanged. No device
 contact, staging, commit, push, package or release is part of this implementation.
-C4 compact review and GNOME Wayland physical acceptance passed; publication
-remains pending. Section C is not complete.
+C4 compact review and GNOME Wayland physical acceptance passed. C4 is published
+in `43a3f6ae28e41a6a3a3a6ae604e281d3062eb11e`; Section C is complete.
 
 Verification: 93 affected unit tests passed, no skips. The combined GTK run passed
 48 checks; after the final dialog-focus guard, 21 directly affected GTK checks
@@ -109,9 +124,9 @@ authorization, file-service permissions, C0 selection, C1 browsing and B5 operat
 handling are unchanged. This closure changes documentation only; validation is
 limited to documentation consistency and hygiene, with no device contact.
 
-C4 review and physical acceptance passed; publication remains pending; see above.
-Section C is not complete. Shared file-picker work remains Section D; no D/E work
-is included in this closure.
+C4 is published and Section C is complete; see the reconciliation above.
+Shared file-picker work remains Section D. No D/E work was included in the
+C3 documentation closure.
 
 ## C2 — Redundant Backup/Restore UI removed: published
 
@@ -163,16 +178,16 @@ normal/optimized suite or physical acceptance was run.
 Incremental USB/SD backup and PC-created baseline adoption are deferred indefinitely.
 Flash backup is only a possible future feature requiring separate feasibility and
 safety review; Flash restore is unapproved. No Temp backup expansion is planned.
-C3 design review is complete with C1 policy retained; C4 remains pending.
-Section C is not complete. D/E, Test Lab and Streams work are
-out of scope. Streaming remains **OPEN / intermittent / instrumented**.
+C3 design review is complete with C1 policy retained; C4 is published and
+Section C is complete. D/E, Test Lab and Streams work were
+out of scope for C2. Streaming remains **OPEN / intermittent / instrumented**.
 
 
 ## C0 — Conventional file selection and activation: published
 
 C0 passed final narrow re-review and combined read-only C0/C1 physical acceptance.
 C0 and C1 are **published and complete** at `4b77705510d99af2cba940064cfd7ca987a25082`.
-Section C is not complete; C3 retains C1 policy as recorded above, with C4 pending.
+Section C is complete; C3 retains C1 policy and C4 is published as recorded above.
 Starting authority was published HEAD/local origin/development
 `c26da8e73b6e8604895ba9da67a32b099c900629`, divergence 0 0, empty index, with
 exactly 15 pending C1 files (+559/-51). C1 production/tests/assets are preserved
@@ -283,7 +298,7 @@ executed, allowlisted commit/push; Section C is not complete.
 
 C1 is implemented, deterministically verified, compact-review approved and
 **read-only physical acceptance passed; published in 4b77705510d9**. See the combined
-acceptance record above. Section C is not complete.
+acceptance record above. Section C is now complete following C4 publication.
 Starting HEAD/local origin/development was
 `c26da8e73b6e8604895ba9da67a32b099c900629`, parent
 `627698b1dd0a3e0a7ebd7b9384a86b0332a507eb`, subject
@@ -349,8 +364,10 @@ workflows were not exercised; Files retains the C1 browsing-only restrictions.
 
 - C2: dedicated backup UI retired; published in `9dbbb29d3e95`.
 - C3: design review complete; current C1 policy retained, generic mutation deferred.
-- C4: bounded polish reviewed and physically accepted; publication pending.
-- Shared file picker remains D; no D/E implementation.
+- C4: bounded polish reviewed, physically accepted and published in `43a3f6ae28e4`;
+  Section C is complete.
+- Shared file picker remains D; foundation and SIDJuke migration are published
+  in `fbb974c7ef04`. Remaining consumer migrations await separate design review.
 
 The implementation/test pass made no C64U contact; the subsequent authorized
 acceptance used read-only connection/browsing as recorded above. No staging, commit,

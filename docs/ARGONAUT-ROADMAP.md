@@ -321,7 +321,7 @@ Approved bounded checkpoints:
   additional generic Files operations are approved. Generic Flash/Temp mutation is
   deferred; specialized Flash workflows remain separate and unchanged.
 - **C4 — Files polish and acceptance:** compact review and physical acceptance
-  passed; publication pending.
+  passed; published in `43a3f6ae28e41a6a3a3a6ae604e281d3062eb11e`.
   Filename labels are bounded with aligned sizes and full-name tooltips/accessibility.
   Menu/Shift+F10 opens existing context actions without changing selection;
   dismissal restores focus. Path/list accessible names, contextual recovery
@@ -335,8 +335,9 @@ Approved bounded checkpoints:
   process and an empty runtime log were verified. No transfers or remote mutations
   were exercised; accessibility and recovery limitations are in CURRENT-STATE.
 
-Section C is **not complete** until C4 publication is complete. C4 publication
-requires its separate safety gates; no staging, commit or push occurred in acceptance.
+Section C is **complete**, with C4 published in
+`43a3f6ae28e41a6a3a3a6ae604e281d3062eb11e`. The acceptance evidence above remains
+historical: no staging, commit or push occurred during that acceptance pass.
 Shared picker remains Section D.
 Streaming remains **OPEN / intermittent / instrumented**.
 
@@ -365,12 +366,18 @@ acceptance is part of this closure.
 
 ## D. Shared Argonaut file picker — reusable component
 
+**Published:** picker foundation and SIDJuke migration are complete in
+`fbb974c7ef04ab539188de232817189e6c55d566`
+(`Integrate SIDJuke with shared file picker`). Section D remains open for the
+remaining consumers. Migration order and bounded scope require separate design
+review; this status reconciliation authorizes no further implementation.
+
 Provide one picker for **This Computer** (local filesystem) and connected
 **C64 Ultimate** storage (USB/SD/Flash/Temp as appropriate). Do not require a
 selection on Files followed by a return to another tab. Each context supplies
 allowed types and actions; preserve Core ownership of filesystem semantics.
 
-Planned consumers: Drives disk images; SIDJuke SID files; Game Library supported
+Remaining consumers: Drives disk images; Game Library supported
 media including CRT/disk images; Cartridge Tools and other suitable workflows;
 ROM/config selection where appropriate after safety review. SIDJuke multi-select
 or directory add is a possible later enhancement, not an initial requirement.
