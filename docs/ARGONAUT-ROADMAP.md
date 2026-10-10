@@ -316,27 +316,38 @@ Approved bounded checkpoints:
   indefinitely. Flash backup remains a possible future feature requiring separate
   feasibility/safety review; Flash restore is unapproved. No Temp backup expansion.
   94 focused tests and 44 offline GTK checks passed, no skips; C2 awaits review.
-- **C3 — Flash/Temp managed operations:** mutation policy and implementation pending.
+- **C3 — Flash/Temp operations design review:** complete; Bruce approved retaining
+  current C1 behavior as the final current policy. No production implementation or
+  additional generic Files operations are approved. Generic Flash/Temp mutation is
+  deferred; specialized Flash workflows remain separate and unchanged.
 - **C4 — Files polish and acceptance:** pending.
 
-Section C is **not complete**. C1 browsing-only restrictions do not replace the
-settled longer-term Flash/Temp direction below. Shared picker remains Section D.
+Section C is **not complete**: C4 Files polish and acceptance remains pending and
+has not begun. Shared picker remains Section D.
 Streaming remains **OPEN / intermittent / instrumented**.
 
+**Approved C3 closure: retain current C1 Flash/Temp behavior.** This supersedes
+older generic Flash copy/add and Temp copyable-storage direction; visibility does
+not confer permission to perform file operations.
 
-**Settled, recovered decision: expose Flash and Temp as first-class locations
-alongside SD and USB. Do not omit them from subsequent designs.**
+- **Flash — Internal Memory:** visible and browsable, including its actual
+  directory tree. Generic Files mutation remains disabled. Existing specialized
+  R6 validated publication, save-copy, configuration preview and reviewed exact-file
+  cleanup remain separate, with their existing validation and safety contracts.
+- **Temp — RAM Disk:** visible and browsable; generic mutation remains disabled.
+  Identify its temporary nature without any persistence guarantee.
+- No additional generic download, upload, copy, delete, rename, overwrite,
+  folder creation or mount/launch capability is approved for either root.
+- Preserve distinct storage icons and existing C1 root authorization, file-service
+  permissions, C0 selection and B5 foreground/cancellation handling.
+- Flash export/snapshot, Flash recovery workflows, Flash restore and incremental
+  backup systems are future possibilities only, not planned implementation items.
+  Future Flash export/recovery or any other expansion requires separate design
+  review and approval. Flash restore remains unapproved; no backup/export UI is
+  introduced by C3.
 
-- **Flash — Internal Memory:** internal nonvolatile storage, visible/browsable;
-  do not make it globally read-only merely because it is sensitive. Allow
-  appropriate copy/add workflows supported by the C64U, with contextual
-  protection/confirmation for destructive overwrite/delete.
-- **Temp — RAM Disk:** normal built-in browsable/copyable storage; identify its
-  temporary/RAM nature visually. Real workflows, including downloads, use it.
-- Distinguish internal Flash, Temp/RAM, SD, and USB visually rather than treating
-  all locations as equivalent removable media.
-- Preserve Network Foundation managed ownership and safety contracts. Broader
-  storage presentation does not bypass R6 validation, review, or cleanup rules.
+C3 closure is documentation-only. No production implementation or physical device
+acceptance is part of this closure.
 
 ## D. Shared Argonaut file picker — reusable component
 

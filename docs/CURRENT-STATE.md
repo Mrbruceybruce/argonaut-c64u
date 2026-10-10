@@ -1,5 +1,40 @@
 # Current development state
 
+## C3 — Flash/Temp design review complete: current policy retained
+
+The C3 design review is complete. Bruce approved retaining the published C1
+Flash/Temp behavior as the final current policy; no production implementation or
+additional generic Files operations are approved.
+
+Authority for this documentation closure: HEAD/local origin/development
+`522906e9f8f4c31fda226a9dfe501d52c934e898`, subject
+`Update file listing test selection mocks`, divergence 0 0, clean index/worktree.
+
+- Flash remains visible and browsable through its actual directory tree. Generic
+  Files mutation remains disabled; specialized Flash workflows remain separate.
+- Temp remains visible and browsable with generic mutation disabled. Its temporary
+  nature is explicit; no persistence guarantee is made.
+- C1 remains directory-browsing-only for these roots: no new generic download,
+  upload, copy, rename, delete, overwrite, folder creation or mount/launch route.
+- Existing R6 validated Flash publication, save-copy, configuration preview and
+  reviewed exact-file cleanup retain their existing scope and safeguards.
+
+Generic Flash/Temp mutation is deferred. Flash export/snapshot, Flash recovery,
+Flash restore and incremental backup systems are future possibilities only, not
+planned implementation items. Any future Flash export/recovery or other expansion
+requires separate design review and approval; Flash restore remains unapproved.
+No backup/export UI is introduced.
+
+This policy supersedes the roadmap's earlier generic Flash copy/add and Temp
+copyable-storage direction while retaining both locations' visibility. Storage
+authorization, file-service permissions, C0 selection, C1 browsing and B5 operation
+handling are unchanged. This closure changes documentation only; validation is
+limited to documentation consistency and hygiene, with no device contact.
+
+C4 — final Files polish and acceptance — remains pending and has not begun.
+Section C is not complete. Shared file-picker work remains Section D; no D/E work
+is included in this closure.
+
 ## C2 — Redundant Backup/Restore UI removed: pending review
 
 Bruce approved retiring the dedicated Backup/Restore interface after the bounded
@@ -49,7 +84,8 @@ normal/optimized suite or physical acceptance was run.
 Incremental USB/SD backup and PC-created baseline adoption are deferred indefinitely.
 Flash backup is only a possible future feature requiring separate feasibility and
 safety review; Flash restore is unapproved. No Temp backup expansion is planned.
-C3/C4 remain pending; Section C is not complete. D/E, Test Lab and Streams work are
+C3 design review is complete with C1 policy retained; C4 remains pending.
+Section C is not complete. D/E, Test Lab and Streams work are
 out of scope. Streaming remains **OPEN / intermittent / instrumented**.
 
 
@@ -57,7 +93,7 @@ out of scope. Streaming remains **OPEN / intermittent / instrumented**.
 
 C0 passed final narrow re-review and combined read-only C0/C1 physical acceptance.
 C0 and C1 are **published and complete** at `4b77705510d99af2cba940064cfd7ca987a25082`.
-Section C is not complete; see C2 above, with C3/C4 still pending.
+Section C is not complete; C3 retains C1 policy as recorded above, with C4 pending.
 Starting authority was published HEAD/local origin/development
 `c26da8e73b6e8604895ba9da67a32b099c900629`, divergence 0 0, empty index, with
 exactly 15 pending C1 files (+559/-51). C1 production/tests/assets are preserved
@@ -233,7 +269,7 @@ Combined read-only physical acceptance passed as recorded above. Hardware mutati
 workflows were not exercised; Files retains the C1 browsing-only restrictions.
 
 - C2: dedicated backup UI retired by the later approved decision; review pending.
-- C3: Flash/Temp managed mutation policy pending.
+- C3: design review complete; current C1 policy retained, generic mutation deferred.
 - C4: final Files polish and acceptance pending.
 - Shared file picker remains D; no D/E implementation.
 
