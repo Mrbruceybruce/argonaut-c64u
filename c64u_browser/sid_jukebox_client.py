@@ -138,6 +138,36 @@ class SidJukeboxClient:
 
     def library_blocked_reason(self):return self._blocked_reason(self.selected())
 
+    @staticmethod
+    def _picker_source(selection, session):
+        from .picker_model import PickerSelection, SID
+        from .storage import storage_root
+        from .scheduler import DeviceSession
+        from pathlib import Path
+        if (not isinstance(selection, PickerSelection) or selection.kind != 'file'
+                or selection.category != SID.category or not SID.matches(selection.filename)
+                or Path(selection.path).name != selection.filename):
+            raise SidCatalogError('source', 'Choose one SID file.')
+        if selection.scope == 'core-host':
+            if selection.device_id or selection.session_id or selection.storage_root:
+                raise SidCatalogError('source', 'Invalid local SID reference.')
+            return SidSource.core_host(selection.path), None
+        if selection.scope != 'c64u':
+            raise SidCatalogError('source', 'Unsupported SID source.')
+        selection.validate_session(session)
+        if not storage_root(selection.path) or storage_root(selection.path) != selection.storage_root:
+            raise SidCatalogError('source', 'Choose a SID inside USB or SD storage.')
+        return (SidSource.c64u(selection.device_id, selection.path),
+                DeviceSession(selection.device_id, selection.session_id))
+
+    def add_selection(self, selection, session):
+        source, expected = self._picker_source(selection, session)
+        return self.catalog.add(source, expected_session=expected)
+
+    def prepare_relink_selection(self, tune_id, selection, session):
+        source, expected = self._picker_source(selection, session)
+        return self.catalog.prepare_relink(tune_id, source, expected_session=expected)
+
     def add_core_host(self, path):return self.catalog.add(SidSource.core_host(path))
     def add_c64u(self, device_id, path):
         return self.catalog.add(SidSource.c64u(device_id, path))

@@ -523,9 +523,11 @@ class SidCatalogService:
                                   'The source C64U is not the active connected device.')
         return JobBinding.device(current), current
 
-    def _submit(self, operation, source, task, *, allow_unavailable=False):
+    def _submit(self, operation, source, task, *, allow_unavailable=False, expected_session=None):
         _validate_source(source)
         binding, session = self._binding(source, allow_unavailable=allow_unavailable)
+        if expected_session is not None and session != expected_session:
+            raise SidCatalogError('session-changed', 'The C64U connection changed. Select the SID again.')
         return self._scheduler.submit(
             CoreJob(operation, lambda job:task(job, session)), binding)
 
@@ -578,7 +580,7 @@ class SidCatalogService:
             raise SidCatalogError('malformed-sid', str(exc)) from exc
         return SidInspection(source, metadata), data
 
-    def add(self, source):
+    def add(self, source, *, expected_session=None):
         self._ready()
         def task(job, session):
             inspection = self._inspect(source, job, session)
@@ -606,7 +608,7 @@ class SidCatalogService:
                                created_at=now, updated_at=now, verified_at=now)
                 self._mutate(lambda:(self._tunes.__setitem__(tune.id, tune), tune)[1])
                 return AddResult(tune, True)
-        return self._submit('sid-jukebox.add', source, task)
+        return self._submit('sid-jukebox.add', source, task, expected_session=expected_session)
 
     def validate_source(self, tune_id):
         tune = self.get(tune_id)
@@ -665,7 +667,7 @@ class SidCatalogService:
             oldest = min(self._plans, key=lambda key:self._plans[key].created_at)
             self._plans.pop(oldest, None)
 
-    def prepare_relink(self, tune_id, source):
+    def prepare_relink(self, tune_id, source, *, expected_session=None):
         tune = self.get(tune_id); _validate_source(source)
         def task(job, session):
             inspection = self._inspect(source, job, session)
@@ -681,7 +683,7 @@ class SidCatalogService:
                     preview, inspection, tune, session, self._clock())
                 self._cleanup_plans_locked()
             return preview
-        return self._submit('sid-jukebox.relink-preview', source, task)
+        return self._submit('sid-jukebox.relink-preview', source, task, expected_session=expected_session)
 
     def execute_relink(self, plan_id, *, accept_changed=False):
         self._ready()

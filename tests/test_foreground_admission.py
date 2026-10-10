@@ -139,12 +139,22 @@ class Admission(unittest.TestCase):
                 files=Mock();files.get_n_items.return_value=1;files.get_item.return_value=file
                 chooser.get_files.return_value=files
                 callbacks={};chooser.connect.side_effect=lambda signal,fn:callbacks.update({signal:fn})
-                with patch(f'c64u_browser.{module}.Gtk.FileChooserNative.new',return_value=chooser):
-                    cls.add_local(tab)
+                if cls is SidJukeboxTab:
+                    tab._choose_sid=lambda *args,**kwargs:cls._choose_sid(tab,*args,**kwargs)
+                    with patch('c64u_browser.sid_jukebox_tab.FilePicker',return_value=chooser) as picker:
+                        cls.add_local(tab)
+                    from c64u_browser.picker_model import PickerSelection
+                    selection=PickerSelection('core-host','/tmp/fake.sid','fake.sid','','','','sid','file')
+                    respond=lambda:picker.call_args.args[1]((selection,))
+                else:
+                    with patch(f'c64u_browser.{module}.Gtk.FileChooserNative.new',return_value=chooser):
+                        cls.add_local(tab)
+                    from gi.repository import Gtk
+                    respond=lambda:callbacks['response'](chooser,Gtk.ResponseType.ACCEPT)
                 a=self.start()
-                from gi.repository import Gtk
-                callbacks['response'](chooser,Gtk.ResponseType.ACCEPT)
+                respond()
                 tab.client.add_core_host.assert_not_called()
+                tab.client.add_selection.assert_not_called()
                 self.assertIs(a,self.app.transfer_job);self.assertFalse(tab.job_busy)
                 a.run();self.pump()
 

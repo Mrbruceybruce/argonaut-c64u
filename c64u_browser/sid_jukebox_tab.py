@@ -3,10 +3,11 @@
 """GTK presentation for the Core-owned SID Jukebox."""
 from pathlib import Path
 import json
-import posixpath
 
-from gi.repository import Gdk, Gio, GLib, GObject, Gtk
+from gi.repository import Gdk, GLib, GObject, Gtk
 
+from .file_picker import FilePicker
+from .picker_model import PickerMode, SID
 from .api import BrowserError
 from .sid_jukebox_client import (
     SidJukeboxClient, clock_text, error_text,
@@ -39,8 +40,8 @@ class SidJukeboxTab:
         self.sort_choice.connect('changed',self._sort_changed);toolbar.append(self.sort_choice)
 
         actions = Gtk.Box(spacing=8);self.box.append(actions)
-        self.add_local_button = app.button(actions, 'Add local SID files…', self.add_local)
-        self.add_c64u_button = app.button(actions, 'Add selected C64U SID', self.add_c64u)
+        self.add_local_button = app.button(actions, 'Add local SID…', self.add_local)
+        self.add_c64u_button = app.button(actions, 'Add C64U SID…', self.add_c64u)
         self.validate_button = app.button(actions, 'Validate', self.validate)
         self.relink_button = app.button(actions, 'Locate/Relink…', self.relink)
         self.remove_button = app.button(actions, 'Remove from Jukebox…', self.remove)
@@ -448,25 +449,34 @@ class SidJukeboxTab:
             widget.destroy()
         dialog.connect('response',response);dialog.present();return dialog
 
-    @staticmethod
-    def _sid_filter(chooser):
-        filter_ = Gtk.FileFilter();filter_.set_name('SID tunes')
-        filter_.add_pattern('*.sid');filter_.add_pattern('*.SID');chooser.add_filter(filter_)
+    def _choose_sid(self, initial_scope, *, tune_id=None, local_path=None):
+        if self.chooser:return
+        scopes = (initial_scope, 'c64u' if initial_scope == 'core-host' else 'core-host')
+        def chosen(results):
+            self.chooser = None
+            if not results:return
+            if len(results) != 1:
+                self._show('Choose one SID file.');return
+            selection = results[0]
+            # Retain the immutable reference through foreground admission.
+            def submit():
+                session = self.app.core.device_session()
+                if tune_id is not None:
+                    return self.client.prepare_relink_selection(tune_id, selection, session)
+                return self.client.add_selection(selection, session)
+            def finished(snapshot):
+                if snapshot.state != 'succeeded':
+                    self._show(error_text(snapshot.error));return
+                self.client.select(snapshot.result.tune.id);self.refresh(True)
+                self._show('SID is available in SID Jukebox.')
+            self._show('Validating SID: ' + selection.path)
+            self._run_job(submit, self._relink_prepared if tune_id is not None else finished)
+        self.chooser = FilePicker(self.app, chosen, mode=PickerMode.OPEN_FILE,
+                                  scopes=scopes, filter=SID, limit=1,
+                                  local_path=local_path or getattr(self.app, 'local', Path.home()))
 
     def add_local(self):
-        if self.chooser:return
-        chooser = Gtk.FileChooserNative.new('Add SID tunes',self.app.window,
-            Gtk.FileChooserAction.OPEN,'Add','Cancel')
-        chooser.set_select_multiple(True);chooser.set_current_folder(
-            Gio.File.new_for_path(str(self.app.local)))
-        self._sid_filter(chooser);self.chooser = chooser
-        def response(_,code):
-            files=chooser.get_files();chosen=([files.get_item(i) for i in range(files.get_n_items())]
-                if code==Gtk.ResponseType.ACCEPT else [])
-            chooser.destroy();self.chooser=None
-            paths=tuple(item.get_path() for item in chosen if item.get_path())
-            if paths:self._add_local_paths(paths)
-        chooser.connect('response',response);chooser.show()
+        self._choose_sid('core-host')
 
     def _add_local_paths(self, paths, index=0, added=0, failures=()):
         if index >= len(paths):
@@ -483,20 +493,8 @@ class SidJukeboxTab:
         self._run_job(job,finished,failed=lambda exc:self._add_local_paths(
             paths,index+1,added,failures+(str(exc),)))
 
-    def _selected_remote_source(self):
-        rows=self.app.rlist.get_selected_rows()
-        if len(rows)!=1 or rows[0].item[0]=='..' or rows[0].item[1]:
-            raise BrowserError('Select one SID file in the C64U Files pane.')
-        name=rows[0].item[0]
-        if not name.casefold().endswith('.sid'):raise BrowserError('Select a .sid file.')
-        session=self.app.core.device_session()
-        if not session.device_id or not session.session_id:raise BrowserError('Connect first.')
-        return session.device_id,posixpath.join(self.app.remote,name)
-
     def add_c64u(self):
-        try:device_id,path=self._selected_remote_source()
-        except Exception as exc:self._show(str(exc));return
-        self.add_c64u_path(device_id,path)
+        self._choose_sid('c64u')
 
     def add_c64u_path(self, device_id, path):
         job=lambda: self.client.add_c64u(device_id,path)
@@ -534,39 +532,10 @@ class SidJukeboxTab:
         self._run_job(job,finished)
 
     def relink(self):
-        if self.client.selected() is None:return
-        dialog=Gtk.Dialog(title='Locate/Relink SID',transient_for=self.app.window,modal=True)
-        dialog.add_button('Cancel',Gtk.ResponseType.CANCEL)
-        dialog.add_button('Choose local SID…',1)
-        dialog.add_button('Use selected C64U SID',2)
-        dialog.get_content_area().append(Gtk.Label(
-            label='Choose a replacement on this computer or use the SID currently selected in the C64U Files pane.',
-            wrap=True,xalign=0,margin_top=12,margin_bottom=12,margin_start=12,margin_end=12))
-        def response(widget,code):
-            widget.destroy()
-            if code==1:self._choose_relink_local()
-            elif code==2:self._prepare_relink_c64u()
-        dialog.connect('response',response);dialog.present()
-
-    def _choose_relink_local(self):
-        if self.chooser:return
-        chooser=Gtk.FileChooserNative.new('Locate replacement SID',self.app.window,
-            Gtk.FileChooserAction.OPEN,'Review','Cancel');self._sid_filter(chooser)
-        tune=self.client.selected();current=Path(tune.source.path).parent
-        if tune.source.scope!='c64u' and current.is_dir():
-            chooser.set_current_folder(Gio.File.new_for_path(str(current)))
-        self.chooser=chooser
-        def response(_,code):
-            file=chooser.get_file();chooser.destroy();self.chooser=None
-            if code!=Gtk.ResponseType.ACCEPT or not file or not file.get_path():return
-            job=lambda: self.client.prepare_relink_core_host(file.get_path())
-            self._run_job(job,self._relink_prepared)
-        chooser.connect('response',response);chooser.show()
-
-    def _prepare_relink_c64u(self):
-        try:device_id,path=self._selected_remote_source();job=lambda: self.client.prepare_relink_c64u(device_id,path)
-        except Exception as exc:self._show(str(exc));return
-        self._run_job(job,self._relink_prepared)
+        tune = self.client.selected()
+        if tune is None:return
+        self._choose_sid(tune.source.scope, tune_id=tune.id,
+                         local_path=Path(tune.source.path).parent if tune.source.scope == 'core-host' else None)
 
     def _relink_prepared(self,snapshot):
         if snapshot.state!='succeeded':self._show(error_text(snapshot.error));return
