@@ -11,8 +11,34 @@ import io
 import threading
 
 from .api import BrowserError, ConnectionFailure, Entry, IdentityEntry, safe_argument
-from .c64u_ftp_types import ErrorCode as EC, FtpOperationError, MutationEvidence, WriteEvidence, Outcome
+from .c64u_ftp_types import ErrorCode as EC, FtpOperationError, MutationEvidence, WriteEvidence, Outcome, ConnectionBinding, DeviceIdentity, checked_path
 from .diagnostics import diagnostic_event
+
+
+CREATION_MKD_RULE = 'c64u-25ea78-1.1.0s2-api0.1-usb0-mkd-triple-slash-v1'
+CREATION_ROOT = b'/USB0/ARGONAUT_LIBRARY'
+CREATION_MKD_PATHS = (CREATION_ROOT, CREATION_ROOT+b'/games', CREATION_ROOT+b'/metadata', CREATION_ROOT+b'/artwork')
+
+
+def _compatible_creation_mkdir(evidence, path, target, binding, live_identity):
+    qualified = DeviceIdentity('id:25EA78', 'C64 Ultimate', '1.1.0s2', '0.1')
+    if (not isinstance(binding, ConnectionBinding) or not binding.core_session_id
+            or binding.device != qualified or live_identity != qualified
+            or target.device_id != binding.device.physical_id
+            or target.session_id != binding.core_session_id
+            or target.root != '/USB0' or target.path != CREATION_ROOT.decode('ascii')
+            or path not in CREATION_MKD_PATHS):
+        return False
+    checked_path(path)
+    return (isinstance(evidence, MutationEvidence)
+            and evidence.operation == evidence.stage == 'MKD'
+            and evidence.outcome == Outcome.COMPLETED
+            and evidence.stage_submitted and evidence.consequential_submitted
+            and evidence.reply_code == 257
+            and evidence.acknowledgment == Outcome.COMPLETED
+            and evidence.requested_path == path
+            and evidence.reply_lines == (b'257 "//'+path+b'" created.',)
+            and evidence.created_path == b'//'+path)
 
 
 def creation_outcome(operation,path,*,result=None,error=None):
@@ -134,14 +160,37 @@ class _FtpOperation:
 
 class _FtpOperations:
     """Private fixed-binding lifetime, shared by nested FTP helpers."""
-    def __init__(self, manager, binding, *, encoding='utf-8', check=None):
+    def __init__(self, manager, binding, *, encoding='utf-8', check=None, creation_identity=None):
         self._manager = manager
         self.binding = binding
+        self._creation_identity = creation_identity
         self._encoding = encoding
         self._check = check
         self._context = ContextVar('argonaut_ftp_operation', default=None)
         self._lock = threading.Lock()
         self.capability_evidence = None
+
+    def classify_library_creation(self, operation, path, target, *, result=None, error=None):
+        outcome, wire = creation_outcome(operation, path, result=result, error=error)
+        if operation != 'MKD':
+            return outcome, wire
+        details = dict(wire)
+        details['path_acceptance_rule'] = 'exact-path' if outcome == 'completed' else None
+        details['compatibility_rule'] = None
+        if error is None and outcome == 'unknown':
+            # Revalidate the captured live binding at classification, not merely
+            # at command submission. A stale response cannot acquire ownership.
+            try:
+                self._manager._check(self.binding)
+            except FtpOperationError:
+                pass
+            else:
+                if _compatible_creation_mkdir(result, path.encode('ascii'), target,
+                                    self.binding, self._creation_identity):
+                    outcome = 'completed'
+                    details['path_acceptance_rule'] = 'firmware-compatibility'
+                    details['compatibility_rule'] = CREATION_MKD_RULE
+        return outcome, tuple(details.items())
 
     @contextmanager
     def operation(self, check=None, *, reject_busy=False):

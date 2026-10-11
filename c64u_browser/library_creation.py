@@ -70,6 +70,11 @@ def create_empty_library(adapter,target,check,session_check,*,observations=None)
         created_at=datetime.now(timezone.utc).isoformat(),application=APPLICATION,
         revision=0,games=[]),sort_keys=True)+'\n').encode()
 
+    def classify(operation,path,**kwargs):
+        classifier=getattr(adapter,'classify_library_creation',None)
+        if classifier is None:return creation_outcome(operation,path,**kwargs)
+        return classifier(operation,path,target,**kwargs)
+
     def consequential(operation,path,call,destination=None):
         nonlocal uncertain,definite_failure
         definite_failure=False
@@ -83,9 +88,9 @@ def create_empty_library(adapter,target,check,session_check,*,observations=None)
         try:
             result=call()
         except Exception as exc:
-            record(*creation_outcome(operation,path,error=exc))
+            record(*classify(operation,path,error=exc))
             raise
-        outcome,wire=creation_outcome(operation,path,result=result)
+        outcome,wire=classify(operation,path,result=result)
         record(outcome,wire)
         if outcome!='completed':
             raise LibraryError('Missing definitive mutation acknowledgment or exact directory path evidence.')

@@ -1,5 +1,84 @@
 # Managed Library — foundation and explicit empty creation
 
+## PA-3E.2 MKD path evidence compatibility — pending independent inspection
+
+Uncommitted correction against `305ac47bb37a642d6958530bcbd163c85d2c848d`.
+The PA-3E physical attempt received `257 "///USB0/ARGONAUT_LIBRARY" created.`
+for `/USB0/ARGONAUT_LIBRARY`. It stopped after one MKD with failed/uncertain
+CreationRecovery; no subsequent mutation or cleanup occurred. PA-3E.1 read-only
+inspection found exactly that directory under USB0, empty. Original evidence at
+`/home/bruce/.local/share/argonaut-pa3df2-305ac47-reviewed/run-20261011T200905Z-g18f7yo5/`
+is preserved unchanged. These observations do not reclassify the historical run,
+establish atomic create-if-absent, or authorize adoption or deletion.
+
+The initializer now has a separate firmware-specific path-evidence validator.
+Compatibility requires the live REST-reported identity captured at Core connection
+and the current managed FTP binding to agree exactly: `id:25EA78`, product
+`C64 Ultimate`, firmware `1.1.0s2`, API `0.1`, and a nonempty captured Core session
+matching the one-use creation target. The reported identity is retained separately
+from saved-profile/MAC fallback identity; missing live identity cannot qualify.
+The adapter rechecks its binding after the reply before accepting compatibility.
+No firmware value is inferred from profiles or historical physical records.
+
+Only the selected `/USB0` root and `/USB0/ARGONAUT_LIBRARY`, plus its exact
+`games`, `metadata`, and `artwork` child paths, qualify. The ordinary strict rule
+runs first and is unchanged. The compatibility branch requires completed MKD
+transport evidence, definitive 257 acknowledgment, matching recorded request
+bytes, and exactly one reply line `257 "//<canonical-request>" created.`.
+This is exactly three leading slashes for these requests, not arbitrary prefix
+stripping. Every other byte must match. Wrong roots/names/case, two/four slashes,
+interior duplicate separators, traversal, relative paths, malformed quoting,
+multiple lines/paths, controls, encoded separators and unexpected trailing text
+remain rejected. Founder, other firmware/API combinations and unverified devices
+do not qualify. Generic parsing, checked_path, mutation semantics and staging
+are unchanged; standalone MKD receives no compatibility exception.
+
+Raw reply code, reply lines, requested path and extracted returned path remain
+lossless evidence. `path_status` remains the generic strict result (`invalid`
+for triple slashes); it is never fabricated as `matched`. Initializer MKD
+observations add `path_acceptance_rule` (`exact-path`, `firmware-compatibility`,
+or null) and `compatibility_rule` (null or
+`c64u-25ea78-1.1.0s2-api0.1-usb0-mkd-triple-slash-v1`). Mutation acknowledgment
+and compatibility qualification remain separate. Unknown consequences still
+stop subsequent mutation and cleanup. One-use authorization, collision refusal,
+bounded definite-failure cleanup, pending-manifest readback, strict RNFR/RNTO,
+and final verification are preserved.
+
+No physical contact, remote mutation, game staging or game publication occurred
+in PA-3E.2. The existing empty leftover requires separately approved exact-path
+disposition with fresh device/media/path/emptiness checks; no recursive or wildcard
+cleanup is authorized. Child-MKD and rename physical qualification remain pending.
+After independent review and manual publication, a separately reviewed acceptance
+driver must pin the new Core baseline and receive a new checksum. Preserve the
+old driver. Any later attempt needs fresh preflight, exclusive-writer confirmation
+and a new one-use creation authorization/UUID; this correction grants no retry.
+
+Offline validation: **434 tests passed, zero failures/errors/skips**, including
+12 new permanent test methods with adversarial subcases. Fake/localhost only;
+no physical C64U contact. The initial 434-test run found one architecture-boundary
+failure from a separate helper module. The validator was moved inside the existing
+managed adapter; the architecture test remained unchanged and the full run passed.
+The earlier focused run passed 64 tests before two additional test methods.
+`git diff --check` and new-test-file trailing-whitespace checks passed.
+
+Exact final command (runner permits only localhost/loopback sockets):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B /tmp/argonaut-pa3f-offline.py \
+  tests.test_creation_path_evidence tests.test_library_creation \
+  tests.test_library_creation_safety tests.test_ftp_evidence \
+  tests.test_ftp_mutations tests.test_ftp_folder_steps tests.test_folder_copy \
+  tests.test_fresh_folder tests.test_fresh_folder_cli tests.test_ftp_ownership \
+  tests.test_ftp_streaming tests.test_streaming tests.test_c64u_ftp \
+  tests.test_ftp_reads tests.test_core tests.test_scheduler \
+  tests.test_import_admission tests.test_import_staging
+```
+
+Local run output: `/tmp/argonaut-pa3e2-regression-final.log` (temporary).
+Loopback socket access required sandbox permission; no packages were installed.
+
+
+
 ## PA-3F library creation safety correction — pending independent review
 
 Uncommitted correction against `1edd5ae9ce19b893671969ecddcc4d447c0061e1`.

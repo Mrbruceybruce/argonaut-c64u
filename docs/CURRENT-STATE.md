@@ -1,5 +1,27 @@
 # Current development state
 
+## PA-3E.2 MKD path evidence compatibility — pending independent inspection
+
+Uncommitted correction against `305ac47bb37a642d6958530bcbd163c85d2c848d`.
+Initializer-only compatibility accepts the exact observed triple-slash 257 reply
+only for live session-bound Beige `25EA78`, C64 Ultimate firmware `1.1.0s2`,
+API `0.1`, and the four exact library-creation MKD paths under USB0.
+The managed adapter preserves raw reply/path evidence and records the separate
+stable compatibility-rule identifier; generic FTP parsing and path validation,
+ordinary mutation semantics, and Managed Staging remain unchanged.
+
+The original PA-3E attempt remains failed/uncertain. PA-3E.1 observed an empty
+`/USB0/ARGONAUT_LIBRARY` leftover; its separate disposition is not authorized.
+Child-MKD and rename physical qualification, a reviewed driver baseline/checksum
+update after manual publication, and fresh one-use creation authorization remain
+pending. No physical contact, game staging or publication occurred in this pass.
+See [the detailed qualification and evidence contract](MANAGED-LIBRARY.md#pa-3e2-mkd-path-evidence-compatibility--pending-independent-inspection).
+
+Offline validation: **434 tests passed, zero failures/errors/skips**, including
+12 new permanent adversarial test methods. Architecture checks remain unchanged.
+`git diff --check` and new-file whitespace checks passed. Exact command and
+initial-run correction are recorded in the detailed contract linked above.
+
 ## PA-3F library creation safety correction — pending independent review
 
 Uncommitted correction against `1edd5ae9ce19b893671969ecddcc4d447c0061e1`.

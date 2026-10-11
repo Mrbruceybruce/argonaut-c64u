@@ -599,8 +599,15 @@ class ArgonautCore:
                                   info['info']['product'], info['info']['firmware_version'],
                                   info['version']['version'])
         binding = ConnectionBinding(identity, session_id, client.host, client.port)
+        # Keep reported identity separate from profile/MAC fallback identity.
+        # Only this live REST observation can qualify creation compatibility.
+        reported = info['info'].get('unique_id')
+        creation_identity = (DeviceIdentity('id:'+reported, identity.product,
+                             identity.firmware, identity.api_version)
+                             if isinstance(reported, str) and reported else None)
         client._ftp_reads = FtpReadAdapter(self._ftp_manager, binding,
-                                          encoding=client.encoding, check=check_current_job)
+                                          encoding=client.encoding, check=check_current_job,
+                                          creation_identity=creation_identity)
         self._pending_ftp = (binding, client)
         try:yield session_id
         finally:self._pending_ftp = None
