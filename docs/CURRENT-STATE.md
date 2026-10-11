@@ -1,5 +1,63 @@
 # Current development state
 
+## Managed Import Phase 3B-1 — approved; pending manual publication
+
+Published Phase 3A baseline: `5996d7081411dfd1a17f55112ddad7679165c054`
+(`Add managed game import planning and review`). The older pending-publication
+headings below record the pre-publication checkpoint and are historical.
+
+Phase 3B-1, including the reviewed safety correction, adds immutable
+transaction/item/budget/evidence records, strict matching
+original/revalidated plan admission, safe visible staging-path construction, an
+offline state model and bounded durable host journals. It has no Core execution
+entry point, network operation, source spooling, remote directory/record creation,
+upload, remote readback, cleanup or UI changes. Import remains unavailable.
+
+Proposed offline limits are 64 selected files, separately capped 128 MiB source
+snapshots, 128 MiB host spool, 128 MiB upload and 128 MiB readback, 1 MiB per
+journal/record, 256 operation records per journal and 64 journals per store.
+Phase 3A's 268,435,456-byte planning-read allowance is unchanged. Execution policy,
+resource accounting and physical staging qualification require later approval.
+
+Host journals record intents before outcomes, preserve partial/uncertain evidence,
+and use private files, file fsync, atomic host replacement and directory fsync.
+Unsupported directory fsync is reported; other persistence errors stop the caller.
+Loading is inspection only, never transfer/retry/cleanup permission. Prepared and
+awaiting-confirmation remain available; staging, verifying, verified-staged and
+published are reserved and rejected on construction, transition and journal load.
+Canceled/failed/uncertain recovery records cannot resume. Fields, nesting and
+collections are bounded before incremental UTF-8 JSON encoding; contradictory
+operation/checkpoint evidence is rejected. Planned payload ceilings are not actual
+I/O metering, which remains a 3B-2 concern.
+
+Correction validation: 120 affected offline tests passed, including 49
+transaction/journal tests (14 added safety regressions), 44 Phase 3A tests and
+27 managed-library tests; no skips. Production modules
+from Phase 3A and existing tests are unchanged. No physical acceptance is claimed.
+See MANAGED-LIBRARY.md for the contract, durability scope and future authorization
+boundary. Phases 3B-2, 3B-3 and 3C remain pending; transfers/imports are not operational.
+
+Independent compact re-review approved Phase 3B-1 for publication. Reviewed
+capabilities include immutable transaction/recovery contracts, strict plan
+eligibility and safe staging paths, reserved execution/publication states and
+rejection of forged authorization fields, consistent operation ordering and
+acknowledged checkpoints, bounded encoding/validation, durable POSIX host-journal
+publication and inspection-only restart recovery.
+
+Evidence: 120 previously passing tests, no skips (49 contract/journal, 44 planner,
+27 managed-library). The final review additionally passed the 1 MiB journal-load
+boundary, one-byte overflow, quoted structural-character and multibyte UTF-8
+encoding boundary probes. These are prior results; tests were not rerun during
+documentation closure. No physical acceptance is required for this offline-only
+checkpoint.
+
+Limitations remain: POSIX host filesystem guarantees and cooperating-process
+locking only; planned payload ceilings are not actual-I/O metering. There is no
+execution admission, FTP upload, remote staging, automatic retry, recovery cleanup,
+manifest publication or enabled Import action. Phases 3B-2, 3B-3 and 3C remain
+pending. Documentation closure prepares manual publication only; no Git staging,
+commit or push was performed in this pass.
+
 ## Managed Library Phase 3A — accepted; pending manual publication
 
 Against published Settings baseline `b45828c39d7521732569a6ec3350a84de397cb81`,
