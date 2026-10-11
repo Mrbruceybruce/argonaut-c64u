@@ -154,6 +154,10 @@ class _FtpOperations:
         finally:state.cancel_deferred -= 1
 
     def mutate(self, operation, path, destination=None):
+        return self.mutate_evidence(operation, path, destination).as_dict()
+
+    def mutate_evidence(self, operation, path, destination=None):
+        """Private wire evidence; safe legacy dictionaries omit paths/peer prose."""
         with self.operation():
             state = self._context.get()
             state.mutation_used = True
@@ -167,9 +171,9 @@ class _FtpOperations:
                 raise BrowserError('Filename encoding failed.') from None
             if operation not in ('rename', 'mkdir', 'delete', 'rmdir'):
                 raise BrowserError('Unknown mutation operation.')
-            return getattr(self._client(), operation)(*args).as_dict()
+            return getattr(self._client(), operation)(*args)
 
-    def write_from(self, path, source, expected_bytes, progress=None):
+    def write_from(self, path, source, expected_bytes, progress=None, *, budget=None):
         with self.operation():
             state = self._context.get()
             state.mutation_used = True
@@ -180,8 +184,20 @@ class _FtpOperations:
                 except Exception as exc:
                     state.failure = exc
                     raise
+            class BudgetGuard:
+                def require(self, amount):
+                    try:budget.require(amount)
+                    except Exception as exc:
+                        state.failure = exc
+                        raise
+                def consume(self, amount):
+                    try:budget.consume(amount)
+                    except Exception as exc:
+                        state.failure = exc
+                        raise
             return self._client().write_from(self._path(path), source,
-                expected_bytes=expected_bytes, progress=update)
+                expected_bytes=expected_bytes, progress=update,
+                **({'budget': BudgetGuard()} if budget is not None else {}))
 
     def readback(self, path, expected_bytes):
         """One bounded RETR observation; upload owns the subsequent SIZE."""

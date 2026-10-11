@@ -1,5 +1,45 @@
 # Current development state
 
+## Managed Import Phase 3B-2B.3E1 — transport/evidence prerequisites; pending inspection
+
+Baseline: `7ca9212c943afabbf417351248bec71792afda9f` (published policy-2
+journal foundation). This entry supersedes the historical pending statuses below.
+Changes remain uncommitted. No managed staging executor, staging authorization,
+Import/Stage enablement, recovery, remote cleanup or game publication was added.
+
+- A hand-authored format-1 record fixture fixes exact UTF-8 bytes, sorted compact
+  keys, escaping, one LF, length (783 bytes) and SHA-256 independently of the encoder.
+  Policy-1's 36,581-byte historical fixture and original capacity remain unchanged.
+- Permanent capacity tests cover all payload counts 1–64 and maximum identities,
+  paths, UTF-8/escaping; operation-prefix and terminal checkpoint boundaries at
+  N=1,2,10,32,64; maximum counters/reasons/digests; exact and one-byte-low allowances.
+  K=2N+5, R=4N+16 and an independent serialized envelope constrain B*R. Structurally
+  valid batches can exceed 1 MiB and are refused; this is not an all-batches-fit claim.
+- Transport evidence separates actual reply acknowledgment from sender bytes.
+  Lost STOR completion and lost/ambiguous MKD replies fail closed. Rejection alone
+  does not prove absence, cleanup or ownership. Existing generic reply behavior stays.
+- Uploads count attempted blocks before sendall; only returned sends count as
+  confirmed. A failed block remains entirely uncertain. Optional shared byte budgets
+  charge attempted exposure once without refunds. Sender success is not durability.
+- MKD retains bounded private reply/path evidence; only an unambiguous quoted 257
+  path matching the exact requested bytes passes the separate staging prerequisite.
+  Unavailable, relative, malformed, mismatched and ambiguous paths fail that check.
+  Raw paths/peer text stay out of diagnostic dictionaries. No atomicity is assumed.
+
+Final offline validation: **613 tests passed**, zero failures/errors/skips (6 record/
+capacity + 607 affected regressions, including 13 new transport tests). Diff and
+new-file whitespace checks passed.
+
+Validation commands/results and proof limits are recorded in MANAGED-LIBRARY's
+3B-2B.3E1 entry. Tests use synthetic content and loopback only; physical C64U FTP
+compatibility and staging acceptance remain unqualified. Existing C0/native-chooser/
+focus/lifecycle qualification limits remain open. Journal capacity is logical, not
+physical disk reservation; loaded journals remain inspection-only and missing trailing
+history is still undetectable from the chain alone. Capacity reservation remains
+mandatory before execution admission or remote mutation. Independent inspection is
+next; executor work requires a separate checkpoint. 3B-2C, 3B-3 recovery and 3C
+manifest publication remain outside this pass. No fetch, commit or push occurred.
+
 ## Managed Import Phase 3B-2B.3C.1 — policy-2 journal foundation; pending inspection
 
 Baseline: `f6c8e77304088f14be554052fa4a2386d4e5cb58` (published 3B-2B.2).

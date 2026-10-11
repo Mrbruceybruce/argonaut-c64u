@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Core-internal C64U FTP contracts. No GUI, credentials or transport handles."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import re
 
@@ -106,12 +106,41 @@ class WriteEvidence:
     length_status: str = 'unobserved'
     error_category: str | None = None
 
+    # None preserves construction by older simulated transports. The wire client
+    # always supplies an explicit count; this is exposure, not remote durability.
+    attempted_send_bytes: int | None = None
+
+    @property
+    def attempted_bytes(self):
+        return self.transferred if self.attempted_send_bytes is None else self.attempted_send_bytes
+
+    @property
+    def confirmed_sender_bytes(self):
+        return self.transferred
+
+    @property
+    def uncertain_send_bytes(self):
+        return self.attempted_bytes - self.transferred
+
+    @property
+    def acknowledgment(self):
+        if not self.submitted:return Outcome.NOT_STARTED
+        if self.terminal_reply in (226, 250):return Outcome.COMPLETED
+        if (self.terminal_reply is None and self.preliminary_reply is not None and
+                400 <= self.preliminary_reply <= 599 and self.preliminary_reply != 421 and
+                self.attempted_bytes == 0):
+            return Outcome.REJECTED
+        return Outcome.UNKNOWN
+
     def as_dict(self):
         return dict(expected_bytes=self.expected_bytes, submitted=self.submitted,
                     preliminary_reply=self.preliminary_reply, terminal_reply=self.terminal_reply,
                     transferred=self.transferred, sha256=self.sha256,
                     outcome=self.outcome.value, length_status=self.length_status,
-                    error_category=self.error_category)
+                    error_category=self.error_category, acknowledgment=self.acknowledgment.value,
+                    attempted_send_bytes=self.attempted_bytes,
+                    confirmed_sender_bytes=self.confirmed_sender_bytes,
+                    uncertain_send_bytes=self.uncertain_send_bytes)
 
 
 @dataclass(frozen=True)
@@ -129,6 +158,49 @@ class MutationEvidence:
     reply_code: int | None = None
     error_category: str | None = None
     acknowledged: tuple[tuple[str, int], ...] = ()
+    # Private bounded wire evidence. Never include peer prose or paths in safe
+    # diagnostics/as_dict, which existing consumers serialize for presentation.
+    reply_lines: tuple[bytes, ...] = field(default=(), repr=False)
+    requested_path: bytes | None = field(default=None, repr=False)
+
+    @property
+    def acknowledgment(self):
+        if not self.consequential_submitted:return Outcome.NOT_STARTED
+        if self.reply_code is not None and 400 <= self.reply_code <= 599 and self.reply_code != 421:
+            return Outcome.REJECTED
+        accepted = {'MKD': (257,), 'DELE': (250,), 'RMD': (250,), 'RNTO': (250,)}
+        if (self.stage, self.reply_code) in self.acknowledged and self.reply_code in accepted.get(self.stage, ()):
+            return Outcome.COMPLETED
+        return Outcome.UNKNOWN
+
+    @property
+    def created_path(self):
+        if self.operation != 'MKD' or self.acknowledgment != Outcome.COMPLETED:
+            return None
+        if len(self.reply_lines) != 1:return None
+        # Doubled quotes are the FTP quoted-path escape. Extra quotes in peer
+        # commentary, multiline and unquoted paths are deliberately ambiguous.
+        match = re.fullmatch(rb'257 "((?:[^"\r\n]|"")*)"(?: [^"\r\n]*)?', self.reply_lines[0])
+        if not match:return None
+        return match[1].replace(b'""', b'"')
+
+    def mkdir_path_status(self, expected_path):
+        checked_path(expected_path)
+        if self.operation != 'MKD' or self.acknowledgment != Outcome.COMPLETED:
+            return 'unavailable'
+        path = self.created_path
+        if path is None:return 'unavailable'
+        try:checked_path(path)
+        except FtpOperationError:return 'invalid'
+        if path != expected_path or self.requested_path != expected_path:return 'mismatch'
+        return 'matched'
+
+    def require_mkdir_path(self, expected_path):
+        """Future staging prerequisite only; grants no ownership or atomicity."""
+        if self.mkdir_path_status(expected_path) != 'matched':
+            raise FtpOperationError(ErrorCode.PROTOCOL, 'mkdir-path',
+                                    reply_code=self.reply_code, outcome=Outcome.UNKNOWN, mutation=self)
+        return self.created_path
 
     def as_dict(self):
         return dict(operation=self.operation, stage=self.stage,

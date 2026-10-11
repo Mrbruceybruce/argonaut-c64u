@@ -412,11 +412,11 @@ class C64UFtpClient:
 
     def _mutation_command(self, verb, path, accepted):
         self._mutation = replace(self._mutation, stage=verb, stage_submitted=False,
-                                 reply_code=None)
+                                 reply_code=None, reply_lines=(), requested_path=path)
         self._phase = 'mutation-reply'
         self._send(verb, path)
         reply = self._reply()
-        self._mutation = replace(self._mutation, reply_code=reply[0])
+        self._mutation = replace(self._mutation, reply_code=reply[0], reply_lines=reply[1])
         self._expect(reply, accepted)
         self._mutation = replace(self._mutation,
             acknowledged=self._mutation.acknowledged + ((verb, reply[0]),))
@@ -535,6 +535,14 @@ class C64UFtpClient:
             if source is not None:
                 self._phase = 'data-io'
                 self._data.settimeout(self._policy.data_idle)
+                # Charge possible exposure before sendall: on failure Python
+                # cannot tell us how much of this block reached the peer. Never
+                # refund it or treat a returned sendall as remote durability.
+                if budget is not None:
+                    budget.require(len(block))
+                    budget.consume(len(block))
+                self._write = replace(self._write,
+                    attempted_send_bytes=self._write.attempted_bytes + len(block))
                 self._data.sendall(block)
             else:
                 self._phase = 'local-io'
@@ -619,13 +627,19 @@ class C64UFtpClient:
             return self._transfer('RETR', path, receive=receive, maximum=max_bytes,
                                   expected=expected_bytes, progress=progress, budget=budget)
 
-    def write_from(self, path, source, *, expected_bytes, progress=None):
+    def write_from(self, path, source, *, expected_bytes, progress=None, budget=None):
+        """Upload with optional cumulative attempted-byte require/consume budget.
+
+        The caller owns the budget (payload, control or aggregate I/O). Every
+        attempted block is charged once, including its unknown suffix on failure.
+        """
         path = checked_path(path)
         if path == b'/' or not callable(getattr(source, 'read', None)):
             raise FtpOperationError(EC.INVALID_ARGUMENT, 'source')
         if type(expected_bytes) is not int or expected_bytes < 0:
             raise FtpOperationError(EC.INVALID_ARGUMENT, 'write-bound')
         with self._operation_scope('STOR'):
-            self._write = WriteEvidence(expected_bytes)
+            self._write = WriteEvidence(expected_bytes, attempted_send_bytes=0)
+            if budget is not None:budget.require(expected_bytes)
             return self._transfer('STOR', path, source=source, expected=expected_bytes,
-                                  maximum=expected_bytes, progress=progress)
+                                  maximum=expected_bytes, progress=progress, budget=budget)
