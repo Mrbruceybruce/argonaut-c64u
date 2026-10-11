@@ -71,7 +71,7 @@ class ExecutionTransaction:
         text(self.session_id, 256); integer(self.manifest_revision, 0, 2**63-1)
         for value in (self.plan_digest, self.manifest_digest, self.snapshot_evidence_sha256): digest(value)
         require(type(self.policy_version) is int and self.policy_version == 2, 'Unsupported captured policy.')
-        require(type(self.execution_policy_version) is int and self.execution_policy_version == 1, 'Unsupported execution policy.')
+        require(type(self.execution_policy_version) is int and self.execution_policy_version in (1, 2), 'Unsupported execution policy.')
         require(type(self.budgets) is ImportPolicy and type(self.limits) is ExecutionLimits, 'Invalid execution limits.')
         self.budgets.validate(); self.limits.validate()
         require(type(self.items) is tuple, 'Immutable items required.')
@@ -147,9 +147,9 @@ class ExecutionOperation:
         if self.sha256 != '':
             digest(self.sha256)
         if (self.outcome in ('intent', 'not-started') or self.collision == 'present' or
-                self.kind in ('snapshot-validation', 'mkdir')):
+                self.kind in ('snapshot-validation', 'mkdir', 'final-validation')):
             require(self.sha256 == '', 'This operation requires an absent hash.')
-        elif self.outcome == 'completed' and self.kind in ('record', 'upload', 'readback'):
+        elif self.outcome == 'completed' and self.kind in ('record', 'upload', 'readback', 'record-upload', 'record-readback'):
             digest(self.sha256)
 
 
@@ -186,6 +186,9 @@ class ExecutionJournal:
         integer(self.checkpoint, 0, len(self.operations))
         if self.state in ('prepared', 'awaiting-confirmation'):
             require(not self.operations and not self.reason, 'Pre-execution evidence is not execution.')
+        if tx.execution_policy_version == 2:
+            from .import_execution_policy2 import validate_operations
+            return validate_operations(self)
         items = {i.staged_path: i for i in tx.items}
         uploaded = set(); verified = set(); ids = set(); snapshot = mkdir = record = False
         stopped = None; acknowledged = 0
@@ -290,7 +293,8 @@ def transition(previous, state, *, reason=''):
 
 
 def intent(previous, operation_id, kind, path, *, collision='not-applicable'):
-    require(previous.state == ('verifying' if kind == 'readback' else 'staging'), 'Wrong operation phase.')
+    verification = ('readback', 'record-readback', 'final-validation') if previous.transaction.execution_policy_version == 2 else ('readback',)
+    require(previous.state == ('verifying' if kind in verification else 'staging'), 'Wrong operation phase.')
     require(not previous.operations or previous.operations[-1].outcome == 'completed', 'Unresolved operation.')
     op = ExecutionOperation(operation_id, len(previous.operations)+1, kind, path, collision=collision)
     return next_checkpoint(previous, operations=previous.operations+(op,))

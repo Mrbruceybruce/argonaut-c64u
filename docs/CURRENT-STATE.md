@@ -1,5 +1,48 @@
 # Current development state
 
+## Managed Import Phase 3B-2B.3C.1 — policy-2 journal foundation; pending inspection
+
+Baseline: `f6c8e77304088f14be554052fa4a2386d4e5cb58` (published 3B-2B.2).
+Older pending-publication entries below are historical. This pass remains uncommitted.
+
+Schema 3 now explicitly isolates execution policy 2 while preserving policy-1
+canonical fields, bytes, histories and combined-record semantics. Schema-1/2 and
+Core's policy-1 read-only admission are unchanged. No execution authorization,
+FTP dispatch, Import/Stage action, recovery or game publication was added.
+
+Policy 2 separates record-upload acknowledgment from record-readback, orders payload
+uploads/readbacks exactly, and requires a final-validation operation before success.
+The pure format-1 record encoder uses an explicit transaction-derived allowlist,
+canonical UTF-8 JSON plus LF, strict byte bounds and exact-byte SHA-256 expectations.
+Control upload attempted exposure is control_upload_bytes; operation size records
+confirmed control sender bytes and their difference records uncertain exposure.
+Payload counters retain their existing meaning. Accepted upload is not verification.
+
+Reservation uses K=2N+5, R=2K+6=4N+16 and a policy-specific canonical checkpoint
+upper bound B. B*R must fit the captured journal allowance. This is logical capacity,
+not physical disk allocation. Existing writer synchronization, uncertainty blocking,
+inspection-only loading and missing-trailing-history limitations remain in force.
+
+Validation: 432 tests passed, zero failures/errors/skips: 26 new policy-2 tests plus
+the existing 406 affected regressions. Linux/Python 3.13.5; 17.334 seconds. The
+15-checkpoint baseline policy-1 fixture round-trips all 36,581 bytes exactly and
+preserves its original reservation and hash chain. No device/external-service test.
+New tests forbid sockets; the runner restricts other networking to loopback.
+
+```sh
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 /tmp/argonaut-3b2b1/run_regressions.py tests.test_import_execution_policy2 tests.test_import_admission tests.test_import_execution tests.test_import_transaction tests.test_import_policy tests.test_import_snapshots tests.test_import_plan tests.test_managed_library tests.test_scheduler tests.test_ftp_ownership tests.test_ftp_reads tests.test_c64u_ftp tests.test_ftp_streaming tests.test_core
+```
+
+Working diff and new-file whitespace checks passed. Initial focused testing found
+three fixture errors (copied checkpoint permissions and an overflowing aggregate
+counter); these were corrected before the successful combined run.
+
+See MANAGED-LIBRARY's 3B-2B.3C.1 entry for the full contract, accounting and proof.
+Independent inspection is next. The FTP staging executor and physical C64U staging
+qualification remain pending; no 3B-2C work has begun. 3B-3 recovery and 3C manifest
+publication remain separate. Earlier C0/native-chooser/focus/lifecycle qualification
+limits remain open. No fetch, commit or push was performed.
+
 ## Managed Import Phase 3B-2B.2 — read-only admission; pending independent review
 
 Baseline: `3137bd28fbd2b0392cf80e5880d96de8ba348a1c` (published 3B-2B.1).

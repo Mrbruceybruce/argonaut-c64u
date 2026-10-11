@@ -8,6 +8,10 @@ from .import_transaction import canonical, require
 
 
 def planned_operations(tx):
+    tx.validate()
+    if tx.execution_policy_version == 2:
+        from .import_execution_policy2 import planned_operations as policy2_plan
+        return policy2_plan(tx)
     return (('snapshot-validation', ''), ('mkdir', tx.directory), ('record', tx.record_path),
             *(('upload', i.staged_path) for i in tx.items),
             *(('readback', i.staged_path) for i in tx.items))

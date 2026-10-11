@@ -1,5 +1,160 @@
 # Managed Library — foundation and explicit empty creation
 
+## Phase 3B-2B.3C.1 — policy-2 journal foundation; uncommitted inspection checkpoint
+
+Baseline: `f6c8e77304088f14be554052fa4a2386d4e5cb58`, published 3B-2B.2.
+This entry supersedes the historical pending-publication status below. This pass
+adds journal infrastructure only and remains uncommitted for independent inspection.
+It adds no staging executor, staging authorization, FTP dispatch, UI action,
+manifest change, remote cleanup, retry, resume or recovery.
+
+### Strict policy isolation
+
+The schema remains 3 and the serialized dataclass fields do not change.
+`execution_policy_version=1` retains its existing validation/transition semantics,
+combined record operation, canonical bytes and reservation. The existing Core
+projection and read-only admission still select policy 1 and are unchanged.
+Policy 2 is explicitly selected only when constructing an offline transaction;
+there is no automatic upgrade. Its validator rejects legacy `record` operations,
+unknown policy versions and mixed sequences. Expected-previous chain validation
+rejects any transaction/policy change. Schema-1/2 behavior remains unchanged.
+
+The new reader can inspect both policies. The baseline reader rejects policy 2;
+this is backward reading compatibility, not forward support in older binaries.
+Loading returns inspection evidence only, never a writer or execution permission.
+The 15-checkpoint policy-1 fixture was captured from the baseline before editing;
+all 36,581 bytes round-trip identically and its original chain loads unchanged.
+
+### Exact policy-2 sequence and states
+
+For N payloads, the following is the only legal operation prefix. Each operation
+has a unique UUID, exact ordinal and transaction-derived path. Intent records have
+zero size, empty hash and zero accounting. Only completed operations permit the next.
+
+| Ordinal | Kind | State | Path |
+|---|---|---|---|
+| 1 | snapshot-validation | staging | empty |
+| 2 | mkdir | staging | transaction directory |
+| 3 | record-upload | staging | transaction.json path |
+| 3+i | upload | staging | item i staged path |
+| N+4 | record-readback | verifying | transaction.json path |
+| N+4+i | readback | verifying | item i staged path |
+| 2N+5 | final-validation | verifying | transaction directory |
+
+Payload indices i run from 1 through N in immutable transaction order.
+States remain prepared -> awaiting-confirmation -> staging -> verifying ->
+verified-staged. Entering verifying requires all uploads completed. Success requires
+both record/payload readbacks and final-validation completed. Published is prohibited.
+
+Completed mkdir means an accepted MKD acknowledgment, not a subsequent actual-path
+or empty-directory check. Those checks must precede the future record STOR.
+Completed record-upload/payload upload means accepted sender-side completion, not
+independent verification or durable remote storage. Readbacks require exact expected
+length/hash; final-validation requires zero size/empty hash and represents final
+manifest, directory membership and live-binding checks. The future executor must
+supply truthful observations: a pure journal validator does not observe FTP replies.
+
+### Canonical transaction.json format 1
+
+The pure `encode_record` function accepts an exact immutable policy-2 transaction
+and an exact integer format version 1. It explicitly constructs these fields:
+
+- format_version=1, journal_schema_version=3, execution_policy_version=2,
+  policy_version=2, transaction_id and plan_digest;
+- library: library_id, device_id, root and path;
+- manifest: revision and sha256;
+- directory: the deterministic argonaut-import-UUID name;
+- items, in approved order: staged_path, final_path, format, size and sha256.
+
+Staged paths include the intended payload names. No source paths, credentials,
+session ID, snapshot evidence, authorization or mutable runtime state are included.
+Encoding uses sorted keys, compact separators, UTF-8 without ASCII escaping,
+no NaN, and exactly one terminating LF. The encoder builds bounded output using
+the minimum of 1 MiB, captured journal bytes and control upload/read allowances.
+Unsupported formats, invalid transactions and oversized output are rejected.
+
+Expected record length and lowercase SHA-256 are computed from those exact bytes.
+Both record operations use that expectation. `validate_record` accepts only exact
+bytes; reordered/reformatted JSON, extra/missing fields, extra newlines and altered
+values are rejected without normalization. No remote record is written by this pass.
+
+### Accounting, acknowledgment and cancellation evidence
+
+Snapshot validation counts actual snapshot reads. Directory and final validation
+count control reads and require zero size/empty hash. Payload uploads retain the
+existing attempted = confirmed sender + uncertain send exposure invariant; size
+is confirmed sender bytes. Payload readback size equals actual readback bytes.
+
+For policy-2 record-upload, control_upload_bytes is attempted control-send exposure;
+operation size is confirmed control sender bytes. Require size <= attempted;
+the difference is uncertain control-send exposure. Completion requires both equal
+the canonical record length and the canonical hash. These observations do not
+spend payload counters or change their meaning. Record-readback size counts record
+bytes and cannot exceed actual control-read consumption, which can also include
+associated checks. Completed record readback requires the canonical length/hash.
+All operations may retain associated control reads. Unrelated accounting is rejected.
+
+Hashes retain exact-string, 64 lowercase hexadecimal validation; absent hashes are
+allowed only by the operation/outcome contract. Terminal evidence may retain actual
+over-budget observations, subject to integer bounds and checked aggregate addition.
+It does not authorize further I/O or evidence truncation.
+
+Completed mutation outcomes can be durably recorded before verification and can
+atomically end as canceled/failed/uncertain without losing acknowledgment. A lost
+final reply must be recorded as unknown/uncertain; confirmed sender bytes alone
+cannot establish acknowledgment. Interrupted readbacks retain actual partial counts;
+definitive mismatches fail verification without erasing upload evidence.
+Unresolved intents prevent continuation, and terminal states never resume.
+
+Cancellation handlers and transport dispatch are not implemented here. A future
+executor must persist accepted outcomes before honoring later cooperative cancellation,
+without masking session invalidation or deferring cancellation through readback.
+Existing persistence failures still block the live writer without advancing its
+in-memory checkpoint; prior durable intent remains. A durable newer checkpoint after
+an ambiguous persistence failure remains inspection-only on reload.
+
+### Reservation proof
+
+Policy 2 has K=1 snapshot + 1 mkdir + 1 record upload + N uploads + 1 record readback
++ N readbacks + 1 final validation = 2N+5 operations. Reserve R=2K+6=4N+16 checkpoints:
+two per operation; prepared, awaiting-confirmation, staging, verifying and
+verified-staged checkpoints; and one conservative terminal allowance. Successful
+history uses 2K+5 checkpoints. No repeated progress checkpoints or retries are allowed.
+Policy 1 retains K=2N+3 and its unchanged byte/revision calculation.
+
+The canonical sizing document includes the complete policy-specific operation plan,
+exact transaction/paths, maximum UUID/hash/counter/revision/checkpoint widths,
+longest outcome/collision/state strings and a 256-character bounded reason. Its
+encoded UTF-8 length including LF is B, an upper bound rather than a valid observation.
+Require K within captured operations, R <= MAX_REVISIONS, and B*R within captured
+journal_bytes (at most 1 MiB). For 64 payloads K=133 and R=272 fit structural limits;
+byte capacity may still reject the transaction. The writer checks the exact plan
+prefix, sequential revision and each encoded checkpoint <= B, charging bytes and
+revision only after durable persistence. No evidence is silently truncated.
+
+This is logical evidence capacity, not physical disk reservation or an fsync guarantee.
+Missing trailing history cannot be detected solely by the hash chain. External-writer
+exclusion and FTP atomicity are not established by host evidence.
+
+### Validation and next gates
+
+26 new deterministic policy-2 tests and the existing 406-test group passed together:
+432 tests, zero failures/errors/skips, on Linux/Python 3.13.5 (17.334 seconds).
+New tests forbid sockets; the existing runner restricts regression networking to
+loopback fake services. Coverage includes baseline bytes/history, strict policies,
+record exact bytes/bounds, ordered operations, acknowledged-but-unverified cancellation,
+readback mismatches, exposure conservation, persistence failures, crash/reload at every
+checkpoint, final-validation gating and capacity boundaries/maximal terminal fields.
+See CURRENT-STATE for the exact command. Whitespace checks include the new files.
+
+The next checkpoint is independent inspection of this uncommitted foundation.
+Subsequent FTP staging implementation needs separate authorization, continuous live
+ownership, admission-only deadline semantics, actual transport exposure metering,
+acknowledged-path checking and bounded physical C64U staging acceptance. None is
+claimed here. Earlier C0/native-chooser/focus/lifecycle qualifications remain open.
+3B-2C workflow integration, 3B-3 recovery reconciliation and 3C manifest publication
+remain separate and unimplemented by this pass.
+
 ## Phase 3B-2B.2 — read-only execution admission; pending independent review
 
 Implementation baseline: `3137bd28fbd2b0392cf80e5880d96de8ba348a1c` (published
