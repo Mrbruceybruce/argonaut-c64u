@@ -2,8 +2,10 @@
 
 Game Library now presents an explicitly managed C64U library, independently of
 its preserved legacy reference catalog. The legacy catalog and Add/Relink picker
-implementation remain intact for later reviewed adaptation. The visible managed
-view provides explicit empty creation, but no import, scan, migration, artwork editing or launch.
+implementation remain intact for later reviewed adaptation. The Settings → Game Library
+page provides explicit discovery, validated selection, empty creation and confirmed
+host-only Forget. The main tab shows the selected read-only catalog or directs the
+user to Settings. There is no import, scan, migration, artwork editing or launch.
 Files game Add/Scan shortcuts are not offered by this view. Other Files actions,
 SIDJuke and Drives are unchanged.
 
@@ -20,7 +22,7 @@ Configured location always takes priority. Missing/inaccessible, malformed or
 identity-mismatched locations report unavailable with no fallback. Without a
 configuration, complete root listings distinguish absence from inaccessible
 storage. Discovery never recurses. Zero libraries reports not configured; one
-loads read-only; multiple libraries require explicit location selection, including
+is listed read-only; all candidates require explicit location selection, including
 copied libraries sharing a UUID. Selection saves a host preference only. Nothing
 is created, adopted, merged or transferred. Loading is an explicit foreground
 operation with existing contextual cancellation and captured client/session checks.
@@ -57,18 +59,17 @@ corrupt manifests are not valid empty libraries.
 C64U storage holds the managed manifest, game files and future portable metadata.
 Host storage holds preferences; a future cache must be rebuildable. No SQL or
 cache persistence is added in this phase. General Settings Undo/defaults preserve
-the separately saved library location; Clear location explicitly removes it.
+the separately saved library location; Forget Library explicitly removes it after confirmation, without deleting files.
 
 Further mutation/recovery workflows need separate review.
 Explicit managed imports, content verification, legacy migration and managed
 Relink remain later work. Recorded storage benchmarks rule out timestamp-only
-content identity; this phase makes no incremental-indexing or corrected
-fresh-creation hardware qualification claim. No existing catalog is rewritten
-or automatically migrated.
+content identity; this phase makes no incremental-indexing claim. No existing
+catalog is rewritten or automatically migrated.
 
 ## Phase 2: empty creation
 
-Create Library is available only in the unconfigured/no-library state. A remote
+Create Library is available in Settings only in the unconfigured/no-library state. A remote
 folder picker selects one exact USB/SD root, and Core returns a one-use captured
 device/session/root/destination target. The separate confirmation names that
 target. Cancelling either dialog performs no writes. An existing destination,
@@ -117,9 +118,56 @@ Repeated loading returned the same valid library identity. Normal shutdown
 succeeded with exit code `0`.
 
 This establishes successful existing-library recognition, not full qualification
-of corrected fresh creation. Corrected fresh creation has not been physically
-retested. Absence of creation/duplicate prompts was not separately confirmed.
+of corrected fresh creation. At that checkpoint, corrected fresh creation had
+not been physically retested. Absence of creation/duplicate prompts was not
+separately confirmed during SD recognition.
 No imports, scanning, cleanup or storage mutations were performed during
 recognition acceptance; the existing library was left untouched.
 
 Creation uses no metadata/artwork population, SQL, cache, migration or folder scan.
+
+
+## Settings relocation and later acceptance evidence
+
+The pending Settings relocation reuses the reader and creation service. Explicit
+Discover Libraries lists candidates without changing the host association. Select
+Library re-reads and validates the chosen identity under the captured session,
+then saves before updating the selected view. Save failures preserve the prior
+selection. Stale and busy actions refuse; Forget remains host-only and confirmed.
+
+Bruce subsequently reported successful USB1 fresh-creation physical acceptance:
+Founder `25BE71`, `/USB1/ARGONAUT_LIBRARY`, UUID
+`56dc72d1-d607-4a7e-9174-d72f82155fb6`, revision 0, zero games. This is separate
+from the SD recognition evidence above and supersedes its then-outstanding fresh
+creation limitation. Settings relocation subsequently passed compact review and
+the user-confirmed physical acceptance recorded below. The implementation and
+acceptance documentation remain uncommitted and unpublished.
+
+### User-confirmed Settings physical acceptance — passed
+
+Bruce confirmed the following on GNOME Wayland using C64 Founder's Edition
+`25BE71`. The two existing libraries remained distinct:
+
+- SD: `/SD/ARGONAUT_LIBRARY`, UUID `2b8b17e2-6778-49f1-9fef-f8ee9bd5a691`.
+- USB1: `/USB1/ARGONAUT_LIBRARY`, UUID `56dc72d1-d607-4a7e-9174-d72f82155fb6`.
+
+Both were revision `0` with zero games. Settings → Game Library displayed
+correctly and discovered both libraries. Explicit USB1 selection updated the
+main Game Library without restarting; the selected library persisted after an
+application restart. Explicit Discover Libraries populated the available choices.
+Switching from USB1 to SD then updated the main Game Library to SD. Cancelling
+the Forget Library confirmation preserved the selected host association.
+Normal shutdown returned to the terminal with exit code `0`, as reported by Bruce.
+No game imports or device-storage mutations were performed during this acceptance.
+
+The existing warning `GtkText - did not receive a focus-out event` appeared;
+it remains unresolved and is nonblocking for this acceptance. The separately
+reproduced native GTK/PyGObject lifecycle crash also remains unresolved; no fix
+is claimed. This acceptance does not certify screen-reader use, comprehensive
+keyboard navigation, or new library creation. The earlier USB1 fresh-creation
+acceptance and SD recognition evidence remain separate.
+
+The reviewed Settings/Forget implementation and this acceptance record are ready
+for manual publication preparation, but remain uncommitted and unpublished.
+No Managed Import, Folder Scan, migration, Move Library, Delete Library or Phase 3
+work is included.

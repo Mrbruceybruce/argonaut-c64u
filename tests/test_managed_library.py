@@ -212,3 +212,93 @@ class ManagedCoreTests(TestCase):
         self.core.configure_game_library(PATH)
         self.core.preferences.app_options['width']=1300;self.core.preferences.save()
         self.assertEqual(PATH,Preferences(self.core.preferences.path).load().game_library_location['path'])
+
+
+    def test_forget_clears_persisted_identity_without_remote_io_and_rediscovery(self):
+        from c64u_browser.profiles import Preferences
+        session=self.core.device_session()
+        identity=LibraryIdentity(ID,session.device_id,'/SD',PATH)
+        self.core.configure_game_library(PATH,identity=identity,expected_session=session)
+        options=dict(self.core.preferences.app_options)
+        self.client.list_directory.reset_mock();self.read.reset_mock()
+        with patch('socket.socket.connect',side_effect=AssertionError('No network')):
+            self.core.configure_game_library('',expected_session=session)
+        self.assertIsNone(self.core.preferences.game_library_location)
+        self.assertIsNone(Preferences(self.core.preferences.path).load().game_library_location)
+        self.assertEqual(options,self.core.preferences.app_options)
+        self.client.list_directory.assert_not_called();self.read.assert_not_called()
+        self.assertFalse(self.core.game_library.path.exists())
+        result=self.core.load_managed_library().wait(5)
+        self.assertEqual('valid',result.result.status)
+        self.assertEqual(ID,result.result.libraries[0].identity.library_id)
+        self.assertIsNone(self.core.preferences.game_library_location)
+
+    def test_forget_stale_session_and_busy_session_gate_preserve_preference(self):
+        self.core.configure_game_library(PATH);before=dict(self.core.preferences.game_library_location)
+        session=self.core.device_session();self.core.connect(self.fixture.profile)
+        with self.assertRaises(Exception):self.core.configure_game_library('',expected_session=session)
+        with self.core._session_admission():
+            with self.assertRaises(Exception):self.core.configure_game_library('')
+        self.assertEqual(before,self.core.preferences.game_library_location)
+
+    def test_forget_save_failure_rolls_back_and_disconnected_clear_is_host_only(self):
+        self.core.configure_game_library(PATH);before=dict(self.core.preferences.game_library_location)
+        with patch.object(self.core.preferences,'save',side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):self.core.configure_game_library('')
+        self.assertEqual(before,self.core.preferences.game_library_location)
+        self.core.disconnect();self.client.list_directory.reset_mock();self.read.reset_mock()
+        self.core.configure_game_library('',expected_session=self.core.device_session())
+        self.assertIsNone(self.core.preferences.game_library_location)
+        self.client.list_directory.assert_not_called();self.read.assert_not_called()
+
+
+    def test_explicit_discovery_ignores_configured_priority_without_changing_it(self):
+        self.core.configure_game_library(PATH);before=dict(self.core.preferences.game_library_location)
+        result=self.core.load_managed_library(discover=True).wait(5)
+        self.assertEqual('valid',result.result.status)
+        self.assertEqual('/',self.client.list_directory.call_args_list[0].args[0])
+        self.assertEqual(before,self.core.preferences.game_library_location)
+
+    def test_candidate_validation_is_readonly_and_requires_captured_session(self):
+        session=self.core.device_session();identity=LibraryIdentity(ID,session.device_id,'/SD',PATH)
+        result=self.core.load_managed_library(selection=identity,expected_session=session).wait(5)
+        self.assertEqual('valid',result.result.status)
+        self.assertIsNone(self.core.preferences.game_library_location)
+        self.client.list_directory.assert_called_once_with(PATH)
+        self.core.connect(self.fixture.profile);self.client.list_directory.reset_mock()
+        with self.assertRaises(Exception):self.core.load_managed_library(selection=identity,expected_session=session)
+        self.client.list_directory.assert_not_called()
+
+    def test_changed_candidate_uuid_and_cross_device_identity_refused(self):
+        session=self.core.device_session()
+        identity=LibraryIdentity(GAME,session.device_id,'/SD',PATH)
+        result=self.core.load_managed_library(selection=identity,expected_session=session).wait(5)
+        self.assertEqual('unavailable',result.result.status)
+        self.assertIsNone(self.core.preferences.game_library_location)
+        with self.assertRaises(Exception):self.core.load_managed_library(selection=replace(identity,device_id='other'))
+
+    def test_founder_sd_and_usb1_remain_independently_identified_and_unchanged(self):
+        sd='2b8b17e2-6778-49f1-9fef-f8ee9bd5a691';usb='56dc72d1-d607-4a7e-9174-d72f82155fb6'
+        payloads={PATH+'/manifest.json':manifest(library_id=sd),
+            '/USB1/ARGONAUT_LIBRARY/manifest.json':manifest(library_id=usb)}
+        before=dict(payloads)
+        def listing(path):
+            return path,([E(name=n,kind='dir') for n in ('SD','USB1')] if path=='/' else
+                [E(name='ARGONAUT_LIBRARY',kind='dir')] if path in ('/SD','/USB1') else
+                [E(name='manifest.json',kind='file')]+[E(name=n,kind='dir') for n in ('games','metadata','artwork')])
+        self.client.list_directory.side_effect=listing
+        self.read.side_effect=lambda client,path,*args,**kwargs:payloads[path]
+        result=self.core.load_managed_library(discover=True).wait(5)
+        self.assertEqual('multiple',result.result.status)
+        self.assertEqual({sd,usb},{v.identity.library_id for v in result.result.libraries})
+        self.assertIsNone(self.core.preferences.game_library_location)
+        chosen=next(v for v in result.result.libraries if v.identity.library_id==usb)
+        session=self.core.device_session()
+        verified=self.core.load_managed_library(selection=chosen.identity,expected_session=session).wait(5)
+        self.assertEqual(chosen,verified.result.libraries[0])
+        self.core.configure_game_library(chosen.identity.path,identity=chosen.identity,expected_session=session)
+        from c64u_browser.profiles import Preferences
+        self.assertEqual(chosen.identity.preference(),Preferences(self.core.preferences.path).load().game_library_location)
+        self.core.configure_game_library('',expected_session=session)
+        self.assertEqual(before,payloads)
+        self.assertEqual('multiple',self.core.load_managed_library(discover=True).wait(5).result.status)

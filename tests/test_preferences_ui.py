@@ -718,7 +718,7 @@ class PreferencesUI(unittest.TestCase):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Preferences
         dialog=show_preferences(self.app);self.pump()
-        self.assertEqual(dialog.pages.get_n_pages(),3)
+        self.assertEqual(dialog.pages.get_n_pages(),4)
         general=dialog.pages.get_nth_page(0)
         checks=[w for w in self.walk(general) if isinstance(w,self.Gtk.CheckButton)]
         for w in checks:
@@ -939,7 +939,7 @@ class PreferencesUI(unittest.TestCase):
         profile=Profile.new('Test','test.local')
         self.app.preferences.profiles=[profile];self.app.preferences.selected_id=profile.id
         dialog=show_preferences(self.app)
-        self.assertEqual([dialog.pages.get_tab_label_text(dialog.pages.get_nth_page(i)) for i in range(3)],['General','Device details','About'])
+        self.assertEqual([dialog.pages.get_tab_label_text(dialog.pages.get_nth_page(i)) for i in range(4)],['General','Device details','About','Game Library'])
         general=dialog.pages.get_nth_page(0)
         plus=next(w for w in self.walk(general) if isinstance(w,self.Gtk.Button) and w.get_label()=='+')
         plus.emit('clicked');dialog.connections.fields['case_edition'].set_text('Test box')

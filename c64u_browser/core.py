@@ -391,15 +391,22 @@ class ArgonautCore:
                 raise
         self._emit('library-location-changed')
 
-    def load_managed_library(self):
+    def load_managed_library(self, *, discover=False, selection=None, expected_session=None):
         """One foreground read job, fixed to the captured client/session/location."""
-        from .managed_library import ManagedLibraryReader, location
+        from .managed_library import ManagedLibraryReader, LibraryIdentity, location
         from .native_files import read_remote_game
         with self._session_admission():
             session = self.device_session()
             client = self._require_client()
             configured = location(self.preferences.game_library_location)
-            if configured and configured['device_id'] != session.device_id:
+            if expected_session is not None and session != expected_session:
+                raise CoreError('session', 'Connection changed. Discover libraries again.')
+            if selection is not None:
+                if not isinstance(selection,LibraryIdentity) or selection.device_id != session.device_id:
+                    raise CoreError('identity', 'The selected library belongs to another device.')
+                target=location(selection.preference())
+            else:target=None if discover else configured
+            if target and target['device_id'] != session.device_id:
                 raise CoreError('identity', 'The configured library belongs to another device.')
         def task(job):
             def check():
@@ -411,7 +418,7 @@ class ArgonautCore:
             with read_operation(client, check):
                 reader = ManagedLibraryReader(client.list_directory,
                     lambda path,limit:read_remote_game(client,path,limit,check=check),session,check)
-                result = reader.discover(configured)
+                result = reader.discover(target)
                 check()
                 return result
         return self.scheduler.submit(CoreJob('game-library.managed-load',task),JobBinding.device(session))

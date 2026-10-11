@@ -1,5 +1,76 @@
 # Argonaut roadmap
 
+## Game Library Settings relocation — accepted; pending manual publication
+
+The pending Forget correction is retained within a dedicated native Settings →
+Game Library page. Current identity/status, explicit discovery and selection,
+Create Library and confirmed host-only Forget now live there. The main Game
+Library tab presents the selected library and read-only catalog, or an explicit
+unconfigured/unavailable state with Go to Settings. Importing remains deferred.
+Discovery lists candidates without adoption or merging. Selection revalidates the
+captured device/session/path/UUID before saving; persistence must succeed before
+the selected view changes. Creation protocol and storage restrictions are unchanged.
+
+Physical evidence supplied by Bruce is separate from these offline implementation
+checks: SD recognition passed for Founder `25BE71`, `/SD/ARGONAUT_LIBRARY`, UUID
+`2b8b17e2-6778-49f1-9fef-f8ee9bd5a691`. Subsequent USB1 fresh creation also passed,
+for `/USB1/ARGONAUT_LIBRARY`, UUID `56dc72d1-d607-4a7e-9174-d72f82155fb6`.
+Both libraries are revision 0 with zero games. The prior outstanding-fresh-creation
+wording below is historical and superseded by this supplied USB1 acceptance.
+Neither library was contacted or changed during this implementation. This does
+not qualify importing, populated manifests, recovery, moves, deletion or scanning.
+Compact review approved physical acceptance; the user-confirmed result is recorded
+below. No packaging, release or Phase 3 work is included.
+
+### User-confirmed Settings physical acceptance — passed
+
+Bruce confirmed the following on GNOME Wayland using C64 Founder's Edition
+`25BE71`. The two existing libraries remained distinct:
+
+- SD: `/SD/ARGONAUT_LIBRARY`, UUID `2b8b17e2-6778-49f1-9fef-f8ee9bd5a691`.
+- USB1: `/USB1/ARGONAUT_LIBRARY`, UUID `56dc72d1-d607-4a7e-9174-d72f82155fb6`.
+
+Both were revision `0` with zero games. Settings → Game Library displayed
+correctly and discovered both libraries. Explicit USB1 selection updated the
+main Game Library without restarting; the selected library persisted after an
+application restart. Explicit Discover Libraries populated the available choices.
+Switching from USB1 to SD then updated the main Game Library to SD. Cancelling
+the Forget Library confirmation preserved the selected host association.
+Normal shutdown returned to the terminal with exit code `0`, as reported by Bruce.
+No game imports or device-storage mutations were performed during this acceptance.
+
+The existing warning `GtkText - did not receive a focus-out event` appeared;
+it remains unresolved and is nonblocking for this acceptance. The separately
+reproduced native GTK/PyGObject lifecycle crash also remains unresolved; no fix
+is claimed. This acceptance does not certify screen-reader use, comprehensive
+keyboard navigation, or new library creation. The earlier USB1 fresh-creation
+acceptance and SD recognition evidence remain separate.
+
+The reviewed Settings/Forget implementation and this acceptance record are ready
+for manual publication preparation, but remain uncommitted and unpublished.
+No Managed Import, Folder Scan, migration, Move Library, Delete Library or Phase 3
+work is included.
+
+
+## Managed Library Forget correction — historical implementation checkpoint
+
+Against published Phases 1–2 baseline `74f0a766f208404e688e6718966e0b9533119742`,
+Game Library now offers confirmed **Forget Library** for a loaded library or a
+stored association. Confirmation identifies device, path and UUID and explains
+that files are not deleted. Forget clears only the host library association and
+current view, returning to the unconfigured state with Create Library available.
+The existing library remains discoverable through explicit Load managed library;
+there is no automatic rediscovery, replacement selection or remote mutation.
+Active foreground operations and stale confirmations refuse the action.
+
+This historical implementation checkpoint preceded review and the physical
+acceptance recorded above. The correction remains uncommitted and unpublished.
+SD recognition and subsequent USB1 fresh creation passed in separate acceptance
+work; no USB1 creation or device contact was part of this implementation.
+Creation protocol, manifest format, picker, legacy catalog, SIDJuke, Drives,
+storage permissions and B5 handling are unchanged. Move/Delete Library, managed
+imports, Folder Scan and migration remain outside this correction.
+
 **7 October 2026 layout follow-up:** broader B3 Device Details grouping and saved
 network-connection/profile relocation passed review and small physical/UI acceptance against
 published credential/discovery checkpoint `b075bddd795b1b104dc5632477444bd85bb7ba39`.

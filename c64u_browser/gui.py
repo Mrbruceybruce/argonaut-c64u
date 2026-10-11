@@ -232,7 +232,7 @@ class Browser(Gtk.Application):
             self.streams_tab.box]
         self.busy_controls.extend(self.sid_jukebox_tab.busy_controls)
         self.busy_controls.extend(self.game_library_tab.busy_controls)
-        self.busy_controls.extend((self.managed_library_view.refresh_button,self.managed_library_view.create_button,self.managed_library_view.choices))
+        self.busy_controls.extend(self.managed_library_view.busy_controls)
         if hasattr(self, 'test_lab_tab'):
             self.busy_controls.append(self.test_lab_tab.box)
         self.refresh_local()

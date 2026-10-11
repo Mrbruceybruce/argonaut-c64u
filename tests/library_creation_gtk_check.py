@@ -55,3 +55,14 @@ class CreationGtk(unittest.TestCase):
         self.assertEqual('unavailable',self.view.state.status)
         self.assertIn('Recovery required',self.view.message.get_text())
         self.assertFalse(self.view.create_button.get_visible())
+
+    def test_creation_confirmation_belongs_to_settings(self):
+        settings=Gtk.Dialog(title='Offline Settings',transient_for=self.window,modal=True)
+        self.addCleanup(settings.destroy)
+        self.view.attach_settings(settings)
+        self.view.choose_creation()
+        self.picker.return_value.dialog.set_transient_for.assert_called_once_with(settings)
+        self.picker.call_args.args[1]((self.selection,))
+        self.assertIs(settings,self.view.confirmation.get_transient_for())
+        self.view.confirmation.response(Gtk.ResponseType.CANCEL)
+        self.core.create_managed_library.assert_not_called()
