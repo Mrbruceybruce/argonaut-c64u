@@ -1,5 +1,79 @@
 # Current development state
 
+## Managed Import Phase 3B-2B.2 — read-only admission; pending independent review
+
+Baseline: `3137bd28fbd2b0392cf80e5880d96de8ba348a1c` (published 3B-2B.1).
+Older uncommitted/publication entries below are historical. This implementation
+remains uncommitted and pending independent inspection and publication.
+
+3B-2B.2F correction: the execution store now explicitly identifies a definite
+pre-write refusal using an internal, non-serialized identity marker. Read-only
+validation and collision checks precede the first persistence boundary. From before
+the first directory fsync onward, failures are uncertain, including temporary-file
+creation/partial writes, file fsync, replacement, directory fsync and cleanup. Unknown
+or unclassified failures remain uncertain; exception class/message alone is never
+proof of safety. The permanent advisory lock is coordination metadata, not checkpoint
+or temporary evidence. Existing journal bytes remain unchanged on duplicate refusal.
+
+Admission consumes authorization in both cases. A store-proven creation refusal
+reports `not-created`, releases its snapshot pin and permits explicit discard or
+normal shutdown cleanup, provided no independent blocker exists. Genuine uncertainty
+still retains snapshots and blocks unsafe cleanup. A live writer's failed outcome
+persistence remains blocked even if its particular append failed before writing.
+No authority is restored, no retry/recovery is introduced, and no schema, reservation
+formula or read-only terminal semantics changed.
+
+Core now owns a separate exact-object, one-use execution confirmation with the
+existing 120-second deadline, captured device/client/session/library/manifest/policy,
+Core generation and exact snapshot owner/evidence. Authorization is consumed before
+busy or failed admission and is never persisted or restored. Exclusive snapshot
+handoff blocks discard/shutdown cleanup while bounded independent size/SHA-256 and
+sealed-identity checks run. Cancellation, failure and shutdown release FTP and the
+scheduler reservation before releasing snapshot ownership; uncertain evidence stays
+retained and blocks cleanup/preparation.
+
+Read-only admission checks the current manifest, complete library/games listings,
+transaction/final-path collisions, policy, ownership and bounded actual read accounting.
+It uses only the managed FTP lease, rejects contention, and disables fallback/retry.
+Logical journal capacity is reserved using canonical worst-case checkpoint bytes and
+revision slots, including terminal evidence. The reserved writer enforces the planned
+operation prefix and actual encoded consumption. This is not physical disk allocation
+or a guarantee against storage failure; conservative sizing can reject larger batches.
+
+No remote staging or FTP mutation, Import/Stage UI action, manifest change, recovery,
+automatic resume or game-content publication is enabled. Read-only success ends the
+journal as canceled with reason `read-only-admission-complete`; its inspection report
+has `mutation_enabled=False` and cannot authorize later staging. Schemas 1/2/3 remain
+compatible; loaded schema-3 journals are inspection-only. Missing trailing history
+remains a limitation. Future remote execution must require a live capacity reservation
+and freshly reviewed live admission; this report and old journals are insufficient.
+
+Validation after 3B-2B.2F: 406 deterministic tests passed: 55 admission/capacity/localhost
+checks and 351 affected regressions, with zero failures, errors or skips. Final
+combined command (from the repository root):
+
+```sh
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 /tmp/argonaut-3b2b1/run_regressions.py tests.test_import_admission tests.test_import_execution tests.test_import_transaction tests.test_import_policy tests.test_import_snapshots tests.test_import_plan tests.test_managed_library tests.test_scheduler tests.test_ftp_ownership tests.test_ftp_reads tests.test_c64u_ftp tests.test_ftp_streaming tests.test_core
+```
+
+The existing offline runner rejects non-loopback socket addresses; new pure admission
+tests forbid sockets and wire tests use localhost fake FTP only. The final run took
+9.995 seconds on the Linux/Python 3.13 host. `git diff --check` passed. No physical
+device or external-service testing occurred.
+The focused admission/journal run also passed 103 tests without failures, errors
+or skips. Seven new tests include both refusal cases with explicit discard and
+shutdown variants, seven persistence-fault subcases, unknown-error fail-closed behavior,
+and actual managed-lease release ordering. Existing cross-Core and shutdown tests
+were strengthened.
+
+See [the admission contract](MANAGED-LIBRARY.md#phase-3b-2b2--read-only-execution-admission-pending-independent-review)
+for the precise ownership sequence, capacity proof and limits. No physical C64U, GTK,
+cross-platform durability or power-loss acceptance was performed. Earlier C0/native-
+chooser/focus/lifecycle qualifications remain open. Independent review is the next
+checkpoint; remote staging, 3B-3 recovery and 3C manifest publication are not started
+by this pass. No fetch, commit or push.
+
+
 ## Managed Import Phase 3B-2B.1 — journal infrastructure; uncommitted review checkpoint
 
 Baseline: `6c35c5fb19c294ff8fa8a1c7438f0cf8a5bf9e52`. Schema 3 adds immutable,

@@ -1,5 +1,177 @@
 # Managed Library — foundation and explicit empty creation
 
+## Phase 3B-2B.2 — read-only execution admission; pending independent review
+
+Implementation baseline: `3137bd28fbd2b0392cf80e5880d96de8ba348a1c` (published
+execution-journal foundation). This entry supersedes the older checkpoint status
+below. This slice is uncommitted and pending independent review and publication.
+There is no remote staging, FTP mutation, enabled Import/Stage action, recovery,
+automatic resume, manifest change or game-content publication.
+
+### Execution confirmation and guarded ownership
+
+Core exposes internal `review_managed_execution`, `confirm_managed_execution` and
+worker-only synchronous `admit_managed_execution`. Preparation is not execution
+consent. The separate confirmation carries the redacted schema-3 transaction:
+exact device/session, library UUID/root/path, manifest revision/digest, transaction
+and plan digest, intended staging/final payload paths, sizes and SHA-256 values,
+captured policy and a canonical SHA-256 of the ready snapshot evidence. Its message
+states staging-only consequences and this checkpoint's read-only limitation.
+
+The bounded volatile registry binds exact confirmation/authorization object identity,
+Core instance, client identity, preparation generation and exact live snapshot owner
+and evidence. Copies, serialized tokens, cross-Core capabilities and loaded journals
+cannot grant authority. The 120-second monotonic deadline is inherited from the
+existing snapshot-confirmation convention, starts at review and remains enforced
+through admission. It is not extended on confirmation or progress. Registry sizes
+remain at most 32 pending and 32 authorized entries; eviction loses authority.
+
+Execution entry atomically removes the authorization before session, scheduler,
+snapshot, capacity or FTP admission checks. Refusal, cancellation, expiration and
+failure never restore it. Session/library invalidation clears pending capabilities;
+Core generation and exact identities/preferences are checked repeatedly. Captured
+schema/policy versions remain strictly validated. Execution authorization is never
+serialized into schema-3 evidence.
+
+Ready snapshots retain their original schema-2 transaction and a sealed file identity
+(device/inode/size/mtime/ctime) captured after preparation synchronization. An exclusive
+preparation-registry claim prevents discard or replacement and makes shutdown defer
+cleanup. Validation opens each exact member through the retained directory descriptor
+with no symlink following, rejects hard links, replacements, unexpected members/types,
+permissions/owner changes and changed sizes, then independently hashes bounded
+8192-byte reads. Actual reads, including canceled/failed reads, are charged separately
+from preparation reads. The complete sealed set is checked again after hashing and
+after the final remote checks. POSIX/cooperating-process assumptions remain; this is
+not protection against arbitrary code running as the same OS user.
+
+### Read-only admission sequence and resource lifetime
+
+1. Consume confirmation; recheck live Core/client/session, library, policy, snapshot
+   completeness and prior resource accounting; claim the exact snapshot owner.
+2. Calculate the aggregate evidence reservation before acquiring a transport or
+   creating a journal; reject insufficient operation, revision or byte capacity.
+3. Reserve the existing device scheduler lane with busy rejection. Require the
+   existing managed FTP adapter; create a fresh reserved schema-3 host writer in a
+   caller-provided existing private journal directory. Record awaiting-confirmation,
+   staging and snapshot-validation intent. These states do not prove remote writes.
+4. Acquire a fail-fast adapter operation and its single managed FTP lease. Read the
+   exact manifest and complete relevant library/games listings; reject ambiguous
+   names, redirected paths, existing transaction directory or final destinations.
+   Independently validate the owned snapshots, then repeat manifest/collision reads
+   and recheck snapshot identities and the live cancellation/session/deadline gates.
+5. Persist the snapshot-validation outcome with actual snapshot/control read counts.
+   No remote mutation is dispatched. This read-only checkpoint durably ends the
+   attempt as `canceled`, reason `read-only-admission-complete`, and returns
+   `admission-checked` inspection evidence with `mutation_enabled=False`.
+6. Release FTP first, drain the scheduler reservation, then release snapshot ownership.
+   The returned report carries no lease, writer, authorization or future eligibility.
+
+Only existing managed read/list operations are used (CWD/PWD/MLSD and SIZE/RETR/SIZE
+plus existing session setup/closure). Admission disables LIST fallback and does not
+reconnect/retry. Existing callers retain their previous listing behavior. Listing
+wire data and manifest payload bytes share a 16 MiB control-read allowance; the
+existing bounded parser rejects incomplete/malformed listings and unsuccessful data
+reads are still charged. This counts received data-channel content, not FTP command
+or reply framing. Snapshot validation has the exact planned payload allowance;
+future control uploads retain a separate 1 MiB limit. No upload/readback allowance
+is spent by this slice. Current disk ownership is measured against captured limits.
+
+Absence observations are point-in-time evidence, not atomic FTP exclusion or a lock
+against another remote writer. No future executor may treat this returned report as
+permission: it must operate under a live fresh admission lifetime and separately
+reviewed collision/mutation rules. This slice closes its attempt rather than creating
+an active executor or a resumable journal. A repeated invocation is not an automatic
+retry; the original journal UUID cannot be recreated in the same store.
+
+### Evidence-capacity guarantee and limits
+
+`import_capacity.py` enumerates the fixed operation plan: snapshot validation,
+mkdir, transaction record, all uploads, then all readbacks. The sizing document uses
+the actual transaction and paths and the current canonical encoder options (sorted
+keys, compact separators, UTF-8, no ASCII escaping, terminating newline). For every
+planned operation it includes the longest outcome/collision strings, a 64-character
+hash, 19-digit size/accounting counters, and full UUID/sequence fields. It also includes
+the longest state, 256-character bounded reason, maximum revision width, full
+predecessor hash and maximum checkpoint width. Those simultaneous maxima need not
+form a valid execution; their serialized length B bounds every valid planned prefix.
+
+For K = 3 + 2N operations, reserve R = 2K + 6 revisions: two per operation, the five
+normal state checkpoints (including initial prepared), and an extra terminal
+uncertainty/failure checkpoint. Require K within the captured operation limit,
+R <= 520, and B*R within the captured aggregate byte allowance (at most 1 MiB).
+The live reserved writer checks each actual canonical encoding against B, charges
+its actual length and revision only after durable persistence, and preserves B bytes
+for every remaining reserved slot. Operation identities/paths must follow the exact
+planned prefix; unrelated operations cannot spend its capacity. Existing schema-3
+successor validation and store aggregate limits remain in force. The serialization
+format and schema-1/2 behavior are unchanged; unreserved infrastructure writers remain
+available for existing offline callers and are not execution authority.
+
+This is a conservative logical journal-evidence allowance, not filesystem allocation,
+free-space reservation, quota enforcement or a promise that fsync will succeed.
+Large batches that meet payload limits can fail this stricter evidence bound; the
+algorithm deliberately does not assume a 64-file batch fits. Actual canonical history
+is usually smaller. No reservation is restored from disk, no old history is adopted,
+and no journal capacity is automatically pruned. Missing trailing history remains
+undetectable solely from the hash chain. Loaded schema-3 journals remain inspection-only.
+A future mutator must require this live reservation and retain fail-closed persistence
+handling; it cannot rely on an unreserved writer or this read-only result.
+
+### Cancellation, uncertainty and remaining qualification
+
+3B-2B.2F correction: the execution store now explicitly identifies a definite
+pre-write refusal using an internal, non-serialized identity marker. Read-only
+validation and collision checks precede the first persistence boundary. From before
+the first directory fsync onward, failures are uncertain, including temporary-file
+creation/partial writes, file fsync, replacement, directory fsync and cleanup. Unknown
+or unclassified failures remain uncertain; exception class/message alone is never
+proof of safety. The permanent advisory lock is coordination metadata, not checkpoint
+or temporary evidence. Existing journal bytes remain unchanged on duplicate refusal.
+
+Admission consumes authorization in both cases. A store-proven creation refusal
+reports `not-created`, releases its snapshot pin and permits explicit discard or
+normal shutdown cleanup, provided no independent blocker exists. Genuine uncertainty
+still retains snapshots and blocks unsafe cleanup. A live writer's failed outcome
+persistence remains blocked even if its particular append failed before writing.
+No authority is restored, no retry/recovery is introduced, and no schema, reservation
+formula or read-only terminal semantics changed.
+
+Cancellation is checked before admission and between bounded reads and phase boundaries.
+There is no consequential remote operation requiring deferred cancellation. Journal
+persistence itself completes or fails before its live writer can advance. Failures
+record truthful snapshot/control observations when the writer is usable; uncertain
+persistence blocks that writer and preserves preceding intents. Failure after initial
+checkpoint persistence also blocks snapshot cleanup. Snapshot identity uncertainty
+retains ownership/evidence and blocks preparation/discard for later explicit review.
+Shutdown invalidates admission, defers cleanup of executing snapshots and cleans only
+after FTP/scheduler release when ownership and persistence remain certain. No automatic
+recovery, remote cleanup, retry or journal-based reauthorization is introduced.
+
+The 3B-2B.2F tests reproduce missing-parent and duplicate-journal refusals, checking
+consumed authorization, unchanged artifacts, explicit discard and shutdown cleanup.
+Real persistence syscall fault injection covers seven consequential boundaries while
+retaining durable intents and blocking writers/cleanup. An unclassified
+FileNotFoundError also stays uncertain. Cross-Core testing uses two actual Core
+instances; shutdown tests directly observe FTP lease, scheduler reservation and
+snapshot-pin release before cleanup, including the real managed localhost transport.
+Final validation: 406 tests passed, zero failures, errors or skips.
+
+New deterministic tests cover object identity/replay/expiry, admission failures,
+Core/client/device/session/library/policy changes, manifest changes, complete listings,
+collisions, independent hashing, modifications/replacements/hard links/symlinks,
+concurrent discard/shutdown, cancellation at every observed check boundary, resource
+exhaustion, logical capacity boundaries, maximum terminal evidence, journal failures,
+lease contention/release and no remote mutations. Localhost tests exercise the real
+managed adapter/lease/parser with fallback disabled. See CURRENT-STATE for final counts.
+
+No physical C64U, GTK, cross-platform durability or power-loss acceptance is claimed.
+Earlier C0/native-chooser/focus/lifecycle qualifications remain open. Independent
+review must assess the conservative capacity proof, read-only terminal semantics and
+ownership races. Remote-record encoding, live mutation handoff, external-writer
+assumptions and physical C64U staging acceptance remain later separately authorized
+work. 3B-3 recovery and 3C manifest publication remain separate. Stop here.
+
+
 ## Phase 3B-2B.1 — execution-journal foundation; uncommitted review checkpoint
 
 Baseline: `6c35c5fb19c294ff8fa8a1c7438f0cf8a5bf9e52` (guarded host snapshots).

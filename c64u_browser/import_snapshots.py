@@ -88,6 +88,8 @@ class ReadAllowance:
 class OwnedSnapshots:
     """Private POSIX descriptor ownership. Cleanup never recursively follows paths."""
     def __init__(self, parent, transaction):
+        self.transaction = transaction
+        self.sealed = {}
         self.parent = self.directory = None
         self.name = 'argonaut-snapshots-' + uuid4().hex
         self.files = {}
@@ -286,6 +288,7 @@ def prepare_snapshots(transaction, parent, remote_stream, check, report):
                 refuse(count == item.size and digest.hexdigest() == item.sha256,
                        'snapshot-content', 'Source size or SHA-256 changed. Prepare a new plan.')
                 os.fsync(fd);owned.measure();check()
+                owned.sealed[f'item-{ordinal:04d}.snapshot'] = file_identity(os.fstat(fd))
             finally:os.close(fd)
             completed += 1
         check();progress('snapshots-ready')
@@ -314,3 +317,58 @@ def prepare_snapshots(transaction, parent, remote_stream, check, report):
         if not cleaned:exc.snapshot_owner = owned
         exc.snapshot_evidence = evidence('canceled' if getattr(exc,'cancelled',False) else 'failed',cleaned,failure)
         raise
+
+
+def check_snapshot_identity(owned, transaction):
+    """Recheck every sealed member after hashing or other admission work."""
+    refuse(not owned.closed and owned.transaction is transaction,
+           'execution-snapshot', 'Snapshot transaction owner changed.')
+    named = os.stat(owned.name, dir_fd=owned.parent, follow_symlinks=False)
+    held = os.fstat(owned.directory)
+    refuse(stat.S_ISDIR(named.st_mode) and (named.st_dev, named.st_ino) == owned.identity ==
+           (held.st_dev, held.st_ino) and held.st_uid == os.getuid() and
+           stat.S_IMODE(held.st_mode) & 0o077 == 0,
+           'execution-snapshot', 'Snapshot directory ownership changed.')
+    expected = {f'item-{n:04d}.snapshot' for n in range(1, len(transaction.items)+1)}
+    refuse(set(owned.files) == set(owned.sealed) == set(os.listdir(owned.directory)) == expected,
+           'execution-snapshot', 'Snapshot set is incomplete or has unexpected files.')
+    for n, item in enumerate(transaction.items, 1):
+        name = f'item-{n:04d}.snapshot'
+        info = os.stat(name, dir_fd=owned.directory, follow_symlinks=False)
+        refuse(stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and
+               info.st_uid == os.getuid() and stat.S_IMODE(info.st_mode) & 0o077 == 0 and
+               (info.st_dev, info.st_ino) == owned.files[name] and
+               file_identity(info) == owned.sealed[name] and info.st_size == item.size,
+               'execution-snapshot', 'Snapshot file ownership or content identity changed.')
+
+
+def validate_owned_snapshots(owned, transaction, budget, check):
+    """Independent bounded reread through retained ownership; never path adoption."""
+    check_snapshot_identity(owned, transaction)
+    for n, item in enumerate(transaction.items, 1):
+        check(); name = f'item-{n:04d}.snapshot'
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=owned.directory)
+        try:
+            before = os.fstat(fd)
+            refuse(stat.S_ISREG(before.st_mode) and before.st_nlink == 1 and
+                   before.st_uid == os.getuid() and stat.S_IMODE(before.st_mode) & 0o077 == 0 and
+                   (before.st_dev, before.st_ino) == owned.files[name] and
+                   file_identity(before) == owned.sealed[name] and before.st_size == item.size,
+                   'execution-snapshot', 'Snapshot identity or size changed.')
+            digest = hashlib.sha256(); count = 0
+            while count < item.size:
+                check(); budget.require(min(CHUNK_BYTES, item.size-count))
+                block = os.read(fd, min(CHUNK_BYTES, item.size-count))
+                budget.consume(len(block)); count += len(block); digest.update(block)
+                if not block: break
+            after = os.fstat(fd)
+            named = os.stat(name, dir_fd=owned.directory, follow_symlinks=False)
+            refuse(count == item.size and digest.hexdigest() == item.sha256 and
+                   file_identity(before) == file_identity(after) == file_identity(named) and
+                   after.st_nlink == named.st_nlink == 1,
+                   'execution-snapshot', 'Snapshot content or ownership changed during validation.')
+            check()
+        finally:
+            os.close(fd)
+    check_snapshot_identity(owned, transaction)
+    owned.measure(); check()

@@ -568,7 +568,7 @@ class C64UFtpClient:
                                   outcome=Outcome.COMPLETED)
         return TransferResult(self._count, digest.hexdigest(), reply[0], transfer=self._write)
 
-    def list_directory(self, path, *, limits=None):
+    def list_directory(self, path, *, limits=None, budget=None, allow_fallback=True):
         path = checked_path(path)
         limits = limits or ListingLimits()
         with self._operation_scope('MLSD'):
@@ -583,17 +583,21 @@ class C64UFtpClient:
             # Preserve actual octets for the service's existing path/volume
             # revalidation. Never normalize identity or silently assume CWD.
             dialect = 'list' if self._capabilities.mlsd in (CS.UNSUPPORTED, CS.BROKEN) else 'mlsd'
+            if dialect == 'list' and not allow_fallback:
+                raise FtpOperationError(EC.LISTING, 'listing-no-fallback')
             parser = ListingParser(dialect, limits)
             if dialect == 'mlsd':
-                result = self._transfer('MLSD', None, receive=parser.feed)
+                result = self._transfer('MLSD', None, receive=parser.feed, budget=budget)
                 if result is None:
+                    if not allow_fallback:
+                        raise FtpOperationError(EC.LISTING, 'listing-no-fallback')
                     self._capabilities = replace(self._capabilities, mlsd=CS.UNSUPPORTED)
                     dialect = 'list'
                     parser = ListingParser(dialect, limits)
             if dialect == 'list':
                 self._event('fallback', reason=self._capabilities.mlsd.value, dialect='list')
                 self._operation = 'LIST'
-                self._transfer('LIST', None, receive=parser.feed)
+                self._transfer('LIST', None, receive=parser.feed, budget=budget)
             entries = parser.finish()
             self._capabilities = replace(self._capabilities, listing_dialect=dialect,
                 mlsd=CS.VERIFIED if dialect == 'mlsd' else self._capabilities.mlsd)

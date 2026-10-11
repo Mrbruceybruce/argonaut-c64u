@@ -42,6 +42,7 @@ class SnapshotPreparation:
         self._closed = False
         self._cleanup_blocked = False
         self._cleaning = set()
+        self._executing = set()
         self.cleanup_evidence = None
         self._uncertain_owner = None
         self._generation = 0
@@ -173,10 +174,14 @@ class SnapshotPreparation:
         with self._lock:
             entry = self._ready.get(getattr(result,'snapshot_id',''))
             refuse(entry is not None and entry[1] is result,'snapshot-ownership','Unknown snapshot ownership.')
-            refuse(not self._cleanup_blocked and result.snapshot_id not in self._cleaning,
+            refuse(not self._cleanup_blocked and result.snapshot_id not in self._cleaning and
+                   result.snapshot_id not in self._executing,
                    'admission_busy','Snapshot cleanup is active or requires recovery review.')
             # Retain _ready throughout cleanup: it owns admission and disk usage.
             self._cleaning.add(result.snapshot_id)
+        return self._cleanup_claimed(result, entry)
+
+    def _cleanup_claimed(self, result, entry):
         cleaned = False
         try:
             cleaned = entry[0].cleanup()
@@ -197,7 +202,42 @@ class SnapshotPreparation:
             self._pending.clear();self._authorized.clear()
             # Do not race an active discard or retry unresolved cleanup.
             ready = tuple(result for key,(owned,result) in self._ready.items()
-                          if key not in self._cleaning and not self._cleanup_blocked)
+                          if key not in self._cleaning and key not in self._executing and not self._cleanup_blocked)
         for result in ready:
             try:self.discard(result)
             except Exception:pass  # discard retained ownership and uncertainty evidence.
+
+
+    def execution_owner(self, result):
+        with self._lock:
+            entry = self._ready.get(getattr(result, 'snapshot_id', ''))
+            refuse(not self._closed and not self._cleanup_blocked and entry is not None and
+                   entry[1] is result and result.snapshot_id not in self._cleaning and
+                   result.snapshot_id not in self._executing and result.status == 'snapshots-ready' and
+                   result.files_completed == result.files_total,
+                   'execution-snapshot', 'Ready snapshot ownership is unavailable.')
+            return entry[0]
+
+    def claim_execution(self, result, owner):
+        with self._lock:
+            entry = self._ready.get(result.snapshot_id)
+            refuse(not self._closed and not self._cleanup_blocked and entry is not None and
+                   entry[0] is owner and entry[1] is result and not owner.closed and
+                   result.snapshot_id not in self._cleaning and result.snapshot_id not in self._executing,
+                   'execution-snapshot', 'Snapshot ownership is busy or stale.')
+            self._executing.add(result.snapshot_id)
+
+    def release_execution(self, result, *, uncertain=False):
+        with self._lock:
+            self._executing.remove(result.snapshot_id)
+            if uncertain:
+                self._cleanup_blocked = True
+                self.cleanup_evidence = replace(result, status='execution-uncertain', cleanup_complete=False)
+            cleanup = self._closed and not self._cleanup_blocked
+            if cleanup:
+                # Transfer directly to cleanup under the same registry lock.
+                # A concurrent close/discard cannot claim the released set.
+                self._cleaning.add(result.snapshot_id)
+                entry = self._ready[result.snapshot_id]
+        if cleanup:
+            self._cleanup_claimed(result, entry)

@@ -15,6 +15,14 @@ from .import_execution import (ExecutionJournal, ExecutionTransaction, MAX_REVIS
     uuid, transition, intent, outcome, validate_successor)
 
 
+# Internal identity marker, never serialized or interpreted as execution authority.
+_DEFINITE_REFUSAL = object()
+
+
+def _definite_creation_refusal(error):
+    return getattr(error, '_execution_persistence_disposition', None) is _DEFINITE_REFUSAL
+
+
 class ExecutionJournalStore(JournalStore):
     @staticmethod
     def _prefix(transaction_id):
@@ -77,55 +85,77 @@ class ExecutionJournalStore(JournalStore):
         self._append(journal, previous=None)
         return _ExecutionJournalWriter(self, journal)
 
+    def create_reserved(self, transaction):
+        from .import_capacity import _ReservedHistory
+        try:
+            reservation = _ReservedHistory(transaction)
+            journal = ExecutionJournal(transaction).validate()
+            data = encode(journal); reservation.check(journal, data)
+        except BaseException as exc:
+            # These builders perform no persistence at all.
+            exc._execution_persistence_disposition = _DEFINITE_REFUSAL
+            raise
+        self._append(journal, previous=None)
+        reservation.charge(data)
+        return _ExecutionJournalWriter(self, journal, reservation=reservation)
+
     def _append(self, journal, *, previous):
-        data = encode(journal)
-        if previous is None:
-            require(journal == ExecutionJournal(journal.transaction), 'Initial execution journal must be prepared.')
-        else: validate_successor(previous, journal)
-        name = self._filename(journal.transaction.id, journal.revision)
-        with self._locked() as directory:
-            # Preflight required durability before creating a checkpoint. Unlike
-            # the legacy store, unsupported directory fsync is a hard failure.
-            os.fsync(directory)
-            current = self._chain(directory, journal.transaction.id)
-            require(current == previous, 'Existing or changed execution attempt; no replay.')
-            retained_bytes = sum(os.stat(n, dir_fd=directory, follow_symlinks=False).st_size
-                for n in os.listdir(directory) if n.startswith(self._prefix(journal.transaction.id)))
-            require(retained_bytes + len(data) <= journal.transaction.budgets.journal_bytes,
-                    'Retained execution history exceeds the captured journal byte allowance.')
+        effects_possible = False
+        try:
+            data = encode(journal)
             if previous is None:
-                try: os.stat(journal.transaction.id+'.json', dir_fd=directory, follow_symlinks=False)
-                except FileNotFoundError: pass
-                else: raise ValueError('Historical transaction exists; no journal conversion or adoption.')
-                attempts = {n.split('.execution-', 1)[0] for n in os.listdir(directory) if '.execution-' in n}
-                require(len(attempts) < MAX_RECOVERY_JOURNALS, 'Execution attempt quota exceeded.')
-            temporary = 'execution-write-' + uuid4().hex
-            primary = None
-            try:
-                fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
-                with os.fdopen(fd, 'wb') as stream:
-                    stream.write(data); stream.flush(); os.fsync(stream.fileno())
-                # A new revision name under the cooperating-process lock. Never
-                # replace the prior intent checkpoint, even on outcome failure.
-                try: os.stat(name, dir_fd=directory, follow_symlinks=False)
-                except FileNotFoundError: pass
-                else: raise ValueError('Execution checkpoint already exists.')
-                os.replace(temporary, name, src_dir_fd=directory, dst_dir_fd=directory)
+                require(journal == ExecutionJournal(journal.transaction), 'Initial execution journal must be prepared.')
+            else: validate_successor(previous, journal)
+            name = self._filename(journal.transaction.id, journal.revision)
+            with self._locked() as directory:
+                current = self._chain(directory, journal.transaction.id)
+                require(current == previous, 'Existing or changed execution attempt; no replay.')
+                retained_bytes = sum(os.stat(n, dir_fd=directory, follow_symlinks=False).st_size
+                    for n in os.listdir(directory) if n.startswith(self._prefix(journal.transaction.id)))
+                require(retained_bytes + len(data) <= journal.transaction.budgets.journal_bytes,
+                        'Retained execution history exceeds the captured journal byte allowance.')
+                if previous is None:
+                    try: os.stat(journal.transaction.id+'.json', dir_fd=directory, follow_symlinks=False)
+                    except FileNotFoundError: pass
+                    else: raise ValueError('Historical transaction exists; no journal conversion or adoption.')
+                    attempts = {n.split('.execution-', 1)[0] for n in os.listdir(directory) if '.execution-' in n}
+                    require(len(attempts) < MAX_RECOVERY_JOURNALS, 'Execution attempt quota exceeded.')
+                # All read-only refusals precede the first persistence boundary.
+                # The permanent advisory lock is coordination, not checkpoint data.
+                # Set before the syscall: a raised error does not prove no effects.
+                effects_possible = True
                 os.fsync(directory)
-            except BaseException as exc:
-                primary = exc
-                raise
-            finally:
-                try: os.unlink(temporary, dir_fd=directory)
-                except FileNotFoundError: pass
-                except OSError:
-                    if primary is None: raise
-                    primary.add_note('Execution checkpoint temporary cleanup failed; inspection required.')
+                temporary = 'execution-write-' + uuid4().hex
+                primary = None
+                try:
+                    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+                    with os.fdopen(fd, 'wb') as stream:
+                        stream.write(data); stream.flush(); os.fsync(stream.fileno())
+                    # A new revision name under the cooperating-process lock. Never
+                    # replace the prior intent checkpoint, even on outcome failure.
+                    try: os.stat(name, dir_fd=directory, follow_symlinks=False)
+                    except FileNotFoundError: pass
+                    else: raise ValueError('Execution checkpoint already exists.')
+                    os.replace(temporary, name, src_dir_fd=directory, dst_dir_fd=directory)
+                    os.fsync(directory)
+                except BaseException as exc:
+                    primary = exc
+                    raise
+                finally:
+                    try: os.unlink(temporary, dir_fd=directory)
+                    except FileNotFoundError: pass
+                    except OSError:
+                        if primary is None: raise
+                        primary.add_note('Execution checkpoint temporary cleanup failed; inspection required.')
+        except BaseException as exc:
+            exc._execution_persistence_disposition = None if effects_possible else _DEFINITE_REFUSAL
+            raise
 
 
 class _ExecutionJournalWriter:
     """Live local persistence owner only; no Core job, consent or transport access."""
-    def __init__(self, store, journal):
+    def __init__(self, store, journal, *, reservation=None):
+        self._reservation = reservation
         self._store = store
         self._current = journal
         self._blocked = False
@@ -142,10 +172,14 @@ class _ExecutionJournalWriter:
             require(not self._blocked, 'Persistence is uncertain; writer cannot continue.')
             require(previous is self._current, 'Expected the live previous checkpoint; loaded evidence cannot resume.')
             candidate = builder(previous, *args, **kwargs)
+            if self._reservation is not None:
+                data = encode(candidate)
+                self._reservation.check(candidate, data)
             try: self._store._append(candidate, previous=previous)
             except BaseException:
                 self._blocked = True
                 raise
+            if self._reservation is not None:self._reservation.charge(data)
             self._current = candidate
             return candidate
 

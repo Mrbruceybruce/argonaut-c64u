@@ -104,9 +104,10 @@ class _FtpOperations:
         self.capability_evidence = None
 
     @contextmanager
-    def operation(self, check=None):
+    def operation(self, check=None, *, reject_busy=False):
         existing = self._context.get()
         if existing is not None:
+            if reject_busy:raise BrowserError('FTP operation already owned.')
             existing.checks.append(check)
             try:
                 self._manager._check(self.binding)
@@ -122,6 +123,9 @@ class _FtpOperations:
         try:
             # Serialize independent read contexts; nested helpers reuse context.
             # This runs on a worker, never waits while holding another FTP lease.
+            if reject_busy:
+                acquired = self._lock.acquire(blocking=False)
+                if not acquired:raise BrowserError('FTP operation already owned.')
             while not acquired:
                 self._manager._check(self.binding)
                 state.check()
@@ -286,7 +290,7 @@ class FtpReadAdapter(_FtpOperations):
             state.check()
             return result
 
-    def list_directory(self, path='/', *, identity=False):
+    def list_directory(self, path='/', *, identity=False, budget=None, allow_fallback=True):
         if identity:
             if not isinstance(path, bytes) or not path.startswith(b'/'):
                 raise BrowserError('Identity directory paths must be absolute bytes.')
@@ -300,7 +304,8 @@ class FtpReadAdapter(_FtpOperations):
                 raise BrowserError('Filename encoding failed. Check the selected filename encoding.') from None
         try:
             with self.operation():
-                result = self._client().list_directory(wire_path)
+                result = self._client().list_directory(wire_path, **(
+                    {'budget': budget, 'allow_fallback': allow_fallback} if budget is not None or not allow_fallback else {}))
                 if identity:
                     return result.actual_path, [IdentityEntry(e.name, e.kind, e.size) for e in result.entries]
                 entries = [Entry(e.name.decode(self._encoding), e.kind, e.size) for e in result.entries]

@@ -65,6 +65,7 @@ def _session_change(method):
         with self._session_admission():
             self._machine_targets.clear()
             self._import_preparation.invalidate()
+            self._import_admission.invalidate()
             return method(self, *args, **kwargs)
     return guarded
 
@@ -218,6 +219,8 @@ class ArgonautCore:
         self._machine_targets = {}
         from .import_preparation import SnapshotPreparation
         self._import_preparation = SnapshotPreparation(self)
+        from .import_admission import ExecutionAdmission
+        self._import_admission = ExecutionAdmission(self)
         self._client = None
         self._active_profile = None
         self._device_info = None
@@ -393,6 +396,7 @@ class ArgonautCore:
                 self.preferences.game_library_location = before
                 raise
         self._import_preparation.invalidate()
+        self._import_admission.invalidate()
         self._emit('library-location-changed')
 
     def load_managed_library(self, *, discover=False, selection=None, expected_session=None):
@@ -477,6 +481,17 @@ class ArgonautCore:
 
     def discard_managed_snapshots(self, result):
         return self._import_preparation.discard(result)
+
+    def review_managed_execution(self, snapshots, expected_session):
+        return self._import_admission.review(snapshots, expected_session)
+
+    def confirm_managed_execution(self, confirmation, *, confirmed):
+        return self._import_admission.confirm(confirmation, confirmed=confirmed)
+
+    def admit_managed_execution(self, authorization, *, journal_directory, check_cancel=lambda: None):
+        """Worker-only read-only check; no Stage/Import action or retained authority."""
+        return self._import_admission.admit(authorization, journal_directory=journal_directory,
+                                            check_cancel=check_cancel)
 
     def usb_backup_root(self):
         """Return the configured Core-host backup parent, if one is set."""
@@ -926,6 +941,7 @@ class ArgonautCore:
     def close(self):
         """Release Core execution resources; jobs are not persisted."""
         self._machine_targets.clear()
+        self._import_admission.invalidate()
         self._import_preparation.close()
         try:
             self._ftp_manager.invalidate(self._device_identity)
