@@ -1,5 +1,244 @@
 # Managed Library — foundation and explicit empty creation
 
+## Managed Import Phase 3B-2B.3E2F — exclusive-writer correction; pending inspection
+
+Baseline remains `2a03ab4b29d4b91c46e59cb39bffb8c060bed712`; all E2 changes remain
+uncommitted. The approved Option A is an exclusive-writer operating contract, not
+an atomic technical lock. Core staging confirmation now requires the separate
+`exclusive_writer_acknowledged=True` argument (exact True) alongside ordinary
+confirmation. The exact reviewed device, root/library, transaction and staging-only
+consequences include the requirement that no other FTP client, Argonaut instance
+or C64U-side operation modify selected managed-library storage during staging.
+Only this acknowledged confirmation issues the existing one-use staging capability;
+read-only consent cannot substitute. Existing identity checks, consumption before
+admission, 120-second admission deadline and continuous ownership remain intact.
+
+Collision and membership checks still refuse detected existing targets or changed
+contents. Argonaut's scheduler/lease excludes competing managed operations on its
+controlled device path; it does not lock out external clients. A writer violating
+the operating requirement can create a target after absence checking and before
+STOR, and ordinary FTP can overwrite that target. No automatic overwrite, retry,
+adoption or cleanup workflow is provided. This explicit residual risk qualifies
+all earlier E2 no-overwrite wording.
+
+Verified-staged receipts are point-in-time readback evidence, not current-content
+or immutability guarantees. They expose `evidence_scope='point-in-time'` and
+`requires_publication_revalidation=True`, with no execution or publication authority.
+A later phase must independently rehash record/payload bytes and revalidate manifest
+identity, destination collisions and device/library bindings, refusing any mismatch.
+Equal-length external edits after readback may pass final membership/size checks.
+
+Permanent loopback regressions now demonstrate both residual races and enforce the
+new acknowledgment prerequisite. Journal format/order/capacity, independent staging
+readback, cancellation, partial-send accounting and cleanup blocking are unchanged.
+Physical acceptance remains pending, including the exclusive-writer operating
+procedure. No Import/Stage UI, recovery or manifest publication is enabled. Earlier
+C0/native-chooser/focus/lifecycle qualifications remain open.
+
+The acknowledgment is a required input to the existing staging-specific confirm
+method; it is not a second independently transferable capability. Exact-object and
+Core registry checks bind it to the reviewed transaction and snapshots. An omitted,
+false or merely truthy acknowledgment cannot mint staging authorization. Neither
+acknowledgment nor authorization is reconstructed from journal or receipt data.
+The receipt's immutable fields identify the transaction/library, staged paths,
+expected lengths and hashes. Its scope properties describe historical observations;
+they do not implement or authorize later-phase publication/recovery.
+
+The overwrite regression injects an external payload target immediately before the
+loopback server processes STOR, after absence checking. It deliberately observes
+the overwrite under a violated operating contract; this is residual-risk evidence,
+not a claim of unconditional safety. The staleness regression independently reads
+and verifies the payload, replaces its bytes with equal-length data, then observes
+verified-staged with a point-in-time receipt whose expected hash differs from the
+subsequent remote bytes. Rechecking SIZE alone cannot catch this change.
+
+Logical journal reservation still does not reserve physical disk space. Missing
+trailing history is not detectable solely by the hash chain. Loaded journals remain
+inspection-only. Snapshot pinning, persistence uncertainty and retained remote
+leftover ownership are unchanged. Physical acceptance must validate the operating
+procedure, actual MKD path/acknowledgment variants, interrupted writes, independent
+readback, cancellation and resource release before real staging is qualified.
+
+Deterministic validation: **649 affected tests passed**, zero failures, errors or
+skips (96.630 s). This includes 36 staging tests, six added by E2F, and all 613
+baseline affected regressions. The focused staging run passed 36 tests in 20.745 s,
+also with zero failures/errors/skips. Both permanent race reproductions passed:
+the first confirms overwrite is possible under violated exclusivity; the second
+confirms equal-length post-readback replacement requires fresh publication hashing.
+Neither result is an unconditional safety claim.
+
+Exact commands, from the development worktree:
+
+```sh
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 /tmp/argonaut-3b2b1/run_regressions.py tests.test_import_staging
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 /tmp/argonaut-3b2b1/run_regressions.py tests.test_import_staging tests.test_import_evidence_prerequisites tests.test_import_execution_policy2 tests.test_import_admission tests.test_import_execution tests.test_import_transaction tests.test_import_policy tests.test_import_snapshots tests.test_import_plan tests.test_managed_library tests.test_scheduler tests.test_ftp_ownership tests.test_ftp_reads tests.test_c64u_ftp tests.test_ftp_streaming tests.test_core tests.test_ftp_mutations tests.test_ftp_uploads tests.test_ftp_replacements tests.test_ftp_replacement_corrections tests.test_ftp_folder_steps tests.test_transfers tests.test_ftp_evidence
+git diff --check
+```
+
+The existing offline runner restricts socket connect/connect_ex/bind to loopback.
+The test process was permitted to use localhost fixture sockets; no physical
+C64U or external service was contacted. Linux/Python 3.13.5; hardware behavior is
+unqualified. Canonical format-1 and policy-1 fixtures remain byte-for-byte unchanged.
+Diff and new-file syntax/whitespace checks passed (final LF, no CR or trailing
+spaces/tabs). The seven-file inventory and empty index remain unchanged; HEAD and
+local origin/development remain at the baseline. The separate UI review worktree
+remains clean at the published baseline. No fetch, commit, push or device access.
+
+Recommendation: PASS for independent inspection under approved Option A; no
+physical acceptance, UI enablement, recovery or publication is authorized here.
+
+## Phase 3B-2B.3E2 — managed staging executor; uncommitted inspection checkpoint
+
+Baseline: `2a03ab4b29d4b91c46e59cb39bffb8c060bed712`, published E1 transport and
+evidence prerequisites. This entry supersedes older pending and executor-unimplemented
+statuses below. E2 adds worker-only Core staging; it does not enable Import/Stage UI,
+publish games/manifests, rename into games/, implement recovery, or perform remote cleanup.
+
+### Separate authority and continuous ownership
+
+`review_managed_staging`, `confirm_managed_staging` and `stage_managed_import` use a
+separate Core-owned `StagingAdmission` registry. `StagingConfirmation` exposes the exact
+policy-2 transaction and a message naming device, library, transaction, payload sizes/
+hashes, directory creation, uploads, verification and retained leftovers. Explicit True
+confirmation is required. Exact confirmation/capability object identity rejects copies,
+replay and cross-Core use; neither snapshot readiness nor read-only admission grants
+staging authority. Registries are bounded and invalidated on session/library changes
+and shutdown. Existing read-only confirmation and policy-1 admission remain compatible.
+
+Authorization is consumed before session/scheduler/lease admission. Checks bind the
+registered client, Core preparation generation, device/session, selected library, manifest
+identity, approved resource policy, exact snapshot evidence and sealed snapshot owner.
+The original 120-second deadline is checked through revalidation and the final pre-MKD
+eligibility gate. Thereafter it is not an overall transfer timeout: binding, policy,
+ownership and cancellation checks continue, with normal transport timeouts still active.
+No authorization is serialized into a journal or receipt.
+
+Snapshot execution pinning encloses a busy-rejecting device scheduler reservation and
+one managed FTP operation/lease, with no fallback or reconnect. The live reserved journal
+writer remains owned across the full run. Failure outcomes or retained-intent uncertainty
+are handled before releasing the active lease; then the scheduler drains, then the snapshot
+pin releases. Discard cannot acquire an executing set; shutdown defers host cleanup.
+Pinned directory descriptors and sealed member identities select bounded upload streams;
+original source paths are never reopened for execution. Ownership is rechecked before
+and during reads, and again at final validation.
+
+### Durable staging sequence
+
+Schema 3 / execution policy 2 and format-1 bytes remain unchanged. For N items the exact
+plan is snapshot-validation, mkdir, record-upload, N uploads, record-readback, N readbacks,
+final-validation: K=2N+5 and reservation R=4N+16. Logical B*R reservation precedes remote
+mutation eligibility; all expected-previous and hash-chain checks remain mandatory.
+Every planned operation has a durable intent before its remote work, with collision
+absence inherited from admission and refreshed before writing. An observed target
+collision produces rejected/present evidence without dispatch. Associated preflight
+listing/manifest bytes are charged to that operation's outcome, not hidden extra revisions.
+
+1. Independently reread/hash sealed snapshots and revalidate the remote manifest, library
+   structure, case-insensitive transaction-directory absence and final destination names.
+2. Persist MKD intent; refresh admission, snapshot identity and deadline; issue one MKD.
+   Require definitive acknowledgment and exact usable returned-path evidence. Persist
+   completed MKD before any subsequent remote directory observation.
+3. Under record-upload intent, independently establish the directory's visibility and
+   emptiness. Stream the canonical format-1 record once and persist its acknowledged STOR
+   outcome. Unexpected content is a refusal, never adoption.
+4. For each payload, revalidate the manifest/bindings, exact directory membership and
+   target absence; stream the pinned snapshot in bounded chunks; require accepted STOR
+   and exact approved sender length/hash. Persist completion before another operation.
+5. Durably enter verifying. Independently read the record, then each payload, through
+   bounded SIZE → RETR → SIZE checks and fresh SHA-256. Exact sizes, digests and accepted
+   transfer completion are required. Each readback outcome is persisted separately.
+6. Final-validation rechecks manifest revision/digest, library/device/session/policy,
+   intended final-name collisions, snapshot identity and exact directory membership with
+   expected file sizes. Only completed final-validation plus all earlier operations permits
+   durable verified-staged success.
+
+`StagingReceipt` identifies the immutable transaction, verified artifact paths/sizes/hashes
+and actual accounting. It is evidence only: no executable writer, token, publication,
+retry, recovery, launch or cleanup authority is returned. Existing game manifests and
+games/ remain untouched by executor commands.
+
+### Accounting, cancellation and uncertainty
+
+Snapshot-validation reads are separate from preparation's source-read budget. Payload
+attempted upload bytes partition into confirmed sender bytes plus uncertain send exposure.
+Control record upload is separately charged; its operation size records confirmed sender
+bytes. Control reads include manifest/listing bodies and record readback; payload readback
+has its own allowance. Existing bounded FTP reply handling remains separate from these
+content-byte counters. All byte meters are cumulative for this execution; every attempted
+send block and every received block is charged before dependent work, including failed
+sends, rejected sinks, interruptions and verification failures. Sender completion does not
+prove remote durability. Fresh readback hashing is independent of upload hashing.
+
+Cooperative cancellation is checked before operations and between streaming chunks.
+Only the transport's existing short-mutation reply boundary defers cooperative cancellation;
+session invalidation is never masked. A received accepted mutation acknowledgment is
+persisted before later cancellation. Lost/malformed replies or interrupted writes leave
+uncertain evidence and prohibit further remote operations. No ABOR/QUIT is sent on an
+uncertain stream, and no retry, reconnect, intentional overwrite of an observed target,
+adoption or cleanup workflow is attempted. External check-to-STOR races remain
+possible under a violated exclusive-writer operating contract (see E2F above).
+
+Every unsuccessful run after possible remote mutation conservatively blocks host snapshot
+cleanup for future inspection, even where an individual reply was a definite rejection.
+Snapshot identity uncertainty, journal persistence uncertainty or uncertain creation also
+block cleanup. The existing definite pre-persistence refusal marker still permits ordinary
+host discard/shutdown cleanup when no independent uncertainty exists. Append/fsync failure
+never advances the live writer; its durable prefix/intent remains. Loaded journals remain
+inspection-only; missing trailing history cannot be detected by their chain alone. A
+capacity reservation bounds logical evidence bytes/revisions, not physical free space.
+
+### Remaining qualification and phase boundaries
+
+These are ordinary Core ownership boundaries, not protection from arbitrary code running
+as the same OS user. Remote absence/membership observations do not constitute an atomic
+filesystem lock or prove external writers are excluded. A race after a check cannot be
+eliminated by the available FTP operations; no atomic create-if-absent or durable-storage
+guarantee is assumed. Observed collisions, wrong paths, unexpected contents or changed
+manifests stop the run and retain evidence. Hardware/workflow acceptance must review
+concurrent-writer behavior and operating constraints before real staging is enabled.
+
+Physical C64U qualification is still pending: actual MKD reply/path variations, interrupted
+MKD/STOR behavior, independent record/payload readback, cancellation and resource release
+must be checked under a separately authorized device acceptance pass. No physical device
+was contacted here. No GUI workflow is enabled. 3B-2C lifecycle work, 3B-3 recovery and 3C
+manifest publication remain separate; earlier C0/native-chooser/focus/lifecycle gates remain.
+The generic Offline Test Lab fixture is unchanged; E2 transport tests use localhost managed
+FTP fixtures rather than weakening production validation for simulated evidence.
+
+### Deterministic validation
+
+Final affected regression run: **643 tests passed**, zero failures, errors or skips,
+in 94.340 seconds, including 30 new E2 tests and the 613 baseline affected regressions.
+The focused staging plus unchanged transport-boundary guard passed 31 tests in 19.514 s.
+Linux/Python 3.13.5. Tests use offline fakes and localhost FTP fixtures; the existing
+runner guards connect/connect_ex/bind to loopback. It is an existing local `/tmp` helper,
+not a new repository artifact. No physical device or external service was contacted.
+
+```sh
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 /tmp/argonaut-3b2b1/run_regressions.py tests.test_import_staging tests.test_c64u_ftp.ParserTests.test_only_core_read_adapter_imports_transport_and_headless_boundary
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 /tmp/argonaut-3b2b1/run_regressions.py tests.test_import_staging tests.test_import_evidence_prerequisites tests.test_import_execution_policy2 tests.test_import_admission tests.test_import_execution tests.test_import_transaction tests.test_import_policy tests.test_import_snapshots tests.test_import_plan tests.test_managed_library tests.test_scheduler tests.test_ftp_ownership tests.test_ftp_reads tests.test_c64u_ftp tests.test_ftp_streaming tests.test_core tests.test_ftp_mutations tests.test_ftp_uploads tests.test_ftp_replacements tests.test_ftp_replacement_corrections tests.test_ftp_folder_steps tests.test_transfers tests.test_ftp_evidence
+git diff --check
+```
+
+Coverage includes separate authority/copy/replay/expiry/busy refusal; final admission
+expiry versus ongoing transfer; invalidated bindings/manifests/policies; snapshot tamper,
+discard and shutdown races; capacity refusal and actual directory-fsync failure; intent/
+outcome/terminal persistence failure; MKD collisions, rejection, bad paths and reply loss;
+record/payload acknowledgment, partial send exposure and cancellation after acknowledgment;
+independent readback mismatch/short/overlong/changed-SIZE/lost-completion; cumulative budget
+exhaustion; exact final membership and destination collision; release order; inspection-only
+crash prefixes; no forbidden mutation commands, game-manifest changes or game publication.
+The two-item successful history has K=9, 23 durable checkpoints within R=24, and one FTP
+lease across admission, mutation and verification. Receipt and journal accounting agree.
+
+Earlier runs found one test-fixture misuse (requesting another snapshot authorization
+while a ready set existed) and one architecture-boundary failure (direct FTP-type import
+from the executor). Both were corrected. The executor now consumes adapter evidence
+values; the existing transport-boundary regression was not weakened. All final commands
+above passed. New files were checked for final LF, no CR and no trailing spaces/tabs.
+Published canonical format-1 and policy-1 fixtures remain byte-for-byte unchanged.
+All seven changed/new files remain uncommitted; no fetch, commit, push or rebase occurred.
+
 ## Phase 3B-2B.3E1 — transport and evidence prerequisites; pending inspection
 
 Baseline: `7ca9212c943afabbf417351248bec71792afda9f`. The policy-2 foundation is

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Core-owned read-only execution admission. No remote mutation dispatcher."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 from threading import Lock
@@ -47,6 +47,10 @@ class AdmissionEvidence:
 
 
 class ExecutionAdmission:
+    confirmation_type = ExecutionConfirmation
+    authorization_type = ExecutionAuthorization
+    execution_policy_version = 1
+
     def __init__(self, core):
         self.core = core
         self._lock = Lock()
@@ -96,7 +100,8 @@ class ExecutionAdmission:
                 separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
             tx = execution_transaction(original, snapshot_evidence_sha256=digest,
                 limits=ExecutionLimits(original.budgets.planned_upload_bytes, MiB, 16*MiB))
-            target = ExecutionConfirmation(uuid4().hex, tx, time.monotonic()+AUTHORIZATION_SECONDS)
+            tx = replace(tx, execution_policy_version=self.execution_policy_version).validate()
+            target = self.confirmation_type(uuid4().hex, tx, time.monotonic()+AUTHORIZATION_SECONDS)
             with preparation._lock:generation = preparation._generation
             entry = (target, self.core._require_client(), generation, owner, snapshots)
             self._check(entry)
@@ -107,14 +112,14 @@ class ExecutionAdmission:
             return target
 
     def confirm(self, target, *, confirmed):
-        refuse(type(target) is ExecutionConfirmation, 'execution-authorization', 'Unknown execution confirmation.')
+        refuse(type(target) is self.confirmation_type, 'execution-authorization', 'Unknown execution confirmation.')
         with self._lock:entry = self._pending.pop(target.token, None)
         refuse(entry is not None and entry[0] is target, 'execution-authorization', 'Confirmation is copied, stale or used.')
         if confirmed is False:return None
         refuse(confirmed is True, 'execution-authorization', 'Explicit execution confirmation required.')
         with self.core._session_admission():
             self._check(entry)
-            authorization = ExecutionAuthorization(uuid4().hex)
+            authorization = self.authorization_type(uuid4().hex)
             with self._lock:
                 if len(self._authorized) >= 32:self._authorized.pop(next(iter(self._authorized)))
                 self._authorized[authorization.token] = (authorization, entry)

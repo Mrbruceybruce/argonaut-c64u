@@ -66,6 +66,7 @@ def _session_change(method):
             self._machine_targets.clear()
             self._import_preparation.invalidate()
             self._import_admission.invalidate()
+            self._import_staging.invalidate()
             return method(self, *args, **kwargs)
     return guarded
 
@@ -221,6 +222,8 @@ class ArgonautCore:
         self._import_preparation = SnapshotPreparation(self)
         from .import_admission import ExecutionAdmission
         self._import_admission = ExecutionAdmission(self)
+        from .import_staging import StagingAdmission
+        self._import_staging = StagingAdmission(self)
         self._client = None
         self._active_profile = None
         self._device_info = None
@@ -397,6 +400,7 @@ class ArgonautCore:
                 raise
         self._import_preparation.invalidate()
         self._import_admission.invalidate()
+        self._import_staging.invalidate()
         self._emit('library-location-changed')
 
     def load_managed_library(self, *, discover=False, selection=None, expected_session=None):
@@ -432,7 +436,7 @@ class ArgonautCore:
         return self.scheduler.submit(CoreJob('game-library.managed-load',task),JobBinding.device(session))
 
     def prepare_managed_import(self, selections, library, expected_session, *, previous=None):
-        """Read-only preparation/revalidation. There is no import execution endpoint."""
+        """Read-only import planning/revalidation; staging requires separate confirmation."""
         from .import_plan import ImportPlanner, ImportPlan, validate_selections
         from .managed_library import ManagedLibrary, location
         from .native_files import read_remote_game
@@ -492,6 +496,18 @@ class ArgonautCore:
         """Worker-only read-only check; no Stage/Import action or retained authority."""
         return self._import_admission.admit(authorization, journal_directory=journal_directory,
                                             check_cancel=check_cancel)
+
+    def review_managed_staging(self, snapshots, expected_session):
+        return self._import_staging.review(snapshots, expected_session)
+
+    def confirm_managed_staging(self, confirmation, *, confirmed, exclusive_writer_acknowledged=False):
+        return self._import_staging.confirm(confirmation, confirmed=confirmed,
+            exclusive_writer_acknowledged=exclusive_writer_acknowledged)
+
+    def stage_managed_import(self, authorization, *, journal_directory, check_cancel=lambda: None):
+        """Worker-only staging; no GUI action or manifest publication."""
+        return self._import_staging.stage(authorization, journal_directory=journal_directory,
+                                          check_cancel=check_cancel)
 
     def usb_backup_root(self):
         """Return the configured Core-host backup parent, if one is set."""
@@ -942,6 +958,7 @@ class ArgonautCore:
         """Release Core execution resources; jobs are not persisted."""
         self._machine_targets.clear()
         self._import_admission.invalidate()
+        self._import_staging.invalidate()
         self._import_preparation.close()
         try:
             self._ftp_manager.invalidate(self._device_identity)

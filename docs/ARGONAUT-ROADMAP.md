@@ -1,5 +1,90 @@
 # Argonaut roadmap
 
+## Managed Import Phase 3B-2B.3E2F — exclusive-writer correction; pending inspection
+
+Baseline remains `2a03ab4b29d4b91c46e59cb39bffb8c060bed712`; all E2 changes remain
+uncommitted. The approved Option A is an exclusive-writer operating contract, not
+an atomic technical lock. Core staging confirmation now requires the separate
+`exclusive_writer_acknowledged=True` argument (exact True) alongside ordinary
+confirmation. The exact reviewed device, root/library, transaction and staging-only
+consequences include the requirement that no other FTP client, Argonaut instance
+or C64U-side operation modify selected managed-library storage during staging.
+Only this acknowledged confirmation issues the existing one-use staging capability;
+read-only consent cannot substitute. Existing identity checks, consumption before
+admission, 120-second admission deadline and continuous ownership remain intact.
+
+Collision and membership checks still refuse detected existing targets or changed
+contents. Argonaut's scheduler/lease excludes competing managed operations on its
+controlled device path; it does not lock out external clients. A writer violating
+the operating requirement can create a target after absence checking and before
+STOR, and ordinary FTP can overwrite that target. No automatic overwrite, retry,
+adoption or cleanup workflow is provided. This explicit residual risk qualifies
+all earlier E2 no-overwrite wording.
+
+Verified-staged receipts are point-in-time readback evidence, not current-content
+or immutability guarantees. They expose `evidence_scope='point-in-time'` and
+`requires_publication_revalidation=True`, with no execution or publication authority.
+A later phase must independently rehash record/payload bytes and revalidate manifest
+identity, destination collisions and device/library bindings, refusing any mismatch.
+Equal-length external edits after readback may pass final membership/size checks.
+
+Permanent loopback regressions now demonstrate both residual races and enforce the
+new acknowledgment prerequisite. Journal format/order/capacity, independent staging
+readback, cancellation, partial-send accounting and cleanup blocking are unchanged.
+Physical acceptance remains pending, including the exclusive-writer operating
+procedure. No Import/Stage UI, recovery or manifest publication is enabled. Earlier
+C0/native-chooser/focus/lifecycle qualifications remain open.
+
+Validation: **649 affected tests passed**, zero failures/errors/skips (96.630 s),
+including six new regressions. Focused staging: 36 passed (20.745 s). Both permanent
+race reproductions passed as residual-risk demonstrations. Loopback-only testing;
+diff and new-file whitespace checks passed. See MANAGED-LIBRARY for exact commands.
+PASS for independent inspection under approved Option A; physical acceptance and
+publication remain pending.
+
+## Managed Import Phase 3B-2B.3E2 — Core staging executor; pending inspection
+
+Baseline: `2a03ab4b29d4b91c46e59cb39bffb8c060bed712` (published E1 prerequisites).
+Older pending-publication statuses below are historical. This pass remains uncommitted.
+
+Core now provides worker-only review/confirm/stage methods for managed-library staging.
+Staging uses a distinct, identity-checked, one-use confirmation/capability registry and
+schema-3 execution policy 2. Read-only execution confirmation still cannot mutate.
+The 120-second deadline survives admission through the final pre-MKD gate, then stops
+being a transfer deadline. Device/session, library, policy and cancellation checks continue.
+No Import/Stage UI action is enabled; no game manifest or game content is published.
+
+The exact snapshot set, device scheduler reservation, managed FTP lease and live journal
+writer cover admission, staging, independent readback and durable terminal handling.
+Intent precedes each operation. Accepted MKD/STOR outcomes become durable before later
+cooperative cancellation or commands. Execution performs one MKD, canonical transaction
+record/payload uploads, separate SIZE/RETR/SIZE hash verification, and final manifest,
+directory-membership and destination-collision checks before verified-staged. Its receipt
+is non-executable evidence. No rename, overwrite of an observed target, retry, reconnect,
+resume, adoption, remote cleanup or recovery is dispatched.
+
+Logical capacity (K=2N+5, R=4N+16) is reserved before mutation eligibility. Actual bounded
+snapshot/control/payload accounting includes failed sends and reads. Persistence failures,
+snapshot identity uncertainty and every unsuccessful attempt with possible remote effects
+retain evidence and block snapshot cleanup. Definite pre-persistence refusal remains
+separate. Release order is FTP lease, scheduler reservation, then snapshot ownership.
+
+Physical C64U acceptance and workflow integration remain pending. Exact path/manifest
+checks do not exclude external-writer races; FTP atomic create-if-absent, durable storage
+and a remote filesystem lock are not claimed. Unexpected observations stop execution and
+retain leftovers; there is no automatic disposition. Logical capacity cannot guarantee
+physical disk space; loaded journals remain inspection-only and missing trailing history
+is not detectable solely from the hash chain. 3B-2C lifecycle work, 3B-3 recovery and 3C
+manifest publication remain separate. Earlier C0/native-chooser/focus/lifecycle physical
+qualification limits remain open. No device access, fetch, commit or push occurred.
+
+Final validation: **643 tests passed**, zero failures/errors/skips (94.340 s),
+including 30 new staging tests and all 613 affected baseline regressions. The focused
+staging-plus-architecture run passed 31 tests. Loopback-only networking; Linux/Python
+3.13.5. Diff and new-file whitespace checks passed. Independent inspection is next.
+
+See MANAGED-LIBRARY's E2 entry for lifecycle, limits and exact validation commands.
+
 ## Managed Import Phase 3B-2B.3E1 — transport/evidence prerequisites; pending inspection
 
 Baseline: `7ca9212c943afabbf417351248bec71792afda9f` (published policy-2
