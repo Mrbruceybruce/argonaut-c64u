@@ -1,5 +1,19 @@
 # Argonaut roadmap
 
+## Published baseline and future planning status
+
+Managed Import E2/E2F is published in
+`d6c7ed62cf23d196928247177bd8b2a2cb07e88c`. Older uncommitted/pending-publication
+entries below are historical checkpoint records, retained without rewriting them.
+Publication does not complete physical FTP acceptance. Exclusive-writer consent,
+residual external-writer races and point-in-time receipts with mandatory later
+verification remain part of the contract. 3B-2C workflow/lifecycle integration,
+3B-3 recovery, 3C manifest publication and earlier C0/native-chooser/focus/lifecycle
+and physical qualification gates remain pending.
+
+The separate [ARGONAUT OFFLINE LIBRARIES AND PLAYBACK](#n-argonaut-offline-libraries-and-playback--planned-future-track)
+track below is **PLANNED** only; it does not change existing Managed Import behavior.
+
 ## Managed Import Phase 3B-2B.3E2F — exclusive-writer correction; pending inspection
 
 Baseline remains `2a03ab4b29d4b91c46e59cb39bffb8c060bed712`; all E2 changes remain
@@ -1203,6 +1217,172 @@ add to Game Library → later launch without the physical cart.
   cross-platform qualification principles, with portable code and automated
   platform checks throughout. Old Stable 1.9 gates are completed history, not a
   newly reopened release task.
+
+## N. ARGONAUT OFFLINE LIBRARIES AND PLAYBACK — PLANNED future track
+
+**Status: PLANNED — no implementation or acceptance is claimed for the new
+capabilities below.** Extend Argonaut's existing C64U management and catalog
+foundations into a C64 library manager usable without a connected C64U, including
+local playback and preparation of removable media for later C64U use.
+
+This is an explicitly separate future development track, not a replacement for
+Managed Import. E2/E2F is published at
+`d6c7ed62cf23d196928247177bd8b2a2cb07e88c`; physical FTP acceptance remains pending.
+Preserve 3B-2C workflow/lifecycle integration, 3B-3 recovery, 3C final placement and
+manifest publication, plus outstanding C0/native-chooser/focus/lifecycle and
+physical qualification gates. Planning this track does not authorize implementation,
+change current managed-library formats, or broaden existing import/launch actions.
+
+### Existing foundations and proposed reuse
+
+Repository authority already separates metadata-only catalogs (`game_library.py`,
+`sid_jukebox.py`) from reviewed device execution (`game_launch.py`, `sid_playback.py`).
+`sid_format.py` provides bounded PSID/RSID metadata parsing, including subtunes,
+chip configuration and compatibility evidence. `file_service.py` and
+`picker_model.py` distinguish Core-host, C64U and client file references. Existing
+local catalog references are not evidence that the new offline managed-library
+preparation or emulator integration is implemented.
+
+Reuse candidates are Core-owned planning/review, explicit destination selection,
+UUID and path validation, bounded hashing, metadata extraction, resource accounting,
+transaction intent/outcome concepts and independent verification. Evaluate each
+candidate against the new storage and playback contracts before reuse. **Do not
+reuse FTP staging unchanged for local filesystems:** local identity, permissions,
+symlinks, case handling, rename/flush behavior, interrupted writes and media removal
+need their own reviewed implementation and platform qualification. Core-host storage
+must remain distinct from a future remote UI client's filesystem.
+
+### PLANNED — offline preparation and multiple libraries
+
+Prepare managed libraries on explicitly selected internal PC/Mac storage, USB thumb
+drives, SD cards and other supported removable media. Validate the destination
+filesystem, access rights and available capacity; prepare directories/manifests;
+copy and independently verify local files while preserving sources. No destructive
+formatting or automatic cleanup. Define safe completion, outstanding-write handling
+and removable-media ejection guidance. Design for Debian/Linux, Windows and macOS
+where supported; a mounted or writable volume alone does not prove C64U compatibility.
+
+**ONE PHYSICAL STORAGE DEVICE MAY CONTAIN MULTIPLE INDEPENDENT ARGONAUT LIBRARIES.**
+Each library has its own UUID, manifest and managed root directory, with independent
+content/catalog identity and explicit selection/adoption. Distinguish a physical
+volume root from a library's managed root. Prevent overlapping managed roots and
+conflicting paths, including platform-specific path aliases. Capacity is shared
+across libraries on the same medium; removal invalidates availability for all of
+them. Do not permanently encode a one-drive/one-library assumption.
+
+Current `managed_library.py` uses a device/root/path/UUID binding, one selected
+library preference and bounded discovery of `ARGONAUT_LIBRARY` at supported remote
+storage roots. These are current constraints, not the future general model.
+Existing Managed Import behavior stays unchanged until a separately reviewed
+extension or migration is approved. Define how copied manifests/duplicate UUIDs
+are distinguished from the same library returning at a different mount location;
+never silently merge, reidentify or rewrite them.
+
+### PLANNED — discovery, explicit adoption and availability
+
+Automatically discover compatible manifests through read-only, bounded scanning.
+Present locations and identities; optional discovery notifications may invite
+review. Detection must not modify a library, rewrite its manifest, adopt it or
+switch the active selection. Explicit user approval is required to adopt a library
+for management; any migration requires its own reviewed consent and contract.
+
+Distinguish **detected** (found but not adopted), **adopted** (explicitly selected
+for management) and **unavailable** (a known location cannot currently be accessed).
+Retain adopted identity and catalog references when media is disconnected or
+missing. Do not substitute another drive, infer identity from a mount path alone,
+or silently forget a temporarily unavailable location.
+
+### PLANNED — offline Game Library and external VICE
+
+Provide offline browsing/catalog management and local launch of supported CRT,
+D64 and PRG content without C64U connectivity. Initially invoke installed external
+VICE executables rather than embedding an emulator. Investigate `x64sc` and other
+suitable VICE targets; do not assume executable names, command-line flags, supported
+versions or format compatibility are identical across platforms.
+
+Plan configurable executable paths, installation/version/capability checks and clear
+unavailable/incompatible outcomes. Review Linux, Windows and macOS process launching,
+argument handling, working directories and emulator configuration. Preserve user
+files and define protection from emulator-side writes to disk images or other media;
+do not assume external playback is read-only. PRG support in this future local
+backend does not change the current managed-import format allowlist or C64U launch
+qualification. Keep local playback and separately reviewed C64U launch distinct.
+
+### PLANNED — SID Music Library and external VSID
+
+Add a dedicated music catalog sharing common library identity, locations, discovery,
+verification and transaction infrastructure while keeping music metadata/playback
+separate from game behavior. Plan import/cataloging of supported SID files and
+appropriate PSID/RSID parsing for title, author, release information/year, subtunes
+and SID configuration. Preserve original release text where it cannot safely be
+interpreted as a year; parsing is not proof that a tune is playable.
+
+Plan offline playback through installed VSID, with executable/capability selection
+and compatibility warnings. Investigate selected-subtune control, multi-SID models/
+addresses and format restrictions rather than assuming all tunes work with every
+player. Offline playlists and selected-subtune playback are future capabilities;
+existing C64U SIDJuke navigation is not VSID integration. Later preparation/transfer
+of music for C64U storage needs explicit destination and compatibility review; it
+must not silently reuse the game-only manifest or import contract.
+
+### PLANNED — catalog, content and location identities
+
+| Identity | Planned meaning and constraints |
+| --- | --- |
+| Catalog | Logical game or musical work; title and filename are descriptive metadata, not proof of identity. |
+| Content | Exact file bytes/version and SHA-256 digest; matching content does not itself authorize merging catalog records. |
+| Location | Specific local, removable or C64U storage reference, with library/volume/device identity and availability. |
+
+Allow one logical catalog item to reference multiple content versions and each
+version to have multiple locations. Preserve independent per-library catalog
+identity; cross-library relationships or merges must be explicit. A location going
+offline must not delete the logical item or silently redirect execution to a
+look-alike filename. Define fresh identity/content validation before use, and safe
+handling of missing, changed or disconnected locations.
+
+### PLANNED — UI concepts, not enabled actions
+
+Explore **Game Library**, **SID Music Library**, **Library Locations**, **Prepare
+USB/SD Library**, **Discover / Adopt Existing Library**, **Settings → Emulators**,
+**Play Locally** and **Launch on C64U** as user-facing concepts. Existing tabs and
+actions are not redesigned or enabled by this plan. Make the selected library,
+location availability and playback target clear; keep Core responsible for identity,
+permissions, transactions and execution authority.
+
+### Proposed development sequence — all PLANNED, separate approval per slice
+
+1. **Identity and compatibility contract:** library/volume/catalog/content/location
+   model, versioning, adoption, non-overlap and migration rules; review against the
+   existing managed-library format and phase boundaries before implementation.
+2. **Read-only locations and discovery:** bounded discovery, explicit adoption,
+   unavailable-state retention and portable media identity; prove no manifest writes
+   or silent library switching.
+3. **Local preparation backend:** resource planning, source preservation, local
+   transaction evidence, independent copy verification and interruption handling;
+   qualify supported filesystems and safe completion/ejection behavior.
+4. **Offline game catalog and VICE launch:** multiple versions/locations, emulator
+   configuration and guarded external process launch; qualify CRT/D64/PRG support
+   and user-file protection per supported OS/player combination.
+5. **SID Music Library and VSID:** music-specific metadata and compatibility, local
+   playback, followed by reviewed subtune/playlist capabilities and future C64U-media
+   preparation. Share infrastructure without merging game/music execution rules.
+6. **Integrated workflow and platform acceptance:** review the proposed UI concepts,
+   media removal/reinsertion, multiple-library behavior and cross-platform playback.
+   Do not declare implementation or physical qualification complete from this plan.
+
+### Unresolved architecture and safety decisions
+
+| Question | Required later design/acceptance decision |
+| --- | --- |
+| Manifest compatibility/versioning | Separate or shared game/music schema; compatibility with C64U managed libraries; explicit migration/adoption and rollback policy. |
+| Discovery scope/performance | Search roots, nesting/depth limits, scan budgets, removable/network filesystem exclusions and optional notifications. |
+| Filesystem compatibility | Supported desktop/C64U combinations; names, case, permissions, file-size limits, links and durability semantics. |
+| Media identity/ejection | Stable volume/library identity, duplicate/copied UUIDs, drive-letter/mount changes, shared capacity, removal and OS-specific safe-eject guidance. |
+| Local transaction safety | Atomicity/durability guarantees actually available per filesystem, exclusive-writer requirements, interruption evidence and separately approved recovery/cleanup. |
+| Metadata and merging | Extraction limits/provenance, release-year interpretation, catalog merge consent and conflict handling. |
+| Emulator support | Discovery, supported VICE versions/targets including x64sc and VSID, launch arguments, lifecycle and protection from emulator writes. |
+| SID compatibility | PSID/RSID scope, selected subtunes, multi-SID configuration and warnings; no universal playback assumption. |
+| Duplicate content/locations | Digest-based detection versus logical-work identity, multiple versions/copies, offline locations and explicit cross-library relationships. |
 
 ## Design principles
 

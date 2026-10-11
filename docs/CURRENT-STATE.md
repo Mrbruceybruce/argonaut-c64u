@@ -1,5 +1,25 @@
 # Current development state
 
+## Published baseline and future planning status
+
+Managed Import E2/E2F is published in
+`d6c7ed62cf23d196928247177bd8b2a2cb07e88c`. Older uncommitted/pending-publication
+entries below are historical checkpoint records, retained without rewriting them.
+Publication does not complete physical FTP acceptance. Exclusive-writer consent,
+residual external-writer races and point-in-time receipts with mandatory later
+verification remain part of the contract. 3B-2C workflow/lifecycle integration,
+3B-3 recovery, 3C manifest publication and earlier C0/native-chooser/focus/lifecycle
+and physical qualification gates remain pending.
+
+The roadmap now records **ARGONAUT OFFLINE LIBRARIES AND PLAYBACK — PLANNED**:
+local/removable-media preparation, multiple independent libraries per medium,
+read-only discovery with explicit adoption, content/version/location identity and
+future external VICE/VSID playback. This is a documentation-only future track;
+new offline preparation and emulator capabilities are not implemented. Existing
+local catalog references and SID metadata parsing are foundations, not completion
+of this initiative. See the [future roadmap track](ARGONAUT-ROADMAP.md#n-argonaut-offline-libraries-and-playback--planned-future-track)
+for sequencing and unresolved architecture decisions.
+
 ## Managed Import Phase 3B-2B.3E2F — exclusive-writer correction; pending inspection
 
 Baseline remains `2a03ab4b29d4b91c46e59cb39bffb8c060bed712`; all E2 changes remain

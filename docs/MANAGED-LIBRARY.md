@@ -1,5 +1,29 @@
 # Managed Library — foundation and explicit empty creation
 
+## Published baseline and future planning status
+
+Managed Import E2/E2F is published in
+`d6c7ed62cf23d196928247177bd8b2a2cb07e88c`. Older uncommitted/pending-publication
+entries below are historical checkpoint records, retained without rewriting them.
+Publication does not complete physical FTP acceptance. Exclusive-writer consent,
+residual external-writer races and point-in-time receipts with mandatory later
+verification remain part of the contract. 3B-2C workflow/lifecycle integration,
+3B-3 recovery, 3C manifest publication and earlier C0/native-chooser/focus/lifecycle
+and physical qualification gates remain pending.
+
+### Future local/multiple-library extension — PLANNED, no contract migration
+
+The [offline libraries and playback track](ARGONAUT-ROADMAP.md#n-argonaut-offline-libraries-and-playback--planned-future-track)
+plans multiple independent library UUIDs/manifests/managed roots on one physical
+medium, explicit discovery/adoption and local preparation. The existing remote
+path/layout, selected-library preference, game format allowlist and FTP execution
+contract remain unchanged. Local filesystem transactions and future SID manifests
+require separate design review; neither FTP atomicity nor unchanged reuse of the
+FTP executor is assumed. Shared physical capacity/removal and non-overlapping
+managed roots must be addressed before implementation. Detection alone never grants
+adoption, migration or write authority. This plan does not implement recovery or
+manifest publication.
+
 ## Managed Import Phase 3B-2B.3E2F — exclusive-writer correction; pending inspection
 
 Baseline remains `2a03ab4b29d4b91c46e59cb39bffb8c060bed712`; all E2 changes remain
