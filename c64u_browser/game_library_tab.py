@@ -13,6 +13,8 @@ from .game_library_client import (
     source_text,
 )
 from .game_library_bulk_dialog import BulkImportDialog
+from .file_picker import FilePicker
+from .picker_model import PickerMode, GAMES
 
 
 class GameLibraryTab:
@@ -49,7 +51,7 @@ class GameLibraryTab:
         self.add_local_button = app.button(
             actions, 'Add local files…', self.add_local)
         self.add_c64u_button = app.button(
-            actions, 'Add selected C64U file(s)', self.add_c64u)
+            actions, 'Add C64U files…', self.add_c64u)
         bulk_actions = Gtk.Box(spacing=8)
         self.box.append(bulk_actions)
         self.scan_local_button = app.button(
@@ -304,92 +306,55 @@ class GameLibraryTab:
         self._show('Game Library details saved.')
         self.refresh(preserve=True)
 
-    def _game_filter(self, chooser):
-        filter_ = Gtk.FileFilter();filter_.set_name('D64 and CRT games')
-        filter_.add_pattern('*.d64');filter_.add_pattern('*.D64')
-        filter_.add_pattern('*.crt');filter_.add_pattern('*.CRT')
-        chooser.add_filter(filter_)
-
     def add_local(self):
-        if self.chooser:return
-        chooser = Gtk.FileChooserNative.new(
-            'Add D64 or CRT to Game Library', self.app.window,
-            Gtk.FileChooserAction.OPEN, 'Add', 'Cancel')
-        chooser.set_select_multiple(True)
-        chooser.set_current_folder(Gio.File.new_for_path(str(self.app.local)))
-        self._game_filter(chooser);self.chooser = chooser
-        def response(_, code):
-            files = chooser.get_files()
-            chosen = ([files.get_item(index) for index in range(files.get_n_items())]
-                      if code == Gtk.ResponseType.ACCEPT else [])
-            chooser.destroy();self.chooser = None
-            if not chosen:return
-            paths = tuple(item.get_path() for item in chosen)
-            paths = tuple(path for path in paths if path)
-            if not paths:
-                self._show('Choose files on the Argonaut Core computer.');return
-            if len(paths) > 64:
-                self._show('Choose at most 64 games in one Add operation.');return
-            self._add_local_paths(paths)
-        chooser.connect('response', response);chooser.show()
-
-    def _add_local_paths(self, paths, index=0, results=(), failures=()):
-        if index >= len(paths):
-            self.refresh(False)
-            self._show(add_results_text(results, failures))
-            return
-        job = lambda: self.client.add_core_host(paths[index])
-        def finished(snapshot):
-            if snapshot.state != 'succeeded':
-                self._add_local_paths(
-                    paths, index + 1, results,
-                    failures + (client_error_text(snapshot.error),))
-                return
-            self._add_local_paths(
-                paths, index + 1, results + (snapshot.result,), failures)
-        self._run_job(job, finished, failed=lambda exc:self._add_local_paths(
-            paths, index + 1, results, failures + (str(exc),)))
-
-    def _selected_remote_source(self):
-        rows = self.app.rlist.get_selected_rows()
-        if len(rows) != 1 or rows[0].item[0] == '..' or rows[0].item[1]:
-            raise BrowserError('Select one D64 or CRT file in the C64U Files pane.')
-        session = self.app.core.device_session()
-        if not session.device_id or not session.session_id:
-            raise BrowserError('Connect to the source C64U first.')
-        return session.device_id, posixpath.join(self.app.remote, rows[0].item[0])
-
-    def _selected_remote_files(self):
-        rows = self.app.rlist.get_selected_rows()
-        if not rows:
-            raise BrowserError('Select one or more D64 or CRT files in the C64U Files pane.')
-        names = []
-        for row in rows:
-            name, directory = row.item
-            if (name == '..' or directory
-                    or not name.casefold().endswith(('.d64', '.crt'))):
-                raise BrowserError('Select only D64 or CRT files in the C64U Files pane.')
-            names.append(name)
-        session = self.app.core.device_session()
-        if not session.device_id or not session.session_id:
-            raise BrowserError('Connect to the source C64U first.')
-        paths = tuple(posixpath.join(self.app.remote, name) for name in names)
-        return session.device_id, paths
+        self._choose_add(('core-host', 'c64u'))
 
     def add_c64u(self):
-        try:
-            device_id, paths = self._selected_remote_files()
-            if len(paths) > 1:
-                job = lambda: self.client.scan_c64u_sources(device_id, paths)
-                self._start_bulk_scan(job);return
-            job = lambda: self.client.add_c64u(device_id, paths[0])
+        self._choose_add(('c64u', 'core-host'))
+
+    def _choose_add(self, scopes):
+        if self.chooser:return
+        def chosen(selections):
+            self.chooser = None
+            if selections:self.add_selections(selections)
+        self.chooser = FilePicker(self.app, chosen, mode=PickerMode.OPEN_FILES,
+            scopes=scopes, filter=GAMES, limit=max(64, self.client.library.bulk_max_candidates),
+            local_path=self.app.local)
+
+    def add_selections(self, selections):
+        selections = tuple(selections)
+        try:self.client.picker_sources(selections, self.app.core.device_session())
         except Exception as exc:self._show(str(exc));return
+        if selections[0].scope == CORE_HOST:
+            self._add_local_selections(selections);return
+        if len(selections) > 1:
+            self._start_bulk_scan(lambda:self.client.scan_selections(
+                selections, self.app.core.device_session()))
+            return
+        job = lambda:self.client.add_selection(selections[0], self.app.core.device_session())
         def finished(snapshot):
             if snapshot.state != 'succeeded':
                 self._show(client_error_text(snapshot.error));return
             self.client.select(snapshot.result.record.id)
             self.refresh(True);self._show('C64U game reference added to the library.')
         self._run_job(job, finished)
+
+    def _add_local_selections(self, selections, index=0, results=(), failures=()):
+        if index >= len(selections):
+            self.refresh(False)
+            self._show(add_results_text(results, failures))
+            return
+        job = lambda:self.client.add_selection(selections[index], self.app.core.device_session())
+        def finished(snapshot):
+            if snapshot.state != 'succeeded':
+                self._add_local_selections(
+                    selections, index + 1, results,
+                    failures + (client_error_text(snapshot.error),))
+                return
+            self._add_local_selections(
+                selections, index + 1, results + (snapshot.result,), failures)
+        self._run_job(job, finished, failed=lambda exc:self._add_local_selections(
+            selections, index + 1, results, failures + (str(exc),)))
 
     def _scan_options(self, title, description, submit):
         dialog = Gtk.Dialog(title=title, transient_for=self.app.window, modal=True)
@@ -500,28 +465,21 @@ class GameLibraryTab:
 
     def relink(self):
         record = self.client.selected()
-        if record is None:return
-        if record.source.scope == C64U:
+        if record is None or self.chooser:return
+        def chosen(selections):
+            self.chooser = None
+            if not selections:return
             try:
-                device_id, path = self._selected_remote_source()
-                job = lambda: self.client.prepare_relink_c64u(device_id, path)
+                if len(selections) != 1:raise BrowserError('Choose one replacement game.')
+                self.client.picker_sources(selections, self.app.core.device_session())
             except Exception as exc:self._show(str(exc));return
-            self._run_job(job, self._relink_prepared);return
-        if self.chooser:return
-        chooser = Gtk.FileChooserNative.new(
-            'Locate replacement D64 or CRT', self.app.window,
-            Gtk.FileChooserAction.OPEN, 'Review', 'Cancel')
-        current = Path(record.source.path).parent
-        if current.is_dir():chooser.set_current_folder(Gio.File.new_for_path(str(current)))
-        self._game_filter(chooser);self.chooser = chooser
-        def response(_, code):
-            file = chooser.get_file();chooser.destroy();self.chooser = None
-            if code != Gtk.ResponseType.ACCEPT or not file:return
-            path = file.get_path()
-            if not path:return
-            job = lambda: self.client.prepare_relink_core_host(path)
+            job = lambda:self.client.prepare_relink_selection(
+                record, selections[0], self.app.core.device_session())
             self._run_job(job, self._relink_prepared)
-        chooser.connect('response', response);chooser.show()
+        self.chooser = FilePicker(self.app, chosen, mode=PickerMode.OPEN_FILE,
+            scopes=(record.source.scope,), filter=GAMES,
+            local_path=Path(record.source.path).parent if record.source.scope == CORE_HOST
+                       else self.app.local)
 
     def _relink_prepared(self, snapshot):
         if snapshot.state != 'succeeded':

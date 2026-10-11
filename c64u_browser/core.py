@@ -213,6 +213,7 @@ class ArgonautCore:
         self._session_passwords = {}
         self.preferences_error = None
         self._session_gate = Lock()
+        self._library_creation_plans = {}
         self._machine_targets = {}
         self._client = None
         self._active_profile = None
@@ -240,6 +241,7 @@ class ArgonautCore:
             remote_lister=self._list_game_directory,
             bulk_remote_reader=self._read_game_bulk_source,
             session_provider=self.device_session,
+            session_admission=self._session_admission,
             scheduler=self.scheduler)
         self.game_launch = GameLaunchService(
             self.game_library, self._require_client, self.device_session,
@@ -305,6 +307,114 @@ class ArgonautCore:
         return UsbBackupService._volume_fingerprint(
             self._require_client(), source.volume, job.check_cancel,
             UsbBackupService._fingerprint_progress(job,stage), stage)
+
+    def prepare_library_creation(self, selection):
+        from .picker_model import PickerSelection
+        from .storage import storage_root
+        from .library_creation import CreationTarget
+        import uuid
+        with self._session_admission():
+            session=self.device_session();self._require_client()
+            if (not isinstance(selection,PickerSelection) or selection.scope!='c64u'
+                    or selection.kind!='dir' or selection.category!='library-root'
+                    or storage_root(selection.path)!=selection.path
+                    or selection.storage_root!=selection.path
+                    or selection.filename!=selection.path[1:]):
+                raise CoreError('source','Choose one USB or SD storage root.')
+            selection.validate_session(session)
+            if self.preferences.game_library_location is not None:
+                raise CoreError('location','A library is already configured. Creation refused.')
+            target=CreationTarget(str(uuid.uuid4()),session.device_id,session.session_id,
+                selection.path,selection.path+'/ARGONAUT_LIBRARY')
+            if len(self._library_creation_plans)>=16:self._library_creation_plans.clear()
+            self._library_creation_plans[target.token]=target
+            return target
+
+    def discard_library_creation(self, token):
+        self._library_creation_plans.pop(token,None)
+
+    def create_managed_library(self, target):
+        from .library_creation import CreationTarget, create_empty_library, CreationError, CreationRecovery
+        from .managed_library import LibraryState
+        if not isinstance(target,CreationTarget) or self._library_creation_plans.pop(target.token,None)!=target:
+            raise CoreError('plan','Creation confirmation is missing or already used.')
+        session=DeviceSession(target.device_id,target.session_id)
+        def task(job):
+            # Same fail-fast gate as reconnect; never block GTK waiting for a write.
+            with self._session_admission():
+                def session_check():
+                    if self.device_session()!=session:
+                        raise CoreError('session','Connection changed. Creation stopped at the captured destination.')
+                    if self.preferences.game_library_location is not None:
+                        raise CoreError('location','Library location changed. Creation stopped.')
+                def check():session_check();job.check_cancel()
+                check();client=self._require_client();adapter=adapter_for(client)
+                if adapter is None:raise CoreError('session','Creation requires a managed storage session.')
+                library=create_empty_library(adapter,target,check,session_check)
+                # Completed remote content is valid even if preference persistence fails.
+                # Never delete it or claim registration succeeded in that case.
+                try:
+                    session_check()
+                    self.preferences.game_library_location=library.identity.preference()
+                    self.preferences.save()
+                except Exception as exc:
+                    self.preferences.game_library_location=None
+                    raise CreationError(CreationRecovery(target.path,'registration',(),(target.path,),
+                        'Library structure was verified, but registration failed. Reload this exact location; '
+                        'do not recreate it. '+str(exc))) from None
+                return LibraryState('valid','Empty managed library created and verified.',(library,),session.session_id)
+        return self.scheduler.submit(CoreJob('game-library.managed-create',task),JobBinding.device(session))
+
+    def configure_game_library(self, path, *, identity=None, expected_session=None):
+        """Persist only a host preference. Never create or adopt remote content."""
+        from .managed_library import location, library_path, LibraryIdentity
+        with self._session_admission():
+            session = self.device_session()
+            if expected_session is not None and session != expected_session:
+                raise CoreError('session', 'Connection changed. Select the library again.')
+            value = None
+            if path:
+                if not session.device_id or not session.session_id:
+                    raise CoreError('session', 'Connect to the intended C64U before setting its library location.')
+                value = dict(device_id=session.device_id,root=library_path(path),path=path,library_id='')
+                if identity is not None:
+                    if (not isinstance(identity, LibraryIdentity) or identity.device_id != session.device_id
+                            or identity.path != path or identity.root != value['root']):
+                        raise CoreError('identity', 'Library selection no longer matches this device/location.')
+                    value['library_id'] = identity.library_id
+                value = location(value)
+            before = self.preferences.game_library_location
+            self.preferences.game_library_location = value
+            try:self.preferences.save()
+            except BaseException:
+                self.preferences.game_library_location = before
+                raise
+        self._emit('library-location-changed')
+
+    def load_managed_library(self):
+        """One foreground read job, fixed to the captured client/session/location."""
+        from .managed_library import ManagedLibraryReader, location
+        from .native_files import read_remote_game
+        with self._session_admission():
+            session = self.device_session()
+            client = self._require_client()
+            configured = location(self.preferences.game_library_location)
+            if configured and configured['device_id'] != session.device_id:
+                raise CoreError('identity', 'The configured library belongs to another device.')
+        def task(job):
+            def check():
+                job.check_cancel()
+                if self.device_session() != session or self._client is not client:
+                    raise CoreError('session', 'Connection changed. Reload the library.')
+                if self.preferences.game_library_location != configured:
+                    raise CoreError('location', 'Library location changed. Reload the library.')
+            with read_operation(client, check):
+                reader = ManagedLibraryReader(client.list_directory,
+                    lambda path,limit:read_remote_game(client,path,limit,check=check),session,check)
+                result = reader.discover(configured)
+                check()
+                return result
+        return self.scheduler.submit(CoreJob('game-library.managed-load',task),JobBinding.device(session))
 
     def usb_backup_root(self):
         """Return the configured Core-host backup parent, if one is set."""

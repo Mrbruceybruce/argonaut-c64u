@@ -226,6 +226,63 @@ class GameLibraryClient:
         return bool(connected and record
                     and record.state not in ('missing', 'changed', 'unavailable'))
 
+    @staticmethod
+    def picker_sources(selections, session):
+        from pathlib import Path
+        from .picker_model import PickerSelection, GAMES
+        from .storage import storage_root
+        from .scheduler import DeviceSession
+        from .game_library import _validate_source
+        selections = tuple(selections)
+        if not selections:
+            raise GameLibraryError('source', 'Choose at least one game.')
+        sources = []
+        expected = None
+        for item in selections:
+            if (not isinstance(item, PickerSelection) or item.kind != 'file'
+                    or item.category != GAMES.category or not GAMES.matches(item.filename)
+                    or Path(item.path).name != item.filename):
+                raise GameLibraryError('source', 'Choose D64 or CRT game files.')
+            if item.scope == 'core-host':
+                if item.device_id or item.session_id or item.storage_root:
+                    raise GameLibraryError('source', 'Invalid local game reference.')
+                source = GameSource.core_host(item.path)
+            elif item.scope == C64U:
+                item.validate_session(session)
+                if not storage_root(item.path) or storage_root(item.path) != item.storage_root:
+                    raise GameLibraryError('source', 'Choose games inside one USB or SD root.')
+                expected = DeviceSession(item.device_id, item.session_id)
+                source = GameSource.c64u(item.device_id, item.path)
+            else:
+                raise GameLibraryError('source', 'Unsupported game source scope.')
+            _validate_source(source)
+            sources.append(source)
+        if len({(s.scope, s.device_id, s.volume) for s in sources}) != 1:
+            raise GameLibraryError('source', 'Choose games from one source and storage root.')
+        if len(set(sources)) != len(sources):
+            raise GameLibraryError('source', 'Choose each game path only once.')
+        if sources[0].scope == 'core-host' and len(sources) > 64:
+            raise GameLibraryError('source', 'Choose at most 64 games in one Add operation.')
+        return tuple(sources), expected
+
+    def add_selection(self, selection, session):
+        sources, expected = self.picker_sources((selection,), session)
+        return self.library.add(sources[0], expected_session=expected)
+
+    def scan_selections(self, selections, session):
+        sources, expected = self.picker_sources(selections, session)
+        if sources[0].scope != C64U:
+            raise GameLibraryError('source', 'Choose C64U games for this preview.')
+        request = BulkImportRequest.c64u_sources(
+            sources[0].device_id, tuple(source.path for source in sources))
+        return self.library.prepare_bulk_import(request, expected_session=expected)
+
+    def prepare_relink_selection(self, record, selection, session):
+        sources, expected = self.picker_sources((selection,), session)
+        if self.library.get(record.id) != record or sources[0].scope != record.source.scope:
+            raise GameLibraryError('record-changed', 'Game entry changed. Open Relink again.')
+        return self.library.prepare_relink(record.id, sources[0], expected_session=expected)
+
     def add_core_host(self, path):
         return self.library.add(GameSource.core_host(path))
 

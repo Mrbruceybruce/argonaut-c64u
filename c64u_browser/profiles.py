@@ -68,6 +68,7 @@ class Preferences:
         self.screenshot_folder = ''
         self.recording_folder = ''
         self.usb_backup_root = ''
+        self.game_library_location = None
         self.setting_favorites = set()
 
     def load(self):
@@ -82,6 +83,8 @@ class Preferences:
             if not isinstance(self.recording_folder,str):raise ValueError('Invalid recording folder')
             self.screenshot_folder = data.get('screenshot_folder', '')
             if not isinstance(self.screenshot_folder,str):raise ValueError('Invalid screenshot folder')
+            from .managed_library import location
+            self.game_library_location = location(data.get('game_library_location'))
             self.usb_backup_root = data.get('usb_backup_root', '')
             if not isinstance(self.usb_backup_root,str):raise ValueError('Invalid USB/SD backup root')
             favorites = data.get('setting_favorites', [])
@@ -99,12 +102,15 @@ class Preferences:
         return self
 
     def save(self):
+        from .managed_library import location
+        location(self.game_library_location)
         self.app_options=validate(self.app_options)
         for p in self.profiles: p.validate()
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         data = {'app_options': self.app_options, 'schema_version': 1, 'selected_id': self.selected_id,
                 'profiles': [asdict(p) for p in self.profiles], 'screenshot_folder': self.screenshot_folder, 'recording_folder': self.recording_folder,
                 'usb_backup_root': self.usb_backup_root,
+                'game_library_location': self.game_library_location,
                 'setting_favorites': [list(key) for key in sorted(self.setting_favorites)]}
         fd, temp = tempfile.mkstemp(dir=self.path.parent, prefix='.config-')
         try:

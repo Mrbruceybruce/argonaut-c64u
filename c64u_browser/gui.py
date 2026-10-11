@@ -206,8 +206,10 @@ class Browser(Gtk.Application):
         self.streams_tab=StreamsTab(self)
         self.tabs.append_page(self.streams_tab.box,Gtk.Label(label='Streams'))
         self.game_library_tab=GameLibraryTab(self)
+        from .managed_library_view import ManagedLibraryView
+        self.managed_library_view=ManagedLibraryView(self)
         self.tabs.append_page(
-            self.game_library_tab.box,Gtk.Label(label='Game Library'))
+            self.managed_library_view.box,Gtk.Label(label='Game Library'))
         if test_lab_enabled(self.preferences):
             from .test_lab_tab import TestLabTab
             self.test_lab_tab = TestLabTab(self)
@@ -230,6 +232,7 @@ class Browser(Gtk.Application):
             self.streams_tab.box]
         self.busy_controls.extend(self.sid_jukebox_tab.busy_controls)
         self.busy_controls.extend(self.game_library_tab.busy_controls)
+        self.busy_controls.extend((self.managed_library_view.refresh_button,self.managed_library_view.create_button,self.managed_library_view.choices))
         if hasattr(self, 'test_lab_tab'):
             self.busy_controls.append(self.test_lab_tab.box)
         self.refresh_local()
@@ -947,21 +950,29 @@ class Browser(Gtk.Application):
                         self.tabs.set_current_page(
                             self.tabs.page_num(self.sid_jukebox_tab.box))
                 self.button(box,'Add to SID Jukebox',lambda:action(open_sid))
-            if not local and directory and not multiple:
+            if not local and directory and not multiple and not hasattr(self,'managed_library_view'):
                 path = posixpath.join(self.remote, name)
                 self.button(
                     box, 'Scan folder for games…',
                     lambda:action(
                         lambda:self.game_library_tab.scan_c64u_folder(path)))
-            if not local and not directory:
+            if not local and not directory and not hasattr(self,'managed_library_view'):
                 selected = tuple(item.item for item in listing.get_selected_rows())
                 if selected and all(
                         not is_directory and item_name.casefold().endswith(
                             ('.d64', '.crt'))
                         for item_name, is_directory in selected):
+                    from .picker_model import PickerSelection
+                    from .storage import storage_root
+                    session = self.core.device_session()
+                    game_selections = tuple(PickerSelection(
+                        'c64u', posixpath.join(self.remote, item_name), item_name,
+                        storage_root(posixpath.join(self.remote, item_name)),
+                        session.device_id, session.session_id, 'games', 'file')
+                        for item_name, _ in selected)
                     self.button(
                         box, 'Add selected to Game Library',
-                        lambda:action(self.game_library_tab.add_c64u))
+                        lambda:action(lambda:self.game_library_tab.add_selections(game_selections)))
             self.button(box, 'Copy', lambda: action(lambda: self.copy_selection(local)))
             if not multiple:
                 self.button(box, 'Rename…', lambda: action(lambda: self.rename_item(local, name)))
@@ -1628,6 +1639,8 @@ class Browser(Gtk.Application):
         if getattr(self, 'test_lab_tab', None): self.test_lab_tab.stop_schedule()
         disable_private_log(getattr(self, 'operation_log', None))
         self.operation_log = None
+        managed = getattr(self, 'managed_library_view', None)
+        if managed is not None:managed.close()
         game_library_tab = getattr(self, 'game_library_tab', None)
         if game_library_tab is not None:game_library_tab.close()
         self.streams_tab.close()

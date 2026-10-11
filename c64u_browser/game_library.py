@@ -5,6 +5,7 @@
 The catalog owns metadata only.  It never moves, copies, mounts, uploads,
 launches, or deletes a referenced game or its artwork.
 """
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock
@@ -506,7 +507,7 @@ def inspect_crt(data):
 class GameLibraryService:
     """Core-owned metadata catalog with explicit source identity."""
     def __init__(self, path=None, *, remote_reader=None, remote_lister=None,
-                 bulk_remote_reader=None, session_provider=None,
+                 bulk_remote_reader=None, session_provider=None, session_admission=None,
                  scheduler=None, plan_ttl=300, plan_limit=128,
                  bulk_plan_ttl=BULK_PLAN_TTL,
                  bulk_plan_limit=BULK_PLAN_LIMIT,
@@ -521,6 +522,7 @@ class GameLibraryService:
         self._remote_lister = remote_lister
         self._bulk_remote_reader = bulk_remote_reader
         self._session_provider = session_provider or (lambda: DeviceSession('', ''))
+        self._session_admission = session_admission or nullcontext
         self._scheduler = scheduler or CoreScheduler(self._session_provider, clock=clock)
         self._owns_scheduler = scheduler is None
         self._clock = clock
@@ -678,9 +680,11 @@ class GameLibraryService:
             raise GameLibraryError('device-unavailable', 'Connect to the source C64U first.')
         return JobBinding.device(current), current
 
-    def _submit(self, operation, source, task, *, allow_unavailable=False):
+    def _submit(self, operation, source, task, *, allow_unavailable=False, expected_session=None):
         _validate_source(source)
         binding, session = self._binding(source, allow_unavailable=allow_unavailable)
+        if expected_session is not None and session != expected_session:
+            raise GameLibraryError('session', 'Connection changed. Select the game again.')
         return self._scheduler.submit(CoreJob(operation, lambda job:task(job, session)), binding)
 
     def _read(self, source, job, expected_session=None):
@@ -715,6 +719,8 @@ class GameLibraryService:
         try:data = self._remote_reader(source)
         except ConnectionFailure as exc:
             raise GameLibraryError('device-unavailable', 'The source C64U is unavailable.', retryable=True) from exc
+        if self._session() != expected_session:
+            raise GameLibraryError('session', 'The C64U connection changed while reading the game.')
         if not isinstance(data, bytes):
             raise GameLibraryError('source', 'C64U source reader returned invalid data.')
         job.report(JobProgress('hash', len(data), len(data), 'bytes', 'Validating C64U game file…'))
@@ -756,13 +762,27 @@ class GameLibraryService:
             metadata = inspect_crt(data)
         return SourceInspection(source, format_name, digest, len(data), metadata)
 
-    def add(self, source, *, title=''):
+    @contextmanager
+    def _publication(self, source, session, inspection):
+        # Acquire only after reading/validation and the catalog lock. Core's
+        # fail-fast gate excludes session replacement through the disk write.
+        guard = self._session_admission if source.scope == C64U else nullcontext
+        with guard():
+            _validate_source(source)
+            if inspection.source != source:
+                raise GameLibraryError('source', 'The validated game source changed.')
+            if source.scope == C64U and (session is None or self._session() != session
+                                        or source.device_id != session.device_id):
+                raise GameLibraryError('session', 'Connection changed. Select the game again.')
+            yield
+
+    def add(self, source, *, title='', expected_session=None):
         self._ready()
         if not isinstance(title, str):
             raise GameLibraryError('metadata', 'Game title must be text.')
         def task(job, session):
             inspection = self._inspect(source, job, session)
-            with self._lock:
+            with self._lock, self._publication(source, session, inspection):
                 same_source = next((record for record in self._records.values()
                                     if record.source == source), None)
                 same_content = next((record for record in self._records.values()
@@ -787,7 +807,7 @@ class GameLibraryService:
                                     created_at=now, updated_at=now, verified_at=now)
                 self._replace(record)
                 return AddResult(record, True)
-        return self._submit('game-library.add', source, task)
+        return self._submit('game-library.add', source, task, expected_session=expected_session)
 
     def validate_source(self, record_id):
         record = self.get(record_id)
@@ -841,7 +861,7 @@ class GameLibraryService:
             oldest = min(self._plans, key=lambda key:self._plans[key].created_at)
             self._plans.pop(oldest, None)
 
-    def prepare_relink(self, record_id, source):
+    def prepare_relink(self, record_id, source, *, expected_session=None):
         record = self.get(record_id)
         if _validate_source(source) != record.format:
             raise GameLibraryError('unsupported-format', 'Relink to the same game format.')
@@ -858,7 +878,7 @@ class GameLibraryService:
                     preview, inspection, record, session, self._clock())
                 self._cleanup_plans_locked()
             return preview
-        return self._submit('game-library.relink-preview', source, task)
+        return self._submit('game-library.relink-preview', source, task, expected_session=expected_session)
 
     def execute_relink(self, plan_id, *, accept_changed=False):
         self._ready()
@@ -881,7 +901,7 @@ class GameLibraryService:
             inspection = self._inspect(plan.preview.source, job, plan.session)
             if inspection.sha256 != plan.inspection.sha256:
                 raise GameLibraryError('changed-source', 'The selected file changed after Relink review.')
-            with self._lock:
+            with self._lock, self._publication(plan.preview.source, plan.session, inspection):
                 if self._records.get(record.id) != record:
                     raise GameLibraryError(
                         'plan-stale', 'The Game Library entry changed after Relink review. Prepare it again.')
@@ -1154,7 +1174,7 @@ class GameLibraryService:
                 raise GameLibraryError('source', 'C64U source reader returned invalid data.')
         return self._inspection_from_data(source, format_name, data)
 
-    def prepare_bulk_import(self, request):
+    def prepare_bulk_import(self, request, *, expected_session=None):
         """Discover and classify candidates without modifying the catalog."""
         self._ready(); request = self._validate_bulk_request(request)
         if request.scope == CORE_HOST:
@@ -1164,6 +1184,8 @@ class GameLibraryService:
                                     request.roots[0] if request.kind == 'sources'
                                     else posixpath.join(request.roots[0], 'scan.d64'))
             binding, session = self._binding(probe)
+        if expected_session is not None and session != expected_session:
+            raise GameLibraryError('session', 'Connection changed. Select the games again.')
 
         def task(job):
             before_catalog = tuple(self.list())

@@ -29,7 +29,8 @@ class Admission(unittest.TestCase):
         for name in ('run_file_job','begin_file_job','end_file_job','cancel_transfer','bind_job_cancel','job_cancel_callback'):
             setattr(self.app,name,lambda *args,_name=name,**kw:getattr(Browser,_name)(self.app,*args,**kw))
         self.app.operation=OperationPresentation(lambda view:self.app.status.set_text(view.message))
-        self.app.core=SimpleNamespace(files=SimpleNamespace(cancel=self.cancel))
+        self.app.core=SimpleNamespace(files=SimpleNamespace(cancel=self.cancel),
+            device_session=lambda:SimpleNamespace(device_id="",session_id=""))
         self.jobs={}
 
     def idle(self, fn, *args):
@@ -127,7 +128,7 @@ class Admission(unittest.TestCase):
     def tab(self, cls):
         tab=SimpleNamespace(app=self.app,client=Mock(),chooser=None,
             job_busy=False,cancel_button=Mock(),_update_actions=Mock(),_show=Mock(),refresh=Mock())
-        for name in ('_run_job','_add_local_paths'):
+        for name in ('_run_job','_add_local_selections','_choose_add','add_selections'):
             setattr(tab,name,lambda *args,_name=name,**kw:getattr(cls,_name)(tab,*args,**kw))
         tab._game_filter=Mock();tab._sid_filter=Mock()
         return tab
@@ -147,10 +148,12 @@ class Admission(unittest.TestCase):
                     selection=PickerSelection('core-host','/tmp/fake.sid','fake.sid','','','','sid','file')
                     respond=lambda:picker.call_args.args[1]((selection,))
                 else:
-                    with patch(f'c64u_browser.{module}.Gtk.FileChooserNative.new',return_value=chooser):
+                    tab.client.library.bulk_max_candidates=50000
+                    with patch('c64u_browser.game_library_tab.FilePicker',return_value=chooser) as picker:
                         cls.add_local(tab)
-                    from gi.repository import Gtk
-                    respond=lambda:callbacks['response'](chooser,Gtk.ResponseType.ACCEPT)
+                    from c64u_browser.picker_model import PickerSelection
+                    selection=PickerSelection('core-host','/tmp/fake.crt','fake.crt','','','','games','file')
+                    respond=lambda:picker.call_args.args[1]((selection,))
                 a=self.start()
                 respond()
                 tab.client.add_core_host.assert_not_called()
@@ -248,9 +251,9 @@ class Admission(unittest.TestCase):
 
     def test_submission_failure_batch_continues_and_terminal_failure_releases(self):
         tab=self.tab(GameLibraryTab);job=self.job('game-library.add')
-        tab.client.add_core_host.side_effect=[ValueError('bad source'),job]
-        tab._add_local_paths(('/tmp/one','/tmp/two'))
-        self.assertEqual(2,tab.client.add_core_host.call_count)
+        tab.client.add_selection.side_effect=[ValueError('bad source'),job]
+        tab._add_local_selections(('one-selection','two-selection'))
+        self.assertEqual(2,tab.client.add_selection.call_count)
         self.assertIs(job,self.app.transfer_job)
         # A failed managed job is terminal just like successful/cancelled work.
         failing=CoreJob('file.failure',lambda _:(_ for _ in ()).throw(ValueError('failure')))

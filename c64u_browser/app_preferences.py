@@ -132,6 +132,26 @@ def show_preferences(app, page=0):
         entry=Gtk.Entry(text=getattr(prefs,key),placeholder_text=placeholder,hexpand=True);folderrow.append(entry);folders[key]=entry
         button=Gtk.Button(label='Browse…');folderrow.append(button)
         button.connect('clicked',browse,entry,label)
+    box.append(Gtk.Label(label='Configured Game Library Location',xalign=0))
+    library_row=Gtk.Box(spacing=8);box.append(library_row)
+    configured=prefs.game_library_location
+    library_entry=Gtk.Entry(text=configured['path'] if configured else '',
+        placeholder_text='/USB0/ARGONAUT_LIBRARY',hexpand=True)
+    library_entry.update_property([Gtk.AccessibleProperty.LABEL],['Configured Game Library Location'])
+    library_row.append(library_entry)
+    library_save=Gtk.Button(label='Save location');library_row.append(library_save)
+    library_clear=Gtk.Button(label='Clear location');library_row.append(library_clear)
+    library_note=Gtk.Label(label='Saved for the connected device. Loading checks the manifest; nothing is created. '
+        'This location is separate from General Undo and Restore defaults.',wrap=True,xalign=0)
+    box.append(library_note)
+    def save_library(clear=False):
+        if app.busy:return
+        try:app.core.configure_game_library('' if clear else library_entry.get_text().strip())
+        except Exception as exc:library_note.set_text(str(exc));return
+        library_entry.set_text(prefs.game_library_location['path'] if prefs.game_library_location else '')
+        library_note.set_text('Library location saved. Use Load managed library in Game Library; no files were changed.')
+    library_save.connect('clicked',lambda *_:save_library())
+    library_clear.connect('clicked',lambda *_:save_library(True))
     note=Gtk.Label(label='General settings save automatically. Undo restores the values from when Settings opened. Restore defaults keeps connection profiles and C64U settings.',wrap=True,xalign=0);box.append(note)
     error=Gtk.Label(wrap=True,xalign=0);box.append(error)
     dialog.general_message=error
