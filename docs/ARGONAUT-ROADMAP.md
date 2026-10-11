@@ -1,5 +1,49 @@
 # Argonaut roadmap
 
+## Managed Import Phase 3B-2B.1 — journal infrastructure; uncommitted review checkpoint
+
+Baseline: `6c35c5fb19c294ff8fa8a1c7438f0cf8a5bf9e52`. Schema 3 adds immutable,
+redacted execution evidence and an internal host-only persistence writer. No Core
+execution admission, snapshot handoff, FTP writes, Stage/Import action, recovery,
+cleanup or publication is enabled. Schema-1/2 and 3B-2A behavior remain unchanged.
+
+Durable, bounded, hash-linked checkpoints retain prior intents. Expected-previous
+checks and mandatory file/directory synchronization precede acknowledgment; any
+persistence failure blocks the writer without advancing its in-memory checkpoint.
+Loaded evidence remains inspection-only. Verified-staged is evidence, never
+publication or execution permission. Actual accounting remains distinct from policy.
+
+Proposed phase division: 3B-2B owns admission, remote staging/upload/readback,
+durable evidence and cancellation safety; 3B-2C owns supported workflow integration,
+progress/results, snapshot lifecycle and integrated physical qualification; 3B-3
+owns explicit recovery inspection/reconciliation/disposition; 3C owns separately
+authorized final placement and manifest publication. Bounded physical C64U FTP
+staging acceptance is required before 3B-2B's Core FTP-write portion is complete.
+This journal-only pass does not authorize or complete those later portions.
+
+See [the schema-3 contract](MANAGED-LIBRARY.md#phase-3b-2b1--execution-journal-foundation-uncommitted-review-checkpoint)
+for states, accounting, durability, limits, tests and remaining review decisions.
+
+3B-2B.1F correction: schema-3 operation hashes now require exact string type at
+construction and journal validation. Empty strings are accepted only where the
+operation permits absence; nonempty values must be 64 lowercase hexadecimal
+characters. No coercion or repair occurs. Schema-1/2 behavior is unchanged.
+
+Validation after correction: 236 deterministic tests passed, no skips (48 schema-3
+tests, including nine new adversarial tests, and 188 existing transaction/journal,
+policy, snapshot, planner and managed-library tests). The focused execution,
+transaction and policy run separately passed 111 tests with no skips. All six
+requested suites ran using the existing offline runner with a non-loopback socket
+guard; new journal tests forbid sockets. `git diff --check` passed. No physical
+device contact, remote staging/publication, package/GTK acceptance, fetch, commit
+or push occurred.
+
+No journal capacity reservation exists yet; it is mandatory before execution
+admission or FTP writes. The hash chain alone cannot detect missing trailing
+history. Loaded journals remain inspection-only. Earlier C0/native-chooser/focus/
+lifecycle qualifications and POSIX-only durability limitations remain open.
+Changes remain uncommitted for final review; no 3B-2B.2 work is authorized.
+
 ## Managed Import Phase 3B-2A — authorization and host snapshots approved; pending manual publication
 
 Published compatibility baseline: `9b04bbe748a2216c32114116f3e2880c72d87cb5`

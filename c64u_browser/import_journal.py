@@ -15,10 +15,11 @@ from .import_transaction import (Budgets, Journal, MAX_JOURNAL_BYTES, MAX_RECOVE
 from .import_policy import ImportPolicy, TransactionV2, JournalV2, ResourceAccounting
 from .managed_library import LibraryIdentity, uuid_text
 from .picker_model import PickerSelection
+from .import_execution import ExecutionJournal, decode_execution
 
 
 def encode(journal):
-    require(type(journal) in (Journal,JournalV2), 'Expected transaction journal.');journal.validate()
+    require(type(journal) in (Journal,JournalV2,ExecutionJournal), 'Expected transaction journal.');journal.validate()
     # Each scalar and collection is already bounded; iterencode avoids a full
     # JSON string. Never append beyond the captured byte allowance.
     limit=journal.transaction.budgets.journal_bytes
@@ -68,7 +69,11 @@ def decode(data):
         require(type(document) is dict and type(document.get('schema_version')) is int,
                 'Missing or invalid schema version.')
         version=document['schema_version']
-        require(version in (1,2),'Unsupported journal version.')
+        require(version in (1,2,3),'Unsupported journal version.')
+        if version == 3:
+            result = decode_execution(document, _fields)
+            require(len(data) <= result.transaction.budgets.journal_bytes, 'Journal size exceeded.')
+            return result
         journal_type,transaction_type,budget_type=((Journal,Transaction,Budgets) if version==1
             else (JournalV2,TransactionV2,ImportPolicy))
         raw=_fields(document,journal_type)
@@ -143,6 +148,7 @@ class JournalStore:
         return result
 
     def save(self,journal,*,previous=None):
+        require(type(journal) in (Journal, JournalV2), 'Use the execution journal owner for schema 3.')
         data=encode(journal);name=self._name(journal.transaction.id)
         if previous is not None:
             previous.validate()

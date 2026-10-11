@@ -1,5 +1,171 @@
 # Managed Library — foundation and explicit empty creation
 
+## Phase 3B-2B.1 — execution-journal foundation; uncommitted review checkpoint
+
+Baseline: `6c35c5fb19c294ff8fa8a1c7438f0cf8a5bf9e52` (guarded host snapshots).
+This slice is journal infrastructure only. It adds no Core execution admission,
+active snapshot handoff, transport calls, remote writes, Import/Stage action,
+recovery, remote cleanup, final placement or manifest publication. Schema-1/2 and
+3B-2A behavior remain unchanged. The older pending-publication entries below are
+historical; they do not describe this uncommitted checkpoint.
+
+### Phase division for subsequent review
+
+| Phase | Responsibility and completion boundary |
+| --- | --- |
+| 3B-2B | Core execution admission, remote staging, upload, independent readback, durable evidence and cancellation safety. Bounded physical C64U FTP staging acceptance is required before its Core FTP-write portion is complete. |
+| 3B-2C | Supported workflow integration, staging progress/results, snapshot lifecycle and integrated physical qualification. Safety needed by an active executor cannot be deferred out of 2B. |
+| 3B-3 | Explicit recovery inspection, reconciliation and disposition of interrupted or uncertain attempts; no automatic replay or adoption. |
+| 3C | Separately authorized final placement and manifest publication. |
+
+This records the proposed split; implementing 2B.1 does not authorize subsequent
+slices. The exact execution authorization lifetime, physical target/matrix,
+remote-record format and external-writer assumptions still require later review.
+
+### Schema 3: immutable evidence, not authority
+
+`import_execution.py` defines a separate execution schema. The explicit projection
+factory accepts a schema-2 transaction, a SHA-256 reference to snapshot evidence,
+and finite execution-specific limits. It never reads snapshots or establishes
+ownership. The projection retains transaction UUID, plan evidence digest, exact
+library/device/session binding, manifest revision/digest, policy version 2,
+execution-policy version 1, intended staging/final paths, formats, sizes and hashes.
+Host source paths, credentials and authorization tokens are excluded. Item hashes
+bind the referenced snapshot evidence to the intended payload contract; this slice
+does not itself inspect or authenticate that evidence.
+
+The 3B-2B.1F correction validates every operation hash at direct construction and
+again during journal validation: exact string type, with no coercion. Empty strings
+are required for intents, not-started outcomes, collision refusals, snapshot-validation
+and mkdir evidence; completed record/upload/readback evidence requires a canonical
+64-character lowercase hexadecimal SHA-256. Other permitted partial/failure hashes
+may be empty or canonical. Non-string values, including falsy values, are rejected
+through construction, codec, writer and inspection paths without advancing state.
+
+Canonical JSON, strict fields/types/UTF-8, duplicate-key rejection, bounded nesting,
+64-file/256-operation ceilings and captured journal limits follow existing
+conventions. Unknown versions, aliased/traversing paths, duplicate items/operation
+UUIDs, gaps and mismatched operation identities are rejected. Schema-1/2 codecs,
+pre-execution restrictions and reserved states retain their meaning. No automatic
+conversion exists. Historical `.json` attempts with the same UUID cannot be
+adopted by a new writer in the same store.
+
+Schema-3 states:
+
+`prepared -> awaiting-confirmation -> staging -> verifying -> verified-staged`
+
+Pre-execution cancellation/failure is permitted. Active attempts may terminate as
+canceled, failed or uncertain. An unresolved intent can terminate only as uncertain;
+unknown outcomes require uncertainty. Rejected/not-started outcomes are terminal.
+A completed operation can be recorded atomically with a terminal cancellation or
+failure without pretending its consequence did not occur. All terminal states,
+including verified-staged, prohibit resumption. Published is never supported.
+
+The operation sequence is snapshot-validation, mkdir, transaction-record, all
+uploads, then independent readbacks. Record completion requires upload and readback
+accounting. Payload completion requires exact size/hash and corresponding byte
+observations; every item must have completed readback before verified-staged.
+Operation UUIDs and ordinal sequence identify intent/outcome pairs. Collision
+observations distinguish absent/present/not-applicable; present can only accompany
+a rejected, non-writing outcome. Caller-supplied absence is evidence, never a claim
+of atomic FTP exclusion. No deletion, rename or manifest operation is representable.
+
+### Accounting contract
+
+Actual observations are separate from captured allowances. Counters are bounded
+nonnegative integers (maximum `2^63-1`, excluding booleans) with checked addition:
+
+- snapshot-validation bytes read (distinct from 2A source-read accounting);
+- attempted upload bytes, confirmed sender-side bytes and uncertain send exposure;
+- independent payload readback bytes;
+- remote transaction-record/control upload and read bytes.
+
+Attempted upload equals confirmed sender bytes plus uncertain send exposure.
+Confirmed sender bytes do not prove durable remote storage. Operation byte counts
+must agree with their associated observation counters. Intent has zero observations;
+not-started may retain control reads but no payload writes. Collision refusal cannot
+claim a write. Failure/uncertain records retain truthful over-budget observations;
+active/success records must fit policy. Control uploads conservatively count bytes
+offered for the remote record, not confirmed remote storage. Control reads include
+record verification and bounded manifest/listing checks; record bytes are not game
+payload. No actual I/O metering is activated by this slice.
+
+Execution-specific limits are explicit: snapshot-validation allowance at most
+8192 MiB and at least planned payload, control-upload allowance at most 1 MiB,
+control-read allowance at most 16 MiB. These are bounded infrastructure contracts,
+not approval of a future transfer policy or a guarantee that every batch fits.
+Existing payload/upload/readback/disk policies remain unchanged.
+
+### Durable local ownership and failure handling
+
+`ExecutionJournalStore.create` returns a live, internal persistence writer only
+for a fresh attempt. It is not connected to Core scheduling or execution APIs and
+cannot dispatch anything. Writer methods record transitions, intent and outcome,
+requiring the exact live previous checkpoint. Loaded/decoded objects are inspection
+records, never live writers; the store exposes no resume API and rejects direct
+save. These are ordinary application boundaries, not protection against arbitrary
+code executing as the same OS user.
+
+Each immutable checkpoint is retained as `<UUID>.execution-<six-digit-revision>`.
+It contains its revision and the canonical SHA-256 of its predecessor. Loading
+validates the entire contiguous chain and each expected-previous transition; gaps,
+corruption and contradictory outcomes stop inspection rather than falling back.
+The hash chain alone cannot detect deletion of an entire trailing suffix; an intact
+earlier prefix remains inspection evidence, never proof that no later work occurred.
+Separate names leave legacy `.json` journal behavior unchanged. The shared private
+POSIX lock serializes cooperating writers. Files use exclusive 0600 temporary
+creation, file flush/fsync, atomic host replacement into a new revision name, and
+required directory fsync. Directory fsync is preflighted and unsupported/failing
+synchronization is fatal for execution evidence, unlike legacy best-effort reporting.
+
+The live writer advances only after persistence fully succeeds. Any persistence
+exception blocks that writer, including failures after rename. The predecessor
+file remains intact, so failed outcome persistence never removes the last durable
+intent. The latest candidate may nevertheless be visible after a failed directory
+sync: inspection does not certify its durability or authorize continuation. No
+rollback, automatic retry, recovery deletion or remote-success inference occurs.
+Temporary cleanup failures preserve the primary failure; uncertain leftovers require
+later inspection. The hash chain is consistency evidence, not a cryptographic
+ownership proof against a cooperating-user/host compromise.
+
+Both each checkpoint and the aggregate retained encoded history are bounded by the
+captured journal byte allowance (at most 1 MiB). There are at most 520 revisions
+per attempt and 64 execution attempts per store, separately from legacy journals.
+A history budget can exhaust before the file-count ceiling. This conservative
+foundation stops before advancing, preserving the last intent if necessary; a
+future executor must preflight sufficient evidence capacity before remote writes.
+No outcome/failure capacity reservation is implemented yet. Reservation is mandatory
+before execution admission or FTP writes, not an optional later optimization.
+Filesystem allocation, temporary writes and crash leftovers are not OS disk quotas.
+No automatic pruning or recovery is introduced.
+
+### Validation and next checkpoint
+
+The deterministic test command is:
+
+```sh
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_import_execution tests.test_import_transaction tests.test_import_policy tests.test_import_snapshots tests.test_import_plan tests.test_managed_library
+```
+
+The reported run used the same unittest module list through a temporary runner
+that rejects non-loopback socket addresses. New journal tests forbid sockets
+entirely; existing planner/snapshot wire tests use localhost read-only fixtures.
+Initial attempts found a missing `tests` import path, then sandbox socket denial;
+those were environment setup errors, not skips or passing test evidence.
+
+Final results are recorded in CURRENT-STATE. Existing tests were not rewritten.
+Coverage includes schema-1/2 compatibility, malformed schema-3 records, transitions,
+identity/order/collision rejection, partial-send accounting, mismatch and resource
+bounds, write/replace/file-sync/directory-sync failures, immutable prior intents,
+crash prefixes through verified-staged, private files and inspection-only reload.
+No C64U, real FTP-write, GTK, cross-platform durability or power-loss acceptance was
+performed. Existing C0/native-chooser/focus/lifecycle qualifications remain open.
+
+Recommended next checkpoint, only after explicit authorization: review the new
+schema/durability boundary and then define Core execution admission and guarded
+snapshot ownership handoff. Remote-record encoding, transport metering and physical
+FTP staging qualification remain later work. Stop here with changes uncommitted.
+
 Game Library now presents an explicitly managed C64U library, independently of
 its preserved legacy reference catalog. The legacy catalog and Add/Relink picker
 implementation remain intact for later reviewed adaptation. The Settings → Game Library
