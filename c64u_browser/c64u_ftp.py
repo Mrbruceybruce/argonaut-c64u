@@ -421,13 +421,13 @@ class C64UFtpClient:
         self._mutation = replace(self._mutation,
             acknowledged=self._mutation.acknowledged + ((verb, reply[0]),))
 
-    def rename(self, source, destination):
+    def rename(self, source, destination, *, strict=False):
         with self._operation_scope('rename'):
             checked_path(source);checked_path(destination)
             self._check()  # final cooperative check before RNFR
             with self._defer_cancel():
-                self._mutation_command('RNFR', source, range(300, 400))
-                self._mutation_command('RNTO', destination, range(200, 300))
+                self._mutation_command('RNFR', source, (350,) if strict else range(300, 400))
+                self._mutation_command('RNTO', destination, (250,) if strict else range(200, 300))
             return self._mutation_complete()
 
     def _single_mutation(self, verb, path, accepted):

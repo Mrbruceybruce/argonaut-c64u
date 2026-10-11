@@ -1,5 +1,26 @@
 # Argonaut roadmap
 
+## PA-3F library creation safety correction — pending independent review
+
+Uncommitted correction against `1edd5ae9ce19b893671969ecddcc4d447c0061e1`.
+Managed-library initialization now requires an exact, unambiguous quoted 257 MKD
+path for the library root and all three child directories. Accepted status alone
+never establishes ownership. Unknown MKD/STOR/rename outcomes stop further remote
+operations and automatic cleanup. Definite failures retain bounded cleanup of
+operation-owned, freshly verified empty directories; an uncertain cleanup stops
+at that command and retains its evidence. Creation results preserve the observed
+operation outcomes and bounded reply/path evidence. Generic FTP defaults are
+unchanged; creation opts into exact RNFR 350 / RNTO 250 acknowledgment.
+
+Offline validation: **781 affected tests passed, zero failures/errors/skips**;
+the focused creation/mutation/architecture run passed **98 tests**. Both PA-3
+reproductions now fail closed. `git diff --check` and the new-file whitespace
+check passed. See [the detailed contract and commands](MANAGED-LIBRARY.md#pa-3f-library-creation-safety-correction--pending-independent-review).
+Firmware-specific exact MKD reply qualification and Beige `/USB0` initialization
+remain pending, requiring separate approval and fresh identity/session/collision
+checks. No physical device contact, staging, game publication, recovery engine,
+Import/Stage enablement or acceptance driver was part of this correction.
+
 ## Published baseline and future planning status
 
 Managed Import E2/E2F is published in

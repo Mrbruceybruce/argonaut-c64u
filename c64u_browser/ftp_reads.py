@@ -11,8 +11,48 @@ import io
 import threading
 
 from .api import BrowserError, ConnectionFailure, Entry, IdentityEntry, safe_argument
-from .c64u_ftp_types import ErrorCode as EC, FtpOperationError
+from .c64u_ftp_types import ErrorCode as EC, FtpOperationError, MutationEvidence, WriteEvidence, Outcome
 from .diagnostics import diagnostic_event
+
+
+def creation_outcome(operation,path,*,result=None,error=None):
+    """Initializer-only classification. No wire types/handles escape this seam.
+
+    Successful generic mutations are insufficient for creation ownership.
+    Unknown observations never authorize cleanup. Raw reply/path bytes remain
+    bounded and are encoded losslessly for JSON-compatible Core evidence.
+    """
+    failure=error if isinstance(error,FtpOperationError) else getattr(error,'ftp_error',None)
+    evidence=(getattr(result,'transfer',None) if operation=='STOR' else result)
+    if isinstance(failure,FtpOperationError):
+        evidence=failure.transfer if operation=='STOR' else failure.mutation
+    outcome=Outcome.UNKNOWN
+    valid_type=isinstance(evidence,WriteEvidence if operation=='STOR' else MutationEvidence)
+    if error is None and valid_type:
+        if evidence.acknowledgment==Outcome.COMPLETED:
+            outcome=Outcome.COMPLETED
+            if operation=='MKD':
+                try:evidence.require_mkdir_path(path.encode('ascii'))
+                except FtpOperationError:outcome=Outcome.UNKNOWN
+    elif error is not None:
+        if valid_type:
+            ack=evidence.acknowledgment
+            # A lost RNFR reply is uncertain protocol state even without RNTO.
+            submitted=(evidence.submitted if isinstance(evidence,WriteEvidence)
+                       else evidence.stage_submitted or evidence.consequential_submitted)
+            if ack==Outcome.REJECTED and evidence.outcome==Outcome.REJECTED:
+                outcome=Outcome.REJECTED
+            elif not submitted and evidence.outcome==Outcome.NOT_STARTED:
+                outcome=Outcome.NOT_STARTED
+        elif isinstance(failure,FtpOperationError) and failure.outcome==Outcome.NOT_STARTED:
+            outcome=Outcome.NOT_STARTED
+    wire=evidence.as_dict() if valid_type else {}
+    if isinstance(evidence,MutationEvidence):
+        wire.update(reply_lines_hex=tuple(line.hex() for line in evidence.reply_lines),
+            requested_path_hex=None if evidence.requested_path is None else evidence.requested_path.hex(),
+            created_path_hex=None if evidence.created_path is None else evidence.created_path.hex())
+        if operation=='MKD':wire['path_status']=evidence.mkdir_path_status(path.encode('ascii'))
+    return outcome.value,tuple(wire.items())
 
 
 def transport_event(event):
@@ -156,7 +196,7 @@ class _FtpOperations:
     def mutate(self, operation, path, destination=None):
         return self.mutate_evidence(operation, path, destination).as_dict()
 
-    def mutate_evidence(self, operation, path, destination=None):
+    def mutate_evidence(self, operation, path, destination=None, *, strict_rename=False):
         """Private wire evidence; safe legacy dictionaries omit paths/peer prose."""
         with self.operation():
             state = self._context.get()
@@ -171,7 +211,8 @@ class _FtpOperations:
                 raise BrowserError('Filename encoding failed.') from None
             if operation not in ('rename', 'mkdir', 'delete', 'rmdir'):
                 raise BrowserError('Unknown mutation operation.')
-            return getattr(self._client(), operation)(*args)
+            options={'strict':True} if operation=='rename' and strict_rename else {}
+            return getattr(self._client(), operation)(*args,**options)
 
     def write_from(self, path, source, expected_bytes, progress=None, *, budget=None):
         with self.operation():

@@ -6,6 +6,7 @@ from unittest import TestCase
 from unittest.mock import patch
 from c64u_browser.library_creation import create_empty_library,CreationTarget,CreationError
 from c64u_browser.managed_library import ManagedLibraryReader,LibraryError,parse_manifest
+from c64u_browser.c64u_ftp_types import MutationEvidence, WriteEvidence, TransferResult, Outcome, FtpOperationError, ErrorCode
 from c64u_browser.picker_model import PickerSelection
 from c64u_browser.scheduler import DeviceSession
 from tests.test_managed_library import ID,PATH,manifest
@@ -36,11 +37,20 @@ class MemoryAdapter:
         elif action=='delete':del self.files[path]
         else:raise AssertionError(action)
         return {'outcome':'acknowledged'}
+    def mutate_evidence(self,action,path,destination=None,*,strict_rename=False):
+        self.mutate(action,path,destination)
+        verb={'mkdir':'MKD','rmdir':'RMD','rename':'RNTO'}[action]
+        code=257 if action=='mkdir' else 250
+        return MutationEvidence(verb,verb,Outcome.COMPLETED,True,True,code,
+            acknowledged=((verb,code),),reply_lines=(b'257 "'+path.encode()+b'" created',),
+            requested_path=path.encode())
     def write_from(self,path,stream,size):
         self.calls.append(('write',path,None));self.before('write',path)
         if path in self.files:raise LibraryError('Overwrite forbidden')
         data=stream.read();self.files[path]=data
-        return NS(transferred=len(data),sha256=hashlib.sha256(data).hexdigest())
+        digest=hashlib.sha256(data).hexdigest()
+        return TransferResult(len(data),digest,226,transfer=WriteEvidence(size,True,150,226,
+            len(data),digest,Outcome.COMPLETED,'matched'))
     def read(self,path,maximum):
         data=self.files[path]
         if len(data)>maximum:raise LibraryError('Too large')
@@ -151,7 +161,8 @@ class CreationTests(TestCase):
     def test_failure_before_manifest_cleans_only_acknowledged_empty_directories(self):
         self.adapter.files['/SD/user.crt']=b'keep'
         def fail(action,path):
-            if action=='write':raise LibraryError('write refused before transfer')
+            if action=='write':raise FtpOperationError(ErrorCode.STOR,'preliminary-reply',outcome=Outcome.REJECTED,
+                    transfer=WriteEvidence(0,True,550,outcome=Outcome.REJECTED))
         self.adapter.before=fail
         with self.assertRaises(CreationError) as caught:self.create()
         self.assertEqual((PATH+'/artwork',PATH+'/metadata',PATH+'/games',PATH),caught.exception.result.removed)
@@ -278,7 +289,8 @@ class ManagedWireCreationTests(TestCase):
         from c64u_ftp_server import FakeC64UFtp
         import test_ftp_reads as reads
         fixture=reads.ReadMigrationTests();self.addCleanup(fixture.doCleanups)
-        with FakeC64UFtp(directories={b'/':b'',b'/USB1':b''},mutation_tree=True) as server:
+        with FakeC64UFtp(directories={b'/':b'',b'/USB1':b''},mutation_tree=True,
+                after_mutation={b'MKD':lambda p:b'257 \"'+p+b'\" created\r\n'}) as server:
             with patch('ftplib.FTP',side_effect=AssertionError('Legacy transport forbidden')):
                 core,profile=fixture.connect(server)
                 session=core.device_session()

@@ -1,5 +1,94 @@
 # Managed Library — foundation and explicit empty creation
 
+## PA-3F library creation safety correction — pending independent review
+
+Uncommitted correction against `1edd5ae9ce19b893671969ecddcc4d447c0061e1`.
+The original one-use Core authorization, device/session/root binding, schema-1
+revision-zero manifest, independent readback, final structure verification and
+preference registration sequence remain in place.
+
+Every initialization MKD now uses the existing strict path-evidence validator:
+only a definitive 257 acknowledgment with one unambiguous absolute quoted path
+matching the exact request permits continuation. Missing, relative, malformed,
+multiline, case/spelling-mismatched or ambiguous paths stop creation before any
+subsequent mutation. An accepted response with invalid path evidence represents
+possible remote effects, never proven ownership or permission to adopt/clean up.
+Creation also opts into RNFR 350 / RNTO 250 replies so an ambiguous RNFR cannot
+advance to RNTO. Generic folder/mutation acceptance defaults are unchanged.
+
+The adapter classifies wire outcomes as completed, rejected, not-started or
+unknown. A definite refusal does not prove remote absence. Unclassified failures,
+lost MKD/STOR completion, partial upload, ambiguous rename, failed verification
+with retained artifacts and uncertain registration fail closed. No further
+remote operations, reconnect, retry, adoption or cleanup is attempted after
+uncertainty. Cancellation before upload can retain safe empty-directory cleanup;
+cancellation during/after consequential upload retains artifacts and observations.
+
+`CreationRecovery` retains its existing fields and adds `uncertain`, ordered
+`observations`, `possible_paths` and a separate `cleanup_error`. `retained` tracks
+acknowledged operation-owned directories not definitively removed; possible
+paths identify artifacts requiring inspection without asserting presence or
+ownership. Observations preserve operation/path/destination, the creation-level
+outcome and transport evidence. Bounded raw reply/path bytes are returned as hex
+rather than rendered peer prose; job results remain JSON serializable. Successful
+Core creation returns a `LibraryState` subclass with the same observations.
+Preference-save failure retains those observations and the verified remote
+library. These returned observations are not a durable execution journal or
+recovery authorization.
+
+Automatic cleanup remains limited to individually removing directories whose
+creation was acknowledged with exact path evidence and whose exact listing is
+freshly empty. No preexisting directory, file or recursive tree is deleted.
+Cleanup stops on its first failure; a lost cleanup reply records the possible
+consequence without asserting successful removal. Primary and cleanup failures
+remain separate. FTP path checks are not locks against external writers, and
+neither atomic rename nor no-clobber STOR is assumed.
+
+Validation used fake/localhost transports only with a loopback-only socket guard
+and temporary preferences. **781 affected tests passed, zero failures/errors/skips**.
+The focused creation/mutation/architecture run passed **98 tests**. Thirty new
+wire safety tests cover both PA-3 reproductions, all four MKD boundaries,
+invalid/missing/ambiguous replies, definite refusal and safe cleanup, uncertain
+cleanup, partial/lost upload, pending/final verification, preference persistence,
+cancellation, one-use replay, JSON evidence and FTP/scheduler release. Existing
+in-memory fixtures now supply explicit mutation/upload evidence rather than
+unqualified mock success. An initial regression run exposed an import-boundary
+violation; classification was moved into the existing adapter, and the unchanged
+architecture check plus full suite passed. `git diff --check` and explicit
+new-file whitespace validation passed.
+
+Exact final regression command (repository working directory; temporary runner
+`/tmp/argonaut-pa3f-offline.py` rejects non-loopback socket access):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B /tmp/argonaut-pa3f-offline.py \
+  tests.test_library_creation tests.test_library_creation_safety \
+  tests.test_managed_library tests.test_c64u_ftp tests.test_ftp_evidence \
+  tests.test_ftp_mutations tests.test_ftp_folder_steps tests.test_ftp_uploads \
+  tests.test_ftp_streaming tests.test_ftp_ownership tests.test_ftp_reads \
+  tests.test_ftp_replacements tests.test_ftp_replacement_corrections \
+  tests.test_folder_copy tests.test_fresh_folder tests.test_empty_upload \
+  tests.test_upload_cleanup tests.test_core tests.test_scheduler tests.test_jobs \
+  tests.test_foreground_admission tests.test_recovery tests.test_cancel_copy \
+  tests.test_import_admission tests.test_import_staging \
+  tests.test_import_evidence_prerequisites tests.test_import_execution \
+  tests.test_import_execution_policy2 tests.test_import_transaction \
+  tests.test_import_policy tests.test_import_snapshots tests.test_import_plan
+```
+
+Focused command used the same runner with `tests.test_library_creation`,
+`tests.test_library_creation_safety`, `tests.test_ftp_mutations` and
+`tests.test_c64u_ftp.ParserTests.test_only_core_read_adapter_imports_transport_and_headless_boundary`.
+Loopback sockets required permission outside the restricted execution sandbox.
+No physical Beige/Founder contact or shared-profile changes occurred.
+
+Firmware-specific exact MKD reply qualification remains outstanding. Beige
+`/USB0/ARGONAUT_LIBRARY` initialization is pending; it requires a separately
+reviewed isolated driver, explicit physical-write approval and fresh identity,
+session, media and collision checks. No physical library initialization, managed
+staging, game publication, new recovery engine or Import/Stage enablement was
+performed. Earlier lifecycle, 3B-2C, 3B-3 and 3C gates remain unchanged.
+
 ## Published baseline and future planning status
 
 Managed Import E2/E2F is published in

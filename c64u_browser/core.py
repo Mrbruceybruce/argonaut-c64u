@@ -343,8 +343,7 @@ class ArgonautCore:
         self._library_creation_plans.pop(token,None)
 
     def create_managed_library(self, target):
-        from .library_creation import CreationTarget, create_empty_library, CreationError, CreationRecovery
-        from .managed_library import LibraryState
+        from .library_creation import CreationTarget, create_empty_library, CreationError, CreationRecovery, CreationState
         if not isinstance(target,CreationTarget) or self._library_creation_plans.pop(target.token,None)!=target:
             raise CoreError('plan','Creation confirmation is missing or already used.')
         session=DeviceSession(target.device_id,target.session_id)
@@ -359,7 +358,8 @@ class ArgonautCore:
                 def check():session_check();job.check_cancel()
                 check();client=self._require_client();adapter=adapter_for(client)
                 if adapter is None:raise CoreError('session','Creation requires a managed storage session.')
-                library=create_empty_library(adapter,target,check,session_check)
+                observations=[]
+                library=create_empty_library(adapter,target,check,session_check,observations=observations)
                 # Completed remote content is valid even if preference persistence fails.
                 # Never delete it or claim registration succeeded in that case.
                 try:
@@ -370,8 +370,8 @@ class ArgonautCore:
                     self.preferences.game_library_location=None
                     raise CreationError(CreationRecovery(target.path,'registration',(),(target.path,),
                         'Library structure was verified, but registration failed. Reload this exact location; '
-                        'do not recreate it. '+str(exc))) from None
-                return LibraryState('valid','Empty managed library created and verified.',(library,),session.session_id)
+                        'do not recreate it. '+str(exc),True,tuple(observations),(target.path+'/manifest.json',))) from None
+                return CreationState('valid','Empty managed library created and verified.',(library,),session.session_id,tuple(observations))
         return self.scheduler.submit(CoreJob('game-library.managed-create',task),JobBinding.device(session))
 
     def configure_game_library(self, path, *, identity=None, expected_session=None):
