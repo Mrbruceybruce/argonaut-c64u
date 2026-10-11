@@ -295,7 +295,7 @@ class FtpReadAdapter(_FtpOperations):
             # can carry arbitrary octets; never invent a lossy user filename.
             raise BrowserError('Filename encoding failed. Retry with --encoding latin-1; byte mapping needs hardware verification.') from None
 
-    def read(self, path, maximum, *, progress=None, check=None, allowed_sizes=None):
+    def read(self, path, maximum, *, progress=None, check=None, allowed_sizes=None, budget=None):
         try:wire_path = path.encode(self._encoding)
         except UnicodeError:
             raise BrowserError('Filename encoding failed.') from None
@@ -303,6 +303,7 @@ class FtpReadAdapter(_FtpOperations):
             state = self._context.get()
             client = self._client()
             expected = client.size(wire_path)
+            if budget is not None:budget.require(expected)
             if not 0 < expected <= maximum:
                 raise BrowserError(f'File must contain between 1 byte and {maximum:,} bytes.')
             if allowed_sizes is not None and expected not in allowed_sizes:
@@ -315,8 +316,23 @@ class FtpReadAdapter(_FtpOperations):
                     except Exception as exc:
                         state.failure = exc
                         raise
+            # Restore the caller's typed budget failure through transport cleanup.
+            class BudgetGuard:
+                @property
+                def remaining(self):return budget.remaining
+                def require(self, amount):
+                    try:budget.require(amount)
+                    except Exception as exc:
+                        state.failure = exc
+                        raise
+                def consume(self, amount):
+                    try:budget.consume(amount)
+                    except Exception as exc:
+                        state.failure = exc
+                        raise
             client.read_into(wire_path, output, max_bytes=maximum,
-                             expected_bytes=expected, progress=update)
+                             expected_bytes=expected, progress=update,
+                             **({'budget': BudgetGuard()} if budget is not None else {}))
             state.check()
             if client.size(wire_path) != expected:
                 raise BrowserError('File changed or download was incomplete.')

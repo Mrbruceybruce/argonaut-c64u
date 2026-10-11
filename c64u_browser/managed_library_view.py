@@ -10,6 +10,8 @@ class ManagedLibraryView:
         self.app=app;self.generation=0;self.closed=False
         self.chooser=None;self.confirmation=None;self.forget_confirmation=None
         self.settings_dialog=None;self.available=();self.available_session=None
+        from .import_review import ImportReview
+        self.import_review=ImportReview(self)
         self.box=self.column()
         self.main_message=Gtk.Label(xalign=0,wrap=True,wrap_mode=Pango.WrapMode.WORD_CHAR,selectable=True)
         self.box.append(self.main_message)
@@ -19,7 +21,7 @@ class ManagedLibraryView:
         scroll=Gtk.ScrolledWindow(vexpand=True)
         self.rows=Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         scroll.set_child(self.rows);self.box.append(scroll)
-        self.box.append(Gtk.Label(label='Game importing is not available yet.',xalign=0,wrap=True))
+        self.box.append(self.import_review.box)
 
         self.settings_box=self.column()
         heading=Gtk.Label(label='Game Library',xalign=0);heading.add_css_class('title-2')
@@ -53,7 +55,7 @@ class ManagedLibraryView:
         self.settings_box.append(Gtk.Label(label='Selection is saved separately from General settings. '
             'Forget keeps all files on the device. Libraries are never merged.',xalign=0,wrap=True))
         self.busy_controls=(self.refresh_button,self.select_button,self.create_button,
-                            self.forget_button,self.choices,self.settings_button)
+                            self.forget_button,self.choices,self.settings_button,*self.import_review.busy_controls)
         self.unsubscribe=app.core.add_listener(lambda event:GLib.idle_add(self.event,event))
         self.reset()
 
@@ -96,6 +98,7 @@ class ManagedLibraryView:
         return False
 
     def reset(self):
+        self.import_review.invalidate()
         self.generation+=1
         if self.forget_confirmation:self.forget_confirmation.response(Gtk.ResponseType.CANCEL)
         self.available=();self.available_session=None
@@ -118,6 +121,7 @@ class ManagedLibraryView:
             f'Revision {library.revision} · {len(library.games)} games')
 
     def render(self,state):
+        self.import_review.invalidate()
         self.state=state
         configured=self.app.preferences.game_library_location
         self.create_button.set_visible(state.status=='none' and configured is None)
@@ -146,6 +150,7 @@ class ManagedLibraryView:
             self.main_message.set_text('No Game Library Configured\n'
                 'Choose an existing library or create a new one in Settings → Game Library.')
         self.render_available()
+        self.import_review.update()
 
     def render_available(self):
         selected=self.choices.get_selected_row()
@@ -324,3 +329,4 @@ class ManagedLibraryView:
     def close(self):
         self.closed=True;self.generation+=1;self.unsubscribe()
         self.detach_settings()
+        self.import_review.close()

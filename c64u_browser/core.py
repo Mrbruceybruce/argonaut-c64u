@@ -423,6 +423,44 @@ class ArgonautCore:
                 return result
         return self.scheduler.submit(CoreJob('game-library.managed-load',task),JobBinding.device(session))
 
+    def prepare_managed_import(self, selections, library, expected_session, *, previous=None):
+        """Read-only preparation/revalidation. There is no import execution endpoint."""
+        from .import_plan import ImportPlanner, ImportPlan, validate_selections
+        from .managed_library import ManagedLibrary, location
+        from .native_files import read_remote_game
+        with self._session_admission():
+            session = self.device_session()
+            client = self._require_client()
+            configured = location(self.preferences.game_library_location)
+            if (not isinstance(library, ManagedLibrary) or session != expected_session
+                    or not session.session_id or library.identity.device_id != session.device_id
+                    or configured != library.identity.preference()):
+                raise CoreError('identity', 'Select and load the intended managed library before planning.')
+            selections = validate_selections(selections, session)
+            if previous is not None and (not isinstance(previous, ImportPlan)
+                    or previous.library != library.identity or previous.session_id != session.session_id
+                    or tuple(i.source for i in previous.items) != selections):
+                raise CoreError('plan', 'Plan context changed. Prepare a new review.')
+        def task(job):
+            def check():
+                job.check_cancel()
+                if self.device_session() != session or self._client is not client:
+                    raise CoreError('session', 'Connection changed. Discard this review.')
+                if location(self.preferences.game_library_location) != configured:
+                    raise CoreError('location', 'Selected library changed. Discard this review.')
+            with read_operation(client, check):
+                check()
+                planner = ImportPlanner(client.list_directory,
+                    lambda path, limit, progress, budget=None: read_remote_game(
+                        client, path, limit, progress=lambda count, total=None: progress(count), check=check, budget=budget),
+                    session, check, job.report)
+                plan = planner.prepare(selections, library.identity, library.revision)
+                check()
+                if previous is not None and previous.evidence() != plan.evidence():
+                    raise CoreError('plan', 'Source or destination evidence changed. Prepare a new review.')
+                return plan
+        return self.scheduler.submit(CoreJob('game-library.import-plan', task), JobBinding.device(session))
+
     def usb_backup_root(self):
         """Return the configured Core-host backup parent, if one is set."""
         value=self.preferences.usb_backup_root.strip()

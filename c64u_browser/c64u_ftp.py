@@ -468,7 +468,7 @@ class C64UFtpClient:
             return int(reply[1][0][4:])
 
     def _transfer(self, verb, path, *, receive=None, source=None, expected=None,
-                  maximum=None, progress=None):
+                  maximum=None, progress=None, budget=None):
         self._expect(self._command('TYPE', b'I'), (200,))
         reply = self._expect(self._command('PASV'), (227,))
         match = re.fullmatch(rb'227 [^\r\n]*\(([0-9,]+)\)\.?', reply[1][-1])
@@ -511,7 +511,17 @@ class C64UFtpClient:
             else:
                 self._phase = 'data-io'
                 self._data.settimeout(self._policy.data_idle)
-                block = self._data.recv(8192)
+                amount = 8192
+                if budget is not None:
+                    amount = min(amount, budget.remaining)
+                    if amount == 0:
+                        # Peek only to distinguish exact EOF from excess data. No
+                        # excess payload is consumed or passed to the sink.
+                        if self._data.recv(1, socket.MSG_PEEK):budget.require(1)
+                        block = b''
+                    else:block = self._data.recv(amount)
+                    budget.consume(len(block))
+                else:block = self._data.recv(amount)
             if not block:
                 if source is not None:
                     self._write = replace(self._write,
@@ -590,7 +600,7 @@ class C64UFtpClient:
             self._event('listing-complete', entries=len(entries), wire_bytes=parser.total)
             return ListingResult(actual_path, entries, dialect, parser.total)
 
-    def read_into(self, path, sink, *, max_bytes, expected_bytes=None, progress=None):
+    def read_into(self, path, sink, *, max_bytes, expected_bytes=None, progress=None, budget=None):
         path = checked_path(path)
         if path == b'/' or not callable(getattr(sink, 'write', None)):
             raise FtpOperationError(EC.INVALID_ARGUMENT, 'sink')
@@ -603,7 +613,7 @@ class C64UFtpClient:
                 raise FtpOperationError(EC.LOCAL_IO, 'local-io')
         with self._operation_scope('RETR'):
             return self._transfer('RETR', path, receive=receive, maximum=max_bytes,
-                                  expected=expected_bytes, progress=progress)
+                                  expected=expected_bytes, progress=progress, budget=budget)
 
     def write_from(self, path, source, *, expected_bytes, progress=None):
         path = checked_path(path)

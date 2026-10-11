@@ -1,5 +1,96 @@
 # Argonaut roadmap
 
+## Managed Library Phase 3A — accepted; pending manual publication
+
+Against published Settings baseline `b45828c39d7521732569a6ec3350a84de397cb81`,
+Add Games now offers shared-picker selection, explicit Prepare Plan and read-only
+review in the main Game Library tab. Import remains unavailable; configuration
+stays exclusively in Settings. No game importing is operational.
+
+Immutable plans bind typed sources to the selected device/session/root/path/UUID,
+manifest revision and exact-byte digest. Local and managed remote reads validate
+D64/CRT content and SHA-256. Relevant catalog duplicates require actual-byte
+verification; missing/unverified content and filename conflicts block candidates.
+Identical content is skipped deterministically. Sources and relevant destination
+content are reread before completion. Revalidate Review rejects changed evidence.
+Plans are point-in-time observations, never execution authority.
+
+Preparation uses existing Core scheduling, B5 foreground admission and contextual
+Cancel. No writes, staging, metadata publication, manifest changes, legacy catalog
+changes, mount/launch, recovery or cleanup are implemented. Phase 3B/3C/3D remain
+pending. Review bounds are 64 sources, 256 MiB of aggregate source bytes read
+(including failed reads and verification rereads), and at most 128 relevant
+catalog entries totaling 256 MiB. Required verification must fit the source budget.
+
+Validation: 227 affected unit tests passed, including 31 new planner/Core/managed
+wire tests. The 38 planning/managed-library/creation GTK checks passed, including
+10 new planning UI/foreground checks. Tests use fake or localhost transports;
+no physical C64U was contacted. The old foreground chooser test still calls
+`FilePicker.emit`, which does not exist; the same error was reproduced on an
+isolated copy of the published baseline. Dedicated B5 and picker regressions pass.
+The previously documented GTK focus warning and native lifecycle issue are not
+claimed fixed. Compact re-review and bounded physical acceptance subsequently
+passed; their evidence and limitations are recorded below.
+
+
+Source-budget correction — re-review passed: the original success-only counter
+was replaced by one operation-wide 268,435,456-byte source-read allowance. Known
+sizes are checked before payload reads; local reads and optional managed FTP
+receives are capped to the remaining allowance and charged before buffering.
+Failed/rejected reads retain their charges, including final-reply/length failures.
+Verification rereads use the same allowance. Exhaustion returns
+`import-source-budget` and no complete plan; it never skips hashing/verification.
+Manifest and relevant-catalog reads retain their separate existing bounds.
+The existing read stack gained an optional budget; no-budget consumers retain
+existing behavior. No transfer execution or mutation was added.
+
+Correction validation: the combined planner/FTP/foreground selection passed 286
+tests; the final planner suite passed 44 tests after one additional end-to-end
+case (13 new budget regressions in total). All 11 focused planning GTK checks
+passed, including a new budget-error review-invalidation check. Localhost wire
+checks cover misleading SIZE, exact EOF, streaming exhaustion, cancellation,
+lease release, unchanged files/preferences and no mutation commands. Those checks
+were offline; subsequent physical acceptance is recorded below. Earlier broad-suite
+evidence below is historical.
+
+Additional offline GTK checks passed: B5 (3), shared picker (16), game picker (9),
+SID picker (4), Drives picker (3), C1 storage (6) and C4 layout (6): 47 checks,
+or 85 with the 38 checks above. Broader foreground testing has one baseline
+native-chooser error. Full C0 input testing reported six failures in 28 checks
+on both current and baseline, with differing cases; two current keyboard failures
+passed individually, while one also failed individually on baseline. C0 input
+qualification remains incomplete; no new 3A-attributable failure was established.
+
+### Phase 3A GNOME Wayland physical acceptance — passed; pending manual publication
+
+Read-only acceptance used source Development on C64 Founder's Edition `25BE71`,
+with destination `/USB1/ARGONAUT_LIBRARY`, revision `0`. UI results were reported
+by Bruce; process exit and repository authority were checked separately.
+
+- Local planning classified one new game, proposing 1,050,688 transfer bytes.
+  Explicit revalidation passed with unchanged classification and workload.
+- Remote planning classified one new game, proposing 174,848 transfer bytes.
+- Cancellation reported "operation canceled by request": no completed plan was
+  returned, the UI returned to idle, and no automatic retry occurred.
+- USB1 remained at revision `0`, with zero games. Import remained disabled;
+  no game import or device-storage mutation occurred.
+- Normal shutdown returned exit code `0`; no Argonaut runtime or launcher remained.
+
+Limits: source filenames and SHA-256 values were not independently inspected;
+the displayed library UUID and SD contents were not independently verified.
+Session/library-change invalidation was not physically exercised. This is bounded,
+user-reported UI acceptance, not broader physical qualification. The known
+`GtkText - did not receive a focus-out event` warning appeared and remains
+unresolved. No crash occurred in this run; the previously documented native
+GTK/PyGObject lifecycle fault remains unresolved.
+
+The source-budget re-review approved physical acceptance: 77 targeted tests
+passed (44 planner, including 13 budget regressions, plus 33 shared-read/download
+tests), as did 11 focused GTK checks and 10 additional exact-limit/one-byte-over
+wire probes. No skips were reported; these are prior review results, not test
+runs repeated during documentation closure. Phase 3B/3C/3D remain unimplemented.
+Publication is prepared only; no staging, commit or push was performed in closure.
+
 ## Game Library Settings relocation — accepted; pending manual publication
 
 The pending Forget correction is retained within a dedicated native Settings →

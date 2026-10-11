@@ -29,23 +29,23 @@ def read_remote(client,path,max_bytes=MAX_BYTES):
  with operation_event('ftp','read_remote','file'):
   return _read_remote(client,path,max_bytes,MAX_BYTES)
 
-def read_remote_game(client,path,max_bytes,progress=None,check=None):
+def read_remote_game(client,path,max_bytes,progress=None,check=None,*,budget=None):
  """Read one explicitly bounded Game Library source from C64U storage.
 
  This deliberately separate entry point permits CRT validation up to 64 MiB
  without increasing the general remote-file limit used by other features.
  """
  with operation_event('ftp','read_remote_game','file'):
-  return _read_remote(client,path,max_bytes,MAX_GAME_BYTES,progress,check)
+  return _read_remote(client,path,max_bytes,MAX_GAME_BYTES,progress,check,budget=budget)
 
 def _read_remote(client,path,max_bytes=MAX_BYTES,absolute_max=MAX_BYTES,
-                 progress=None,check=None):
+                 progress=None,check=None,*,budget=None):
  safe_argument(path)
  if type(max_bytes) is not int or not 1<=max_bytes<=absolute_max:raise BrowserError('Invalid remote file size bound.')
  if not ((storage_root(path) and storage_root(path)!=path) or any(path.startswith(folder+'/') for folder in FLASH_FOLDERS.values())) or any(p in ('','.','..') for p in path.split('/')[1:]):raise BrowserError('Choose a USB/SD or supported Flash file.')
  adapter=adapter_for(client)
  if adapter is not None:
-  return adapter.read(path,max_bytes,progress=progress,check=check)
+  return adapter.read(path,max_bytes,progress=progress,check=check,**({"budget":budget} if budget is not None else {}))
  raise BrowserError('Remote reads require a Core-managed read adapter.')
 
 def read_local(path):

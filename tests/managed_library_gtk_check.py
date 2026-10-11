@@ -198,7 +198,10 @@ class ManagedSettingsGtk(unittest.TestCase):
         self.assertFalse(any(isinstance(w,Gtk.Entry) and w.get_placeholder_text()=='/USB0/ARGONAUT_LIBRARY'
                              for w in fixture.walk(general)))
         main_labels=[w.get_label() for w in fixture.walk(app.managed_library_view.box) if isinstance(w,Gtk.Button)]
-        self.assertEqual(['Go to Settings'],main_labels)
+        self.assertIn('Go to Settings',main_labels)
+        self.assertIn('Add Games…',main_labels)
+        self.assertFalse({'Discover Libraries','Select Library','Create Library','Forget Library'} & set(main_labels))
+        self.assertFalse(app.managed_library_view.import_review.execute.get_sensitive())
         library=parse_manifest(manifest(),'device',PATH)
         app.managed_library_view.render(LibraryState('valid','Loaded',(library,),'one'))
         app.managed_library_view.forget()
