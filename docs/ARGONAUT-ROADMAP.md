@@ -1,5 +1,57 @@
 # Argonaut roadmap
 
+## Managed Import Phase 3B-2A — approved; pending manual publication
+
+Baseline: `d2e37e3949690f935f4bf79388db9f33f47c15e0`, published
+Phase 3B-1 transaction/journal foundation. Older pending-publication entries
+below are historical.
+
+This checkpoint adds an explicit schema-2 offline transaction policy alongside
+unchanged schema-1 budget semantics. Schema-1 journals retain their original
+128 MiB ceilings and validation/state restrictions; loading never upgrades,
+resumes or authorizes either version. Execution/publication states remain reserved.
+
+Validated host preferences use existing atomic preference persistence:
+Maximum Import Batch Size (`import_batch_mib`) defaults to 128 MiB, range
+1–4096 MiB; Maximum Temporary Disk Usage (`import_temp_mib`) defaults to
+512 MiB, range 1–8192 MiB. These are preference-model fields, without new
+Settings controls in this compatibility checkpoint. Invalid values are rejected;
+missing fields receive bounded defaults. There is no unlimited option.
+
+New explicit schema-2 attempts freeze the effective policy, separately recording
+selected payload, temporary disk ceiling, planned upload/readback payload,
+cumulative I/O allowances and measured accounting evidence. Preference changes
+do not alter existing attempts. Verification rereads are not additional game
+payload. These records are contracts and evidence, not actual I/O enforcement,
+free-disk checks or consent.
+
+Phase 3A is unchanged: its aggregate 256 MiB source-read budget includes
+verification rereads. A configured 4096 MiB batch does not guarantee eligibility.
+No snapshots, execution admission, transfers, remote staging/readback, manifest
+publication, recovery cleanup, retries or Import UI are added. POSIX journal
+publication and cooperating-writer locking retain their existing guarantees.
+Phase 3B-2B and later work remain pending.
+
+Validation: 142 affected offline tests passed, no skips (49 existing transaction/
+journal, 44 planner, 27 managed-library, eight existing preference and 14 new
+compatibility/preference tests). No physical device acceptance was performed.
+
+Independent compact review approved this schema-2 compatibility checkpoint for
+publication. It confirmed unchanged schema-1 limits and state restrictions,
+byte-for-byte round trips for five existing schema-1 journal fixtures, immutable
+schema-2 policy capture and separation of payload, temporary disk, planned
+transfers and actual-I/O allowances. Reserved execution states remain unavailable.
+
+Review evidence: 142 previously passing tests, plus 63 independently rerun focused
+tests, all passing with no skips. Additional published-format compatibility and
+eight schema-version/evidence rejection probes passed with network access forbidden.
+No physical acceptance was required for this offline-only checkpoint.
+
+Documentation closure prepares manual publication only. No actual transfer
+metering, execution or remote staging exists; Phase 3A's 256 MiB planning-read
+budget and POSIX/cooperating-writer journal limitations remain unchanged.
+No later-phase work is complete, and no staging, commit or push was performed.
+
 ## Managed Import Phase 3B-1 — approved; pending manual publication
 
 Published Phase 3A baseline: `5996d7081411dfd1a17f55112ddad7679165c054`

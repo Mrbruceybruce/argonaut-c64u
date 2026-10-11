@@ -5,7 +5,8 @@ GAME_LIBRARY_PAGE=3
 DEFAULTS={'remember_window':True,'width':1200,'height':850,'preview_scale':150,
           'preview_audio':True,'remember_folders':True,'show_hidden_local':False,
           'replay_enabled':False,'replay_seconds':30,'developer_mode':False,
-          'local_folder':'','remote_folders':{}}
+          'local_folder':'','remote_folders':{},
+          'import_batch_mib':128,'import_temp_mib':512}
 
 def defaults():
     return {**DEFAULTS,'remote_folders':{}}
@@ -18,7 +19,8 @@ def validate(options):
         value=options.get(key,result[key])
         if type(value) is not bool:raise ValueError('Invalid preference: '+key)
         result[key]=value
-    for key,low,high in (('width',600,10000),('height',400,10000),('preview_scale',50,300)):
+    for key,low,high in (('width',600,10000),('height',400,10000),('preview_scale',50,300),
+                         ('import_batch_mib',1,4096),('import_temp_mib',1,8192)):
         value=options.get(key,result[key])
         if type(value) is not int or not low<=value<=high:raise ValueError('Invalid preference: '+key)
         result[key]=value

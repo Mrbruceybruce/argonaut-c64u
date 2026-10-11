@@ -12,12 +12,13 @@ from uuid import uuid4
 
 from .import_transaction import (Budgets, Journal, MAX_JOURNAL_BYTES, MAX_RECOVERY_JOURNALS, OperationEvidence,
     Transaction, TransactionError, TransactionItem, canonical, require, MAX_DEPTH)
+from .import_policy import ImportPolicy, TransactionV2, JournalV2, ResourceAccounting
 from .managed_library import LibraryIdentity, uuid_text
 from .picker_model import PickerSelection
 
 
 def encode(journal):
-    require(type(journal) is Journal, 'Expected transaction journal.');journal.validate()
+    require(type(journal) in (Journal,JournalV2), 'Expected transaction journal.');journal.validate()
     # Each scalar and collection is already bounded; iterencode avoids a full
     # JSON string. Never append beyond the captured byte allowance.
     limit=journal.transaction.budgets.journal_bytes
@@ -63,10 +64,18 @@ def decode(data):
     require(type(data) is bytes and 0<len(data)<=MAX_JOURNAL_BYTES,'Invalid journal size.')
     _check_depth(data)
     try:
-        raw=_fields(json.loads(data.decode('utf-8'),object_pairs_hook=_object),Journal)
-        tx=_fields(raw['transaction'],Transaction)
+        document=json.loads(data.decode('utf-8'),object_pairs_hook=_object)
+        require(type(document) is dict and type(document.get('schema_version')) is int,
+                'Missing or invalid schema version.')
+        version=document['schema_version']
+        require(version in (1,2),'Unsupported journal version.')
+        journal_type,transaction_type,budget_type=((Journal,Transaction,Budgets) if version==1
+            else (JournalV2,TransactionV2,ImportPolicy))
+        raw=_fields(document,journal_type)
+        if version==2:raw['accounting']=ResourceAccounting(**_fields(raw['accounting'],ResourceAccounting))
+        tx=_fields(raw['transaction'],transaction_type)
         tx['library']=LibraryIdentity(**_fields(tx['library'],LibraryIdentity))
-        tx['budgets']=Budgets(**_fields(tx['budgets'],Budgets));tx['budgets'].validate()
+        tx['budgets']=budget_type(**_fields(tx['budgets'],budget_type));tx['budgets'].validate()
         require(type(tx['items']) is list and len(tx['items'])<=tx['budgets'].files,'Invalid item count.')
         items=[]
         for value in tx['items']:
@@ -74,10 +83,10 @@ def decode(data):
             item['source']=PickerSelection(**_fields(item['source'],PickerSelection))
             require(type(item['local_identity']) is list,'Invalid source identity.')
             item['local_identity']=tuple(item['local_identity']);items.append(TransactionItem(**item))
-        tx['items']=tuple(items);raw['transaction']=Transaction(**tx)
+        tx['items']=tuple(items);raw['transaction']=transaction_type(**tx)
         require(type(raw['operations']) is list and len(raw['operations'])<=tx['budgets'].operations,'Invalid evidence count.')
         raw['operations']=tuple(OperationEvidence(**_fields(o,OperationEvidence)) for o in raw['operations'])
-        result=Journal(**raw).validate()
+        result=journal_type(**raw).validate()
         require(len(data)<=result.transaction.budgets.journal_bytes,'Journal size exceeded.')
         return result
     except (ValueError,TypeError,KeyError,AttributeError,RecursionError) as exc:
@@ -143,7 +152,7 @@ class JournalStore:
             # recovery observations cannot be advanced or turned into authority.
             require(journal==previous.transition(journal.state,reason=journal.reason),
                     'Journal update is not an available pre-execution transition.')
-        else:require(journal==Journal(journal.transaction),'Initial journal must be prepared.')
+        else:require(journal==type(journal)(journal.transaction),'Initial journal must be prepared.')
         temporary='journal-write-'+uuid4().hex
         with self._locked() as directory:
             try:current=self._read(directory,name)

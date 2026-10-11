@@ -145,6 +145,11 @@ class Transaction:
     def recovery_location(self):return self.library.path + '/' + self.directory
 
     def validate(self):
+        self._validate_structure()
+        self._validate_payload()
+        return self
+
+    def _validate_structure(self):
         require(type(self.items) is tuple and len(self.items)<=MAX_FILES, 'Invalid item count.')
         immutable(self);identity(self.library)
         for value in (self.id, self.plan_id, self.revalidated_plan_id):
@@ -157,7 +162,7 @@ class Transaction:
         try:stamp = datetime.fromisoformat(self.created_at)
         except (TypeError, ValueError) as exc:raise TransactionError('Invalid timestamp.') from exc
         require(stamp.tzinfo is not None, 'Timestamp needs timezone.')
-        require(type(self.budgets) is Budgets, 'Invalid resource budgets.');self.budgets.validate()
+        self._validate_budgets()
         integer(len(self.items), 1, self.budgets.files)
         integer(self.skipped_duplicates, 0, self.budgets.files-len(self.items))
         names=set();hashes=set()
@@ -187,11 +192,20 @@ class Transaction:
             require(item.final_path.casefold() not in names and (item.size,item.sha256) not in hashes,
                     'Duplicate transfer item.')
             names.add(item.final_path.casefold());hashes.add((item.size,item.sha256))
+        return self
+
+    def _validate_source_item(self):
+        return self.validate()
+
+    def _validate_budgets(self):
+        require(type(self.budgets) is Budgets, 'Invalid resource budgets.')
+        self.budgets.validate()
+
+    def _validate_payload(self):
         total=sum(i.size for i in self.items)
         for cap in (self.budgets.snapshot_bytes,self.budgets.spool_bytes,
                     self.budgets.upload_bytes,self.budgets.readback_bytes):
             require(total<=cap,'Transaction resource budget exceeded.')
-        return self
 
     def require_absent(self, entries):
         """Validate a supplied complete parent listing; never a lease/ownership claim."""
@@ -249,6 +263,12 @@ def prepare_transaction(original, revalidated, *, library, session, revision, ma
     Trusted future Core must supply the actual revalidation result. Offline data
     cannot prove freshness or human consent; execution must recheck both.
     """
+    return _prepare_transaction(original,revalidated,library=library,session=session,
+        revision=revision,manifest_digest=manifest_digest,budgets=budgets)
+
+
+def _prepare_transaction(original,revalidated,*,library,session,revision,manifest_digest,
+                         budgets,transaction_type=Transaction):
     _eligible(original);_eligible(revalidated)
     identity(library);integer(revision,0,2**63-1);digest(manifest_digest)
     require(type(session) is DeviceSession, 'Invalid captured session.')
@@ -259,7 +279,7 @@ def prepare_transaction(original, revalidated, *, library, session, revision, ma
     transaction_id=str(uuid4());directory='argonaut-import-'+transaction_id
     selected=tuple(i for i in revalidated.items if i.classification=='new')
     require(bool(selected),'Duplicate-only batch has nothing to stage.')
-    result=Transaction(transaction_id,original.id,revalidated.id,evidence_digest(revalidated),library,
+    result=transaction_type(transaction_id,original.id,revalidated.id,evidence_digest(revalidated),library,
         session.session_id,revision,manifest_digest,datetime.now(timezone.utc).isoformat(),budgets,
         tuple(TransactionItem(i.source,i.local_identity,i.format,i.size,i.sha256,i.relative_destination,
               f'{directory}/item-{n:04d}.{i.format.lower()}') for n,i in enumerate(selected,1)),
@@ -268,7 +288,7 @@ def prepare_transaction(original, revalidated, *, library, session, revision, ma
     for i in revalidated.items:
         check=replace(result,items=(TransactionItem(i.source,i.local_identity,i.format,i.size,i.sha256,
             i.relative_destination,f'{directory}/item-0001.{i.format.lower()}'),),skipped_duplicates=0)
-        check.validate()
+        check._validate_source_item()
     return result.validate()
 
 
@@ -308,7 +328,7 @@ class Journal:
     def validate(self):
         require(type(self.operations) is tuple and len(self.operations)<=MAX_OPERATIONS, 'Invalid evidence count.')
         immutable(self);self.transaction.validate()
-        require(type(self.schema_version) is int and self.schema_version==SCHEMA_VERSION,'Unknown journal schema.')
+        self._validate_schema()
         require(self.state in STATES and self.state not in RESERVED_STATES,
                 'Execution/publication states are reserved for later authorized phases.')
         integer(len(self.operations),0,self.transaction.budgets.operations)
@@ -356,6 +376,11 @@ class Journal:
         require((self.state=='uncertain')==unknown, 'Unknown outcome requires uncertain recovery state.')
 
         return self
+
+    def _validate_schema(self):
+        require(type(self.schema_version) is int and self.schema_version==SCHEMA_VERSION,
+                'Unknown journal schema.')
+        require(type(self.transaction) is Transaction, 'Schema-1 transaction required.')
 
     def transition(self,state,*,reason=''):
         self.validate()

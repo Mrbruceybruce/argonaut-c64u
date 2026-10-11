@@ -507,3 +507,90 @@ execution admission, FTP upload, remote staging, automatic retry, recovery clean
 manifest publication or enabled Import action. Phases 3B-2, 3B-3 and 3C remain
 pending. Documentation closure prepares manual publication only; no Git staging,
 commit or push was performed in this pass.
+
+## Phase 3B-2A: versioned compatibility — approved; pending manual publication
+
+The published schema-1 implementation at
+`d2e37e3949690f935f4bf79388db9f33f47c15e0` remains supported. Its four
+128 MiB planned payload ceilings, validation, state restrictions and inspection-only
+loading keep their original meaning. `prepare_transaction` still constructs the
+schema-1 contract. No stored record is automatically upgraded, resumed or adopted
+as execution authorization.
+
+`prepare_transaction_v2` is an explicit offline factory for future attempts.
+It requires the same eligible original/revalidated plans and captured device,
+session, library, revision and manifest digest. The frozen `ImportPolicy` captures:
+
+- Batch payload ceiling: validated `import_batch_mib`, default 128 MiB,
+  range 1–4096 MiB (Maximum Import Batch Size).
+- Temporary host disk ceiling: validated `import_temp_mib`, default 512 MiB,
+  range 1–8192 MiB (Maximum Temporary Disk Usage).
+- Selected payload: each selected source's declared validated size, including
+  selected duplicates, once; verification rereads do not add game payload.
+- Planned upload and readback: new-item payload once per direction. Skipped
+  duplicates do not consume planned transfer or spool capacity. Planned spool
+  payload must fit the captured temporary-disk ceiling.
+- Separate cumulative snapshot-read, upload and readback allowances. The factory
+  captures twice the configured batch ceiling for each, bounded at 8192 MiB.
+  These finite allowances reserve room for future verification work; they do not
+  authorize retry or implement any I/O. Each allowance must cover planned payload.
+- The existing 64-file, 1 MiB journal and 256-operation hard ceilings. The store
+  remains limited to 64 journals.
+
+Preferences use the existing host `app_options` model and atomic save path;
+no preference-file schema change or Settings widgets are introduced. Missing
+values receive bounded defaults. Non-integers (including booleans), zero,
+negative and out-of-range values fail validation. Corrupt persisted values are
+reported without rewriting the original file. Saving validates before replacement.
+Changing preferences has no effect on an already captured transaction policy.
+
+Schema-2 journals separately carry immutable `ResourceAccounting` observations:
+snapshot bytes read, temporary-disk peak, upload bytes and readback bytes. They
+start at zero; prepared/awaiting-confirmation records cannot claim I/O. Failed,
+canceled or uncertain inspection evidence can retain an over-limit observation
+rather than erase it. Counters are bounded nonnegative integers, not authority,
+proof of successful verification, actual enforcement or available disk capacity.
+No runtime accounting writer is introduced here.
+
+Both journal versions retain exact field validation, strict UTF-8, bounded
+strings/collections/nesting, incremental size-limited encoding, private POSIX
+publication, exclusive temporary files, file fsync, atomic replacement, directory
+fsync where supported, and stale-writer protection among cooperating processes.
+Loading dispatches strictly on version and returns that version; mismatched fields,
+unknown versions and attempts to replace an existing record with another schema
+are rejected. Reserved execution/publication states and execution APIs remain
+unavailable, including after round-trip or restart.
+
+Phase 3A's 256 MiB planning-read budget is unchanged and includes verification
+rereads and failed reads. Larger preferences may still be rejected during planning;
+4096 MiB selection is not a promise of import eligibility. Existing per-format and
+identity/eligibility limits also remain applicable.
+
+Validation: 142 offline tests passed with no skips, including 14 new tests covering
+schema-1 boundaries and round-trip, schema-2 policy/payload limits, preference
+bounds and persistence failures, immutable capture, duplicates, journal round-trip,
+corrupt/truncated data, exact encoding ceiling and one-byte-over rejection, UTF-8,
+reserved authorization and no automatic version conversion. Existing 49 contract/
+journal, 44 planner, 27 managed-library and eight preference tests remain passing.
+No device contact or physical qualification. There are no source snapshots,
+execution admission, FTP uploads, remote staging/readback, manifest publication,
+enabled Import action, recovery cleanup or automatic retries. Phase 3B-2B and
+later work are not implemented by this checkpoint.
+
+### Schema-2 publication approval and documentation closure
+
+Independent compact review approved this schema-2 compatibility checkpoint for
+publication. It confirmed unchanged schema-1 limits and state restrictions,
+byte-for-byte round trips for five existing schema-1 journal fixtures, immutable
+schema-2 policy capture and separation of payload, temporary disk, planned
+transfers and actual-I/O allowances. Reserved execution states remain unavailable.
+
+Review evidence: 142 previously passing tests, plus 63 independently rerun focused
+tests, all passing with no skips. Additional published-format compatibility and
+eight schema-version/evidence rejection probes passed with network access forbidden.
+No physical acceptance was required for this offline-only checkpoint.
+
+Documentation closure prepares manual publication only. No actual transfer
+metering, execution or remote staging exists; Phase 3A's 256 MiB planning-read
+budget and POSIX/cooperating-writer journal limitations remain unchanged.
+No later-phase work is complete, and no staging, commit or push was performed.
