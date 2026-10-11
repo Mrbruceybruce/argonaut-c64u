@@ -64,6 +64,7 @@ def _session_change(method):
     def guarded(self, *args, **kwargs):
         with self._session_admission():
             self._machine_targets.clear()
+            self._import_preparation.invalidate()
             return method(self, *args, **kwargs)
     return guarded
 
@@ -215,6 +216,8 @@ class ArgonautCore:
         self._session_gate = Lock()
         self._library_creation_plans = {}
         self._machine_targets = {}
+        from .import_preparation import SnapshotPreparation
+        self._import_preparation = SnapshotPreparation(self)
         self._client = None
         self._active_profile = None
         self._device_info = None
@@ -389,6 +392,7 @@ class ArgonautCore:
             except BaseException:
                 self.preferences.game_library_location = before
                 raise
+        self._import_preparation.invalidate()
         self._emit('library-location-changed')
 
     def load_managed_library(self, *, discover=False, selection=None, expected_session=None):
@@ -460,6 +464,19 @@ class ArgonautCore:
                     raise CoreError('plan', 'Source or destination evidence changed. Prepare a new review.')
                 return plan
         return self.scheduler.submit(CoreJob('game-library.import-plan', task), JobBinding.device(session))
+
+    def review_managed_snapshots(self, transaction, expected_session):
+        """Internal confirmation model only; no Stage/Import UI or remote writes."""
+        return self._import_preparation.review(transaction, expected_session)
+
+    def confirm_managed_snapshots(self, confirmation, *, confirmed):
+        return self._import_preparation.confirm(confirmation, confirmed=confirmed)
+
+    def prepare_managed_snapshots(self, authorization, *, temporary_parent):
+        return self._import_preparation.prepare(authorization, temporary_parent=temporary_parent)
+
+    def discard_managed_snapshots(self, result):
+        return self._import_preparation.discard(result)
 
     def usb_backup_root(self):
         """Return the configured Core-host backup parent, if one is set."""
@@ -909,6 +926,7 @@ class ArgonautCore:
     def close(self):
         """Release Core execution resources; jobs are not persisted."""
         self._machine_targets.clear()
+        self._import_preparation.close()
         try:
             self._ftp_manager.invalidate(self._device_identity)
             self.scheduler.close()

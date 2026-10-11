@@ -231,7 +231,8 @@ class FtpReadAdapter(_FtpOperations):
         state.client = None
         state.transport_error = None
 
-    def read_into(self, path, sink, *, progress=None, check=None, finish=None):
+    def read_into(self, path, sink, *, progress=None, check=None, finish=None,
+                  expected_bytes=None, budget=None):
         """Stream one exact SIZE/RETR/SIZE observation, including empty files.
 
         The caller prepares/owns the sink and any publication or fsync policy.
@@ -246,6 +247,20 @@ class FtpReadAdapter(_FtpOperations):
             state = self._context.get()
             client = self._client()
             expected = client.size(wire_path)
+            if expected_bytes is not None and expected != expected_bytes:
+                raise BrowserError('Remote source size differs from the approved snapshot.')
+            if budget is not None:budget.require(expected)
+            class BudgetGuard:
+                @property
+                def remaining(self):return budget.remaining
+                def require(self, amount):
+                    try:budget.require(amount)
+                    except Exception as exc:
+                        state.failure = exc;raise
+                def consume(self, amount):
+                    try:budget.consume(amount)
+                    except Exception as exc:
+                        state.failure = exc;raise
             class Sink:
                 def write(self, block):
                     try:
@@ -262,7 +277,8 @@ class FtpReadAdapter(_FtpOperations):
                         state.failure = exc
                         raise
             result = client.read_into(wire_path, Sink(), max_bytes=expected,
-                                      expected_bytes=expected, progress=update)
+                                      expected_bytes=expected, progress=update,
+                                      **({'budget': BudgetGuard()} if budget is not None else {}))
             if finish is not None:finish()
             state.check()
             if client.size(wire_path) != expected:

@@ -594,3 +594,168 @@ Documentation closure prepares manual publication only. No actual transfer
 metering, execution or remote staging exists; Phase 3A's 256 MiB planning-read
 budget and POSIX/cooperating-writer journal limitations remain unchanged.
 No later-phase work is complete, and no staging, commit or push was performed.
+
+## Managed Import Phase 3B-2A — authorization and host snapshots approved; pending manual publication
+
+Published compatibility baseline: `9b04bbe748a2216c32114116f3e2880c72d87cb5`
+(`Add versioned managed import resource policies`). Earlier publication/status
+entries below describe historical checkpoints.
+
+Core now exposes internal review, explicit confirmation, one-use preparation and
+owned-snapshot discard methods. No new UI action is exposed; Import remains
+disabled. Confirmation states: “Stage and Verify prepares files but does not
+import them into the Game Library.” In this slice all preparation is host-only;
+there is no remote staging, upload, remote readback or manifest publication.
+
+Consent lives only in bounded Core memory, binds the immutable schema-2 transaction,
+device/session/library, manifest and policy, and expires after 120 seconds
+(including preparation). A copied token, transaction UUID or journal is not consent.
+Reconnect/selection changes invalidate pending consent. Preparation consumes it
+once, even on admission failure, and uses the existing device scheduler lane with
+busy rejection. Manifest identity/revision/digest are reread before and after
+snapshots; state and captured policy are checked between streaming chunks.
+
+Local sources are revalidated and read with fixed 8192-byte buffers; remote sources
+use the existing session-bound managed FTP streaming reader. Exact size and SHA-256
+must match the approved transaction. Source bytes consumed are charged even on
+failure/cancellation, separately from payload and planned future transfers.
+Private host snapshots enforce disk limits using allocated file blocks/logical
+size and directory allocation, with space checks and bounded writes.
+
+Snapshot ownership is descriptor-based, exclusive, restrictive and rejects symlinks.
+Failure/cancellation cleans only proven owned files, releases FTP leases and returns
+non-ready accounting evidence. Successful snapshots need explicit discard or Core
+shutdown; restart never adopts/resumes or automatically cleans old directories.
+Uncertain cleanup preserves unexpected content and blocks further preparation in
+that Core session. Runtime evidence is volatile; durable transaction journals
+remain separate and unchanged. No journal schema or reserved state is added.
+
+Validation: 341 combined affected offline tests passed without skips, followed by
+31 passing snapshot/admission tests including four additional lifecycle probes.
+Fake FTP checks verified lease release and absence of mutation verbs. No physical
+C64U contact or acceptance. Phase 3A's 256 MiB planning-read budget, schema-1/2
+compatibility and POSIX/cooperating-writer journal limitations remain unchanged.
+Remote staging, execution/publication, importing and Phases 3B-2B/3B-2C/3C remain
+unimplemented by this checkpoint.
+
+### Internal preparation contract and remaining limits
+
+The internal Core methods are `review_managed_snapshots`,
+`confirm_managed_snapshots(confirmed=True)`, `prepare_managed_snapshots`, and
+`discard_managed_snapshots`. They are not wired to a desktop action. Confirmation
+cancellation produces no capability. Registries retain at most 32 pending reviews
+and 32 authorizations; object identity and Core ownership prevent reconstructing a
+capability from serialized fields. The deadline is monotonic and does not renew.
+One preparation or retained snapshot set may exist per Core instance; the device
+lane still excludes other device work. Busy admission consumes consent, requiring
+a new explicit review rather than retry. No independent dispatcher is introduced.
+
+A caller supplies an existing private, user-owned POSIX host parent. Preparation
+creates an unpredictable 0700 child and exclusive 0600 ordinal files. Path traversal
+and symlinks in parent/source components are rejected. Cleanup checks device/inode,
+regular-file type and link count using retained directory descriptors. It never
+recursively deletes a directory tree or removes unexpected replacement files.
+Cleanup completion is reported; unresolved cleanup blocks further attempts in the
+current Core instance. Crash leftovers require explicit inspection outside this
+slice; they are never adopted or automatically retried/removed after restart.
+
+Disk accounting reserves only incremental growth beyond the current file footprint,
+using the filesystem's reported allocation unit rather than a fixed block size.
+Allocated blocks are measured in POSIX 512-byte units; logical host bytes written
+are reported separately in runtime SnapshotEvidence, without a journal change.
+Append-only writes credit already allocated capacity, so fragmented chunks do not
+reserve the same block repeatedly. Partial writes and write exceptions retain
+observed logical growth and peak disk evidence.
+
+When st_blocks is absent, invalid or below logical size (for example delayed,
+sparse or compressed allocation), rounded logical size is conservatively reserved
+and evidence is labeled conservative-rounded rather than exact physical usage.
+Directory footprint receives the same treatment. Allocation rounding uses f_frsize,
+falling back to a positive f_bsize; if neither is usable, preparation stops.
+Actual allocation is rechecked after writes and fsync: unexpectedly larger
+allocation is recorded and stops preparation. Filesystem inode metadata, unrelated
+process usage, delayed allocation and free-space races cannot be perfectly reserved;
+ENOSPC and fsync errors stop preparation and preserve failure evidence. This is
+application-side protection, not an operating-system disk quota.
+Limits may reject a payload near the disk ceiling because filesystem overhead also
+consumes space. The snapshot-read allowance counts actual source bytes at the read
+boundary, including chunks whose sink later fails. Manifest control reads retain
+the existing separate manifest bounds and are not counted as source payload.
+
+Progress carries phase/current source, files completed/total and source bytes
+read/total; verification progress precedes ready status. Job cancellation is checked
+between chunks and at final admission. A cancellation arriving after successful
+completion does not retroactively undo completion; owned snapshots can be discarded.
+Snapshot results and failure accounting are non-resumable runtime evidence, not
+remote execution capabilities. Existing durable journals are neither rewritten nor
+advanced by preparation. No new persisted schema is necessary for this slice.
+
+Shared FTP `read_into` accepts optional approved-size and cumulative-read limits;
+existing callers without them retain their previous behavior. The existing reader,
+lease manager and transport perform SIZE/RETR/SIZE and stream in 8192-byte chunks.
+There is no FTP server-side copy assumption, upload, mount or launch operation.
+A ready snapshot set alone cannot execute anything. Future execution must obtain
+its own separately reviewed admission and recheck relevant state.
+
+### Bounded cleanup/admission and disk-accounting correction — approved in final review
+
+Cleanup now retains snapshot ownership/admission until its definitive outcome.
+Concurrent preparation and repeated discard are refused while cleanup runs.
+Failure or interruption retains a blocking uncertainty state and cleanup evidence;
+shutdown neither races active cleanup nor retries uncertain content. No recovery
+mechanism or deletion of unrelated files is introduced.
+
+Disk reservation now charges only the increase beyond already-counted allocation.
+Fragmented writes reuse existing capacity, including a one-byte append at the
+1 MiB allocation boundary. Runtime evidence records host bytes written separately
+from peak disk footprint. Actual allocation is checked after partial writes and
+exceptions. Missing/insufficient allocation evidence uses a labeled conservative
+rounded-logical-size fallback; an unavailable allocation unit stops preparation.
+
+Validation: 170 targeted offline tests passed without skips, including 15 new
+cleanup/admission and disk regressions, existing snapshots, managed FTP,
+foreground/scheduler and schema-1/2 compatibility tests. No physical acceptance,
+remote mutation or transfer execution is claimed. Authorization, session/library/
+manifest guards, hashes, journals and Phase 3A planning remain unchanged.
+
+### Initialization-cleanup exception correction — approved in final review
+
+Constructor failures now record ownership and default to cleanup uncertainty before
+attempting cleanup. If cleanup raises or is canceled, the original initialization
+failure is re-raised with separate secondary failure evidence; cleanup is never
+retried by the outer handler. Only a reported successful cleanup releases admission.
+Failure before any owner can be recovered remains conservatively uncertain.
+
+Runtime failure evidence retains the phase, primary/secondary exception types,
+secondary OS error number when available, created directory path/identity, tracked
+file identities and available byte/allocation accounting. Core retains an uncertain
+owner and blocking state for later inspection. Ordinary retry, discard and shutdown
+do not clear that state or retry uncertain cleanup. Unrelated content is preserved.
+This adds no persisted journal schema or recovery mechanism.
+
+Validation: 178 targeted offline tests passed with no skips, including eight new
+initialization-cleanup cases and the exact allocation-setup failure followed by
+interrupted directory removal. Authorization, guards, hashing, streaming,
+disk-accounting rules and FTP services are unchanged by this narrow correction.
+
+### Final independent review and publication readiness
+
+Independent final review approved this authorization and host-snapshot checkpoint
+for publication. The review confirmed Core-owned one-use authorization with a
+120-second deadline and captured transaction/device/session/library/manifest/policy
+identity; bounded 8192-byte local and remote streaming; exact size and SHA-256
+verification; actual source-read and temporary-disk accounting; and incremental
+filesystem allocation accounting. Cleanup retains admission until proven complete.
+Initialization failures preserve primary and cleanup-error evidence; uncertain
+cleanup blocks further preparation. Cancellation and managed FTP lease release
+remain protected. No remote mutation or enabled Import action was introduced.
+
+Evidence: 178 previously passing targeted offline tests; 23 independently rerun
+focused tests all passed with no skips, including the eight initialization-cleanup
+regressions and the original allocation-setup/interrupted-removal reproduction.
+No physical acceptance is required for this offline checkpoint.
+
+Limits remain: POSIX filesystem assumptions, allocation races and conservative
+estimates rather than OS disk quotas, no implemented recovery for uncertain
+cleanup, and non-resumable snapshots. No remote staging, upload, readback or
+manifest publication exists. Phases 3B-2B/3B-2C/3C remain unimplemented.
