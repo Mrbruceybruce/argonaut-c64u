@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Volatile schema-3 evidence allowance. Not filesystem space or I/O insurance."""
+"""Volatile schema-3/4 evidence allowance. Not filesystem space or I/O insurance."""
 from dataclasses import dataclass
 import json
 
-from .import_execution import ExecutionJournal, ExecutionOperation, ExecutionAccounting, MAX_REVISIONS
+from .import_execution import ExecutionJournal, ExecutionOperation, ExecutionAccounting, MAX_REVISIONS, initial_journal
 from .import_transaction import canonical, require
 
 
 def planned_operations(tx):
     tx.validate()
-    if tx.execution_policy_version == 2:
+    if tx.execution_policy_version in (2, 3):
         from .import_execution_policy2 import planned_operations as policy2_plan
         return policy2_plan(tx)
     return (('snapshot-validation', ''), ('mkdir', tx.directory), ('record', tx.record_path),
@@ -35,7 +35,7 @@ def reserve_capacity(tx):
     """
     tx.validate(); plan = planned_operations(tx)
     require(len(plan) <= tx.budgets.operations, 'Insufficient operation capacity.')
-    document = canonical(ExecutionJournal(tx))
+    document = canonical(initial_journal(tx))
     document.update(state='awaiting-confirmation', reason='x'*256, revision=MAX_REVISIONS-1,
                     previous_digest='f'*64, checkpoint=len(plan))
     document['operations'] = []
@@ -43,6 +43,9 @@ def reserve_capacity(tx):
         op = canonical(ExecutionOperation('ffffffff-ffff-ffff-ffff-ffffffffffff', n, kind, path))
         op.update(outcome='not-started', size=2**63-1, sha256='f'*64,
                   collision='not-applicable', accounting={k: 2**63-1 for k in canonical(ExecutionAccounting())})
+        if tx.execution_policy_version == 3:
+            from .import_mkd_proof import maximum_document
+            op['mkd_proof'] = maximum_document(tx) if kind == 'mkdir' else None
         document['operations'].append(op)
     maximum = len(json.dumps(document, sort_keys=True, separators=(',', ':'),
                              ensure_ascii=False, allow_nan=False).encode('utf-8')) + 1

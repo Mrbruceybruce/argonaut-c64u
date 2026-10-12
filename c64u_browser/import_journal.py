@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Bounded, private host journals. Remote record publication is not implemented."""
+"""Bounded, private host journal codecs and historical pre-execution storage."""
 from contextlib import contextmanager
 from dataclasses import fields
 import errno
@@ -16,10 +16,11 @@ from .import_policy import ImportPolicy, TransactionV2, JournalV2, ResourceAccou
 from .managed_library import LibraryIdentity, uuid_text
 from .picker_model import PickerSelection
 from .import_execution import ExecutionJournal, decode_execution
+from .import_execution_v4 import ExecutionJournalV4, decode_execution_v4
 
 
 def encode(journal):
-    require(type(journal) in (Journal,JournalV2,ExecutionJournal), 'Expected transaction journal.');journal.validate()
+    require(type(journal) in (Journal,JournalV2,ExecutionJournal,ExecutionJournalV4), 'Expected transaction journal.');journal.validate()
     # Each scalar and collection is already bounded; iterencode avoids a full
     # JSON string. Never append beyond the captured byte allowance.
     limit=journal.transaction.budgets.journal_bytes
@@ -69,9 +70,9 @@ def decode(data):
         require(type(document) is dict and type(document.get('schema_version')) is int,
                 'Missing or invalid schema version.')
         version=document['schema_version']
-        require(version in (1,2,3),'Unsupported journal version.')
-        if version == 3:
-            result = decode_execution(document, _fields)
+        require(version in (1,2,3,4),'Unsupported journal version.')
+        if version in (3,4):
+            result = (decode_execution if version == 3 else decode_execution_v4)(document, _fields)
             require(len(data) <= result.transaction.budgets.journal_bytes, 'Journal size exceeded.')
             return result
         journal_type,transaction_type,budget_type=((Journal,Transaction,Budgets) if version==1
@@ -148,7 +149,7 @@ class JournalStore:
         return result
 
     def save(self,journal,*,previous=None):
-        require(type(journal) in (Journal, JournalV2), 'Use the execution journal owner for schema 3.')
+        require(type(journal) in (Journal, JournalV2), 'Use the execution journal owner for execution evidence.')
         data=encode(journal);name=self._name(journal.transaction.id)
         if previous is not None:
             previous.validate()

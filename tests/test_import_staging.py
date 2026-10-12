@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from c64u_browser.import_execution_store import ExecutionJournalStore
-from c64u_browser.import_execution_policy2 import encode_record, planned_operations
+from c64u_browser.import_execution_policy3 import encode_record, planned_operations
 from c64u_browser.import_journal import encode
 from c64u_browser.import_snapshots import SnapshotError
 from c64u_browser.import_transaction import TransactionError
@@ -39,7 +39,7 @@ class AuthorizationTests(unittest.TestCase):
 
     def test_exact_types_copies_replay_cross_core_and_decline(self):
         target=self.review();tx=target.transaction
-        self.assertEqual(2,tx.execution_policy_version)
+        self.assertEqual(3,tx.execution_policy_version)
         for text in (tx.id,tx.library.device_id,tx.library.library_id,tx.library.path,tx.items[0].final_path):self.assertIn(text,target.message)
         with self.assertRaises(SnapshotError):self.core.confirm_managed_staging(replace(target),confirmed=True,exclusive_writer_acknowledged=True)
         with self.assertRaises(SnapshotError):self.core.confirm_managed_staging(target,confirmed=True,exclusive_writer_acknowledged=True)
@@ -113,19 +113,28 @@ class AuthorizationTests(unittest.TestCase):
 
 class StagingTests(unittest.TestCase):
     @contextmanager
-    def fixture(self, *, count=1):
+    def fixture(self, *, count=1, beige=False):
         from c64u_ftp_server import FakeC64UFtp
         from c64u_browser.managed_library import parse_manifest
         from c64u_browser.picker_model import PickerSelection
         from c64u_browser.import_policy import prepare_transaction_v2
         f=reads.ReadMigrationTests();self.addCleanup(f.doCleanups)
-        root=PATH.encode();original=manifest()
-        dirs={b'/':b'',b'/USB1':b'',b'/SD':b'',root:b'',**{root+b'/'+n:b'' for n in (b'games',b'metadata',b'artwork')}}
+        library_path='/USB0/ARGONAUT_LIBRARY' if beige else PATH
+        root=library_path.encode();original=manifest()
+        dirs={b'/':b'',b'/USB0':b'',b'/USB1':b'',b'/SD':b'',root:b'',**{root+b'/'+n:b'' for n in (b'games',b'metadata',b'artwork')}}
         with FakeC64UFtp(directories=dirs,files={root+b'/manifest.json':original},mutation_tree=True,
                 after_mutation={b'MKD':lambda path:b'257 "'+path.replace(b'"',b'""')+b'" created\r\n'}) as server:
-            core,_=f.connect(server);session=core.device_session()
-            library=parse_manifest(original,session.device_id,PATH)
-            core.configure_game_library(PATH,identity=library.identity,expected_session=session)
+            if beige:
+                import copy
+                live=copy.deepcopy(reads.INFO)
+                live['info'].update(unique_id='25EA78',firmware_version='1.1.0s2')
+                with patch.object(reads,'INFO',live):
+                    core,profile=f.core(server)
+                    core.connect(replace(profile,device_id='25EA78'),remote_folder='/USB1')
+            else:core,_=f.connect(server)
+            session=core.device_session()
+            library=parse_manifest(original,session.device_id,library_path)
+            core.configure_game_library(library_path,identity=library.identity,expected_session=session)
             parent=core.preferences.path.parent;selections=[]
             for n in range(count):
                 source=parent/f'{n}.crt';data=bytearray(crt_bytes());data[-1]=n;source.write_bytes(data)
@@ -163,12 +172,12 @@ class StagingTests(unittest.TestCase):
     def path(self,name=''):return (self.tx.library.path+'/'+self.tx.directory+('/'+name if name else '')).encode()
 
     def test_success_exact_artifacts_and_durable_history_one_lease(self):
-        with self.fixture(count=2):
+        with self.fixture():
             before=self.server.connections;receipt=self.stage();j=self.journal()
             self.assertEqual('verified-staged',receipt.state);self.assertEqual('verified-staged',j.state)
-            self.assertEqual(2,j.transaction.execution_policy_version)
+            self.assertEqual(3,j.transaction.execution_policy_version)
             self.assertEqual(planned_operations(self.tx),tuple((o.kind,o.path) for o in j.operations))
-            self.assertEqual(9,len(j.operations));self.assertEqual(23,len(list(self.folder.glob('*.execution-*'))))
+            self.assertEqual(7,len(j.operations));self.assertEqual(19,len(list(self.folder.glob('*.execution-*'))))
             self.assertEqual(encode_record(self.tx),self.server.files[self.path('transaction.json')])
             for item in self.tx.items:self.assertEqual(item.sha256,hashlib.sha256(self.server.files[(self.tx.library.path+'/'+item.staged_path).encode()]).hexdigest())
             self.assertEqual(receipt.accounting,j.accounting)

@@ -1,5 +1,101 @@
 # Managed Library — foundation and explicit empty creation
 
+## PA-4F.3C targeted correction — pending independent reinspection
+
+The PA-4F.3R findings are corrected within the existing uncommitted 19-file scope.
+Schema-4 MKD `not-started` now requires both submission flags to be false; the
+existing no-reply/no-acknowledgment constraints remain in force. Contradictory
+observations fail capture, journal validation, canonical encoding and reload.
+Staging retains the original unresolved intent with an explicit validation error;
+it does not drop contradictory fields into a fabricated outcome. Legitimate
+unknown submission, including an observed positive acknowledgment followed by
+transport uncertainty, remains representable and never permits STOR.
+
+Both 256-character capacity binding fields now use four-byte UTF-8 scalars:
+1024 bytes each. The complete field audit retains the conservative full-checkpoint
+strategy and unchanged 1 MiB ceiling. The one-item Beige fixture now has
+M4=42978, R=20, reservation=859560 bytes, superseding the original PA-4F.3 sizing
+below. An exact captured allowance of 859540 passes (its six-digit value shortens
+each checkpoint by one byte); 859539 fails. Maximum raw reply, escaped identity,
+Unicode binding, terminal and actual-history-consumption regressions are retained.
+Two-item imports may still be refused even for small payloads; capacity optimization
+is deferred to a separate follow-up.
+
+Validation: 648 affected offline tests passed (15 new adversarial tests), zero
+failures/errors/skips, on Linux/Python 3.13.5 with the loopback-only runner.
+Tracked and all new-file whitespace checks passed.
+
+Historical schemas/policies and format-1/2 fixtures are unchanged. Qualified Beige
+and ordinary strict matching remain supported. Physical staging is unauthorized;
+one-item readiness is conditional on independent reinspection and separately
+authorized fresh physical checks. Founder remains unqualified. No recovery,
+publication, automatic retry, reconnect, adoption or cleanup is enabled.
+
+## PA-4F.3 versioned staging MKD evidence — pending independent inspection
+
+Uncommitted offline implementation against published baseline
+`dd6d17398326c307a2ee39b7314ba3fa9e903695`. New Core staging attempts use journal
+schema **4**, execution policy **3**, remote transaction record format **2**;
+captured resource policy remains **2**. Historical schema-1/2/3 journals,
+execution policies 1/2 and format-1 record bytes retain their original meaning.
+There is no implicit migration, reinterpretation of uncertain history or resume
+permission from loaded evidence. Unknown version combinations fail closed.
+
+An immutable MKD proof is attached to the exact transaction operation and derived
+destination. It retains request bytes, lossless lowercase-hex reply lines,
+submission/acknowledgment observations, explicit complete/unavailable/truncated
+availability, generic path status, separate acceptance decision and allowlisted
+rule/reason, live REST identity provenance and Core/adapter/session binding.
+The dedicated schema-4 validator leaves historical scalar limits unchanged.
+Reply bounds are 64 lines, 4096 raw bytes per line, 16384 total including CRLF;
+identity fields are bounded to 128 UTF-8 bytes each. Parsed returned paths are
+reconstructed from raw proof, not independently normalized or repaired.
+
+Ordinary strict matching remains supported. The separate staging rule is
+`c64u-25ea78-1.1.0s2-api0.1-staging-usb0-mkd-extra-two-slashes-v1`.
+It requires current REST-reported Beige `25EA78`, C64 Ultimate `1.1.0s2`/API `0.1`,
+matching live adapter binding, and the exact generated transaction directory
+under `/USB0/ARGONAUT_LIBRARY`. For destination bytes P, only the single completed
+257 reply `b'257 "//' + P + b'" created.'` qualifies. Generic path status stays
+`invalid`; the separate decision is `firmware-compatible`. Generic FTP validation
+and the initializer's existing four-path exception remain unchanged.
+Founder remains unqualified; the observed slash convention is not claimed to be
+Beige-exclusive. Physical staging acceptance remains pending.
+
+Ordering remains durable intent, one MKD, actual observation/classification,
+durable outcome plus proof, then first STOR. Cooperative cancellation does not
+interrupt acknowledgment-to-persistence. Changed identity/session/adapter,
+unqualified evidence or persistence uncertainty blocks uploads. The parser may
+lose partial reply bytes before returning evidence; absence is recorded honestly.
+No observation is fabricated, and unsaved proof is not claimed durable. Scheduler,
+snapshot, one-use authorization, exclusive-writer acknowledgment and FTP lease
+boundaries remain in force. No retry, adoption, cleanup, UI enablement, recovery,
+game publication or modification of the game manifest is added.
+
+Format 2 preserves the existing remote field allowlist and declares schema 4,
+execution policy 3 and resource policy 2. It is sorted compact UTF-8 JSON with one
+trailing LF, exact length/SHA-256 expectations and independent readback. Raw proof
+and session data remain local. The fixed 783-byte format-2 fixture has SHA-256
+`07f857f75eaa7e3f358be469ee958b2c77bcb56e441854e133113e77f0ec39ce`.
+
+Capacity reserves K=2N+5 operations and R=4N+16 full maximum checkpoints, including
+terminal evidence and repeated maximum proof. `R * M4(tx)` must fit both captured
+journal allowance and the unchanged 1 MiB ceiling; the live writer also meters
+actual canonical bytes. For the retained Beige library identity and intended
+174848-byte D64 metadata fixture, M4=42466, R=20 and reservation=849320 bytes.
+Normal one-payload success retains 19 checkpoints. Two-payload fixtures are refused
+before an FTP lease or MKD; no unchanged maximum batch size is promised. Logical
+reservation is not physical disk-space insurance. Missing trailing history remains
+undetectable solely from the hash chain.
+
+Validation: 633 affected deterministic tests passed on Linux/Python 3.13.5,
+zero failures, errors or skips, using `tests/run_import_regressions.py` with a
+loopback-only socket guard. Tracked and new-file whitespace checks passed.
+
+Independent code inspection and separately authorized physical acceptance are
+still required. No physical device was contacted for this implementation. Earlier
+milestone entries below are retained as historical checkpoint descriptions.
+
 ## PA-3E.2 MKD path evidence compatibility — pending independent inspection
 
 Uncommitted correction against `305ac47bb37a642d6958530bcbd163c85d2c848d`.

@@ -100,7 +100,11 @@ class ExecutionAdmission:
                 separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
             tx = execution_transaction(original, snapshot_evidence_sha256=digest,
                 limits=ExecutionLimits(original.budgets.planned_upload_bytes, MiB, 16*MiB))
-            tx = replace(tx, execution_policy_version=self.execution_policy_version).validate()
+            if self.execution_policy_version == 3:
+                from .import_execution_v4 import new_transaction
+                tx = new_transaction(tx)
+            else:
+                tx = replace(tx, execution_policy_version=self.execution_policy_version).validate()
             target = self.confirmation_type(uuid4().hex, tx, time.monotonic()+AUTHORIZATION_SECONDS)
             with preparation._lock:generation = preparation._generation
             entry = (target, self.core._require_client(), generation, owner, snapshots)

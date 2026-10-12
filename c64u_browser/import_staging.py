@@ -11,8 +11,9 @@ from uuid import uuid4
 from .ftp_reads import adapter_for
 from .import_admission import ExecutionAdmission
 from .import_capacity import reserve_capacity
+from .import_transaction import TransactionError
 from .import_execution import ExecutionTransaction, ExecutionAccounting as Accounting
-from .import_execution_policy2 import encode_record
+from .import_execution_policy3 import encode_record
 from .import_execution_store import ExecutionJournalStore, _definite_creation_refusal
 from .import_snapshots import (ReadAllowance, refuse, check_snapshot_identity,
     validate_owned_snapshots, file_identity)
@@ -77,7 +78,7 @@ class StagingFailure:
 class StagingAdmission(ExecutionAdmission):
     confirmation_type = StagingConfirmation
     authorization_type = StagingAuthorization
-    execution_policy_version = 2
+    execution_policy_version = 3
 
     def confirm(self, target, *, confirmed, exclusive_writer_acknowledged=False):
         # Only this staging-specific confirmation path mints a registered capability.
@@ -181,11 +182,13 @@ class _Staging:
         self.confirmed = 0
         self.members = {}
         self.observed_size = 0; self.observed_hash = ''
-        self.op_unknown = False; self.collision = False
+        self.op_unknown = False; self.collision = False; self.mkd_proof = None
 
     def check(self):
         self.scheduler_check(); self.cancel()
         self.admission._check(self.entry, expiry=not self.admitted)
+        refuse(self.adapter is None or adapter_for(self.entry[1]) is self.adapter,
+               'staging-transport', 'Managed adapter ownership changed.')
 
     def accounting(self):
         return Accounting(self.snapshot_reads.consumed, self.uploads.consumed, self.confirmed,
@@ -257,7 +260,7 @@ class _Staging:
     def operation(self, kind, path, body):
         self.check(); w = self.writer
         oid = str(uuid4()); before = self.accounting()
-        self.observed_size = 0; self.observed_hash = ''; self.op_unknown = False; self.collision = False
+        self.observed_size = 0; self.observed_hash = ''; self.op_unknown = False; self.collision = False; self.mkd_proof = None
         w.intent(oid,kind,path,previous=w.current,
                  collision='absent' if kind in ('mkdir','record-upload','upload') else 'not-applicable')
         def values():
@@ -265,7 +268,7 @@ class _Staging:
             delta = Accounting(**{name:getattr(after,name)-getattr(before,name) for name in before.__dataclass_fields__})
             size = (delta.snapshot_validation_reads if kind=='snapshot-validation' else
                     delta.readback_bytes if kind=='readback' else self.observed_size)
-            return dict(size=size,sha256=self.observed_hash,accounting=delta)
+            return dict(size=size,sha256=self.observed_hash,accounting=delta,mkd_proof=self.mkd_proof)
         try:
             body()
             # No cooperative check here: accepted mutations must be durable first.
@@ -273,14 +276,22 @@ class _Staging:
         except BaseException as exc:
             wire = getattr(exc,'ftp_error',None)
             unknown = self.op_unknown or bool(wire and wire.outcome == 'unknown')
-            if not w.blocked and w.current.operations[-1].outcome=='intent':
+            invalid_proof = kind == 'mkdir' and isinstance(exc, TransactionError)
+            if invalid_proof:
+                # Reject the observation rather than silently dropping its fields
+                # into a different, valid outcome. fail() retains unresolved intent.
+                self.block_cleanup = True
+                exc.add_note('Invalid MKD proof rejected; durable intent retained without an outcome.')
+            if not invalid_proof and not w.blocked and w.current.operations[-1].outcome=='intent':
                 try:
-                    w.outcome(oid,'unknown' if unknown else 'rejected',previous=w.current,
+                    status = ('unknown' if unknown else 'not-started' if self.mkd_proof is not None and
+                              not self.mkd_proof.consequential_submitted else 'rejected')
+                    w.outcome(oid,status,previous=w.current,
                         terminal_state='uncertain' if unknown else 'canceled' if getattr(exc,'cancelled',False) else 'failed',
                         collision='present' if self.collision and kind in ('mkdir','record-upload','upload') and not unknown else None,
                         reason=getattr(exc,'code','') if getattr(exc,'code','') in (
                             'staging-collision','staging-membership','staging-manifest','staging-readback',
-                            'execution-snapshot','staging-upload','snapshot-read-budget') else 'staging-stopped',**values())
+                            'execution-snapshot','staging-upload','snapshot-read-budget','mkd-unobserved') else 'staging-stopped',**values())
                 except BaseException:
                     self.block_cleanup = True
                     exc.add_note('Staging outcome persistence failed; retained intent requires inspection.')
@@ -292,19 +303,36 @@ class _Staging:
         self.check()  # final 120-second eligibility gate, not a transfer timeout
         self.admitted = True
         path = self.tx.library.path+'/'+self.tx.directory
+        evidence = None; error = None
         try:
             evidence = self.adapter.mutate_evidence('mkdir',path)
             self.remote_possible = True
             self.op_unknown = True
-            evidence.require_mkdir_path(path.encode(self.adapter._encoding))
-            refuse(evidence.acknowledgment=='completed', 'staging-mkdir', 'MKD was not acknowledged.')
-            self.op_unknown = False
         except BaseException as exc:
+            error = exc
             wire = getattr(exc,'ftp_error',None)
             if wire and wire.mutation and wire.mutation.consequential_submitted:
                 self.remote_possible = True
                 self.op_unknown = wire.mutation.acknowledgment != 'rejected'
-            raise
+        # No cooperative cancellation here. Recheck authority/binding separately,
+        # then persist the actual observation, including a stale positive reply.
+        context_valid = True
+        try:
+            self.admission._check(self.entry, expiry=False)
+            context_valid = adapter_for(self.entry[1]) is self.adapter
+        except Exception:context_valid = False
+        self.mkd_proof = self.adapter.classify_staging_mkdir(
+            self.tx, self.writer.current.operations[-1].id, result=evidence,
+            error=error, context_valid=context_valid)
+        if self.mkd_proof is None:
+            self.remote_possible = self.op_unknown = True
+            refuse(False, 'mkd-unobserved', 'MKD transport observation is unavailable.')
+        self.op_unknown = (self.mkd_proof.consequential_submitted and
+                           self.mkd_proof.acknowledgment != 'rejected')
+        if error is not None:raise error
+        refuse(self.mkd_proof.decision in ('strict','firmware-compatible'),
+               'staging-mkdir', 'MKD lacks qualified durable path evidence.')
+        self.op_unknown = False
 
     def upload(self, path, source, expected, digest, *, control=False):
         # Refuse observed targets. STOR is not atomic create-if-absent: another

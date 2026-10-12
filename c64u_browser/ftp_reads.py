@@ -192,6 +192,31 @@ class _FtpOperations:
                     details['compatibility_rule'] = CREATION_MKD_RULE
         return outcome, tuple(details.items())
 
+    def classify_staging_mkdir(self, transaction, operation_id, *, result=None, error=None,
+                               context_valid=True):
+        """Staging-only observation, not authority; destination is transaction-derived."""
+        from .import_execution_v4 import ExecutionTransactionV4
+        from .import_mkd_proof import capture, MkdObservation
+        from .import_transaction import require
+        require(type(transaction) is ExecutionTransactionV4, 'Policy-3 transaction required.')
+        transaction.validate()
+        valid = context_valid is True
+        try:
+            self._manager._check(self.binding)
+        except FtpOperationError:
+            valid = False
+        valid = (valid and self.binding.core_session_id == transaction.session_id and
+                 self.binding.device.physical_id == transaction.library.device_id and
+                 (self._creation_identity is None or self._creation_identity == self.binding.device))
+        wire_error = error if isinstance(error, FtpOperationError) else getattr(error, 'ftp_error', None)
+        evidence = wire_error.mutation if wire_error is not None else result
+        if type(evidence) is not MutationEvidence:return None
+        observation = MkdObservation(evidence.operation, evidence.stage, evidence.outcome.value,
+            evidence.stage_submitted, evidence.consequential_submitted, evidence.reply_code,
+            evidence.acknowledged, evidence.reply_lines, evidence.requested_path)
+        return capture(transaction, operation_id, observation, encoding=self._encoding,
+                       identity=self._creation_identity, binding=self.binding, binding_valid=valid)
+
     @contextmanager
     def operation(self, check=None, *, reject_busy=False):
         existing = self._context.get()

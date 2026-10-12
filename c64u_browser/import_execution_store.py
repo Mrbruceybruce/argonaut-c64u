@@ -12,7 +12,8 @@ from uuid import uuid4
 from .import_journal import JournalStore, encode, decode
 from .import_transaction import require, MAX_JOURNAL_BYTES, MAX_RECOVERY_JOURNALS
 from .import_execution import (ExecutionJournal, ExecutionTransaction, MAX_REVISIONS,
-    uuid, transition, intent, outcome, validate_successor)
+    uuid, transition, intent, outcome, validate_successor, initial_journal)
+from .import_execution_v4 import ExecutionJournalV4
 
 
 # Internal identity marker, never serialized or interpreted as execution authority.
@@ -43,7 +44,7 @@ class ExecutionJournalStore(JournalStore):
                     'Unsafe execution checkpoint.')
             require(info.st_size <= MAX_JOURNAL_BYTES, 'Oversized execution checkpoint.')
             result = decode(stream.read(MAX_JOURNAL_BYTES+1))
-        require(type(result) is ExecutionJournal, 'Expected execution checkpoint.')
+        require(type(result) in (ExecutionJournal, ExecutionJournalV4), 'Expected execution checkpoint.')
         return result
 
     def _chain(self, directory, transaction_id):
@@ -64,7 +65,7 @@ class ExecutionJournalStore(JournalStore):
             require(current.transaction.id == transaction_id and current.revision == revision,
                     'Checkpoint filename identity mismatch.')
             if previous is None:
-                require(current == ExecutionJournal(current.transaction), 'Invalid initial execution checkpoint.')
+                require(current == initial_journal(current.transaction), 'Invalid initial execution checkpoint.')
             else: validate_successor(previous, current)
             previous = current
         return previous
@@ -80,8 +81,7 @@ class ExecutionJournalStore(JournalStore):
         raise ValueError('Loaded execution evidence cannot be saved or resumed; create a new attempt.')
 
     def create(self, transaction):
-        require(type(transaction) is ExecutionTransaction, 'Explicit execution projection required.')
-        journal = ExecutionJournal(transaction).validate()
+        journal = initial_journal(transaction).validate()
         self._append(journal, previous=None)
         return _ExecutionJournalWriter(self, journal)
 
@@ -89,7 +89,7 @@ class ExecutionJournalStore(JournalStore):
         from .import_capacity import _ReservedHistory
         try:
             reservation = _ReservedHistory(transaction)
-            journal = ExecutionJournal(transaction).validate()
+            journal = initial_journal(transaction).validate()
             data = encode(journal); reservation.check(journal, data)
         except BaseException as exc:
             # These builders perform no persistence at all.
@@ -104,7 +104,7 @@ class ExecutionJournalStore(JournalStore):
         try:
             data = encode(journal)
             if previous is None:
-                require(journal == ExecutionJournal(journal.transaction), 'Initial execution journal must be prepared.')
+                require(journal == initial_journal(journal.transaction), 'Initial execution journal must be prepared.')
             else: validate_successor(previous, journal)
             name = self._filename(journal.transaction.id, journal.revision)
             with self._locked() as directory:

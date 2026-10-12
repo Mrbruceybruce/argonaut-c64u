@@ -293,14 +293,16 @@ def transition(previous, state, *, reason=''):
 
 
 def intent(previous, operation_id, kind, path, *, collision='not-applicable'):
-    verification = ('readback', 'record-readback', 'final-validation') if previous.transaction.execution_policy_version == 2 else ('readback',)
+    verification = ('readback', 'record-readback', 'final-validation') if previous.transaction.execution_policy_version in (2, 3) else ('readback',)
     require(previous.state == ('verifying' if kind in verification else 'staging'), 'Wrong operation phase.')
     require(not previous.operations or previous.operations[-1].outcome == 'completed', 'Unresolved operation.')
-    op = ExecutionOperation(operation_id, len(previous.operations)+1, kind, path, collision=collision)
+    from .import_execution_v4 import ExecutionOperationV4
+    operation_type = ExecutionOperationV4 if previous.schema_version == 4 else ExecutionOperation
+    op = operation_type(operation_id, len(previous.operations)+1, kind, path, collision=collision)
     return next_checkpoint(previous, operations=previous.operations+(op,))
 
 
-def outcome(previous, operation_id, status, *, size=0, sha256='', accounting=ExecutionAccounting(), reason='', collision=None, terminal_state=None):
+def outcome(previous, operation_id, status, *, size=0, sha256='', accounting=ExecutionAccounting(), reason='', collision=None, terminal_state=None, mkd_proof=None):
     require(previous.operations and previous.operations[-1].outcome == 'intent', 'Missing durable intent.')
     op = previous.operations[-1]
     require(op.id == operation_id and status in ('completed', 'not-started', 'rejected', 'unknown'), 'Mismatched outcome identity/status.')
@@ -310,7 +312,9 @@ def outcome(previous, operation_id, status, *, size=0, sha256='', accounting=Exe
                 (status != 'unknown' or terminal_state == 'uncertain'), 'Invalid terminal outcome state.')
         state = terminal_state
     require(collision is None or (collision == 'present' and status == 'rejected'), 'Invalid collision update.')
-    updated = replace(op, outcome=status, size=size, sha256=sha256, accounting=accounting,
+    require(mkd_proof is None or previous.schema_version == 4, 'Historical journal cannot carry MKD proof.')
+    proof = {'mkd_proof': mkd_proof} if previous.schema_version == 4 else {}
+    updated = replace(op, **proof, outcome=status, size=size, sha256=sha256, accounting=accounting,
                       collision=op.collision if collision is None else collision)
     return next_checkpoint(previous, operations=previous.operations[:-1]+(updated,), state=state,
                            checkpoint=len(previous.operations) if status == 'completed' else previous.checkpoint, reason=reason)
@@ -318,7 +322,8 @@ def outcome(previous, operation_id, status, *, size=0, sha256='', accounting=Exe
 
 def validate_successor(previous, current):
     previous.validate(); current.validate()
-    require(previous.transaction == current.transaction, 'Execution identity changed.')
+    require(type(previous) is type(current) and previous.schema_version == current.schema_version and
+            previous.transaction == current.transaction, 'Execution identity changed.')
     if len(current.operations) == len(previous.operations)+1:
         op = current.operations[-1]
         expected = intent(previous, op.id, op.kind, op.path, collision=op.collision)
@@ -326,7 +331,7 @@ def validate_successor(previous, current):
         require(len(current.operations) == len(previous.operations) and bool(current.operations), 'Invalid operation replacement.')
         op = current.operations[-1]
         expected = outcome(previous, op.id, op.outcome, size=op.size, sha256=op.sha256,
-                           accounting=op.accounting, reason=current.reason,
+                           accounting=op.accounting, reason=current.reason, mkd_proof=getattr(op, 'mkd_proof', None),
                            collision=None if op.collision == previous.operations[-1].collision else op.collision,
                            terminal_state=current.state if current.state in ('failed', 'canceled', 'uncertain') else None)
     else: expected = transition(previous, current.state, reason=current.reason)
@@ -350,3 +355,9 @@ def decode_execution(document, field_reader):
         operations.append(ExecutionOperation(**op))
     raw['operations'] = tuple(operations)
     return ExecutionJournal(**raw).validate()
+
+
+def initial_journal(transaction):
+    from .import_execution_v4 import ExecutionTransactionV4, ExecutionJournalV4
+    require(type(transaction) in (ExecutionTransaction, ExecutionTransactionV4), 'Explicit execution projection required.')
+    return (ExecutionJournalV4 if type(transaction) is ExecutionTransactionV4 else ExecutionJournal)(transaction)
