@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from c64u_browser.import_execution_store import ExecutionJournalStore
-from c64u_browser.import_execution_policy3 import encode_record, planned_operations
+from c64u_browser.import_execution_policy4 import encode_record, planned_operations
 from c64u_browser.import_journal import encode
 from c64u_browser.import_snapshots import SnapshotError
 from c64u_browser.import_transaction import TransactionError
@@ -39,7 +39,7 @@ class AuthorizationTests(unittest.TestCase):
 
     def test_exact_types_copies_replay_cross_core_and_decline(self):
         target=self.review();tx=target.transaction
-        self.assertEqual(3,tx.execution_policy_version)
+        self.assertEqual(4,tx.execution_policy_version)
         for text in (tx.id,tx.library.device_id,tx.library.library_id,tx.library.path,tx.items[0].final_path):self.assertIn(text,target.message)
         with self.assertRaises(SnapshotError):self.core.confirm_managed_staging(replace(target),confirmed=True,exclusive_writer_acknowledged=True)
         with self.assertRaises(SnapshotError):self.core.confirm_managed_staging(target,confirmed=True,exclusive_writer_acknowledged=True)
@@ -175,9 +175,9 @@ class StagingTests(unittest.TestCase):
         with self.fixture():
             before=self.server.connections;receipt=self.stage();j=self.journal()
             self.assertEqual('verified-staged',receipt.state);self.assertEqual('verified-staged',j.state)
-            self.assertEqual(3,j.transaction.execution_policy_version)
+            self.assertEqual(4,j.transaction.execution_policy_version)
             self.assertEqual(planned_operations(self.tx),tuple((o.kind,o.path) for o in j.operations))
-            self.assertEqual(7,len(j.operations));self.assertEqual(19,len(list(self.folder.glob('*.execution-*'))))
+            self.assertEqual(7,len(j.operations));self.assertEqual(22,len(list(self.folder.glob('*.execution-*'))))
             self.assertEqual(encode_record(self.tx),self.server.files[self.path('transaction.json')])
             for item in self.tx.items:self.assertEqual(item.sha256,hashlib.sha256(self.server.files[(self.tx.library.path+'/'+item.staged_path).encode()]).hexdigest())
             self.assertEqual(receipt.accounting,j.accounting)

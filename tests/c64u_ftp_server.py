@@ -34,6 +34,7 @@ class FakeC64UFtp:
         self.bytes_transferred = 0
         self.commands = []
         self.connections = 0
+        self.initial_cwd = b'/'
         self.live = 0
         self.data_started = threading.Event()
         self.closed = threading.Event()
@@ -44,7 +45,7 @@ class FakeC64UFtp:
         class Handler(socketserver.StreamRequestHandler):
             def handle(self):
                 listener = None
-                cwd = b'/'
+                cwd = fixture.initial_cwd
                 rename_source = None
                 with fixture._lock:
                     fixture.connections += 1

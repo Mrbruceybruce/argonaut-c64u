@@ -1,5 +1,59 @@
 # Current development state
 
+## PA-4.6B versioned FTP context evidence — offline implementation
+
+This section supersedes the earlier staging version and sizing status below.
+New Managed Staging attempts use journal schema 5, execution policy 4 and remote
+record format 3; resource policy remains 2. The historical schema-1/2/3/4 and
+policy-1/2/3 codecs and format-1/2 canonical fixtures retain their meanings and
+bytes. Reloaded journals remain inspection-only; there is no migration or resume.
+
+The existing mkdir operation now has durable context-intent, cwd-observed,
+pwd-observed, mkd-intent and mkd-observed barriers. One managed FTP connection and
+its operation lock span `CWD /`, independent `PWD` verification of exact `/`, and
+the unchanged absolute transaction MKD. The adapter and scheduler remain owned
+through terminal handling. Failure, stale session/ownership, cancellation or
+persistence uncertainty blocks the next command; accepted observations are saved
+before cooperative cancellation is honored. STOR requires durable qualified MKD
+proof. No reconnect, fallback, retry or context replay is provided.
+
+Retention and acceptance are separate. Each context observation retains the exact
+raw prefix up to 16384 bytes, including malformed framing, oversized lines and
+non-UTF-8 octets, as lowercase hex. Capture stops at 16385 observed bytes with a
+16384-byte retained prefix and explicit truncation. Complete, partial, truncated
+and unavailable states carry checked observed/retained counts. Acceptance requires
+exactly one CRLF line with body at most 4096 bytes, the strict CWD 250 / PWD 257
+byte grammar, current ownership and exact parsed root; no path normalization is
+allowed. Failure evidence is saved together with its terminal state. Immutable
+context bindings and observations repeat in successors; they grant no authority.
+
+For the actual one-item PA-4.2 Beige fixture, K=7 and R=2K+9=23 reserved checkpoints
+(22 on success). Continuing envelope S=37235 and largest terminal envelope F=62000
+include raw hex, escaping, all bindings, maximum counters/reasons, predecessor
+hashes and newline. Branch-aware reservation `(R-1)*S+F` is **881170 bytes** under
+the unchanged **1048576-byte** ceiling. The exact captured-budget boundary is
+881147 (shorter budget encoding); 881146 fails. The two-item counterpart requires
+1072716 and remains refused. Maximum supported path lengths are conservatively
+sized and refused when they cannot fit. The historical schema-4 admission floor,
+actual writer consumption checks and separate physical journal-space check remain.
+
+Remote format 3 declares `(format, journal, execution, resource) = (3,5,4,2)` with
+the prior field allowlist, sorted compact UTF-8 JSON and one LF. Bytes, length and
+SHA-256 are precomputed before MKD and independently read back after upload.
+CWD/PWD raw evidence stays local. A fixed format-3 fixture and digest are included.
+The exact pinned Beige triple-slash MKD rule is unchanged; the PA-4.2 duplicated
+path response remains unqualified. Generic FTP navigation and empty-library
+creation retain their existing behavior.
+
+PA-4.2 remains **UNCERTAIN**. Its empty transaction directory and all historical
+evidence remain untouched. Beige behavior after explicit root establishment has
+not been physically qualified; Founder remains unqualified. Connection-local CWD
+control does not prevent external writers racing directory checks or uploads.
+No recovery, cleanup, adoption or game publication is enabled. Independent review,
+publication and new explicit physical authorization are required before another
+staging attempt. Cleanup of the PA-4.2 leftover requires separate authorization
+and a reviewed bounded driver; it must not occur automatically.
+
 ## PA-4F.3C targeted correction — pending independent reinspection
 
 The PA-4F.3R findings are corrected within the existing uncommitted 19-file scope.

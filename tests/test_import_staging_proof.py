@@ -7,6 +7,7 @@ from tests import test_import_staging as staging
 from c64u_browser.import_execution_store import ExecutionJournalStore
 from c64u_browser.import_mkd_proof import RULE
 from c64u_browser.jobs import JobCancelled
+from c64u_browser.c64u_ftp import C64UFtpClient
 
 
 class StagingProofTests(TestCase):
@@ -37,8 +38,8 @@ class StagingProofTests(TestCase):
                     seen.append(path)
             self.server.before_command=hook
             self.assertEqual('verified-staged',self.stage().state)
-            j=self.journal();self.assertEqual((4,3),(j.schema_version,j.transaction.execution_policy_version))
-            self.assertEqual(2,len(seen));self.assertEqual(19,len(list(self.folder.glob('*.execution-*'))))
+            j=self.journal();self.assertEqual((5,4),(j.schema_version,j.transaction.execution_policy_version))
+            self.assertEqual(2,len(seen));self.assertEqual(22,len(list(self.folder.glob('*.execution-*'))))
             self.assertEqual((b'257 "//'+self.path()+b'" created.').hex(),j.operations[1].mkd_proof.reply_lines_hex[0])
 
     def test_unqualified_device_triple_slash_has_no_stor(self):
@@ -116,13 +117,13 @@ class StagingProofTests(TestCase):
 
     def test_adapter_replaced_after_ack_cannot_authorize_upload(self):
         with self.fixture(beige=True):
-            self.triple();adapter=self.core._client._ftp_reads;original=adapter.mutate_evidence
+            self.triple();adapter=self.core._client._ftp_reads;original=C64UFtpClient._root_context_mkdir
             def changed(*args,**kwargs):
                 result=original(*args,**kwargs)
                 self.core._client._ftp_reads=object()
                 return result
             try:
-                with patch.object(adapter,'mutate_evidence',changed):self.failure()
+                with patch.object(C64UFtpClient,'_root_context_mkdir',changed):self.failure()
                 self.assertEqual('uncertain',self.journal().state)
                 self.assertFalse(self.journal().operations[-1].mkd_proof.binding_valid)
                 self.assertNotIn(b'STOR',self.server.verbs[self.start:])
@@ -130,11 +131,11 @@ class StagingProofTests(TestCase):
 
     def test_transport_returning_no_observation_cannot_claim_non_submission(self):
         with self.fixture(beige=True):
-            self.triple();adapter=self.core._client._ftp_reads;original=adapter.mutate_evidence
+            self.triple();adapter=self.core._client._ftp_reads;original=C64UFtpClient._root_context_mkdir
             def lost(*args,**kwargs):original(*args,**kwargs);return None
-            with patch.object(adapter,'mutate_evidence',lost):self.failure()
+            with patch.object(C64UFtpClient,'_root_context_mkdir',lost):self.failure()
             j=self.journal();self.assertEqual('uncertain',j.state)
-            self.assertEqual('mkd-unobserved',j.reason)
+            self.assertEqual('staging-stopped',j.reason)
             self.assertIsNone(j.operations[-1].mkd_proof)
             self.assertNotIn(b'STOR',self.server.verbs[self.start:])
 
@@ -142,13 +143,13 @@ class StagingProofTests(TestCase):
         from c64u_browser.c64u_ftp_types import Outcome
         from c64u_browser.import_transaction import TransactionError
         with self.fixture(beige=True):
-            self.triple();adapter=self.core._client._ftp_reads;original=adapter.mutate_evidence
+            self.triple();adapter=self.core._client._ftp_reads;original=C64UFtpClient._root_context_mkdir
             def contradictory(*args,**kwargs):
                 result=original(*args,**kwargs)
                 # Retain actual submission/257/ack/raw bytes: change only the
                 # contradictory transport claim, exactly as in the inspection.
                 return replace(result,outcome=Outcome.NOT_STARTED)
-            with patch.object(adapter,'mutate_evidence',contradictory):error=self.failure()
+            with patch.object(C64UFtpClient,'_root_context_mkdir',contradictory):error=self.failure()
             self.assertIsInstance(error,TransactionError)
             self.assertIn('transport/submission',str(error))
             self.assertTrue(any('durable intent retained' in n for n in error.__notes__))
@@ -161,9 +162,9 @@ class StagingProofTests(TestCase):
     def test_unknown_after_positive_ack_keeps_evidence_but_never_stores(self):
         from c64u_browser.c64u_ftp_types import Outcome
         with self.fixture(beige=True):
-            self.triple();adapter=self.core._client._ftp_reads;original=adapter.mutate_evidence
+            self.triple();adapter=self.core._client._ftp_reads;original=C64UFtpClient._root_context_mkdir
             def uncertain(*args,**kwargs):return replace(original(*args,**kwargs),outcome=Outcome.UNKNOWN)
-            with patch.object(adapter,'mutate_evidence',uncertain):self.failure()
+            with patch.object(C64UFtpClient,'_root_context_mkdir',uncertain):self.failure()
             j=self.journal();self.assertEqual('uncertain',j.state)
             proof=j.operations[-1].mkd_proof
             self.assertEqual(('unknown','completed','unqualified'),

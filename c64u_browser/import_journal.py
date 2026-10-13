@@ -17,10 +17,11 @@ from .managed_library import LibraryIdentity, uuid_text
 from .picker_model import PickerSelection
 from .import_execution import ExecutionJournal, decode_execution
 from .import_execution_v4 import ExecutionJournalV4, decode_execution_v4
+from .import_execution_v5 import ExecutionJournalV5, decode_execution_v5
 
 
 def encode(journal):
-    require(type(journal) in (Journal,JournalV2,ExecutionJournal,ExecutionJournalV4), 'Expected transaction journal.');journal.validate()
+    require(type(journal) in (Journal,JournalV2,ExecutionJournal,ExecutionJournalV4,ExecutionJournalV5), 'Expected transaction journal.');journal.validate()
     # Each scalar and collection is already bounded; iterencode avoids a full
     # JSON string. Never append beyond the captured byte allowance.
     limit=journal.transaction.budgets.journal_bytes
@@ -70,7 +71,21 @@ def decode(data):
         require(type(document) is dict and type(document.get('schema_version')) is int,
                 'Missing or invalid schema version.')
         version=document['schema_version']
-        require(version in (1,2,3,4),'Unsupported journal version.')
+        require(version in (1,2,3,4,5),'Unsupported journal version.')
+        if version == 5:
+            def bounded(value):
+                nonlocal nodes
+                nodes += 1
+                require(nodes <= 200000, 'Journal node bound exceeded.')
+                if type(value) is dict:
+                    for child in value.values(): bounded(child)
+                elif type(value) is list:
+                    for child in value: bounded(child)
+            nodes = 0
+            bounded(document)
+            result = decode_execution_v5(document, _fields)
+            require(encode(result) == data, 'Noncanonical schema-5 journal.')
+            return result
         if version in (3,4):
             result = (decode_execution if version == 3 else decode_execution_v4)(document, _fields)
             require(len(data) <= result.transaction.budgets.journal_bytes, 'Journal size exceeded.')

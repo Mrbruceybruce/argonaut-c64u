@@ -443,6 +443,65 @@ class C64UFtpClient:
         self._event('mutation-complete', mutation=self._mutation.as_dict())
         return self._mutation
 
+    @contextmanager
+    def _root_context_scope(self):
+        # Do not use _operation_scope('MKD'): CWD/PWD are not MKD submission.
+        if not self._operation_lock.acquire(blocking=False):
+            raise FtpOperationError(EC.BUSY, 'context')
+        try:
+            self._write = self._mutation = None
+            self._submitted = False
+            self._operation = 'context'
+            self._phase = 'context-reply'
+            self._count = 0
+            self._check()
+            if self._state != SessionState.READY or self._buffer:
+                raise FtpOperationError(EC.PROTOCOL, 'context')
+            yield
+        finally:
+            self._operation_lock.release()
+
+    def _root_context_command(self, verb):
+        """Fixed internal commands; caller holds the context lock through fsync."""
+        from .import_context_evidence import candidate_complete, RAW_LIMIT
+        if verb not in ('CWD', 'PWD'):
+            raise FtpOperationError(EC.INVALID_ARGUMENT, 'context')
+        raw = bytearray(); attempted = False; error = None
+        try:
+            self._check()
+            if self._buffer:
+                raise FtpOperationError(EC.PROTOCOL, 'context')
+            self._control.settimeout(self._policy.control_reply)
+            self._event('command', verb=verb)
+            attempted = True  # Before sendall, including a partially delivered send.
+            self._control.sendall(b'CWD /\r\n' if verb == 'CWD' else b'PWD\r\n')
+            deadline = time.monotonic()+self._policy.control_reply
+            while True:
+                self._check()
+                remaining = deadline-time.monotonic()
+                if remaining <= 0: raise TimeoutError()
+                self._control.settimeout(remaining)
+                block = self._control.recv(min(4096, RAW_LIMIT+1-len(raw)))
+                if not block: raise EOFError()
+                raw.extend(block)
+                if len(raw) == RAW_LIMIT+1 or candidate_complete(raw): break
+        except Exception as exc:
+            # Capture precedes any invalidation that clears the old parser buffer.
+            error = exc
+        return bytes(raw), attempted, error
+
+    def _root_context_mkdir(self, path):
+        self._check()
+        self._operation = 'MKD'
+        self._phase = 'mutation-reply'
+        self._mutation = MutationEvidence('MKD', 'MKD', requested_path=path)
+        try:
+            with self._defer_cancel():
+                self._mutation_command('MKD', path, range(200, 300))
+            return self._mutation_complete()
+        except Exception as exc:
+            raise self._failure(exc) from None
+
     def mkdir(self, path):
         return self._single_mutation('MKD', path, range(200, 300))
 

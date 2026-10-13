@@ -9,7 +9,7 @@ from .import_transaction import canonical, require
 
 def planned_operations(tx):
     tx.validate()
-    if tx.execution_policy_version in (2, 3):
+    if tx.execution_policy_version in (2, 3, 4):
         from .import_execution_policy2 import planned_operations as policy2_plan
         return policy2_plan(tx)
     return (('snapshot-validation', ''), ('mkdir', tx.directory), ('record', tx.record_path),
@@ -22,6 +22,7 @@ class EvidenceCapacity:
     checkpoint_bytes: int
     revisions: int
     aggregate_bytes: int
+    continuing_bytes: int = 0
 
 
 def reserve_capacity(tx):
@@ -33,6 +34,9 @@ def reserve_capacity(tx):
     Initial/awaiting/staging/verifying/verified checkpoints plus one terminal
     uncertainty checkpoint and two checkpoints per operation bound revision use.
     """
+    if tx.execution_policy_version == 4:
+        from .import_capacity_v5 import reserve
+        return reserve(tx)
     tx.validate(); plan = planned_operations(tx)
     require(len(plan) <= tx.budgets.operations, 'Insufficient operation capacity.')
     document = canonical(initial_journal(tx))
@@ -71,6 +75,15 @@ class _ReservedHistory:
                 self.used_revisions < self.capacity.revisions and
                 len(data) <= self.capacity.checkpoint_bytes,
                 'Reserved checkpoint envelope exceeded.')
+        if journal.schema_version == 5:
+            terminal = journal.state in ('failed', 'canceled', 'uncertain', 'verified-staged')
+            c = self.capacity
+            require(terminal or len(data) <= c.continuing_bytes, 'Continuing evidence envelope exceeded.')
+            remaining = c.revisions-self.used_revisions-1
+            reserve = 0 if terminal else max(0, remaining-1)*c.continuing_bytes+c.checkpoint_bytes
+            require(terminal or remaining >= 1, 'Missing terminal evidence slot.')
+            require(self.used_bytes+len(data)+reserve <= c.aggregate_bytes, 'Reserved evidence exhausted.')
+            return
         # Preserve a full maximum-sized envelope for every remaining slot.
         require(self.used_bytes + len(data) +
                 (self.capacity.revisions-self.used_revisions-1)*self.capacity.checkpoint_bytes <=

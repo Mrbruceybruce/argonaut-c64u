@@ -14,6 +14,7 @@ from .import_transaction import require, MAX_JOURNAL_BYTES, MAX_RECOVERY_JOURNAL
 from .import_execution import (ExecutionJournal, ExecutionTransaction, MAX_REVISIONS,
     uuid, transition, intent, outcome, validate_successor, initial_journal)
 from .import_execution_v4 import ExecutionJournalV4
+from .import_execution_v5 import ExecutionJournalV5, context_checkpoint
 
 
 # Internal identity marker, never serialized or interpreted as execution authority.
@@ -44,7 +45,7 @@ class ExecutionJournalStore(JournalStore):
                     'Unsafe execution checkpoint.')
             require(info.st_size <= MAX_JOURNAL_BYTES, 'Oversized execution checkpoint.')
             result = decode(stream.read(MAX_JOURNAL_BYTES+1))
-        require(type(result) in (ExecutionJournal, ExecutionJournalV4), 'Expected execution checkpoint.')
+        require(type(result) in (ExecutionJournal, ExecutionJournalV4, ExecutionJournalV5), 'Expected execution checkpoint.')
         return result
 
     def _chain(self, directory, transaction_id):
@@ -52,7 +53,7 @@ class ExecutionJournalStore(JournalStore):
         names = []
         for name in os.listdir(directory):
             if name.startswith(prefix):
-                require(len(names) < MAX_REVISIONS, 'Execution checkpoint quota exceeded.')
+                require(len(names) < MAX_REVISIONS+1, 'Execution checkpoint quota exceeded.')
                 names.append(name)
         names.sort(); previous = None
         retained_bytes = sum(os.stat(n, dir_fd=directory, follow_symlinks=False).st_size for n in names)
@@ -81,6 +82,8 @@ class ExecutionJournalStore(JournalStore):
         raise ValueError('Loaded execution evidence cannot be saved or resumed; create a new attempt.')
 
     def create(self, transaction):
+        if getattr(transaction, 'execution_policy_version', None) == 4:
+            return self.create_reserved(transaction)
         journal = initial_journal(transaction).validate()
         self._append(journal, previous=None)
         return _ExecutionJournalWriter(self, journal)
@@ -118,6 +121,11 @@ class ExecutionJournalStore(JournalStore):
                     try: os.stat(journal.transaction.id+'.json', dir_fd=directory, follow_symlinks=False)
                     except FileNotFoundError: pass
                     else: raise ValueError('Historical transaction exists; no journal conversion or adoption.')
+                    if journal.schema_version == 5:
+                        from .import_capacity import reserve_capacity
+                        space = os.fstatvfs(directory)
+                        require(space.f_bavail * space.f_frsize >= reserve_capacity(journal.transaction).aggregate_bytes,
+                                'Insufficient physical journal disk space.')
                     attempts = {n.split('.execution-', 1)[0] for n in os.listdir(directory) if '.execution-' in n}
                     require(len(attempts) < MAX_RECOVERY_JOURNALS, 'Execution attempt quota exceeded.')
                 # All read-only refusals precede the first persistence boundary.
@@ -186,8 +194,11 @@ class _ExecutionJournalWriter:
     def transition(self, state, *, previous, reason=''):
         return self._record(transition, previous, state, reason=reason)
 
-    def intent(self, operation_id, kind, path, *, previous, collision='not-applicable'):
-        return self._record(intent, previous, operation_id, kind, path, collision=collision)
+    def intent(self, operation_id, kind, path, *, previous, collision='not-applicable', context=None):
+        return self._record(intent, previous, operation_id, kind, path, collision=collision, context=context)
+
+    def context_checkpoint(self, context, phase, *, previous, **evidence):
+        return self._record(context_checkpoint, previous, context, phase, **evidence)
 
     def outcome(self, operation_id, status, *, previous, **evidence):
         return self._record(outcome, previous, operation_id, status, **evidence)

@@ -169,6 +169,8 @@ class _FtpOperations:
         self._context = ContextVar('argonaut_ftp_operation', default=None)
         self._lock = threading.Lock()
         self.capability_evidence = None
+        from uuid import uuid4
+        self._owner_id = uuid4().hex
 
     def classify_library_creation(self, operation, path, target, *, result=None, error=None):
         outcome, wire = creation_outcome(operation, path, result=result, error=error)
@@ -198,7 +200,8 @@ class _FtpOperations:
         from .import_execution_v4 import ExecutionTransactionV4
         from .import_mkd_proof import capture, MkdObservation
         from .import_transaction import require
-        require(type(transaction) is ExecutionTransactionV4, 'Policy-3 transaction required.')
+        from .import_execution_v5 import ExecutionTransactionV5
+        require(type(transaction) in (ExecutionTransactionV4, ExecutionTransactionV5), 'Versioned staging transaction required.')
         transaction.validate()
         valid = context_valid is True
         try:
@@ -266,6 +269,35 @@ class _FtpOperations:
         state.cancel_deferred += 1
         try:yield state
         finally:state.cancel_deferred -= 1
+
+    def staging_context_binding(self, transaction, operation_id):
+        from .import_context_evidence import Context
+        from .import_mkd_proof import destination
+        from .import_transaction import require
+        from .import_execution_v5 import ExecutionTransactionV5
+        require(type(transaction) is ExecutionTransactionV5, 'Schema-5 context required.')
+        client = self._client()
+        identity = self._creation_identity
+        values = dict(physical_id='', product='', firmware='', api_version='', provenance='unavailable')
+        if identity is not None:
+            values.update(physical_id=identity.physical_id.removeprefix('id:'), product=identity.product,
+                          firmware=identity.firmware, api_version=identity.api_version, provenance='live-rest')
+        return Context(transaction.id, operation_id, self._encoding, destination(transaction, self._encoding).hex(),
+            transaction.session_id, transaction.library.device_id, client.identity.ftp_session_id,
+            self._owner_id, **values).validate(transaction, operation_id)
+
+    @contextmanager
+    def staging_context(self, context):
+        from .import_transaction import require
+        state = self._context.get()
+        require(state is not None, 'Context requires managed operation owner.')
+        state.check()
+        client = self._client()
+        state.mutation_used = True  # CWD prohibits releasing/reacquiring a read lease.
+        guard = _StagingContextGuard(self, state, client, context)
+        with client._root_context_scope():
+            if not guard.valid(): raise FtpOperationError(EC.STALE, 'context')
+            yield guard
 
     def mutate(self, operation, path, destination=None):
         return self.mutate_evidence(operation, path, destination).as_dict()
@@ -505,3 +537,48 @@ def read_operation(client, check=None):
 def end_read_attempt(client):
     adapter = adapter_for(client)
     if adapter is not None:adapter.end_read_attempt()
+
+
+class _StagingContextGuard:
+    def __init__(self, adapter, state, client, context):
+        self.adapter, self.state, self.client, self.context = adapter, state, client, context
+        self.socket = client._control
+        self.step = 0
+
+    def valid(self):
+        a, c = self.adapter, self.client
+        try:
+            a._manager._check(a.binding)
+            with a._manager._lock:
+                owned = a._manager._leases.get(a.binding.device.physical_id) is c
+            return (owned and a._context.get() is self.state and self.state.client is c and
+                    c._control is self.socket and self.socket is not None and c._invalid_reason is None and
+                    c.identity.ftp_session_id == self.context.ftp_session_id and
+                    a._owner_id == self.context.adapter_owner_id and
+                    a.binding.core_session_id == self.context.core_session_id and
+                    a.binding.device.physical_id == self.context.device_id and
+                    a._creation_identity == a.binding.device)
+        except Exception: return False
+
+    def observe(self, verb):
+        from .import_context_evidence import observation
+        from .import_transaction import require
+        require((self.step, verb) in ((0, 'CWD'), (1, 'PWD')), 'Context commands cannot repeat.')
+        self.state.check()
+        before = self.valid()
+        if not before: raise FtpOperationError(EC.STALE, 'context')
+        raw, attempted, error = self.client._root_context_command(verb)
+        after = self.valid()
+        result = observation(verb, raw, attempted=attempted, before=before, after=after, interrupted=error is not None)
+        self.step += 1
+        if result.completion != 'accepted':
+            self.step = -1
+            self.client.close()
+        return result, self.state.failure if error is not None and self.state.failure is not None else error
+
+    def mkdir(self):
+        from .import_transaction import require
+        require(self.step == 2 and self.valid(), 'MKD requires same context lease.')
+        self.state.check()
+        self.step = 3
+        return self.client._root_context_mkdir(bytes.fromhex(self.context.destination_hex))

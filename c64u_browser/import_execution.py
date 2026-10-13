@@ -292,13 +292,17 @@ def transition(previous, state, *, reason=''):
     return next_checkpoint(previous, state=state, reason=reason)
 
 
-def intent(previous, operation_id, kind, path, *, collision='not-applicable'):
-    verification = ('readback', 'record-readback', 'final-validation') if previous.transaction.execution_policy_version in (2, 3) else ('readback',)
+def intent(previous, operation_id, kind, path, *, collision='not-applicable', context=None):
+    verification = ('readback', 'record-readback', 'final-validation') if previous.transaction.execution_policy_version in (2, 3, 4) else ('readback',)
     require(previous.state == ('verifying' if kind in verification else 'staging'), 'Wrong operation phase.')
     require(not previous.operations or previous.operations[-1].outcome == 'completed', 'Unresolved operation.')
     from .import_execution_v4 import ExecutionOperationV4
     operation_type = ExecutionOperationV4 if previous.schema_version == 4 else ExecutionOperation
-    op = operation_type(operation_id, len(previous.operations)+1, kind, path, collision=collision)
+    from .import_execution_v5 import ExecutionOperationV5
+    if previous.schema_version == 5: operation_type = ExecutionOperationV5
+    require(context is None or previous.schema_version == 5 and kind == 'mkdir', 'Unexpected context.')
+    extra = dict(context=context, context_phase='context-intent') if context is not None else {}
+    op = operation_type(operation_id, len(previous.operations)+1, kind, path, collision=collision, **extra)
     return next_checkpoint(previous, operations=previous.operations+(op,))
 
 
@@ -312,8 +316,8 @@ def outcome(previous, operation_id, status, *, size=0, sha256='', accounting=Exe
                 (status != 'unknown' or terminal_state == 'uncertain'), 'Invalid terminal outcome state.')
         state = terminal_state
     require(collision is None or (collision == 'present' and status == 'rejected'), 'Invalid collision update.')
-    require(mkd_proof is None or previous.schema_version == 4, 'Historical journal cannot carry MKD proof.')
-    proof = {'mkd_proof': mkd_proof} if previous.schema_version == 4 else {}
+    require(mkd_proof is None or previous.schema_version in (4, 5), 'Historical journal cannot carry MKD proof.')
+    proof = {'mkd_proof': mkd_proof} if previous.schema_version in (4, 5) else {}
     updated = replace(op, **proof, outcome=status, size=size, sha256=sha256, accounting=accounting,
                       collision=op.collision if collision is None else collision)
     return next_checkpoint(previous, operations=previous.operations[:-1]+(updated,), state=state,
@@ -324,9 +328,12 @@ def validate_successor(previous, current):
     previous.validate(); current.validate()
     require(type(previous) is type(current) and previous.schema_version == current.schema_version and
             previous.transaction == current.transaction, 'Execution identity changed.')
+    if previous.schema_version == 5 and current.operations != previous.operations and len(current.operations) == len(previous.operations) and current.operations[-1].kind == 'mkdir':
+        from .import_execution_v5 import validate_context_successor
+        return validate_context_successor(previous, current)
     if len(current.operations) == len(previous.operations)+1:
         op = current.operations[-1]
-        expected = intent(previous, op.id, op.kind, op.path, collision=op.collision)
+        expected = intent(previous, op.id, op.kind, op.path, collision=op.collision, context=getattr(op, 'context', None))
     elif current.operations != previous.operations:
         require(len(current.operations) == len(previous.operations) and bool(current.operations), 'Invalid operation replacement.')
         op = current.operations[-1]
@@ -359,5 +366,7 @@ def decode_execution(document, field_reader):
 
 def initial_journal(transaction):
     from .import_execution_v4 import ExecutionTransactionV4, ExecutionJournalV4
+    from .import_execution_v5 import ExecutionTransactionV5, ExecutionJournalV5
+    if type(transaction) is ExecutionTransactionV5: return ExecutionJournalV5(transaction)
     require(type(transaction) in (ExecutionTransaction, ExecutionTransactionV4), 'Explicit execution projection required.')
     return (ExecutionJournalV4 if type(transaction) is ExecutionTransactionV4 else ExecutionJournal)(transaction)

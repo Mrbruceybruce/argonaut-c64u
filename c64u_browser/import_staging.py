@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Core-owned one-use managed staging. No publication, recovery or remote cleanup."""
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import io
 import os
@@ -13,7 +13,7 @@ from .import_admission import ExecutionAdmission
 from .import_capacity import reserve_capacity
 from .import_transaction import TransactionError
 from .import_execution import ExecutionTransaction, ExecutionAccounting as Accounting
-from .import_execution_policy3 import encode_record
+from .import_execution_policy4 import encode_record
 from .import_execution_store import ExecutionJournalStore, _definite_creation_refusal
 from .import_snapshots import (ReadAllowance, refuse, check_snapshot_identity,
     validate_owned_snapshots, file_identity)
@@ -73,12 +73,14 @@ class StagingFailure:
     accounting: Accounting
     remote_effects_possible: bool
     inspection_required: bool
+    unsaved_context: object = None
+    unsaved_mkd_proof: object = None
 
 
 class StagingAdmission(ExecutionAdmission):
     confirmation_type = StagingConfirmation
     authorization_type = StagingAuthorization
-    execution_policy_version = 3
+    execution_policy_version = 4
 
     def confirm(self, target, *, confirmed, exclusive_writer_acknowledged=False):
         # Only this staging-specific confirmation path mints a registered capability.
@@ -173,6 +175,7 @@ class _Staging:
         self.writer = self.adapter = None; self.scheduler_check = lambda: None
         self.admitted = self.creating = self.remote_possible = self.block_cleanup = False
         self.handled = False
+        self.unsaved_context = None
         tx = self.tx
         self.snapshot_reads = ReadAllowance(tx.limits.snapshot_validation_reads)
         self.control_reads = ReadAllowance(tx.limits.control_read_bytes)
@@ -198,7 +201,7 @@ class _Staging:
     def failure(self):
         state = ('persistence-uncertain' if self.writer and self.writer.blocked else
                  self.writer.current.state if self.writer else 'creation-uncertain' if self.creating else 'not-created')
-        return StagingFailure(self.tx.id, state, self.accounting(), self.remote_possible, self.block_cleanup)
+        return StagingFailure(self.tx.id, state, self.accounting(), self.remote_possible, self.block_cleanup, self.unsaved_context, self.mkd_proof if self.unsaved_context is not None else None)
 
     def fail(self, exc):
         if self.handled:return
@@ -297,42 +300,98 @@ class _Staging:
                     exc.add_note('Staging outcome persistence failed; retained intent requires inspection.')
             raise
 
-    def mkdir(self):
-        self.library(created=False)
-        check_snapshot_identity(self.owner,self.owner.transaction)
-        self.check()  # final 120-second eligibility gate, not a transfer timeout
-        self.admitted = True
-        path = self.tx.library.path+'/'+self.tx.directory
-        evidence = None; error = None
-        try:
-            evidence = self.adapter.mutate_evidence('mkdir',path)
-            self.remote_possible = True
-            self.op_unknown = True
-        except BaseException as exc:
-            error = exc
-            wire = getattr(exc,'ftp_error',None)
-            if wire and wire.mutation and wire.mutation.consequential_submitted:
-                self.remote_possible = True
-                self.op_unknown = wire.mutation.acknowledgment != 'rejected'
-        # No cooperative cancellation here. Recheck authority/binding separately,
-        # then persist the actual observation, including a stale positive reply.
-        context_valid = True
+    def binding_valid(self):
+        # No cooperative cancellation here: accepted observations go to disk first.
         try:
             self.admission._check(self.entry, expiry=False)
-            context_valid = adapter_for(self.entry[1]) is self.adapter
-        except Exception:context_valid = False
-        self.mkd_proof = self.adapter.classify_staging_mkdir(
-            self.tx, self.writer.current.operations[-1].id, result=evidence,
-            error=error, context_valid=context_valid)
-        if self.mkd_proof is None:
-            self.remote_possible = self.op_unknown = True
-            refuse(False, 'mkd-unobserved', 'MKD transport observation is unavailable.')
-        self.op_unknown = (self.mkd_proof.consequential_submitted and
-                           self.mkd_proof.acknowledgment != 'rejected')
-        if error is not None:raise error
-        refuse(self.mkd_proof.decision in ('strict','firmware-compatible'),
-               'staging-mkdir', 'MKD lacks qualified durable path evidence.')
-        self.op_unknown = False
+            return adapter_for(self.entry[1]) is self.adapter
+        except Exception: return False
+
+    def mkdir(self):
+        self.check(); w = self.writer; oid = str(uuid4()); before = self.accounting()
+        self.collision = False; self.mkd_proof = None; self.op_unknown = False
+        context = self.adapter.staging_context_binding(self.tx, oid)
+        self.unsaved_context = context
+        w.intent(oid, 'mkdir', self.tx.directory, previous=w.current, collision='absent', context=context)
+        def accounting():
+            now = self.accounting()
+            return Accounting(**{name:getattr(now,name)-getattr(before,name) for name in before.__dataclass_fields__})
+        def persist(phase, **kw):
+            self.unsaved_context = context
+            w.context_checkpoint(context, phase, previous=w.current, accounting=accounting(), **kw)
+            self.unsaved_context = None
+        def stopped(exc):
+            if w.blocked or w.current.operations[-1].outcome != 'intent': return
+            if isinstance(exc, TransactionError):
+                self.block_cleanup = True
+                exc.add_note('Invalid context/MKD proof rejected; durable intent retained without an outcome.')
+                return  # Invalid projection must not be laundered into an outcome.
+            status = ('unknown' if self.op_unknown else 'rejected' if self.collision else 'not-started')
+            if self.mkd_proof is not None:
+                status = ('not-started' if not self.mkd_proof.consequential_submitted else
+                          'rejected' if self.mkd_proof.acknowledgment == 'rejected' else 'unknown')
+            try:
+                persist('stopped', status=status, mkd_proof=self.mkd_proof,
+                    terminal_state='uncertain' if status == 'unknown' else 'canceled' if getattr(exc,'cancelled',False) else 'failed',
+                    reason='staging-stopped', collision='present' if self.collision else None)
+            except BaseException:
+                self.block_cleanup = True
+                exc.add_note('Context outcome persistence failed; retained intent requires inspection.')
+        try:
+            self.library(created=False)
+            check_snapshot_identity(self.owner, self.owner.transaction)
+            self.check(); self.admitted = True
+            refuse(context.provenance == 'live-rest', 'staging-context', 'Live identity required for context.')
+            with self.adapter.staging_context(context) as guard:
+                try:
+                    for verb, phase in (('CWD', 'cwd-observed'), ('PWD', 'pwd-observed')):
+                        self.check()
+                        observed, error = guard.observe(verb)
+                        if not self.binding_valid():
+                            from .import_context_evidence import classification
+                            observed = replace(observed, binding_after=False)
+                            observed = replace(observed, completion=classification(observed, verb)).validate(verb)
+                        context = replace(context, **{verb.lower(): observed})
+                        self.unsaved_context = context
+                        if observed.completion != 'accepted':
+                            if error is not None: raise error
+                            refuse(False, 'staging-context', 'FTP root context is unqualified.')
+                        persist(phase)
+                    self.check()
+                    refuse(guard.valid() and self.binding_valid(), 'staging-context', 'Context ownership changed.')
+                    persist('mkd-intent')
+                    self.check()
+                    refuse(guard.valid() and self.binding_valid(), 'staging-context', 'Context ownership changed before MKD dispatch.')
+                    evidence = error = None
+                    try:
+                        evidence = guard.mkdir()
+                        self.remote_possible = self.op_unknown = True
+                    except BaseException as exc:
+                        error = exc
+                        wire = getattr(exc, 'ftp_error', exc)
+                        mutation = getattr(wire, 'mutation', None)
+                        if mutation is not None and mutation.consequential_submitted:
+                            self.remote_possible = True
+                            self.op_unknown = mutation.acknowledgment != 'rejected'
+                    owner_valid = guard.valid() and self.binding_valid()
+                    context = replace(context, mkd_lease_id=guard.client.identity.ftp_session_id, mkd_owner_valid=owner_valid)
+                    self.unsaved_context = context
+                    self.mkd_proof = self.adapter.classify_staging_mkdir(self.tx, oid, result=evidence,
+                        error=error, context_valid=owner_valid)
+                    if self.mkd_proof is None:
+                        self.remote_possible = self.op_unknown = True
+                        raise TransactionError('MKD observation unavailable; retain durable intent.')
+                    if error is not None: raise error
+                    refuse(self.mkd_proof.decision in ('strict', 'firmware-compatible'),
+                           'staging-mkdir', 'MKD lacks qualified path evidence.')
+                    persist('mkd-observed', status='completed', mkd_proof=self.mkd_proof)
+                    self.op_unknown = False
+                except BaseException as exc:
+                    stopped(exc)
+                    raise
+        except BaseException as exc:
+            stopped(exc)
+            raise
 
     def upload(self, path, source, expected, digest, *, control=False):
         # Refuse observed targets. STOR is not atomic create-if-absent: another
@@ -384,7 +443,7 @@ class _Staging:
             self.library(created=False)
             check_snapshot_identity(self.owner,self.owner.transaction)
         self.operation('snapshot-validation','',snapshot)
-        self.operation('mkdir',tx.directory,self.mkdir)
+        self.mkdir()
         # This first membership observation proves visibility/emptiness after the
         # acknowledged MKD outcome was persisted, charged to record-upload intent.
         self.operation('record-upload',tx.record_path,

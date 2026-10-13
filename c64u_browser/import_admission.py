@@ -100,7 +100,10 @@ class ExecutionAdmission:
                 separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
             tx = execution_transaction(original, snapshot_evidence_sha256=digest,
                 limits=ExecutionLimits(original.budgets.planned_upload_bytes, MiB, 16*MiB))
-            if self.execution_policy_version == 3:
+            if self.execution_policy_version == 4:
+                from .import_execution_v5 import new_transaction
+                tx = new_transaction(tx)
+            elif self.execution_policy_version == 3:
                 from .import_execution_v4 import new_transaction
                 tx = new_transaction(tx)
             else:
