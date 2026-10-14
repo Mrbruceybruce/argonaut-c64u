@@ -1,5 +1,34 @@
 # Current development state
 
+## PA-5.1A transport and lifecycle foundation — offline implementation
+
+PA-5.1B adds focused offline corrections for the four PA-5.1AR findings:
+shared persistence/cancellation/dispatch ordering, evidence location identity
+checks through receipt, sticky non-deferred cancellation at the new boundary,
+and transport-layer readiness validation. Diagnostic/listener callbacks remain
+outside the shared dispatch lock; late failures retain possible remote effects.
+The existing architecture regression remains unchanged. Independent reinspection
+is required before Git publication. The detailed synchronization boundary and
+filesystem race limitations are documented in Managed Library below.
+
+The additive `begin_evidenced_rename` interface returns durable accepted RNFR
+evidence before an explicit, same-lease RNTO continuation. Both exact raw replies
+are retained independently. A synchronous required-evidence channel propagates
+persistence failures and blocks successors; existing diagnostic/listener callbacks
+remain best-effort. `EvidenceLifecycle` owns admission, registration, cancellation,
+actual terminal observation and explicit Core-close evidence. Internal resource
+observations do not establish independent FTP/scheduler release.
+
+Legacy rename/replacement APIs, staging schemas 1–5, execution policies 1–4,
+remote record formats 1–3 and Game Library behavior remain unchanged. See
+[Managed Library](MANAGED-LIBRARY.md#pa-51a-additive-rename-and-lifecycle-evidence-foundation)
+for the ownership contract and failure policy.
+
+This foundation awaits independent inspection. The Managed Game Publisher remains
+unimplemented. Physical publication is unauthorized; no retry, cleanup, rollback,
+adoption or recovery is introduced. Historical PA-4.13 instruction-compliance
+**FAIL** and PA-4.2 **UNCERTAIN** remain unchanged.
+
 ## PA-4.6B versioned FTP context evidence — offline implementation
 
 This section supersedes the earlier staging version and sizing status below.

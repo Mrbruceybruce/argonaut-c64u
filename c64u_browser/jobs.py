@@ -192,12 +192,17 @@ class CoreJob:
     def check_cancel(self):
         if self._cancel.is_set():raise JobCancelled()
 
-    def request_cancel(self):
+    def _mark_cancel_requested(self):
+        """State-only transition for an owner that persists before notification."""
         with self._lock:
             if self.state in TERMINAL_STATES:return False
             self._cancel.set()
             if self.state in (JobState.PENDING,JobState.QUEUED,JobState.RUNNING):
                 self.state=JobState.CANCEL_REQUESTED
+        return True
+
+    def request_cancel(self):
+        if not self._mark_cancel_requested():return False
         self._emit('cancel-requested')
         return True
 

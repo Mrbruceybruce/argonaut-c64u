@@ -5,7 +5,7 @@ One operation-scoped lease, no pool, no retries, no generic command/socket API.
 All wire parsing uses bytes. Only this module owns the sockets. Core services
 retain authorization, staging, integrity policy and filesystem scope decisions.
 """
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import replace
 import errno
 import hashlib
@@ -259,7 +259,7 @@ class C64UFtpClient:
                         transferred=self._count)
             self._operation_lock.release()
 
-    def _line(self, deadline):
+    def _line(self, deadline, *, capture=None):
         while b'\n' not in self._buffer:
             if len(self._buffer) > self._policy.reply_line_bytes + 1:
                 raise FtpOperationError(EC.PROTOCOL, self._phase)
@@ -274,13 +274,14 @@ class C64UFtpClient:
             self._buffer.extend(block)
         line, _, remainder = self._buffer.partition(b'\n')
         self._buffer = bytearray(remainder)
+        if capture is not None: capture(bytes(line) + b'\n')
         if not line.endswith(b'\r') or len(line)-1 > self._policy.reply_line_bytes:
             raise FtpOperationError(EC.PROTOCOL, self._phase)
         return bytes(line[:-1])
 
-    def _reply(self, timeout=None):
+    def _reply(self, timeout=None, *, capture=None):
         deadline = time.monotonic() + (timeout or self._policy.control_reply)
-        first = self._line(deadline)
+        first = self._line(deadline, capture=capture)
         if not re.match(rb'[1-5][0-9]{2}[ -]', first):
             raise FtpOperationError(EC.COMPLETION_UNKNOWN if self._phase == 'completion' else EC.PROTOCOL, self._phase)
         code = int(first[:3])
@@ -292,7 +293,7 @@ class C64UFtpClient:
             while True:
                 if len(lines) >= self._policy.reply_lines:
                     raise FtpOperationError(EC.PROTOCOL, self._phase)
-                line = self._line(deadline)
+                line = self._line(deadline, capture=capture)
                 total += len(line)+2
                 if total > self._policy.reply_bytes:
                     raise FtpOperationError(EC.PROTOCOL, self._phase)
@@ -301,7 +302,7 @@ class C64UFtpClient:
                     break
         return code, tuple(lines)
 
-    def _send(self, verb, argument=None):
+    def _send(self, verb, argument=None, *, dispatch=None):
         self._check()
         # Only constant verbs at internal call sites; arguments never diagnostic.
         if verb != 'PASS':
@@ -310,14 +311,15 @@ class C64UFtpClient:
         if argument is not None:
             command += b' ' + argument
         self._control.settimeout(self._policy.control_reply)
-        if verb in ('STOR', 'RETR', 'MLSD', 'LIST'):
-            # Check cancellation first; mark before sendall because a failed
-            # send can still have delivered some command bytes.
-            self._submitted = True
-        if self._mutation is not None:
-            self._mutation = replace(self._mutation, stage_submitted=True,
-                                     consequential_submitted=(verb != 'RNFR'))
-        self._control.sendall(command + b'\r\n')
+        with dispatch() if dispatch is not None else nullcontext():
+            if verb in ('STOR', 'RETR', 'MLSD', 'LIST'):
+                # Check cancellation first; mark before sendall because a failed
+                # send can still have delivered some command bytes.
+                self._submitted = True
+            if self._mutation is not None:
+                self._mutation = replace(self._mutation, stage_submitted=True,
+                                         consequential_submitted=(verb != 'RNFR'))
+            self._control.sendall(command + b'\r\n')
 
     def _command(self, verb, argument=None):
         if self._state in (SessionState.READY, SessionState.TRANSFERRING):
@@ -420,6 +422,15 @@ class C64UFtpClient:
         self._expect(reply, accepted)
         self._mutation = replace(self._mutation,
             acknowledged=self._mutation.acknowledged + ((verb, reply[0]),))
+
+    def _rename_ready(self):
+        """Readiness validation without discarding an accepted reply on late cancel."""
+        self._manager._check(self._binding)
+        return self._invalid_reason is None and self.state == SessionState.READY
+
+    def _begin_owned_rename(self, source, destination, dispatch):
+        """Managed-adapter-only additive boundary; legacy rename is unchanged."""
+        return _OwnedRenameWire(self, source, destination, dispatch)
 
     def rename(self, source, destination, *, strict=False):
         with self._operation_scope('rename'):
@@ -702,3 +713,109 @@ class C64UFtpClient:
             if budget is not None:budget.require(expected_bytes)
             return self._transfer('STOR', path, source=source, expected=expected_bytes,
                                   maximum=expected_bytes, progress=progress, budget=budget)
+
+
+class _OwnedRenameWire:
+    """One pending rename on an existing lease, reachable only through its adapter.
+
+    Holds the ordinary operation lock across the evidence boundary. No unrelated
+    command can reuse this protocol state. Abandon closes the socket, sends no
+    cancellation/rollback command, and leaves all observations with the owner.
+    """
+    def __init__(self, client, source, destination, dispatch):
+        checked_path(source); checked_path(destination)
+        if max(len(source), len(destination)) > 2048:
+            raise FtpOperationError(EC.INVALID_ARGUMENT, 'rename-bound')
+        client._check()
+        if client.state != SessionState.READY or not client._operation_lock.acquire(blocking=False):
+            raise FtpOperationError(EC.BUSY, 'rename-owner')
+        self.client, self.source, self.destination = client, source, destination
+        self.dispatch = dispatch
+        self.lease = client.identity
+        self.thread = threading.get_ident()
+        self.active = True
+        self.first = self.second = None
+        client._operation = 'rename'
+        client._phase = 'mutation-reply'
+        client._submitted = False
+        client._count = 0
+        client._write = None
+        client._mutation = MutationEvidence('rename', 'RNFR')
+
+    def _command(self, verb, path, expected):
+        from .rename_evidence import RenameCommandEvidence
+        c = self.client
+        raw = bytearray()
+        truncated = False
+        code = None
+        complete = False
+        error = ''
+        cap = min(c._policy.reply_bytes, 32768)
+        def capture(block):
+            nonlocal truncated
+            room = cap - len(raw)
+            raw.extend(block[:room])
+            truncated |= len(block) > room
+        c._mutation = replace(c._mutation, stage=verb, stage_submitted=False,
+                              consequential_submitted=False, reply_code=None, reply_lines=(), requested_path=path)
+        try:
+            if (not self.active or threading.get_ident() != self.thread or c.identity != self.lease):
+                raise FtpOperationError(EC.STALE, 'rename-owner')
+            c._check()
+            c._send(verb, path, dispatch=self.dispatch)
+            # Once submitted, retain the reply before honoring late cancellation.
+            # Binding checks remain active; only cooperative cancellation defers.
+            with c._defer_cancel():
+                code, lines = c._reply(capture=capture)
+            if c._buffer:
+                # Buffered surplus is ambiguous protocol state, not a later
+                # command's acknowledgment. Preserve it through the failure path.
+                raise FtpOperationError(EC.PROTOCOL, 'rename-surplus-reply')
+            complete = True
+            c._mutation = replace(c._mutation, reply_code=code, reply_lines=lines)
+        except BaseException as exc:
+            error = type(exc).__name__
+            # Retain a bounded literal unterminated tail; never synthesize CRLF.
+            capture(bytes(c._buffer))
+        binding_valid = True
+        try:
+            c._manager._check(c._binding)
+            with c._manager._lock:
+                if c._manager._leases.get(self.lease.device_id) is not c:
+                    raise FtpOperationError(EC.STALE, 'rename-lease')
+            if c._invalid_reason is not None:
+                raise FtpOperationError(EC.STALE, 'rename-session')
+        except BaseException as exc:
+            binding_valid = False
+            error = error or type(exc).__name__
+        submitted = c._mutation.stage_submitted
+        acknowledgment = ('not-started' if not submitted else
+            'accepted' if complete and not truncated and code == expected else
+            'rejected' if complete and code is not None and 400 <= code <= 599 and code != 421 else 'unknown')
+        return RenameCommandEvidence(verb, verb.encode('ascii') + b' ' + path + b'\r\n',
+            bytes(raw), code, submitted, acknowledgment, complete, truncated,
+            self.lease.device_id, self.lease.core_session_id, self.lease.ftp_session_id, error, binding_valid)
+
+    def rnfr(self):
+        if self.first is not None: raise FtpOperationError(EC.STALE, 'rename-used')
+        self.first = self._command('RNFR', self.source, 350)
+        return self.first
+
+    def rnto(self):
+        if self.first is None or not self.first.accepted or self.second is not None:
+            raise FtpOperationError(EC.STALE, 'rename-continuation')
+        self.second = self._command('RNTO', self.destination, 250)
+        return self.second
+
+    def finish(self):
+        if self.second is None or not self.second.accepted:
+            raise FtpOperationError(EC.STALE, 'rename-incomplete')
+        if self.active:
+            self.active = False
+            self.client._operation_lock.release()
+
+    def abandon(self):
+        if self.active:
+            self.client._invalidate()
+            self.active = False
+            self.client._operation_lock.release()

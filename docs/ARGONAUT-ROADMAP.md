@@ -1,5 +1,31 @@
 # Argonaut roadmap
 
+## PA-5.1A publication prerequisites — offline foundation
+
+PA-5.1B adds focused offline corrections for the four PA-5.1AR findings:
+shared persistence/cancellation/dispatch ordering, evidence location identity
+checks through receipt, sticky non-deferred cancellation at the new boundary,
+and transport-layer readiness validation. Diagnostic/listener callbacks remain
+outside the shared dispatch lock; late failures retain possible remote effects.
+The existing architecture regression remains unchanged. Independent reinspection
+is required before Git publication. The detailed synchronization boundary and
+filesystem race limitations are documented in Managed Library below.
+
+Implemented for independent inspection: explicit RNFR / durable owner checkpoint /
+RNTO continuation, separate exact command evidence, and owner-controlled required
+lifecycle persistence. Same lease, session, thread and paths bind continuation;
+uncertain effects and persistence failure block successors without automatic retry,
+reconnect, cleanup, rollback, adoption or recovery. Existing APIs and historical
+staging contracts remain compatible. See [Managed Library](MANAGED-LIBRARY.md#pa-51a-additive-rename-and-lifecycle-evidence-foundation).
+
+Next gate is independent inspection of this foundation. Then the PA-5.0 Managed
+Game Publisher still needs implementation, journal/capacity and upload/readback
+evidence integration, deterministic whole-publication failure tests and separate
+physical review/authorization. Publisher and publication UI remain unimplemented;
+physical publication is unauthorized. Internal lifecycle observations are not
+independent release proof. Historical PA-4.13 instruction-compliance **FAIL** and
+PA-4.2 **UNCERTAIN** remain unchanged.
+
 ## PA-4.6B versioned FTP context evidence — offline implementation
 
 This section supersedes the earlier staging version and sizing status below.

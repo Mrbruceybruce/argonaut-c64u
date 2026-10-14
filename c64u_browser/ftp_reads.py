@@ -13,6 +13,7 @@ import threading
 from .api import BrowserError, ConnectionFailure, Entry, IdentityEntry, safe_argument
 from .c64u_ftp_types import ErrorCode as EC, FtpOperationError, MutationEvidence, WriteEvidence, Outcome, ConnectionBinding, DeviceIdentity, checked_path
 from .diagnostics import diagnostic_event
+from .jobs import JobCancelled
 
 
 CREATION_MKD_RULE = 'c64u-25ea78-1.1.0s2-api0.1-usb0-mkd-triple-slash-v1'
@@ -138,6 +139,7 @@ class _FtpOperation:
     cancel_deferred: int = 0
     mutation_used: bool = False
     cancellation_observed: bool = False
+    rename_owner: object = None
 
     def cancelled(self):
         try:
@@ -157,6 +159,19 @@ class _FtpOperation:
     def check(self):
         if self.cancelled():raise self.failure
 
+    def check_required(self):
+        """Additive boundary: observed cancellation is sticky, never deferred."""
+        if self.cancellation_observed:
+            raise JobCancelled()
+        for check in self.checks:
+            if check is not None:
+                try:
+                    check()
+                except BaseException as exc:
+                    if getattr(exc, 'cancelled', False):
+                        self.cancellation_observed = True
+                    raise
+
 
 class _FtpOperations:
     """Private fixed-binding lifetime, shared by nested FTP helpers."""
@@ -171,6 +186,8 @@ class _FtpOperations:
         self.capability_evidence = None
         from uuid import uuid4
         self._owner_id = uuid4().hex
+        self._rename_owners = {}
+        self._evidence_blocked = False
 
     def classify_library_creation(self, operation, path, target, *, result=None, error=None):
         outcome, wire = creation_outcome(operation, path, result=result, error=error)
@@ -222,6 +239,8 @@ class _FtpOperations:
 
     @contextmanager
     def operation(self, check=None, *, reject_busy=False):
+        if self._evidence_blocked:
+            raise BrowserError('Required rename evidence blocked this adapter; no reconnect.')
         existing = self._context.get()
         if existing is not None:
             if reject_busy:raise BrowserError('FTP operation already owned.')
@@ -253,6 +272,7 @@ class _FtpOperations:
                 token = self._context.set(state)
                 try:yield
                 finally:
+                    if state.rename_owner is not None:state.rename_owner._scope_ended()
                     if state.client is not None:self.capability_evidence = state.client.capabilities
         except FtpOperationError as exc:
             self._raise_failure(state, exc)
@@ -298,6 +318,30 @@ class _FtpOperations:
         with client._root_context_scope():
             if not guard.valid(): raise FtpOperationError(EC.STALE, 'context')
             yield guard
+
+    def begin_evidenced_rename(self, source, destination, evidence):
+        """Explicit continuation inside an already owned operation, no new lease."""
+        from .managed_rename import ManagedRename
+        state = self._context.get()
+        if state is None or state.rename_owner is not None:
+            raise BrowserError('An exclusive managed operation is required.')
+        state.check()
+        safe_argument(source); safe_argument(destination)
+        try:
+            source_bytes = source.encode(self._encoding)
+            destination_bytes = destination.encode(self._encoding)
+        except UnicodeError:
+            raise BrowserError('Filename encoding failed.') from None
+        from .c64u_ftp_types import checked_path
+        checked_path(source_bytes); checked_path(destination_bytes)
+        if max(len(source_bytes), len(destination_bytes)) > 2048 or source_bytes == destination_bytes:
+            raise BrowserError('Invalid bounded rename paths.')
+        client = self._client()
+        owner = ManagedRename(self, state, client, source_bytes, destination_bytes, evidence)
+        self._rename_owners[id(owner)] = owner
+        state.rename_owner = owner
+        state.mutation_used = True
+        return owner._begin()
 
     def mutate(self, operation, path, destination=None):
         return self.mutate_evidence(operation, path, destination).as_dict()
@@ -375,6 +419,10 @@ class _FtpOperations:
 
     def _client(self):
         state = self._context.get()
+        if self._evidence_blocked:
+            raise BrowserError('Required rename evidence blocked this adapter.')
+        if state.rename_owner is not None:
+            raise BrowserError('Pending evidenced rename owns this FTP connection.')
         if state.transport_error is not None:
             raise state.transport_error
         if state.client is None:

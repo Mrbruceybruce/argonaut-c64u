@@ -1,5 +1,137 @@
 # Managed Library — foundation and explicit empty creation
 
+## PA-5.1A additive rename and lifecycle evidence foundation
+
+Offline implementation awaiting independent inspection. The Managed Game Publisher
+remains unimplemented; physical publication is unauthorized. No staging codec,
+execution policy or remote record format changes in this checkpoint. Historical
+PA-4.13 instruction-compliance **FAIL** and PA-4.2 **UNCERTAIN** remain unchanged.
+
+### PA-5.1B focused safety corrections
+
+The PA-5.1AR findings were reproduced and corrected offline; independent
+reinspection remains required before Git publication. The existing transport
+architecture test is unchanged: socket/readiness checks stay in the transport,
+and the rename owner no longer imports transport data types across that boundary.
+
+For one lifecycle/rename attempt, pass the same `RequiredEvidence` instance
+(`control.evidence`) to every rename. Its persistence lock now also orders the
+final submission gate and the entire cancellation intent/state/result transition.
+Wrapping a shared sink in separate channels does not create shared synchronization.
+Under that lock the gate checks required-evidence validity, accepted/persisted
+RNFR, persisted RNTO intent, one-use ownership, session/lease and non-deferred
+cancellation. The linearization point is entry to the marked dispatch section
+after those checks. The transport immediately marks attempted submission and
+calls `sendall`, holding the lock until it returns or raises. A persistence failure
+published first prevents that send; a save/cancellation arriving after dispatch
+begins waits for the bounded send and cannot retract possible remote effects.
+No reply wait, diagnostic callback or evidence sink runs inside this section.
+Diagnostics run before the gate; cancellation listeners run after both owner and
+shared dispatch locks are released. Legacy callback behavior is unchanged.
+
+Observed cancellation remains sticky across legacy deferred contexts. The new
+boundary checks cancellation without deferral before dispatch. Once a command
+has begun, reply capture defers cooperative cancellation while preserving session
+checks; accepted replies are saved before the next cancellation decision. A
+between-command cancellation records `rename-cancellation` and sends no RNTO.
+Late cancellation does not erase an accepted RNTO acknowledgment, and a lost
+reply or persistence failure still cannot produce verified completion. These are
+private evidence records, not a new staging or publication journal schema.
+
+The evidence store rewalks the absolute parent path without symlinks and checks
+its held parent/directory identities before each save and after all fsync barriers.
+Before issuing a receipt it also checks the created record's identity, regular
+file type, owner, 0600 mode, single link and expected size. Detected relocation,
+replacement or substitution blocks the store and preserves partial evidence;
+there is no automatic repair or migration. These checks detect changes at the
+checked boundaries, not arbitrary changes made after a receipt or moved away and
+back between checks. The operator must keep the private evidence tree exclusively
+owned; finite identity checks are not a filesystem transaction lock.
+
+Independent FTP lease/scheduler release remains unverified. Publisher remains
+unimplemented, physical publication remains unauthorized, and historical PA-4.13
+**FAIL** and PA-4.2 **UNCERTAIN** remain unchanged.
+
+`FtpReadAdapter.begin_evidenced_rename(source, destination, evidence)` requires an
+explicit existing `adapter.operation()` context. It binds both encoded paths
+(distinct, at most 2048 bytes each), the adapter, current Core session, managed FTP
+lease, owning thread and a five-minute lifetime. It uses that operation's managed
+lease, acquired lazily if needed. It never reconnects or retries. It persists RNFR
+intent, sends RNFR once, persists its outcome and returns a `ManagedRename` owner
+with immutable `rnfr` evidence. RNTO does not run until the caller explicitly calls
+`owner.continue_rename()` in the same scope. Continuation has no path arguments,
+is consumed once and cannot be copied or restored from serialized evidence.
+
+The new command evidence retains the exact request and literal reply bytes,
+including CRLF framing or an unterminated/malformed prefix. Raw replies are bounded
+by the smaller of the existing transport reply allowance and 32768 bytes; retained
+truncation is explicit. Existing line and multiline parser limits still apply.
+Each observation records submission, code, acknowledgment, completeness, binding
+validity, transport outcome and possible remote effects. Only definitive accepted
+350 permits continuation; only definitive accepted 250 can finish rename. RNTO
+never overwrites RNFR. Private persistence encodes bytes as hex. These records are
+observations, not executable authority or publisher journals.
+
+`RequiredEvidence` calls a synchronous sink directly, validates its canonical
+record hash and synchronized receipt, and permanently blocks on any exception,
+including worker interruption. Diagnostics and listeners cannot replace this
+channel. The supplied `EvidenceDirectory` creates a fresh private directory and
+exclusive 0600 records, checks writes, and synchronizes file, directory and parent
+before returning. The store is bounded to 256 records and 16 MiB by default, with
+a 256 KiB per-record ceiling. It provides no resume, overwrite or cleanup API.
+Custom sinks are trusted internal implementations of the same durability contract;
+a fabricated receipt is not independently verifiable proof of disk durability.
+
+Order is mandatory: durable RNFR intent, RNFR dispatch, durable RNFR outcome,
+explicit continuation with current binding checks, durable RNTO intent, RNTO
+dispatch, durable RNTO outcome, then successor operations. Reentrant callbacks
+cannot continue before the RNFR receipt returns. Persistence failure blocks the
+next command and retains the owner with its observations. RNTO outcome failure
+cannot undo an already dispatched rename and never reports verified completion.
+Accepted RNTO is saved before subsequent cooperative cancellation is honored;
+current session/lease/socket validity is rechecked before allowing successors.
+
+An accepted RNFR leaves server-side pending rename state. The operation lock and
+adapter guard exclude unrelated commands while it is pending. Cancellation,
+expiry, lost replies, invalidated ownership or scope exit cannot use that state
+for another target. On scope exit the connection is abandoned locally; no FTP
+cleanup or rollback command is sent. Blocked owners remain in the adapter registry,
+and that adapter refuses successors/reconnects. Retained ownership means retained
+control/evidence objects; it does not promise a socket survives context exit or
+prove independent server-side release. Lost RNTO conservatively retains possible
+remote consequences. No automatic retry, recovery, adoption or publication exists.
+
+`EvidenceLifecycle(core, evidence)` owns an existing Core and one directly
+scheduled job. The caller must exclusively own that Core and call `start()` from
+a controlling thread. Admission, job registration and submission intent are saved
+before the scheduler receives the job. Busy device lanes fail promptly instead of
+nesting a queued job behind its caller. Submission exceptions retain the exact
+job/Core with submission classified possible. `request_cancel()` saves intent and
+actual cancellation result. `observe_ftp(adapter, phase)` records an existing,
+matching live lease without acquiring one. `wait()` reads and durably saves the
+actual terminal job snapshot; timeout never fabricates terminal success. Worker
+BaseException becomes an observed failed job with its interruption type retained.
+
+`close()` requires durable terminal evidence and observed drained scheduler/FTP
+counts, persists close intent, calls Core.close at most once, then persists its
+result. A terminal snapshot can precede scheduler queue drain; in that case close
+refuses and the owner remains available. Close failure or result-persistence
+failure cannot claim lifecycle completion. Blocked owners are strongly retained
+for inspection. Internal counts and a returned Core.close are not independent
+proof of FTP lease or scheduler release; records explicitly say unverified.
+
+Existing rename/replacement methods and mutation projections keep their behavior.
+Optional diagnostic and terminal listeners remain best-effort. Staging schemas
+1–5, policies 1–4, remote formats 1–3, canonical fixtures and Game Library behavior
+are unchanged. This foundation is not a public UI/CLI publication entry point.
+
+Remaining work after independent inspection: implement the PA-5.0 publisher's
+single-use admission, exact artifact/manifest validation, publication journal and
+capacity reservation, required upload/readback evidence, and complete fake
+publication failure matrix. Physical review and explicit authorization remain
+separate gates. This store is not a substitute for the publisher's bounded journal
+reservation or its full terminal evidence contract.
+
 ## PA-4.6B versioned FTP context evidence — offline implementation
 
 This section supersedes the earlier staging version and sizing status below.
