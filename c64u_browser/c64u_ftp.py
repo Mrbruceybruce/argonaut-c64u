@@ -538,7 +538,7 @@ class C64UFtpClient:
             return int(reply[1][0][4:])
 
     def _transfer(self, verb, path, *, receive=None, source=None, expected=None,
-                  maximum=None, progress=None, budget=None):
+                  maximum=None, progress=None, budget=None, evidence=None):
         self._expect(self._command('TYPE', b'I'), (200,))
         reply = self._expect(self._command('PASV'), (227,))
         match = re.fullmatch(rb'227 [^\r\n]*\(([0-9,]+)\)\.?', reply[1][-1])
@@ -557,8 +557,9 @@ class C64UFtpClient:
         # Never trust a PASV-advertised third-party host.
         self._data.connect((self._control.getpeername()[0], port))
         self._phase = 'preliminary-reply'
-        self._send(verb, path)
-        reply = self._reply()
+        self._send(verb, path, dispatch=None if evidence is None else evidence.dispatch)
+        reply = (self._reply() if evidence is None else
+                 self._publication_reply(evidence, 'stor-preliminary'))
         if reply[0] in (500, 502, 504) and verb == 'MLSD':
             self._data.close()
             self._data = None
@@ -613,7 +614,8 @@ class C64UFtpClient:
                     budget.consume(len(block))
                 self._write = replace(self._write,
                     attempted_send_bytes=self._write.attempted_bytes + len(block))
-                self._data.sendall(block)
+                with evidence.dispatch() if evidence is not None else nullcontext():
+                    self._data.sendall(block)
             else:
                 self._phase = 'local-io'
                 receive(block)
@@ -625,8 +627,11 @@ class C64UFtpClient:
         self._data.close()
         self._data = None
         self._phase = 'completion'
-        self._check()
-        reply = self._reply(self._policy.final_reply)
+        if evidence is None:
+            self._check()
+            reply = self._reply(self._policy.final_reply)
+        else:
+            reply = self._publication_reply(evidence, 'stor-terminal', self._policy.final_reply)
         if source is not None:
             self._write = replace(self._write, terminal_reply=reply[0])
         # A rejected final reply after STOR is uncertain storage state, even if
@@ -697,7 +702,7 @@ class C64UFtpClient:
             return self._transfer('RETR', path, receive=receive, maximum=max_bytes,
                                   expected=expected_bytes, progress=progress, budget=budget)
 
-    def write_from(self, path, source, *, expected_bytes, progress=None, budget=None):
+    def write_from(self, path, source, *, expected_bytes, progress=None, budget=None, _evidence=None):
         """Upload with optional cumulative attempted-byte require/consume budget.
 
         The caller owns the budget (payload, control or aggregate I/O). Every
@@ -712,7 +717,25 @@ class C64UFtpClient:
             self._write = WriteEvidence(expected_bytes, attempted_send_bytes=0)
             if budget is not None:budget.require(expected_bytes)
             return self._transfer('STOR', path, source=source, expected=expected_bytes,
-                                  maximum=expected_bytes, progress=progress, budget=budget)
+                                  maximum=expected_bytes, progress=progress, budget=budget, evidence=_evidence)
+
+    def _publication_reply(self, evidence, kind, timeout=None):
+        # Only post-submission reply capture defers cooperative cancellation.
+        raw = bytearray(); truncated = False; complete = False; code = None
+        def capture(block):
+            nonlocal truncated
+            room = 32768-len(raw); raw.extend(block[:room]); truncated |= len(block)>room
+        try:
+            with self._defer_cancel():
+                reply = self._reply(timeout, capture=capture)
+            code = reply[0]
+            if self._buffer: raise FtpOperationError(EC.PROTOCOL, 'publication-surplus')
+            complete = True
+            if truncated: raise FtpOperationError(EC.PROTOCOL, 'publication-reply-bound')
+            return reply
+        finally:
+            if not complete: capture(bytes(self._buffer))
+            evidence.reply(kind, bytes(raw), code, complete, truncated)
 
 
 class _OwnedRenameWire:

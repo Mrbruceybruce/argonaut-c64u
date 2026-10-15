@@ -203,6 +203,8 @@ class ArgonautCore:
                  subnet_discovery=subnet_scan,
                  networks=local_networks, network_timeout=None):
         self.preferences = preferences or Preferences()
+        from .managed_publication import ManagedPublisher
+        self._managed_publisher = ManagedPublisher(self)
         self._credentials = credentials or Credentials()
         self._client_factory = client_factory
         self._network_timeout = network_timeout
@@ -508,6 +510,26 @@ class ArgonautCore:
         """Worker-only staging; no GUI action or manifest publication."""
         return self._import_staging.stage(authorization, journal_directory=journal_directory,
                                           check_cancel=check_cancel)
+
+    def review_managed_publication(self, history_directory, title, expected_session):
+        """Read-only review job; historical evidence grants no execution authority."""
+        return self._managed_publisher.review(history_directory,title,expected_session)
+
+    def confirm_managed_publication(self, review, *, confirmed, confirmation_text,
+                                    exclusive_writer, unchanged_media, media_capacity_assured):
+        return self._managed_publisher.confirm(review,confirmed=confirmed,
+            confirmation_text=confirmation_text,exclusive_writer=exclusive_writer,
+            unchanged_media=unchanged_media,media_capacity_assured=media_capacity_assured)
+
+    def discard_managed_publication(self, review):
+        return self._managed_publisher.discard(review)
+
+    def publish_managed_transaction(self, authorization, *, journal_directory,
+                                    journal_allowance=None):
+        """One-use headless attempt; receipt requires explicit lifecycle completion."""
+        from .publication_journal import JOURNAL_RESERVATION
+        return self._managed_publisher.publish(authorization,journal_directory=journal_directory,
+            journal_allowance=JOURNAL_RESERVATION if journal_allowance is None else journal_allowance)
 
     def usb_backup_root(self):
         """Return the configured Core-host backup parent, if one is set."""

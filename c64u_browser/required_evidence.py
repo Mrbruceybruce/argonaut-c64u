@@ -171,6 +171,9 @@ class EvidenceDirectory:
                 held.st_nlink != 1 or held.st_size != size):
             raise EvidenceFailure('Evidence record identity or properties changed.')
 
+    def _record_name(self, kind):
+        return f'{self.sequence:06d}-{kind}.json'
+
     def save(self, kind, value):
         with self._lock:
             if self.blocked: raise EvidenceFailure('Evidence directory is blocked.')
@@ -181,7 +184,7 @@ class EvidenceDirectory:
                 data = encode_record(dict(kind=kind, value=value))
                 if self.sequence >= self.record_limit or self.used + len(data) > self.byte_limit:
                     raise EvidenceFailure('Evidence capacity exhausted.')
-                name = f'{self.sequence:06d}-{kind}.json'
+                name = self._record_name(kind)
                 fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=self.fd)
                 try:
                     self._validate_record(fd, name, 0)

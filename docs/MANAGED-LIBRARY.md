@@ -2083,3 +2083,93 @@ Limits remain: POSIX filesystem assumptions, allocation races and conservative
 estimates rather than OS disk quotas, no implemented recovery for uncertain
 cleanup, and non-resumable snapshots. No remote staging, upload, readback or
 manifest publication exists. Phases 3B-2B/3B-2C/3C remain unimplemented.
+
+
+## PA-5.1C — offline managed publisher
+
+The headless publisher uses the PA-5.1B dispatch-boundary cancellation contract.
+This explicitly supersedes PA-5.0's pair-wide deferral: accepted RNFR evidence
+is persisted, but cancellation before RNTO dispatch prevents RNTO. Once RNTO
+submission begins, its actual reply and possible effects are retained. There is
+no retry, reconnect, rollback, cleanup, adoption or recovery executor.
+
+The first contract is the pinned one-item C64Robots transaction. A read-only
+`review_managed_publication(history_directory, title, expected_session)` job
+validates the full pinned historical chain and later observations, fresh REST
+identity, six complete memberships and SIZE/RETR/SIZE reads. The title is explicit
+operator input, normalized NFC, trimmed and bounded to 512 characters. Confirmation
+requires the exact review text plus exclusive-writer, unchanged-media and capacity
+attestations. These are operating conditions, not a technical external-writer lock.
+Review and authorization use registered object identity, a 300-second expiry,
+Core session, adapter, selected library, transport policy and immutable plan digest.
+Authorization is consumed before admission, including busy or capacity refusal.
+A permanent source-key directory next to Core preferences blocks another attempt
+independently of the new attempt UUID or selected evidence directory.
+
+For library L, staging directory D, deterministic game UUID G and review-allocated
+attempt UUID P, the sole mutation sequence is:
+
+1. STOR `D/metadata.pending-P.json` from sealed metadata bytes; independently verify.
+2. STOR `L/manifest.pending-P` from sealed manifest bytes; independently verify.
+3. Rename `D/item-0001.d64` to `L/games/C64Robots v1.3.d64`; independently verify.
+4. Rename `D/metadata.pending-P.json` to `L/metadata/G.json`; independently verify.
+5. Rename `L/manifest.json` to `L/manifest.backup-P`; verify the original bytes.
+6. Rename `L/manifest.pending-P` to `L/manifest.json`; verify final publication.
+
+Each rename uses the published explicit RNFR/RNTO continuation on one managed
+lease, exact 350/250 replies, separate raw evidence and mandatory durable intent
+and outcome. The upload addition uses the same evidence dispatch lock and stores
+literal bounded preliminary/terminal replies separately. It accepts only bounded
+JSON bytes. There is no D64 STOR. All six directories are checked against the
+phase's exact membership; any collision, even identical bytes, stops the attempt.
+The record, old/new manifests, metadata and payload are independently rechecked
+at the architecture's boundaries. Payload execution reads total 699392 bytes;
+review reads 174848 bytes. Control reads are capped at 6 MiB, with at most 64
+complete listings of at most 65536 bytes each and no listing fallback.
+
+The schema-1 manifest advances exactly revision 0 to 1, preserves library UUID
+and creation timestamp and adds one game. Canonical output is sorted compact UTF-8
+JSON with one trailing LF. The confirmed `C64Robots v1.3` fixture is 448 bytes,
+SHA-256 `f2b2d1150e42f8b5207baa15f1fbd2817086432e938f6778bd918969d2cc9e71`.
+Metadata is 407 bytes, SHA-256
+`4462bd06019230287542ce62a873da0e3dea1475f5f385417a968e3b59a9a5f5`.
+The old manifest remains byte-identical in the backup. Replacement is not atomic;
+the manifest can temporarily be absent, or visible before final acceptance.
+
+The separate `argonaut-managed-publication` journal has schema/execution/resource
+versions 1/1/1. Each original event is synchronized before its hash-linked
+`P.publication-NNNNNN` checkpoint, which repeats the immutable plan and references
+`P.event-NNNNNN`. An interrupted pair of local writes is retained and cannot yield
+a receipt. Files are exclusive 0600, directory 0700, and use the reviewed file,
+directory and parent synchronization plus pathname/descriptor identity checks.
+Reload is strict inspection only. No staging journal schemas or fixtures change.
+
+Reservation is 128 events times (73728 event bytes + 32768 checkpoint bytes),
+13631488 bytes, within the unchanged 16 MiB publication ceiling. The final 12
+events are reserved for failure/cancellation/lifecycle records. The encoder-derived
+certificate includes maximum raw reply hex expansion, command paths and identity
+fields; repeated proof has an enforced 24000-byte encoded bound. Actual disk
+admission additionally rounds each file to the held filesystem's allocation unit,
+counts sealed controls, partial-record allowance, index/directories and safety
+margin. Capacity observation does not reserve physical blocks or insure fsync.
+Remote free space remains unverified; capacity assurance is a separate condition.
+
+`publish_managed_transaction` returns a retained `PublicationAttempt` owning one
+scheduled job and the reviewed `EvidenceLifecycle`. `wait()` persists the actual
+terminal state; the worker returns only `verified-pending-lifecycle`. `complete()`
+requires verified bytes, durable terminal state, drained resources and the explicit
+Core close lifecycle before issuing `PublicationReceipt`. The caller must give
+this attempt exclusive Core ownership. A timeout or blocked persistence retains
+the owner for inspection. Internal zero counts and returned close do not prove
+independent FTP/scheduler release. A successful completion emits library-specific
+invalidation; refresh failure cannot authorize repeat publication. Existing managed
+discovery and labels already consume this manifest. The unmanaged local catalog
+is not mutated. GUI publication and game launch remain disabled.
+
+Offline workflow fixtures use the existing VICE D64, replacing only fixture pins
+inside tests. Separate tests pin the real historical chain, deterministic UUID
+and canonical C64Robots JSON. No production fixture override is exposed.
+Physical rename qualification and publication remain unauthorized by this work.
+Founder remains unqualified; PA-4.13 historical instruction-compliance FAIL and
+PA-4.2 historical UNCERTAIN remain unchanged. Independent inspection is required
+before Git publication, followed by separately authorized physical qualification.

@@ -364,6 +364,58 @@ class _FtpOperations:
             options={'strict':True} if operation=='rename' and strict_rename else {}
             return getattr(self._client(), operation)(*args,**options)
 
+    def write_publication_json(self, path, data, evidence):
+        """Bounded sealed bytes and mandatory evidence, on an existing owned lease."""
+        from .required_evidence import RequiredEvidence
+        import hashlib
+        state = self._context.get()
+        if state is None or state.rename_owner is not None or type(evidence) is not RequiredEvidence:
+            raise BrowserError('Owned publication operation and shared evidence required.')
+        if type(data) is not bytes or not 0 < len(data) <= 4096 or not data.endswith(b'\n'):
+            raise BrowserError('Bounded sealed JSON bytes required.')
+        import json
+        json.loads(data)
+        wire = self._path(path)
+        if len(wire) > 2048 or path.lower().endswith('.d64'):
+            raise BrowserError('Publication control path required.')
+        client = self._client(); lease = client.identity; thread = threading.get_ident()
+        state.mutation_used = True
+        adapter = self
+        def check():
+            if (adapter._context.get() is not state or state.client is not client or
+                    client.identity != lease or threading.get_ident() != thread or adapter._evidence_blocked):
+                raise BrowserError('Publication upload owner changed.')
+            adapter._manager._check(adapter.binding)
+            with adapter._manager._lock:
+                if adapter._manager._leases.get(lease.device_id) is not client:
+                    raise BrowserError('Publication upload lease changed.')
+            state.check_required(); client._check()
+        binding = dict(device_id=lease.device_id,core_session_id=lease.core_session_id,
+                       ftp_session_id=lease.ftp_session_id,adapter_owner=self._owner_id)
+        class Boundary:
+            def dispatch(self): return evidence.dispatch(check)
+            def reply(self, kind, raw, code, complete, truncated):
+                evidence.save(kind, dict(**binding,request_hex=(b'STOR '+wire+b'\r\n').hex(),
+                    reply_hex=raw.hex(),reply_code=code,framing_complete=complete,truncated=truncated))
+        try:
+            check()
+            evidence.save('stor-intent',dict(**binding,path=path,request_hex=(b'STOR '+wire+b'\r\n').hex(),
+                size=len(data),sha256=hashlib.sha256(data).hexdigest()))
+            result = client.write_from(wire,io.BytesIO(data),expected_bytes=len(data),_evidence=Boundary())
+            evidence.save('stor-outcome',dict(**binding,**result.transfer.as_dict()))
+            check()
+            return result
+        except BaseException as exc:
+            self._evidence_blocked = True
+            state.failure = state.failure or (translate(exc) if isinstance(exc,FtpOperationError) else exc)
+            if isinstance(exc,FtpOperationError):state.failure.ftp_error = exc
+            failure = getattr(exc,'transfer',None)
+            if not evidence.blocked:
+                evidence.save('stor-failure',dict(**binding,error_type=type(exc).__name__,
+                    transfer=None if failure is None else failure.as_dict(),possible_path=path))
+            client.close()
+            raise state.failure from None
+
     def write_from(self, path, source, expected_bytes, progress=None, *, budget=None):
         with self.operation():
             state = self._context.get()

@@ -1645,3 +1645,30 @@ removal, and power confirmation details remain candidates, not silently chosen.
 **Review stop:** this consolidation changes documentation only. No implementation,
 including B1 diagnosis, tests, device contact, packaging, staging, commit, push,
 tag, release, or branch/worktree creation is authorized by this document.
+
+
+## PA-5.1C offline implementation checkpoint
+
+A headless, one-use managed publisher now implements the pinned one-item sequence:
+two small JSON uploads, four controlled rename pairs and no D64 reupload. A separate
+versioned journal, permanent source-attempt exclusion, bounded capacity admission,
+phase-aware collision checks and independent readback precede receipt issuance.
+Manifest schema 1 advances revision 0 to 1 while preserving library identity and
+creation timestamp. Existing managed discovery displays the confirmed title;
+unmanaged catalog behavior is unchanged. There is no GUI publication or launch.
+
+PA-5.1B's cancellation check at the actual RNTO dispatch boundary supersedes
+PA-5.0's pair-wide deferral. Cancellation before dispatch prevents RNTO; accepted
+RNFR evidence is retained. Post-dispatch consequences remain definitive or uncertain
+according to captured evidence. No retry, rollback, cleanup or adoption is added.
+
+The attempt owns one Core job and requires explicit terminal/lifecycle completion
+before returning a publication receipt. The journal reserves 13631488 bytes within
+the unchanged 16 MiB ceiling, with additional actual-filesystem admission. Historical
+staging schemas and fixtures remain unchanged. See MANAGED-LIBRARY.md for APIs,
+exact paths, canonical hashes, resource limits and failure semantics.
+
+This checkpoint is offline implementation pending independent inspection. It does
+not qualify physical publication or Founder. PA-4.13 historical FAIL and PA-4.2
+historical UNCERTAIN remain unchanged; independent resource release is unverified.
+Git publication and physical publication require their separate later checkpoints.
