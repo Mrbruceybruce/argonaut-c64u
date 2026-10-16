@@ -302,3 +302,48 @@ class ManagedCoreTests(TestCase):
         self.core.configure_game_library('',expected_session=session)
         self.assertEqual(before,payloads)
         self.assertEqual('multiple',self.core.load_managed_library(discover=True).wait(5).result.status)
+
+
+class PublishedRevisionTests(TestCase):
+    @staticmethod
+    def published_manifest():
+        # Canonical offline reconstruction, pinned to the PA-5.10 final readback.
+        from pathlib import Path
+        from c64u_browser.publication_history import load_reference
+        from c64u_browser.publication_model import make_plan, digest
+        old,record,history=load_reference((Path(__file__).parent/'fixtures/publication_history').resolve())
+        data=make_plan('14a1ec8c-dd07-487e-8420-b307fae99d47',
+                       'C64Robots v1.3',old,record,history).manifest
+        assert digest(data)=='f2b2d1150e42f8b5207baa15f1fbd2817086432e938f6778bd918969d2cc9e71'
+        return data
+
+    def test_revision_one_readonly_discovery_and_exact_identity(self):
+        path='/USB0/ARGONAUT_LIBRARY'
+        reads=[]
+        def read(name,limit):
+            reads.append(name);return self.published_manifest()
+        reader=ManagedLibraryReader(lambda name:(name,[E(name='manifest.json',kind='file')]+
+            [E(name=n,kind='dir') for n in ('games','metadata','artwork')]),
+            read,DeviceSession('25EA78','offline-fixture'),lambda:None)
+        selected=dict(device_id='25EA78',root='/USB0',path=path,
+                      library_id='a3b6d459-a989-4224-a372-0a995628f7ce')
+        for _ in range(2):
+            state=reader.discover(selected)
+            self.assertEqual('valid',state.status)
+            library=state.libraries[0]
+            self.assertEqual(1,library.revision)
+            self.assertEqual(selected,library.identity.preference())
+            self.assertEqual(1,len(library.games))
+            game=library.games[0]
+            self.assertEqual(('C64Robots v1.3','D64'),(game.title,game.format))
+            self.assertEqual('/USB0/ARGONAUT_LIBRARY/games/C64Robots v1.3.d64',
+                             library.identity.path+'/'+game.path)
+        self.assertEqual([path+'/manifest.json']*2,reads)
+
+    def test_published_duplicate_id_and_casefolded_path_are_rejected(self):
+        data=json.loads(self.published_manifest())
+        original=data['games'][0]
+        for extra in (dict(original),dict(original,id=GAME,path=original['path'].upper().replace('GAMES/','games/'))):
+            data['games']=[original,extra]
+            with self.assertRaises(LibraryError):
+                parse_manifest(json.dumps(data).encode(),'25EA78','/USB0/ARGONAUT_LIBRARY')

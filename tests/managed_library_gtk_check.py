@@ -326,3 +326,70 @@ class SettingsSelectionGtk(unittest.TestCase):
 def root_icon(name):
     from c64u_browser.storage import root_presentation
     return root_presentation('/'+name)[1]
+
+
+class PublishedRevisionGtk(unittest.TestCase):
+    setUp=ManagedViewGtk.setUp
+    tearDown=ManagedViewGtk.tearDown
+    children=ManagedViewGtk.children
+
+    def published(self):
+        from tests.test_managed_library import PublishedRevisionTests
+        self.session=DeviceSession('25EA78','one')
+        self.core.active_profile=NS(name='Beige')
+        library=parse_manifest(PublishedRevisionTests.published_manifest(),
+                               '25EA78','/USB0/ARGONAUT_LIBRARY')
+        self.app.preferences.game_library_location=library.identity.preference()
+        state=LibraryState('valid','Manifest loaded; content not verified.',(library,),'one')
+        self.view.render(state)
+        return state
+
+    def test_exact_published_display_and_repeat_load_without_duplicates(self):
+        state=self.published()
+        self.view.render(state)
+        rows=self.children(self.view.rows)
+        self.assertEqual(1,len(rows))
+        label=rows[0].get_child()
+        self.assertEqual('C64Robots v1.3 · Commodore 64 · D64\n'
+            '/USB0/ARGONAUT_LIBRARY/games/C64Robots v1.3.d64',label.get_text())
+        self.assertTrue(label.get_selectable())
+        for value in ('Beige','25EA78','a3b6d459-a989-4224-a372-0a995628f7ce','Revision 1'):
+            self.assertIn(value,self.view.main_message.get_text())
+        self.core.configure_game_library.assert_not_called()
+
+    def test_disconnect_reconnect_requires_explicit_reload(self):
+        state=self.published()
+        self.session=DeviceSession('','')
+        self.view.event(NS(kind='disconnected'))
+        self.assertEqual([],self.children(self.view.rows))
+        self.assertEqual('unavailable',self.view.state.status)
+        self.session=DeviceSession('25EA78','two')
+        self.view.event(NS(kind='reconnected'))
+        self.assertEqual([],self.children(self.view.rows))
+        self.core.load_managed_library.assert_not_called()
+        self.view.load()
+        done=self.app.run_file_job.call_args.args[1]
+        done(NS(state='succeeded',result=LibraryState('valid',state.message,state.libraries,'two')))
+        self.assertEqual(1,len(self.children(self.view.rows)))
+
+    def test_pending_load_cannot_restore_offline_catalog(self):
+        state=self.published()
+        self.view.load()
+        done=self.app.run_file_job.call_args.args[1]
+        self.session=DeviceSession('','')
+        self.view.event(NS(kind='offline'))
+        done(NS(state='succeeded',result=state))
+        self.assertEqual([],self.children(self.view.rows))
+        self.assertIn('Unavailable',self.view.main_message.get_text())
+
+    def test_managed_rows_have_no_launch_action_or_legacy_admission(self):
+        self.core.game_launch=Mock()
+        self.core.game_library=Mock()
+        self.published()
+        self.assertEqual(Gtk.SelectionMode.NONE,self.view.rows.get_selection_mode())
+        row=self.view.rows.get_first_child()
+        row.emit('activate')
+        self.core.game_launch.assert_not_called()
+        self.assertEqual([],self.core.game_launch.mock_calls)
+        self.assertEqual([],self.core.game_library.mock_calls)
+        self.assertFalse(hasattr(self.view,'launch_button'))

@@ -2458,3 +2458,26 @@ This checkpoint is offline implementation pending independent inspection. It doe
 not qualify physical publication or Founder. PA-4.13 historical FAIL and PA-4.2
 historical UNCERTAIN remain unchanged; independent resource release is unverified.
 Git publication and physical publication require their separate later checkpoints.
+
+
+## PA-5.10 physical publication and PA-5.11 offline GUI checkpoint
+
+This checkpoint supersedes the earlier pending physical-publication status for
+this Beige publication; earlier milestone entries remain historical records.
+
+PA-5.10 physically published **C64Robots v1.3** on Beige C64 Ultimate `25EA78`
+at `/USB0/ARGONAUT_LIBRARY/games/C64Robots v1.3.d64`. The managed library is
+schema **1**, revision **1**. One publication attempt completed, and final
+independent file/manifest readback passed. No D64 reupload or game launch was
+performed.
+
+PA-5.11 Managed Game Library rows display the validated title, the `Commodore 64`
+platform label, `D64` media and the full published path. The platform is a
+presentation label, not a manifest field. Device/library association, duplicate
+prevention and stale-result handling passed offline verification. The affected
+offline tests, including GUI tests, passed **113/113**; independent review also
+passed **8/8** probes. Live Beige GUI acceptance remains pending. Managed game
+launch remains unavailable.
+
+Historical PA-4.13 instruction-compliance **FAIL** and PA-4.2 **UNCERTAIN** remain
+unchanged. Independent FTP/scheduler resource release remains unverified.

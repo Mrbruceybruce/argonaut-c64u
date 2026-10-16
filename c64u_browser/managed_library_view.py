@@ -135,8 +135,9 @@ class ManagedLibraryView:
             if self.matches(library,configured):
                 self.main_message.set_text('Game Library · Valid\n'+summary+'\n'+state.message)
                 for game in library.games:
-                    label=Gtk.Label(label=f'{game.title} · {game.format}\n{game.path}',
-                        xalign=0,wrap=True,margin_top=5,margin_bottom=5)
+                    label=Gtk.Label(label=(f'{game.title} · Commodore 64 · {game.format}\n'
+                        f'{library.identity.path}/{game.path}'),
+                        xalign=0,wrap=True,selectable=True,margin_top=5,margin_bottom=5)
                     self.rows.append(label)
             else:self.main_message.set_text('No Game Library Configured\n'
                 'Choose an existing library or create a new one in Settings → Game Library.')
