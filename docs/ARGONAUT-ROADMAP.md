@@ -954,6 +954,10 @@ closure reports remain intact, including their contemporaneous stop markers.
 
 Highest priority: reliability and UI clarity before major redesigns.
 
+See [UI design and audit](UI.md) for the 1.10 spit-shine direction, punch-list
+inventory reconciliation and proposed implementation slices. Design approval does
+not establish implementation or acceptance; existing release gates remain in force.
+
 ### 1. P0 — streaming/navigation permanent hang
 
 Observed in the packaged Debian build with a C64U stream active while navigating,
