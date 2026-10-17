@@ -101,7 +101,7 @@ class ApplicationStyleTests(unittest.TestCase):
 
     def test_repeated_activation_preserves_provider_and_header_properties(self):
         app = self.app;window = app.window;provider = app.file_pane_css
-        buttons = (app.reconnect_button, app.disconnect_button, app.settings_button, app.power_button)
+        buttons = (app.connection_button, app.settings_button, app.power_button)
         original = [(b.get_sensitive(), b.get_tooltip_text()) for b in buttons]
         with patch.object(Gtk.StyleContext, 'add_provider_for_display') as register:
             app.do_activate();app.do_activate()

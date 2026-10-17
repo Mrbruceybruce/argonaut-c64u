@@ -4,6 +4,7 @@
 import time
 from gi.repository import GLib
 from .core import CoreError
+from .header import refresh_header
 
 
 class Recovery:
@@ -22,6 +23,7 @@ class Recovery:
         self.generation+=1;self.profile=None
         self.offline=False;self.paused=False;self.delay=5
         self.health_failures=0
+        refresh_header(self.app)
 
     def close(self):
         self.cancel()
@@ -37,6 +39,7 @@ class Recovery:
         generation=self.generation;was_offline=self.offline
         preferred=getattr(self.app,"remote_root","/USB2")
         self.inflight=True
+        refresh_header(self.app)
         def task():
             try:
                 if was_offline:return self.app.core.reconnect(preferred)
@@ -48,11 +51,12 @@ class Recovery:
         future=self.app.pool.submit(task)
         def finish():
             if generation!=self.generation:
-                self.inflight=False;return False
+                self.inflight=False;refresh_header(self.app);return False
             if self.app.busy:
                 GLib.timeout_add(100,finish);return False
             self.inflight=False
-            self.accept(future.result(),was_offline)
+            try:self.accept(future.result(),was_offline)
+            finally:refresh_header(self.app)
             return False
         future.add_done_callback(lambda _:GLib.idle_add(finish))
         return True

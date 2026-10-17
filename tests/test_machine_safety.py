@@ -20,6 +20,9 @@ import test_core
 class Dialog:
     def __init__(self, **kwargs):self.callback=None
     def add_button(self, *args):pass
+    def set_default_size(self, *args):pass
+    def set_default_response(self, *args):pass
+    def get_widget_for_response(self, *args):return Mock()
     def get_content_area(self):return self
     def append(self, child):pass
     def connect(self, signal, callback):self.callback=callback
@@ -42,7 +45,9 @@ class MachineSafetyTests(unittest.TestCase):
             run=lambda task, done:done(task()))
         self.tab=UltimatePower.__new__(UltimatePower)
         self.tab.app=self.app;self.tab.client=self.core.device_operations
-        fake=SimpleNamespace(Dialog=Dialog, Label=lambda **kwargs:None,
+        fake=SimpleNamespace(Dialog=Dialog, Label=lambda **kwargs:Mock(),
+            Box=lambda **kwargs:Mock(), Orientation=SimpleNamespace(VERTICAL=1),
+            Align=SimpleNamespace(END=1),
             ResponseType=SimpleNamespace(OK=1,CANCEL=0))
         self.gtk=patch('c64u_browser.power_dialog.Gtk',fake);self.gtk.start()
         self.addCleanup(self.gtk.stop)

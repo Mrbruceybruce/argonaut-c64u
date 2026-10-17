@@ -174,31 +174,49 @@ class PreferencesUI(unittest.TestCase):
         from threading import Event
         from c64u_browser.jobs import CoreJob,JobProgress
         from c64u_browser.scheduler import CoreScheduler,JobBinding
-        entered=Event();release=Event();finished=[];ticks=[]
+        entered=Event();admitted=Event();release=Event();finished=[];ticks=[]
         scheduler=CoreScheduler(lambda:None);self.addCleanup(scheduler.close)
         def verify(job):
             entered.set()
-            for count in range(1,5):
-                job.report(JobProgress(
-                    'storage-fingerprint',count,None,'directories','ignored',
-                    (('entries_observed',count*10),)))
-                if release.wait(.08):break
-            release.wait(2);job.check_cancel();return 'verified'
+            if not admitted.wait(5):raise AssertionError('Presentation was not admitted')
+            job.report(JobProgress(
+                'storage-fingerprint',4,None,'directories','ignored',
+                (('entries_observed',40),)))
+            if not release.wait(5):raise AssertionError('GTK did not release the worker')
+            job.check_cancel();return 'verified'
         submit=lambda:scheduler.submit(CoreJob('game-library.launch-preview',verify),
                              JobBinding.core_host())
-        heartbeat=self.GLib.timeout_add(
-            20,lambda:(ticks.append(time.monotonic()) or True))
+        loop=self.GLib.MainLoop();condition=[lambda:False]
+        def beat():
+            ticks.append(time.monotonic())
+            if condition[0]():loop.quit()
+            return True
+        heartbeat=self.GLib.timeout_add(20,beat)
+        def until(predicate):
+            # Observe events, not how many fit into a short rendering-dependent
+            # sampling window. The deadline only detects a blocked GTK loop.
+            if predicate():return
+            condition[0]=predicate;expired=[]
+            def timeout():expired.append(True);loop.quit();return False
+            deadline=self.GLib.timeout_add(3000,timeout)
+            try:loop.run()
+            finally:
+                if not expired:self.GLib.source_remove(deadline)
+                condition[0]=lambda:False
+            self.assertFalse(expired,'GTK event delivery deadline expired')
+            self.assertTrue(predicate())
         try:
             self.app.run_file_job(submit,finished.append)
-            self.assertTrue(entered.wait(1));self.pump_for(.25)
+            admitted.set()
+            self.assertTrue(entered.wait(1))
+            until(lambda:len(ticks)>=5 and
+                  'directories checked' in self.app.status.get_text())
             self.assertTrue(self.app.busy)
-            self.assertGreaterEqual(len(ticks),5)
-            self.assertIn('directories checked',self.app.status.get_text())
-            release.set();self.pump_for(.35)
-            self.assertTrue(finished)
+            self.assertFalse(finished)
+            release.set();until(lambda:bool(finished))
             self.assertFalse(self.app.busy)
         finally:
-            release.set();self.GLib.source_remove(heartbeat)
+            admitted.set();release.set();self.GLib.source_remove(heartbeat)
 
     def test_game_library_search_debounce_rejects_stale_client_and_teardown(self):
         from unittest.mock import Mock

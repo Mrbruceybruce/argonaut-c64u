@@ -82,11 +82,16 @@ with brief-section provenance; section 5 retains the supplied original review ID
 keyboard focus indicators. Use consistent GTK button hierarchy and styling,
 with Argonaut blue as a restrained accent. Improve disconnected and empty states.
 
-Replace separate header Reconnect/Disconnect buttons with one contextual
-primary Connect/Disconnect control. Preserve Reconnect as a secondary action
-within an appropriate connection menu or recovery workflow. Preserve underlying
-connection/session semantics, keyboard access and existing recovery protections;
-the exact secondary-action placement is an implementation design detail.
+**Approved UI-02B.1b:** Remove manual Reconnect from the global header. Preserve automatic recovery and internal reconnect mechanisms.
+
+The header contains one contextual Connect/Disconnect control, Settings, and
+Ultimate Power, in that order. Do not relocate manual Reconnect to another menu
+or control. Preserve connection/session semantics, identity and credential
+checks, keyboard access, foreground admission, and recovery protections.
+
+**Superseded:** UI-00/UI-02B.1 retained Reconnect as a secondary menu action.
+UI-02B.1b supersedes that presentation decision only; internal reconnect and
+recovery contracts remain unchanged. Visual acceptance remains pending.
 
 Retain the Commodore Chicken Lips icon as the compact Ultimate Power control.
 Preserve existing Reset/Reboot actions, tooltip, keyboard access and confirmation
@@ -212,7 +217,7 @@ Acceptance notes preserve detailed contracts by reference to sections 7, 9 and 1
 | Original ID | Original finding (verbatim) | Area | Work reference | Status of current direction | Priority | Proposed slice | Current change / acceptance notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | UI-01 | Remove permanent blue file-pane outline | Shared / Files / header | UI-01 | Approved | P2 | UI-C1 | Remove permanent border only; preserve focus and native selection. |
-| UI-02 | Redesign header connection controls | Shared / Files / header | UI-02 | Approved | P2 | UI-B1 | One primary Connect/Disconnect; retain secondary Reconnect and session rules. |
+| UI-02 | Redesign header connection controls | Shared / Files / header | UI-02 | Approved | P2 | UI-B1 | One primary Connect/Disconnect; no manual Reconnect; preserve automatic recovery and session rules. |
 | UI-03 | Introduce consistent status bar | Shared / Files / header | UI-03 | Approved | P1 | UI-B2 | Restyle B5; preserve cancellation, progress, errors, uncertainty and foreground ownership. |
 | UI-04 | Standardize buttons, typography, spacing | Shared / Files / header | UI-04 | Approved | P2 | UI-A1 | Shared visual roles only; do not unify operation logic. |
 | UI-05 | Improve active/inactive file-pane styling | Shared / Files / header | UI-05 | Approved | P2 | UI-C1 | Related to UI-01 but retain independent active-pane clarity requirement. |
@@ -349,7 +354,7 @@ changed components, verification evidence, outstanding issues and reviewer decis
 - Verify dual-pane navigation, file operations and shortcut behavior remain intact.
 - Verify inaccessible storage identifies the affected root without a false
   disconnected-device state; keep operation warnings distinct from connection state.
-- Verify contextual Connect/Disconnect and retained reconnect/recovery routes,
+- Verify contextual Connect/Disconnect and internal reconnect and automatic recovery routes,
   identity binding and stale-settings protections. Preserve power actions,
   tooltip, keyboard access and confirmations.
 - Verify General automatic-save, preference persistence, Undo and Restore Defaults
@@ -384,7 +389,7 @@ and successful implementation tests are distinct from release acceptance.
 | Earlier header history | Roadmap B4 records separate Reconnect/Disconnect controls and prior acceptance. The new contextual control is Approved future direction; earlier behavior and acceptance remain historical evidence. Preserve recovery and stale-settings protections. |
 | Earlier Device Details history | Roadmap B3 records Saved Network Connections near the bottom and prior layout acceptance. Saved Connections at the top and new collapsible sections are Approved future direction, not already implemented or accepted. |
 | Scaling | 100%–600% and 25% steps remain Proposed; renderer range, maximum and GTK logical pixels require verification. |
-| Presentation details | Storage-warning wording, exact preference groupings, status-bar layout and exact secondary Reconnect placement remain design details. Primary Connect/Disconnect, secondary Reconnect and preservation of B5 behavior are Approved. |
+| Presentation details | Storage-warning wording, exact preference groupings, status-bar layout remain design details. Primary Connect/Disconnect without manual Reconnect (UI-02B.1b) and preservation of B5 behavior are Approved. |
 | Functional boundaries | Test Lab placement and channel behavior are Approved as resolved below. Streams Fit to Window details and Instant Replay dependency review remain outstanding. |
 | UI-00 reconciliation resolution, 2026-10-17 | User resolved the Test Lab, connection-control and status-bar questions. Documentation-only approval; no implementation or acceptance claimed. Preserve UI-01–UI-25 and all seven unnumbered candidates, with final candidate IDs deferred until the remaining visual audit is complete. |
 | Remaining audit | UI-01 reports first-pass coverage of twelve screen areas. Section 3 distinguishes remaining interaction/state coverage; original review IDs are reconciled in section 5; underlying screenshots and uninspected interactions are not claimed as independently verified. |
@@ -532,7 +537,7 @@ them for visual consistency:
 
 | Topic | Classification and reconciliation | Both source references |
 | --- | --- | --- |
-| Quick Connect / Machine tab | Historical or superseded requirement: do not restore either. New contextual connection control supersedes the accepted separate-button presentation only; secondary Reconnect remains within an appropriate connection menu or recovery workflow, with unchanged session semantics. | [Release 1.6](../packaging/RELEASE-1.6.md), Quick Connect paragraph; [Current state](CURRENT-STATE.md), B4; UI-00 Global controls. |
+| Quick Connect / Machine tab | Historical or superseded requirement: do not restore either. New contextual connection control supersedes the accepted separate-button presentation only; the earlier secondary Reconnect proposal is superseded by UI-02B.1b; automatic recovery and internal reconnect retain unchanged session semantics. | [Release 1.6](../packaging/RELEASE-1.6.md), Quick Connect paragraph; [Current state](CURRENT-STATE.md), B4; UI-00 Global controls. |
 | Saved Connections placement | Historical or superseded requirement: earlier accepted bottom placement remains evidence. UI-00 explicitly approves top placement and collapsible details; profile/credential semantics survive. No new approval needed for this stated presentation supersession. | [Current state](CURRENT-STATE.md), Device Details / connection-profile layout; UI-00 Device Details. |
 | Permanent pane border | Historical or superseded requirement: remove persistent blue outline as explicitly approved, while preserving native selection, keyboard focus and a clear active pane. C4 tooltip/menu/alignment work is already accepted and should not be duplicated. | [Development test](DEVELOPMENT-TEST.md), Test checklist; [Current state](CURRENT-STATE.md), C0/C4; UI-00 Files. |
 | General save prompts / scale buttons | Historical or superseded requirement: old explicit General Save/Discard and plus/minus presentation do not override UI-00 autosave/Undo and slider. Historical 100–300% support is evidence to check, not proof that proposed 600% works. | [Dev.3 notes](testing/0.1.4-dev.3-NOTES.md); [Release 1.5](../packaging/RELEASE-1.5.md); [Release 1.6](../packaging/RELEASE-1.6.md); UI-00 General/Preview scaling. |
@@ -555,7 +560,7 @@ visual choices and the remaining audit still require later review.
 | Decision | Earlier discrepancy or requirement and sources | Approved resolution / remaining work |
 | --- | --- | --- |
 | Test Lab navigation and channel behavior | UI-00 and [Roadmap](ARGONAUT-ROADMAP.md), I, request removal from the normal top-level experience and Developer Mode access. [Developer Mode](DEVELOPER-MODE.md), opening/channel paragraphs, already gates Stable after restart and always enables Test Lab in Development; [Next pass](NEXT-PASS.md), Stable 1.9 boundary, records that gating. | **Approved:** Settings → Developer → Open Test Lab; remove the normal top-level Test Lab tab in both Stable and Development. Preserve Stable restart/enablement gating without bypass and Development always-available access without additional restrictions. Preserve all functionality, diagnostics, regression capabilities, service shutdown/isolation and reports. Documentation only; implementation remains unauthorized. |
-| Connected reconnect access | UI-00 approves one contextual Connect/Disconnect header control but requires reconnect/recovery. [Current state](CURRENT-STATE.md), B4, and [Roadmap](ARGONAUT-ROADMAP.md), B4, retain an explicit connected Reconnect path and stale-settings protections. | **Approved:** one contextual primary Connect/Disconnect button, with Reconnect retained as a secondary action in an appropriate connection menu or recovery workflow. Underlying connection/session semantics remain unchanged. Preserve keyboard access and stale-settings protections; exact placement remains a later design detail. |
+| Connected reconnect access | UI-00 approves one contextual Connect/Disconnect header control but requires reconnect/recovery. [Current state](CURRENT-STATE.md), B4, and [Roadmap](ARGONAUT-ROADMAP.md), B4, retain an explicit connected Reconnect path and stale-settings protections. | **Superseded presentation:** UI-00 retained a secondary Reconnect action. **Approved UI-02B.1b:** remove manual Reconnect from the global header without relocating it. Preserve automatic recovery, internal reconnect, identity/session semantics, keyboard access and stale-settings protections. The historical B4 acceptance remains evidence for those technical contracts. |
 | Status-bar composition | UI-00 requests distinct connection versus operation messages. [Current state](CURRENT-STATE.md), B5, protects active operation/Cancelling from ordinary messages and uses phase/counts without a progress bar. | **Approved:** redesigned status bar preserves existing B5 cancellation, progress, error, uncertain-outcome and foreground-job behavior; lifecycle and device-operation safety must not weaken. Separate connection state from operation warnings. Exact visual composition remains Proposed; separate regions are an option, not an approved layout. No new progress model is authorized. |
 | Switch consistency versus credential state | UI-00 General and [Roadmap](ARGONAUT-ROADMAP.md), Design principles, prefer switches for persistent binary preferences; [Device Details](DEVICE-DETAILS-STABILIZATION.md), UNKNOWN correction, requires disabled/indeterminate Remember and explicit Save Profile semantics. | Treat Remember password as an action-specific credential choice, retain the current tri-state presentation and save boundary. Do not convert it to an immediate-saving binary switch. This is a preservation constraint, not authorization to redesign credentials. |
 | New inventory numbering | UI-00 initially lacked the original meanings. The final UI-01 attachment supplies 01–78; section 5 preserves the full original-to-work mapping. | Four exact overlaps have explicit aliases; distinct screen requirements remain separate. UI-26–78 remain provisional references, and all seven additional candidates remain unnumbered. No final IDs are invented or silently reassigned. |
@@ -616,7 +621,7 @@ user-reported audit directions, not independently observed screenshot defects.
 
 | Area / provenance in supplied UI-01 brief | Approved direction | Contract preservation and unresolved detail | Proposed planning group |
 | --- | --- | --- | --- |
-| Shared/header — §4 | Native GTK, subtle branding, consistent buttons/type/spacing/icons and all disabled/loading/warning/error states. Contextual primary Connect/Disconnect; secondary Reconnect; compact Chicken Lips Ultimate Power. Structured status bar. | Preserve qualified Reset/Reboot and B5 cancellation/progress/errors/uncertainty/foreground ownership. Exact visual composition remains to be reviewed; no new lifecycle model. | UI-A, UI-B |
+| Shared/header — §4 | Native GTK, subtle branding, consistent buttons/type/spacing/icons and all disabled/loading/warning/error states. Contextual primary Connect/Disconnect; no manual Reconnect (UI-02B.1b); compact Chicken Lips Ultimate Power. Structured status bar. | Preserve qualified Reset/Reboot and B5 cancellation/progress/errors/uncertainty/foreground ownership. Exact visual composition remains to be reviewed; no new lifecycle model. | UI-A, UI-B |
 | Files — §6 Files | Retain two panes; remove permanent blue borders while retaining keyboard focus; improve toolbar grouping, storage shortcuts, row alignment and headings. | Preserve selection, context menus, root permissions and C0–C4 accepted behavior. An inaccessible SD root must not imply overall disconnection. Exact root-warning copy remains Proposed. | UI-C |
 | General — §5 General | Group by function, standardize switches/checkboxes, improve folder rows and Undo/Defaults placement; retain autosave. Graduated slider; Fit to Window in Streams. | 100–600% at 25% remains Proposed subject to renderer qualification. Preserve hidden preference values; remove replay only after dependency/stability review. | UI-D, UI-F Streams |
 | Device Details — §5 Device Details | Saved Connections first; compact form; Hardware Information and Network Discovery independently collapsed by default; expansion lasts only for open Settings session. | Preserve identity, credentials, Test/Connect, profiles and Development session-only behavior. Scroll expanded content; do not turn Remember into immediate-saving preference. | UI-E |
@@ -745,7 +750,7 @@ Release classes:
 | Slice | Bounded work | Dependencies | Future acceptance / completion boundary | Proposed release class |
 | --- | --- | --- | --- | --- |
 | UI-A1 — shared foundation | One scoped style provider; semantic button/heading/state roles; reusable spacing and small form/toolbar helpers. Migrate a representative surface first, then consumers per slice. | Inventory mapping is complete; use source survey in section 11 and obtain implementation authorization. | Native focus/selection/disabled states survive; no global style leaks, clipping or callback changes. | Recommended before release |
-| UI-B1 — header | Primary contextual Connect/Disconnect, secondary Reconnect and retained compact power control. | UI-A1; connection/recovery route review. | Connected/disconnected/recovering/blocked states, keyboard access, identity binding, stale-settings gate and qualified Reset/Reboot unchanged. | Recommended before release; safety preservation required |
+| UI-B1 — header | Primary contextual Connect/Disconnect without manual Reconnect, Settings and retained compact power control (UI-02B.1b). | UI-A1; connection/recovery route review. | Connected/disconnected/recovering/blocked states, keyboard access, identity binding, stale-settings gate and qualified Reset/Reboot unchanged. | Recommended before release; safety preservation required |
 | UI-B2 — status | Restyle existing B5 row and distinguish connection from operation warning. | UI-A1; coordinate header status text with UI-B1. | Active jobs retain ownership; sticky Cancelling, contextual Cancel, truthful progress/errors and uncertain outcomes survive. | Recommended before release; B5 contract required |
 | UI-C1 — Files | Pane headings/borders, navigation versus action grouping, shortcuts and row alignment. | UI-A1; UI-B2 for global status integration. | Native selection and focus, tooltips, menus, root restrictions and inaccessible-root-versus-disconnection wording. | Recommended before release |
 | UI-D1 — General presentation | Functional preference groups, switch/checkbox roles, folder rows, Undo/Defaults placement. Keep scale/replay behavior unchanged until their slices. | UI-A1. | Autosave/Undo, hidden backup-root/library-location persistence and close/chooser focus semantics preserved. | Recommended before release |
@@ -808,7 +813,7 @@ of cosmetic changes; this plan neither resolves the hazard nor waives existing g
    design details; no write-mode semantics change is authorized. Type/ROM placement
    remains investigation, not an unresolved blocker for the documented selector.
 3. **Plan review:** approve slice boundaries and release cut; settle scale maximum,
-   manual/fit behavior, exact secondary Reconnect and subtune placement during their
+   manual/fit behavior and subtune placement during their
    designs. These open details do not revoke the approved overall directions.
 4. **Roadmap proposal only:** section D still lists Drives among remaining picker
    consumers and section E describes replacing the split workflow with local/C64U

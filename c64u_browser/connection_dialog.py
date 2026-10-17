@@ -4,6 +4,7 @@
 from gi.repository import Gtk, GLib
 from .api import BrowserError
 from .core import CoreError
+from .header import begin_connection, end_connection
 from .profiles import Profile
 from .discovery import preferred_subnet, validate_subnet
 
@@ -276,11 +277,13 @@ class ConnectionDialog:
             return p.validate()
         except (ValueError, BrowserError) as exc: raise BrowserError(str(exc)) from exc
 
-    def submit(self, task, done):
+    def submit(self, task, done, *, connecting=False):
         if self.app.busy: return
+        presentation = begin_connection(self.app, 'Connecting…') if connecting else None
         self.controls.set_sensitive(False); self.status.set_text('Working…')
         if hasattr(self,'window') and hasattr(self.window,'pages'):self.window.pages.set_sensitive(False)
         def finish(result):
+            end_connection(self.app, presentation)
             self.controls.set_sensitive(True)
             if hasattr(self,'window') and hasattr(self.window,'pages'):self.window.pages.set_sensitive(True)
             if getattr(self,'_scanning',False):
@@ -298,7 +301,11 @@ class ConnectionDialog:
         def caught():
             try: return task()
             except Exception as exc: return exc
-        self.app.run(caught,finish)
+        try:
+            if self.app.run(caught,finish) is False:end_connection(self.app, presentation)
+        except Exception:
+            end_connection(self.app, presentation)
+            raise
 
 
     def test(self):
@@ -354,7 +361,7 @@ class ConnectionDialog:
                     self.current_id=result.profile.id;self.reload()
                     if hasattr(self.window,'pages'):self.status.set_text('Connected · Authenticated. Connection profile updated; password storage unchanged.')
                     else:self.window.destroy()
-                self.submit(finish_task,connected)
+                self.submit(finish_task,connected,connecting=True)
             if p.device_id or p.device_mac:finish_connection();return
             dialog=Gtk.Dialog(title='Confirm profile device',transient_for=self.window,modal=True)
             dialog.add_button('Cancel',Gtk.ResponseType.CANCEL)
@@ -366,7 +373,7 @@ class ConnectionDialog:
                 dialog.destroy()
                 if code==Gtk.ResponseType.OK and not self.app.busy:finish_connection()
             dialog.connect('response',response);dialog.present()
-        self.submit(task,done)
+        self.submit(task,done,connecting=True)
 
     def add_candidate(self, candidate):
         key=(candidate.host,candidate.port)

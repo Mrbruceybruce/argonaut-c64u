@@ -374,6 +374,8 @@ class ManagedSettingsGtk(unittest.TestCase):
     def test_browser_initial_manual_and_recovery_completion_hooks(self):
         from c64u_browser.gui import Browser
         app=Mock();app.histories={}
+        app.busy=False;app.foreground=NS(token=None)
+        app.recovery.inflight=False;app.header_view=None
         app.core.selected_profile.return_value=NS(auto_connect=True)
         result=NS(profile=NS(),device_info={},remote_path='/USB0',listing=('/USB0',[]))
         app.core.connect_selected.return_value=result

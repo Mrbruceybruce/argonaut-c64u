@@ -16,6 +16,7 @@ from .foreground import ForegroundSlot
 from .operation_status import OperationPresentation
 from .ui_style import install_styles, set_error
 from .appearance import AppearanceFollower
+from .header import ConnectionHeader, refresh_header, begin_connection, end_connection
 from .files import child
 from .navigation import History
 from .file_selection import ClickPolicy, FileListActivation
@@ -123,6 +124,8 @@ class Browser(Gtk.Application):
 
 
     def do_shutdown(self):
+        header = getattr(self, 'header_view', None)
+        if header is not None:header.close()
         appearance = getattr(self, 'appearance', None)
         if appearance is not None:appearance.close()
         Gtk.Application.do_shutdown(self)
@@ -158,15 +161,11 @@ class Browser(Gtk.Application):
         connection = Gtk.Box(spacing=8)
         self.connection_header = connection
         self.controls.append(connection)
-        self.connection_label = Gtk.Label(xalign=0, hexpand=True, wrap=True)
-        self.connection_label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
-        self.connection_label.set_width_chars(10)
-        connection.append(self.connection_label)
+        self.header_view = ConnectionHeader(self, connection)
+        self.connection_label = self.header_view.title
+        self.connection_button = self.header_view.primary
         from .app_preferences import show_preferences
-        self.reconnect_button = self.button(connection, 'Reconnect', self.reconnect_device)
-        self.reconnect_button.set_tooltip_text('Reconnect the active device, or the selected saved connection when disconnected')
-        self.disconnect_button = self.button(connection, 'Disconnect', self.disconnect_device)
-        self.settings_button = self.button(connection, 'Settings', lambda: show_preferences(self))
+        self.settings_button = self.button(self.header_view.actions, 'Settings', lambda: show_preferences(self))
         self.ultimate_power = UltimatePower(self)
         self.power_button = Gtk.Button()
         icon = Gtk.Image.new_from_file(str(ASSETS / 'commodore-c-equals.svg'))
@@ -175,7 +174,7 @@ class Browser(Gtk.Application):
         self.power_button.set_tooltip_text('Ultimate Power\nPower, reset, and memory actions for the connected C64 Ultimate.')
         self.power_button.update_property([Gtk.AccessibleProperty.LABEL], ['Ultimate Power'])
         self.power_button.connect('clicked', lambda *_: self.ultimate_power.show())
-        connection.append(self.power_button)
+        self.header_view.actions.append(self.power_button)
         self.tabs = Gtk.Notebook(vexpand=True)
         self.controls.append(self.tabs)
         files = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -410,6 +409,7 @@ class Browser(Gtk.Application):
         if self.busy or (getattr(self, 'foreground', None) is not None
                          and self.foreground.token is not None): return False
         self.busy = True
+        refresh_header(self)
         sensitivity = [(widget, widget.get_sensitive()) for widget in self.busy_controls]
         for widget, _ in sensitivity: widget.set_sensitive(False)
         self.status.set_text('Working…')
@@ -418,6 +418,7 @@ class Browser(Gtk.Application):
         except Exception as exc:
             self.busy = False
             for widget, sensitive in sensitivity: widget.set_sensitive(sensitive)
+            refresh_header(self)
             error = BrowserError('Could not start the operation. Close and reopen Argonaut. '+str(exc))
             try: done(error)
             except Exception: pass
@@ -433,6 +434,7 @@ class Browser(Gtk.Application):
                     if exc.kind=='authentication':self.recovery.paused=True
                 self.status.set_text(str(exc))
             finally:
+                refresh_header(self)
                 managed=getattr(self,'managed_library_view',None)
                 if managed is not None:managed.try_restore()
             return False
@@ -457,18 +459,7 @@ class Browser(Gtk.Application):
 
     def update_connection_header(self):
         self.update_partial_recovery()
-        selected = self.core.selected_profile()
-        if self.active_profile:
-            info = self.device_info['info']
-            text = f"Connected · {self.active_profile.name} · {self.active_profile.host}:{self.active_profile.http_port} · Firmware {info['firmware_version']} · API {self.device_info['version']['version']}"
-            if self.offline_message:text=f'Offline · {self.active_profile.name} · {self.offline_message}'
-            if selected and selected.id != self.active_profile.id: text += f' · Selected for next connection: {selected.name}'
-        else:
-            text = 'Disconnected' + (f' · Selected: {selected.name}' if selected else ' · No device selected')
-        self.connection_label.set_text(text)
-        self.reconnect_button.set_sensitive(not self.busy and not (self.recovery and self.recovery.inflight)
-                                            and self.reconnect_available())
-        self.disconnect_button.set_sensitive(self.active_profile is not None)
+        refresh_header(self)
         if hasattr(self, 'remote_new_d64_button'):
             self.update_storage_actions()
         if hasattr(self, 'test_lab_tab'):
@@ -489,6 +480,7 @@ class Browser(Gtk.Application):
         active = self.active_profile is not None
         # Share Recovery's in-flight gate; GTK serializes this with its timer.
         self.recovery.inflight = True
+        presentation = begin_connection(self, 'Reconnecting…' if active else 'Connecting…')
         self.update_connection_header()
         def task():
             try:
@@ -497,6 +489,7 @@ class Browser(Gtk.Application):
             except Exception as exc:return exc
         def done(result):
             self.recovery.inflight = False
+            end_connection(self, presentation)
             if isinstance(result, Exception):
                 self.status.set_text(str(result))
                 if active:self.recovery.accept(result, was_offline=True)
@@ -510,9 +503,11 @@ class Browser(Gtk.Application):
         try:
             if self.run(task, done) is False:
                 self.recovery.inflight = False
+                end_connection(self, presentation)
                 self.update_connection_header()
         except Exception:
             self.recovery.inflight = False
+            end_connection(self, presentation)
             self.update_connection_header()
             self.status.set_text('Could not start reconnect. No automatic retry was requested.')
 
@@ -603,8 +598,19 @@ class Browser(Gtk.Application):
     def auto_connect(self):
         profile = self.core.selected_profile()
         if not profile or not profile.auto_connect: return False
-        self.run(lambda: self.core.connect_selected(require_bound=True),
-                 self.activate_connection)
+        if self.busy or self.foreground.token is not None or (self.recovery and self.recovery.inflight):
+            return False
+        presentation = begin_connection(self, 'Connecting…')
+        def task():
+            try:return self.core.connect_selected(require_bound=True)
+            except Exception as exc:return exc
+        def connected(result):
+            try:
+                if isinstance(result, Exception):raise result
+                self.activate_connection(result)
+            finally:end_connection(self, presentation)
+        if not self.run(task, connected):
+            end_connection(self, presentation)
         return False
 
     def show_remote(self, result, select=None):
@@ -788,6 +794,7 @@ class Browser(Gtk.Application):
             raise RuntimeError('Foreground job has no exclusive reservation.')
         self.transfer_job = job
         self.busy = True
+        refresh_header(self)
         self._file_job_sensitivity = [(widget, widget.get_sensitive())
                                       for widget in self.busy_controls]
         for widget, _ in self._file_job_sensitivity:widget.set_sensitive(False)
@@ -829,6 +836,7 @@ class Browser(Gtk.Application):
         finally:
             self._file_job_sensitivity = ()
             self.foreground.release(token, job)
+            refresh_header(self)
             managed=getattr(self,'managed_library_view',None)
             if managed is not None:GLib.idle_add(managed.try_restore)
         return True
@@ -847,6 +855,7 @@ class Browser(Gtk.Application):
             self.status.set_text('Another operation is already in progress.')
             return False
         self.busy = True
+        refresh_header(self)
         try:
             job = submit()
             if job is None or job is False:
@@ -854,6 +863,7 @@ class Browser(Gtk.Application):
         except Exception as exc:
             if not self.foreground.release(token):return False
             self.busy = False
+            refresh_header(self)
             if failed is not None:failed(exc)
             else:self.status.set_text(str(exc))
             return False
@@ -1641,6 +1651,8 @@ class Browser(Gtk.Application):
         if self.busy:
             self.status.set_text('Wait for the current operation to finish before closing.')
             return True
+        header = getattr(self, 'header_view', None)
+        if header is not None:header.close()
         appearance = getattr(self, 'appearance', None)
         if appearance is not None:appearance.close()
         policy = getattr(self, 'file_click_policy', None)

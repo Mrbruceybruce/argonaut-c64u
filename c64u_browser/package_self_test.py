@@ -22,6 +22,14 @@ def _require(condition, check_id, message, checks):
     checks.append({'id': check_id, 'status': 'pass'})
 
 
+def _connection_header_valid(app):
+    """Idle, unconfigured header contract, shared with offline GTK tests."""
+    return (app.connection_button.get_label() == 'Connect…' and
+            app.connection_button.get_sensitive() and
+            not hasattr(app, 'connection_menu') and
+            not hasattr(app, 'reconnect_button'))
+
+
 def _write_report(path, metadata, result, checks, failure=None):
     report = {
         'schema': 1,
@@ -182,8 +190,7 @@ def run(package_metadata, report_path):
             app.activate()
             _require(bool(app.window), 'ui.main_window',
                      'The main window did not open.', checks)
-            _require(app.reconnect_button.get_label() == 'Reconnect' and
-                     not app.disconnect_button.get_sensitive() and
+            _require(_connection_header_valid(app) and
                      app.new_d64_button.get_tooltip_text() == 'New D64 disk…' and
                      app.remote_new_d64_button.get_tooltip_text() ==
                      'New D64 disk on C64U…' and
