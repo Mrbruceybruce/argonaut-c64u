@@ -61,6 +61,7 @@ def scale_control(value,changed=None):
 
 def show_preferences(app, page=0):
     from gi.repository import Gtk,Gio,GLib
+    from .ui_style import set_error
     from copy import deepcopy
     from pathlib import Path
     from . import development
@@ -143,8 +144,7 @@ def show_preferences(app, page=0):
     error=Gtk.Label(wrap=True,xalign=0);box.append(error)
     dialog.general_message=error
     def general_message(message,failed=False):
-        if failed:error.add_css_class('argonaut-error-message')
-        else:error.remove_css_class('argonaut-error-message')
+        set_error(error, failed)
         error.set_text(message)
     actions=Gtk.Box(spacing=8);box.append(actions)
     undo=Gtk.Button(label='Undo');actions.append(undo)

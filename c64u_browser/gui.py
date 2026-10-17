@@ -14,6 +14,8 @@ from gi.repository import Gtk, GLib, Gdk, Gio, Graphene, Pango
 from .api import BrowserError, ConnectionFailure
 from .foreground import ForegroundSlot
 from .operation_status import OperationPresentation
+from .ui_style import install_styles, set_error
+from .appearance import AppearanceFollower
 from .files import child
 from .navigation import History
 from .file_selection import ClickPolicy, FileListActivation
@@ -108,6 +110,7 @@ class Browser(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
+        self.appearance = AppearanceFollower(Gdk.Display.get_default())
         # GTK's macOS/Quartz backend only enables the app-menu "Quit" item and
         # the Cmd+Q accelerator if an "app.quit" action actually exists; without
         # this, both stay permanently disabled on macOS (Linux/Windows menus are
@@ -118,6 +121,11 @@ class Browser(Gtk.Application):
         accel = '<Meta>q' if sys.platform == 'darwin' else '<Primary>q'
         self.set_accels_for_action('app.quit', [accel])
 
+
+    def do_shutdown(self):
+        appearance = getattr(self, 'appearance', None)
+        if appearance is not None:appearance.close()
+        Gtk.Application.do_shutdown(self)
 
     def request_quit(self,*_):
         window=getattr(self,'window',None)
@@ -187,14 +195,7 @@ class Browser(Gtk.Application):
         self.file_click_policy = ClickPolicy()
         self.lpath, self.llist = self.pane(panes, True)
         self.rpath, self.rlist = self.pane(panes, False)
-        css = Gtk.CssProvider()
-        css.load_from_data(
-            b'.argonaut-file-pane { border: 2px solid transparent; border-radius: 6px; padding: 4px; }\n'
-            b'.argonaut-file-pane-active { border-color: alpha(@theme_selected_bg_color, 0.55); }\n'
-            b'.argonaut-error-message { color: #c01c28; font-size: 1.083333em; }')
-        Gtk.StyleContext.add_provider_for_display(
-            self.window.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        self.file_pane_css = css
+        self.file_pane_css = install_styles(self.window.get_display())
         self.set_active_file_pane(True)
         self.settings_tab = SettingsTab(self)
         self.tabs.append_page(self.settings_tab.box, Gtk.Label(label='Ultimate Menu'))
@@ -1263,12 +1264,12 @@ class Browser(Gtk.Application):
             okay = ordinary and not conflict
             create.set_sensitive(okay)
             if conflict:
-                feedback.add_css_class('argonaut-error-message')
+                set_error(feedback, True)
                 feedback.set_text(
                     'That filename already exists in the local folder. '
                     'Choose another filename; nothing will be overwritten.')
             else:
-                feedback.remove_css_class('argonaut-error-message')
+                set_error(feedback, False)
                 feedback.set_text('' if okay else
                                   'Enter one local filename and a disk name. '
                                   'Leave the disk ID blank or enter exactly 2 characters.')
@@ -1301,7 +1302,7 @@ class Browser(Gtk.Application):
             from .disk_image_io import create_blank_d64
             content.set_sensitive(False)
             create.set_sensitive(False)
-            feedback.remove_css_class('argonaut-error-message')
+            set_error(feedback, False)
             feedback.set_text('Creating and validating the disk image…')
             def task():
                 try:
@@ -1312,7 +1313,7 @@ class Browser(Gtk.Application):
                 if isinstance(result, Exception):
                     content.set_sensitive(True)
                     create.set_sensitive(True)
-                    feedback.add_css_class('argonaut-error-message')
+                    set_error(feedback, True)
                     feedback.set_text(str(result))
                     return
                 dialog.destroy()
@@ -1382,12 +1383,12 @@ class Browser(Gtk.Application):
             okay = ordinary and not conflict
             create.set_sensitive(okay)
             if conflict:
-                feedback.add_css_class('argonaut-error-message')
+                set_error(feedback, True)
                 feedback.set_text(
                     'That filename already exists on the C64 Ultimate. '
                     'Choose another filename; nothing will be overwritten.')
             else:
-                feedback.remove_css_class('argonaut-error-message')
+                set_error(feedback, False)
                 feedback.set_text('' if okay else
                                   'Enter one ordinary filename and a disk name.')
             return okay
@@ -1415,13 +1416,13 @@ class Browser(Gtk.Application):
             try:
                 destination = child(folder, leaf)
             except BrowserError as exc:
-                feedback.add_css_class('argonaut-error-message')
+                set_error(feedback, True)
                 feedback.set_text(str(exc))
                 return
 
             content.set_sensitive(False)
             create.set_sensitive(False)
-            feedback.remove_css_class('argonaut-error-message')
+            set_error(feedback, False)
             feedback.set_text('Creating and validating the disk image…')
 
             def task():
@@ -1436,7 +1437,7 @@ class Browser(Gtk.Application):
                 if isinstance(result, Exception):
                     content.set_sensitive(True)
                     create.set_sensitive(True)
-                    feedback.add_css_class('argonaut-error-message')
+                    set_error(feedback, True)
                     feedback.set_text(str(result))
                     return
                 dialog.destroy()
@@ -1640,6 +1641,8 @@ class Browser(Gtk.Application):
         if self.busy:
             self.status.set_text('Wait for the current operation to finish before closing.')
             return True
+        appearance = getattr(self, 'appearance', None)
+        if appearance is not None:appearance.close()
         policy = getattr(self, 'file_click_policy', None)
         if policy is not None:policy.close()
         if self.recovery:self.recovery.close()

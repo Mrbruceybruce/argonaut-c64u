@@ -577,7 +577,8 @@ class PublishedRevisionGtk(unittest.TestCase):
         label=rows[0].get_child()
         self.assertEqual('C64Robots v1.3 · Commodore 64 · D64\n'
             '/USB0/ARGONAUT_LIBRARY/games/C64Robots v1.3.d64',label.get_text())
-        self.assertTrue(label.get_selectable())
+        self.assertFalse(label.get_selectable())
+        self.assertEqual('/USB0/ARGONAUT_LIBRARY/games/C64Robots v1.3.d64',label.get_tooltip_text())
         for value in ('Beige','25EA78','a3b6d459-a989-4224-a372-0a995628f7ce','Revision 1'):
             self.assertIn(value,self.view.main_message.get_text())
         self.core.configure_game_library.assert_not_called()

@@ -190,7 +190,8 @@ class ManagedLibraryView:
                 for game in library.games:
                     label=Gtk.Label(label=(f'{game.title} · Commodore 64 · {game.format}\n'
                         f'{library.identity.path}/{game.path}'),
-                        xalign=0,wrap=True,selectable=True,margin_top=5,margin_bottom=5)
+                        xalign=0,wrap=True,selectable=False,margin_top=5,margin_bottom=5)
+                    label.set_tooltip_text(f'{library.identity.path}/{game.path}')
                     row=Gtk.ListBoxRow();row.library=library;row.game=game
                     row.set_child(label);self.rows.append(row)
             else:self.main_message.set_text('No Game Library Configured\n'

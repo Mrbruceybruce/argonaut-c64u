@@ -12,6 +12,8 @@ class PreferencesUI(unittest.TestCase):
         from c64u_browser.gui import Browser
         from c64u_browser.profiles import Preferences
         self.Gtk=Gtk;self.GLib=GLib;self.Gio=Gio
+        appearance=patch('c64u_browser.gui.AppearanceFollower',autospec=True)
+        self.appearance_factory=appearance.start();self.addCleanup(appearance.stop)
         self.env=patch.dict(os.environ,{'ARGONAUT_DEVELOPMENT':'1'});self.env.start()
         self.temp=tempfile.TemporaryDirectory()
         from c64u_browser.c64_ai_bridge_control import HealthMonitorStatus
@@ -26,10 +28,40 @@ class PreferencesUI(unittest.TestCase):
         self.assertIs(self.app.preferences, self.app.core.preferences)
         self.app.set_application_id('org.local.Argonaut.Test'+uuid.uuid4().hex)
         self.app.set_flags(Gio.ApplicationFlags.NON_UNIQUE);self.app.register(None);self.app.activate()
+    def owned_windows(self):
+        def owned(window):
+            seen=set()
+            while window is not None and window not in seen:
+                if window is self.app.window or window.get_application() is self.app:
+                    return True
+                seen.add(window);window=window.get_transient_for()
+            return False
+        return [w for w in self.Gtk.Window.list_toplevels() if owned(w)]
+
+    def drain_events(self):
+        context=self.GLib.MainContext.default()
+        for _ in range(10000):
+            if not context.pending():return
+            context.iteration(False)
+        self.fail('GTK event queue did not become idle during fixture cleanup')
+
     def tearDown(self):
-        dialog=getattr(self.app,'preferences_dialog',None)
-        if dialog:dialog.response(self.Gtk.ResponseType.CANCEL)
-        self.app.window.close();self.temp.cleanup();self.env.stop()
+        try:
+            # Normal close may correctly refuse invalid edits or open a prompt.
+            # Dispose only this fixture's windows; never enumerate-and-close all.
+            self.drain_events()
+            owned=self.owned_windows()
+            for window in owned:
+                if window is not self.app.window:window.destroy()
+            self.app.preferences_dialog=None
+            self.drain_events()
+            self.app.window.close()
+            self.drain_events()
+            self.assertFalse([w for w in self.owned_windows() if w.get_modal()],
+                             'Fixture leaked a modal window')
+            self.assertFalse(self.owned_windows(), 'Fixture leaked a window')
+        finally:
+            self.temp.cleanup();self.env.stop()
     def pump(self):
         for _ in range(20):
             while self.GLib.MainContext.default().pending():self.GLib.MainContext.default().iteration(False)
@@ -572,14 +604,25 @@ class PreferencesUI(unittest.TestCase):
         service=GameLibraryService(Path(self.temp.name)/'batch-library.json').load()
         self.addCleanup(service.close)
         tab=self.app.game_library_tab
-        tab.client=GameLibraryClient(service,Mock())
-        tab._add_local_paths((str(first),str(duplicate)))
+        launcher=Mock()
+        tab.client=GameLibraryClient(service,launcher)
+        self.app.local=Path(self.temp.name)
+        tab.add_local();self.pump()
+        picker=tab.chooser
+        self.assertEqual(('core-host','c64u'),picker.model.scopes)
+        row=picker.listing.get_first_child()
+        while row:
+            if row.item[0] in (first.name,duplicate.name):picker.listing.select_row(row)
+            row=row.get_next_sibling()
+        self.assertEqual(2,len(picker.listing.get_selected_rows()))
+        picker.response(None,self.Gtk.ResponseType.ACCEPT)
         deadline=time.monotonic()+3
         while time.monotonic()<deadline and 'duplicate content' not in tab.message.get_text():
             self.pump()
         self.assertEqual(1,len(service.list()))
         self.assertIn('Added 1 new game record.',tab.message.get_text())
         self.assertIn('duplicate content',tab.message.get_text())
+        self.assertEqual([],launcher.mock_calls)
 
     def test_game_library_selection_details_and_filters_use_core_catalog(self):
         from unittest.mock import Mock
@@ -611,28 +654,54 @@ class PreferencesUI(unittest.TestCase):
                 if isinstance(w,self.Gtk.Button)}
         self.assertIn('Scan local folder…',labels)
         self.assertIn('Scan C64U folder…',labels)
-        self.assertIn('Add selected C64U file(s)',labels)
+        self.assertIn('Add C64U files…',labels)
 
         submit=Mock();dialog=tab._scan_options(
             'Test scan','/tmp/games',submit)
         dialog.recursive.set_active(True);dialog.response(self.Gtk.ResponseType.OK)
         self.pump();submit.assert_called_once_with(True)
 
-        self.app.remote='/USB2/Games'
-        self.app.populate(self.app.rlist,[('one.d64',False,100),
-                                           ('two.crt',False,200)])
-        row=self.app.rlist.get_first_child().get_next_sibling()
-        self.app.rlist.select_row(row);self.app.rlist.select_row(row.get_next_sibling())
+        from dataclasses import replace
+        from c64u_browser.picker_model import PickerSelection,PickerMode,GAMES
+        from c64u_browser.game_library import BulkImportRequest
+        session=DeviceSession('id:C64-A','session-1')
+        first=PickerSelection('c64u','/USB2/Games/one.d64','one.d64',
+                              '/USB2',session.device_id,session.session_id,'games','file')
+        selections=(first,replace(first,path='/USB2/Games/two.crt',filename='two.crt'))
         job=Mock()
-        with patch.object(self.app.core,'device_session',return_value=DeviceSession(
-                'id:C64-A','session-1')), \
-             patch.object(tab.client,'scan_c64u_sources',return_value=job) as scan, \
-             patch.object(tab,'_start_bulk_scan',side_effect=lambda submit:submit()) as start:
+        # Mock only the picker UI boundary and Core submission; keep consumer
+        # validation real and never perform a remote read, write or launch.
+        with patch('c64u_browser.game_library_tab.FilePicker',autospec=True) as picker, \
+             patch.object(self.app.core,'device_session',return_value=session) as current, \
+             patch.object(tab.client.library,'prepare_bulk_import',return_value=job) as prepare, \
+             patch.object(tab,'_start_bulk_scan') as start, \
+             patch.object(tab.client,'add_selection') as add:
             tab.add_c64u()
-        scan.assert_called_once_with(
-            'id:C64-A',('/USB2/Games/one.d64','/USB2/Games/two.crt'))
-        start.assert_called_once()
-        self.assertTrue(callable(start.call_args.args[0]))
+            self.assertEqual(('c64u','core-host'),picker.call_args.kwargs['scopes'])
+            self.assertEqual(PickerMode.OPEN_FILES,picker.call_args.kwargs['mode'])
+            self.assertEqual(GAMES,picker.call_args.kwargs['filter'])
+            picker.call_args.args[1](None)
+            self.assertIsNone(tab.chooser)
+            start.assert_not_called();prepare.assert_not_called();add.assert_not_called()
+
+            tab.add_c64u();picker.call_args.args[1](selections)
+            start.assert_called_once()
+            submit=start.call_args.args[0]
+            self.assertIs(submit(),job)
+            prepare.assert_called_once_with(
+                BulkImportRequest.c64u_sources(session.device_id,tuple(s.path for s in selections)),
+                expected_session=session)
+            prepare.reset_mock();start.reset_mock()
+            for changed in (DeviceSession(session.device_id,'replacement'),
+                            DeviceSession('other-device',session.session_id)):
+                current.return_value=changed
+                with self.assertRaises(ValueError):submit()
+            prepare.assert_not_called()
+            current.return_value=session
+            tab.add_selections((replace(first,kind='dir'),))
+            self.assertIn('Choose D64 or CRT game files.',tab.message.get_text())
+            tab.add_selections((replace(first,filename='wrong.d64'),))
+            start.assert_not_called();prepare.assert_not_called();add.assert_not_called()
         with patch.object(self.app.core,'device_session',return_value=DeviceSession(
                 'id:C64-A','session-1')), \
              patch.object(tab.client,'scan_c64u_folder',return_value=job) as scan, \
@@ -922,7 +991,7 @@ class PreferencesUI(unittest.TestCase):
         dialog=show_preferences(self.app,1);c=dialog.connections
         labels=[w.get_label() for w in self.walk(c.page)
                 if isinstance(w,self.Gtk.Button)]
-        self.assertIn('Save device profile',labels)
+        self.assertIn('Save Profile',labels)
         self.assertNotIn('Save profile details',labels)
         self.assertEqual(c.fields['case_edition'].get_text(),'Existing case')
         self.assertTrue(c.fields['case_edition'].get_editable());self.assertFalse(c.model.get_editable())
