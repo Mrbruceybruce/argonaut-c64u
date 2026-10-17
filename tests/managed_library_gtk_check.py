@@ -608,14 +608,14 @@ class PublishedRevisionGtk(unittest.TestCase):
         self.assertEqual([],self.children(self.view.rows))
         self.assertIn('Unavailable',self.view.main_message.get_text())
 
-    def test_managed_rows_have_no_launch_action_or_legacy_admission(self):
+    def test_managed_rows_selectable_without_automatic_launch_or_legacy_admission(self):
         self.core.game_launch=Mock()
         self.core.game_library=Mock()
         self.published()
-        self.assertEqual(Gtk.SelectionMode.NONE,self.view.rows.get_selection_mode())
+        self.assertEqual(Gtk.SelectionMode.SINGLE,self.view.rows.get_selection_mode())
         row=self.view.rows.get_first_child()
         row.emit('activate')
         self.core.game_launch.assert_not_called()
         self.assertEqual([],self.core.game_launch.mock_calls)
         self.assertEqual([],self.core.game_library.mock_calls)
-        self.assertFalse(hasattr(self.view,'launch_button'))
+        self.assertEqual('Review & Launch',self.view.launch_review.button.get_label())

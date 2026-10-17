@@ -257,6 +257,8 @@ class ArgonautCore:
         self.game_launch = GameLaunchService(
             self.game_library, self._require_client, self.device_session,
             self.scheduler, volume_identity=self._game_volume_identity)
+        from .managed_d64_preflight import ManagedD64Preflight
+        self.managed_d64_preflight = ManagedD64Preflight(self)
         self.game_library_error = None
         self.sid_catalog = SidCatalogService(
             self.preferences.path.parent / 'sid-jukebox.json',
@@ -959,6 +961,11 @@ class ArgonautCore:
             # Admission refusals and uncertain responses consume the authority too.
             self.discard_machine_command(target)
 
+    def execute_managed_d64(self, plan_id):
+        """Explicit single-use managed D64 execution; returns a Core job."""
+        from .managed_d64_execution import execute
+        return execute(self, plan_id)
+
     def execute_drive_image(self, selection, drive, mode='readonly', *, run=False):
         """Existing desktop worker only; bind the complete action to one session.
 
@@ -993,6 +1000,7 @@ class ArgonautCore:
     def close(self):
         """Release Core execution resources; jobs are not persisted."""
         self._machine_targets.clear()
+        self.managed_d64_preflight.close()
         self._import_admission.invalidate()
         self._import_staging.invalidate()
         self._import_preparation.close()

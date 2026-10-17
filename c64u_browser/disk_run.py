@@ -3,6 +3,7 @@
 import socket
 import struct
 from .api import BrowserError, safe_argument
+from .jobs import JobCancelled
 from .ftp_reads import adapter_for
 from .diagnostics import operation_event
 
@@ -57,12 +58,14 @@ def _mount_and_run(client, path):
         raise BrowserError(detail+'Mount & Run failed: '+str(exc)+'. DMA service must be enabled on TCP port 64.') from exc
 
 
-def run_image_bytes(client, image):
+def run_image_bytes(client, image, *, before_submit=None):
     """Send one already-validated D64 image through RUN_IMG.
 
     A return means the firmware processed a following IDENTIFY command.  It is
     command acceptance evidence, not proof that software reached a playable
     screen.  Failures after RUN_IMG is sent are deliberately uncertain.
+    Optional before_submit runs after authentication, immediately before RUN_IMG;
+    it may reject or cancel without sending the consequential command.
     """
     image = bytes(image)
     size = len(image)
@@ -86,6 +89,7 @@ def run_image_bytes(client, image):
                 if receive_exact(connection, 1) != b'\x01':
                     raise BrowserError(
                         'DMA authentication failed; check the network password.')
+            if before_submit is not None:before_submit()
             # RUN_IMG has a three-byte little-endian length, unlike AUTH/IDENTIFY.
             sent = True
             connection.sendall(b'\x0b\xff' + size.to_bytes(3, 'little') + image)
@@ -96,6 +100,8 @@ def run_image_bytes(client, image):
             if not length:
                 raise BrowserError('DMA service returned an empty response.')
             receive_exact(connection, length)
+    except JobCancelled:
+        raise
     except (OSError, EOFError, BrowserError) as exc:
         if isinstance(exc, DmaLaunchError):raise
         detail = ('Run may have started; check the C64U before retrying. '

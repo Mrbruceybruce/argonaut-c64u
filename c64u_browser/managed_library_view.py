@@ -23,8 +23,12 @@ class ManagedLibraryView:
         self.retry_button.connect('clicked',lambda *_:self.connection_completed(retry=True))
         self.box.append(self.retry_button)
         scroll=Gtk.ScrolledWindow(vexpand=True)
-        self.rows=Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self.rows=Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         scroll.set_child(self.rows);self.box.append(scroll)
+        from .managed_launch_review import ManagedLaunchReview
+        self.launch_review=ManagedLaunchReview(self)
+        self.rows.connect('row-selected',lambda *_:self.launch_review.selection_changed())
+        self.box.append(self.launch_review.box)
         self.box.append(self.import_review.box)
 
         self.settings_box=self.column()
@@ -59,7 +63,7 @@ class ManagedLibraryView:
         self.settings_box.append(Gtk.Label(label='Selection is saved separately from General settings. '
             'Forget keeps all files on the device. Libraries are never merged.',xalign=0,wrap=True))
         self.busy_controls=(self.refresh_button,self.select_button,self.create_button,
-                            self.forget_button,self.choices,self.settings_button,self.retry_button,*self.import_review.busy_controls)
+                            self.forget_button,self.choices,self.settings_button,self.retry_button,self.rows,*self.launch_review.busy_controls,*self.import_review.busy_controls)
         def enqueue(event):
             session=app.core.device_session()
             configured=app.preferences.game_library_location
@@ -99,6 +103,7 @@ class ManagedLibraryView:
         if emitted_session is not None and (emitted_session!=self.app.core.device_session()
                 or emitted_preference!=self.app.preferences.game_library_location):return False
         if event.kind=='library-location-changed':
+            self.rows.unselect_all();self.launch_review.invalidate()
             # A successful explicit selection has already persisted and rendered.
             if (self.state.status=='valid' and self.matches(self.state.libraries[0],
                     self.app.preferences.game_library_location)
@@ -167,6 +172,7 @@ class ManagedLibraryView:
             f'Revision {library.revision} · {len(library.games)} games')
 
     def render(self,state):
+        self.launch_review.invalidate()
         self.import_review.invalidate()
         self.state=state
         self.retry_button.set_visible(self.app.preferences.game_library_location is not None)
@@ -185,7 +191,8 @@ class ManagedLibraryView:
                     label=Gtk.Label(label=(f'{game.title} · Commodore 64 · {game.format}\n'
                         f'{library.identity.path}/{game.path}'),
                         xalign=0,wrap=True,selectable=True,margin_top=5,margin_bottom=5)
-                    self.rows.append(label)
+                    row=Gtk.ListBoxRow();row.library=library;row.game=game
+                    row.set_child(label);self.rows.append(row)
             else:self.main_message.set_text('No Game Library Configured\n'
                 'Choose an existing library or create a new one in Settings → Game Library.')
         elif configured:
@@ -200,6 +207,7 @@ class ManagedLibraryView:
                 'Choose an existing library or create a new one in Settings → Game Library.')
         self.render_available()
         self.import_review.update()
+        self.launch_review.update()
 
     def render_available(self):
         selected=self.choices.get_selected_row()
@@ -392,7 +400,9 @@ class ManagedLibraryView:
         self.chooser.dialog.set_transient_for(self.parent_window())
 
     def close(self):
+        if self.closed:return
         self.restore_pending=None;self.ready_session=None
         self.closed=True;self.generation+=1;self.unsubscribe()
+        self.launch_review.invalidate()
         self.detach_settings()
         self.import_review.close()

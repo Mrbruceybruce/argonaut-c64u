@@ -2,6 +2,7 @@
 """Bounded read-only managed library contracts; no catalog or storage writes."""
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
 import json
 import posixpath
 from uuid import UUID
@@ -83,6 +84,7 @@ class ManagedLibrary:
     created_at: str
     revision: int
     games: tuple
+    manifest_sha256: str = ''
 
 
 @dataclass(frozen=True)
@@ -143,7 +145,7 @@ def parse_manifest(data, device_id, path):
             if artwork:relative_path(artwork,'artwork')
             elif artwork != '':raise ValueError()
             games.append(ManagedGame(identity,game_path,title,format_,size,digest,metadata,artwork))
-        return ManagedLibrary(LibraryIdentity(library_id,device_id,root,path),stamp,revision,tuple(games))
+        return ManagedLibrary(LibraryIdentity(library_id,device_id,root,path),stamp,revision,tuple(games),hashlib.sha256(data).hexdigest())
     except (ValueError,TypeError,KeyError,UnicodeError,RecursionError) as exc:
         raise LibraryError('Malformed or invalid managed-library manifest.') from exc
 
