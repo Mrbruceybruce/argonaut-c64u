@@ -1,5 +1,104 @@
 # Current development state
 
+## Current Game Library State — PA-5.13 Published
+
+This section records the current published managed Game Library state and the
+operator-reported physical acceptance on Beige. Earlier checkpoint statements
+below, including pending GUI acceptance and unavailable managed launching, remain
+historical evidence; they do not describe the current capabilities. Historical
+technical contracts in [Managed Library](MANAGED-LIBRARY.md) retain their original
+checkpoint scope. See [Game Library](GAME-LIBRARY.md#current-managed-game-library-status)
+for the distinction from the existing referenced-file catalog.
+
+### PA-5.10 — Managed Game Publication
+
+C64Robots v1.3 was successfully published to the physical Beige C64 Ultimate in
+`/USB0/ARGONAUT_LIBRARY`. The schema-1 managed manifest reached revision **1**;
+the published D64 and manifest passed independent physical readback verification.
+The publication checkpoint itself did not launch the game.
+
+### PA-5.11 — Game Library GUI
+
+Managed Game Library GUI integration is complete. Existing libraries can be
+discovered and explicitly selected, and validated managed game records are
+presented in the Game Library.
+
+### PA-5.12 — Discovery and Restoration
+
+Discovery now handles inaccessible advertised roots independently. The Beige
+failure caused by `/SD` returning FTP **550** was corrected: validated libraries
+on accessible roots are retained, and partial-discovery warnings identify the
+inaccessible roots. The configured library automatically restores after connection
+and reconnection to its matching device. Physical Beige acceptance passed.
+
+Published commit: `0d8b174d4795225a95c52b1242a2c1b38ffddcbb`.
+
+### PA-5.13 — Managed D64 Launching
+
+Managed D64 launching is complete and published. Immutable selections bind the
+device/session, library and game identity. Read-only preflight validates the exact
+configured library UUID, revision, raw manifest digest, complete game record,
+size, SHA-256 and D64 structure, producing an expiring, single-use launch plan.
+Execution revalidates the library and content and dispatches the exact verified
+bytes through authenticated DMA `RUN_IMG`; it does not ask the device to reread
+a mutable remote path.
+
+GTK requires explicit **Review & Launch**, followed by explicit **Launch**
+confirmation. Canceling or closing the review discards the unused plan. Execution
+reports **Accepted**, **Rejected** or **Uncertain**, with no automatic retry of
+consequential launch operations. Accepted means DMA protocol acceptance, not an
+automated claim of playable gameplay.
+
+Physical Beige acceptance passed: C64Robots v1.3 reached playable gameplay.
+Published commit: `0f90bd700c1596d3ed069f08b7fdbaa97da401bf`.
+
+### Physical acceptance evidence — Beige C64 Ultimate
+
+The following identifies the physically accepted artifact; these are acceptance
+records, not hardcoded launch targets or authorization for another launch.
+
+| Field | Accepted value |
+| --- | --- |
+| Device | Beige C64 Ultimate |
+| Device identity | `id:25EA78` |
+| Library | `/USB0/ARGONAUT_LIBRARY` |
+| Library UUID | `a3b6d459-a989-4224-a372-0a995628f7ce` |
+| Library revision | `1` |
+| Game | C64Robots v1.3 |
+| Game UUID | `56834b05-92d5-585f-9683-b4c79738cfaa` |
+| Game path | `/USB0/ARGONAUT_LIBRARY/games/C64Robots v1.3.d64` |
+| Format | D64 |
+| Verified size | 174848 bytes |
+| Game SHA-256 | `78d99754a49326515d55f69fc7ac55e1984e0bb3b38b8a46466621e0add44d51` |
+| Manifest SHA-256 | `f2b2d1150e42f8b5207baa15f1fbd2817086432e938f6778bd918969d2cc9e71` |
+
+Physical launch acceptance established DMA protocol acceptance, a C64 screen
+transition/reset, the C64Robots title screen, and successful game start and
+interaction. The latter observations establish gameplay for this accepted run;
+they are separate from the application's protocol-level Accepted outcome.
+
+### Outstanding work and unchanged limitations
+
+- Managed **CRT launching is not implemented**. Existing referenced-catalog CRT
+  launching is a separate capability and remains unchanged.
+- Three optional P3 GTK lifecycle regression tests remain deferred: reconnect
+  during an open review followed by a delayed Launch response; view closure during
+  execution followed by an uncertain completion; and cancellation immediately
+  after confirmation before the execution job runs.
+- A post-launch remote manifest/game integrity recheck remains deferred. The
+  recorded preflight and execution-time checks are not post-launch verification.
+- Physical qualification of managed D64 launching on Founder's Edition remains
+  pending. Beige acceptance does not qualify that device.
+- The local `development` worktree in `argonaut-repository` may lag GitHub and
+  contains unrelated local modifications and untracked files. It requires separate
+  reconciliation; PA-5.14 does not modify it or reconcile its history.
+- Existing managed-import/staging limitations and historical uncertain outcomes
+  remain unchanged. In particular, PA-4.13 instruction-compliance **FAIL** and
+  PA-4.2 **UNCERTAIN** are not erased or upgraded by these later milestones.
+  No new recovery, cleanup, adoption, retry or broader publication qualification
+  is implied. Earlier independent-resource-release limitations remain scoped to
+  their recorded attempts.
+
 ## PA-5.1A transport and lifecycle foundation — offline implementation
 
 PA-5.1B adds focused offline corrections for the four PA-5.1AR findings:

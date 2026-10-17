@@ -4,6 +4,27 @@ The Game Library MVP supports referenced D64 and CRT files on the Argonaut Core
 host or on one identified C64U removable volume. Adding a catalog entry does not
 move, copy, upload, mount, launch or delete the referenced file.
 
+## Current managed Game Library status
+
+PA-5.10 through PA-5.13 are complete and published. Managed libraries support
+explicit discovery/selection, partial-discovery warnings for inaccessible roots,
+and automatic configured-library restoration after matching-device connection
+and reconnection. Managed **D64** games now use identity-bound read-only preflight,
+expiring single-use plans, explicit GTK review/Launch confirmation, execution-time
+revalidation and verified-byte DMA `RUN_IMG` dispatch. Outcomes are Accepted,
+Rejected or Uncertain; consequential launches are never retried automatically.
+
+PA-5.13 is published at `0f90bd700c1596d3ed069f08b7fdbaa97da401bf`.
+Physical Beige acceptance established protocol acceptance and separately observed
+C64Robots v1.3 title-screen startup, game start and interaction. Protocol acceptance
+alone still does not prove gameplay. Managed CRT launching and Founder's Edition
+managed-D64 physical qualification remain pending.
+
+See [current milestones, exact acceptance identifiers and deferred work](CURRENT-STATE.md#current-game-library-state--pa-513-published).
+The referenced-file catalog workflows, four legacy launch routes and historical
+acceptance results below retain their existing scope. They do not imply managed
+CRT support; managed launching does not insert games into that legacy catalog.
+
 ## GTK client workflow
 
 The **Game Library** tab is a thin client of the two Core services. It lists the
