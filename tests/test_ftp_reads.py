@@ -285,4 +285,47 @@ class ReadMigrationTests(unittest.TestCase):
             with self.assertRaises(CoreError):core.reconnect('/USB1')
             self.assertEqual(before,server.connections)
 
+
+
+class ManagedDiscoveryTransportTests(unittest.TestCase):
+    core = ReadMigrationTests.core
+    # Reuse fixture helpers, without rerunning the inherited suite.
+    def test_partial_discovery_releases_failed_lease(self):
+        from tests.test_managed_library import PublishedRevisionTests
+        data=PublishedRevisionTests.published_manifest()
+        library=b'/USB0/ARGONAUT_LIBRARY'
+        tree={b'/':b'type=dir; SD\r\ntype=dir; USB0\r\ntype=dir; USB1\r\n',
+              b'/USB0':b'type=dir; ARGONAUT_LIBRARY\r\n',
+              library:b'type=dir; games\r\ntype=dir; metadata\r\ntype=dir; artwork\r\ntype=file;size='+str(len(data)).encode()+b'; manifest.json\r\n'}
+        for bad in (b'/SD',b'/USB1'):
+            with self.subTest(bad=bad),FakeC64UFtp(directories={**tree,**{r:b'' for r in (b'/SD',b'/USB1') if r!=bad}},files={library+b'/manifest.json':data}) as server:
+                core,profile=self.core(server);core.connect(profile,remote_folder='/USB0')
+                session=core.device_session();before=server.connections
+                snapshot=core.load_managed_library(discover=True).wait(10)
+                self.assertEqual('succeeded',snapshot.state,snapshot.error)
+                state=snapshot.result
+                self.assertEqual('partial',state.status)
+                self.assertIn(bad.decode()+': directory listing (control-reply), FTP 550',state.message)
+                self.assertEqual('C64Robots v1.3',state.libraries[0].games[0].title)
+                self.assertEqual(0,core._ftp_manager.active_count)
+                self.assertGreater(server.connections,before+1)
+                self.assertEqual(session,core.device_session())
+                self.assertIsNone(core.preferences.game_library_location)
+                self.assertEqual('/USB0',core.device_operations.list_directory('/USB0')[0])
+                core.close()
+                self.assertFalse(set(server.verbs)&{b'STOR',b'MKD',b'DELE',b'RNFR',b'RNTO'})
+
+    def test_discovery_auth_and_network_do_not_skip(self):
+        tree={b'/':b'type=dir; SD\r\ntype=dir; USB0\r\n',b'/USB0':b''}
+        for reply,kind in ((b'530 denied\r\n','authentication'),(b'421 unavailable\r\n','network')):
+            with self.subTest(kind=kind),FakeC64UFtp(directories=tree) as server:
+                core,profile=self.core(server);core.connect(profile,remote_folder='/USB0')
+                server.before_command=lambda verb,arg:reply if verb==b'CWD' and arg==b'/SD' else None
+                before=len(server.commands)
+                result=core.load_managed_library(discover=True).wait(10)
+                self.assertEqual('failed',result.state);self.assertEqual(kind,result.error.code)
+                self.assertNotIn((b'CWD',b'/USB0'),server.commands[before:])
+                self.assertEqual(0,core._ftp_manager.active_count)
+                core.close()
+
 if __name__=='__main__':unittest.main()

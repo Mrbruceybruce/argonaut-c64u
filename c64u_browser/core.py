@@ -6,7 +6,7 @@ The desktop currently runs this facade in-process.  Future transports and
 clients must call the same application operations instead of owning an
 ``UltimateClient`` themselves.
 """
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from functools import wraps
 from threading import Lock
 from dataclasses import dataclass, replace
@@ -429,9 +429,16 @@ class ArgonautCore:
                     raise CoreError('session', 'Connection changed. Reload the library.')
                 if self.preferences.game_library_location != configured:
                     raise CoreError('location', 'Library location changed. Reload the library.')
-            with read_operation(client, check):
-                reader = ManagedLibraryReader(client.list_directory,
-                    lambda path,limit:read_remote_game(client,path,limit,check=check),session,check)
+            def listing(path):
+                # Discovery attempts release even a poisoned lease before another
+                # root is visited. Every new lease retains the captured binding.
+                with read_operation(client, check):return client.list_directory(path)
+            def read(path,limit):
+                with read_operation(client, check):
+                    return read_remote_game(client,path,limit,check=check)
+            # Configured/selected loads retain their original single read scope.
+            with read_operation(client, check) if target else nullcontext():
+                reader = ManagedLibraryReader(listing,read,session,check)
                 result = reader.discover(target)
                 check()
                 return result

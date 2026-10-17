@@ -29,6 +29,199 @@ class ManagedViewGtk(unittest.TestCase):
         while child:result.append(child);child=child.get_next_sibling()
         return result
 
+    def configured(self):
+        library=parse_manifest(manifest(games=[game()]),'device',PATH)
+        self.app.preferences.game_library_location=library.identity.preference()
+        self.view.reset()
+        return library
+
+    def restoration_browser(self):
+        """Real Browser admission/completion with a manually drained GLib queue."""
+        from c64u_browser.gui import Browser
+        from c64u_browser.foreground import ForegroundSlot
+        from c64u_browser.jobs import CoreJob
+        library=self.configured()
+        self.app.managed_library_view=self.view
+        self.app.foreground=ForegroundSlot()
+        self.app.transfer_job=None
+        self.app.busy_controls=list(self.view.busy_controls)
+        self.app.status=Mock();self.app.operation=Mock();self.app.cancel_button=Mock()
+        self.app.bind_job_cancel=Mock()
+        for name in ('run_file_job','begin_file_job','end_file_job'):
+            setattr(self.app,name,lambda *args,_name=name,**kw:getattr(Browser,_name)(self.app,*args,**kw))
+        restored=CoreJob('game-library.managed-load',lambda _:LibraryState(
+            'valid','Restored',(library,),self.session.session_id))
+        self.core.load_managed_library.return_value=restored
+        idles=[];timers=[]
+        def idle(callback,*args):
+            idles.append((callback,args));return len(idles)
+        for patcher in (patch('c64u_browser.gui.GLib.idle_add',side_effect=idle),
+                patch('c64u_browser.gui.GLib.timeout_add',
+                    side_effect=lambda interval,callback:timers.append(callback))):
+            patcher.start();self.addCleanup(patcher.stop)
+        return restored,idles
+
+    def drain_restoration_callbacks(self,idles):
+        # A finite callback budget makes accidental rescheduling a test failure.
+        for _ in range(30):
+            if not idles:return
+            callback,args=idles.pop(0);callback(*args)
+        self.fail('Completion queue did not drain')
+
+    def test_browser_run_completion_automatically_admits_pending_restore(self):
+        from concurrent.futures import Future
+        from c64u_browser.gui import Browser
+        restored,idles=self.restoration_browser()
+        before=dict(self.app.preferences.game_library_location);session=self.session
+        future=Future();self.app.pool=Mock();self.app.pool.submit.return_value=future
+        def completed(result):
+            self.assertEqual('connected',result)
+            self.assertFalse(self.app.busy)
+            self.assertIsNone(self.app.foreground.token)
+        done=Mock(side_effect=completed)
+        self.assertTrue(Browser.run(self.app,Mock(),done))
+        self.view.connection_completed()
+        self.assertTrue(self.app.busy);self.assertIsNotNone(self.view.restore_pending)
+        self.core.load_managed_library.assert_not_called()
+        future.set_result('connected')
+        finish,args=idles[0]
+        self.drain_restoration_callbacks(idles)
+        done.assert_called_once_with('connected')
+        self.assertIsNone(self.view.restore_pending)
+        self.assertIs(self.app.transfer_job,restored)
+        self.core.load_managed_library.assert_called_once_with(discover=False,expected_session=session)
+        restored.run();self.drain_restoration_callbacks(idles)
+        # Replay delivery and a delayed same-session connection event only after
+        # the restoration completes; neither may submit another library load.
+        finish(*args)
+        self.listeners[0](NS(kind='connected'))
+        self.drain_restoration_callbacks(idles)
+        self.assertFalse(self.app.busy);self.assertIsNone(self.app.foreground.token)
+        self.assertEqual('valid',self.view.state.status)
+        self.assertEqual(1,len(self.children(self.view.rows)))
+        self.assertEqual(before,self.app.preferences.game_library_location)
+        self.assertEqual(session,self.core.device_session())
+        self.core.load_managed_library.assert_called_once_with(discover=False,expected_session=session)
+        self.core.configure_game_library.assert_not_called()
+
+    def test_file_job_completion_automatically_admits_pending_restore(self):
+        from c64u_browser.jobs import CoreJob
+        restored,idles=self.restoration_browser()
+        before=dict(self.app.preferences.game_library_location);session=self.session
+        blocker=CoreJob('file.synthetic',lambda _:'finished')
+        self.assertTrue(self.app.run_file_job(lambda:blocker,Mock()))
+        token=self.app.foreground.token
+        self.view.connection_completed()
+        self.assertIsNotNone(self.view.restore_pending)
+        self.core.load_managed_library.assert_not_called()
+        blocker.run()
+        # Real run_file_job completion invokes real end_file_job; its wakeup
+        # remains queued until we have asserted release of the previous owner.
+        completion,args=idles.pop(0);completion(*args)
+        self.assertFalse(self.app.busy)
+        self.assertIsNone(self.app.foreground.token)
+        self.assertIsNone(self.app.transfer_job)
+        self.core.load_managed_library.assert_not_called()
+        self.drain_restoration_callbacks(idles)
+        self.assertIsNone(self.view.restore_pending)
+        self.assertIs(self.app.transfer_job,restored)
+        self.core.load_managed_library.assert_called_once_with(discover=False,expected_session=session)
+        self.assertFalse(self.app.end_file_job(blocker,token))
+        completion(*args)
+        restored.run();self.drain_restoration_callbacks(idles)
+        self.listeners[0](NS(kind='reconnected'));self.drain_restoration_callbacks(idles)
+        self.assertFalse(self.app.busy);self.assertIsNone(self.app.foreground.token)
+        self.assertEqual(before,self.app.preferences.game_library_location)
+        self.assertEqual(session,self.core.device_session())
+        self.assertEqual('valid',self.view.state.status)
+        self.core.load_managed_library.assert_called_once_with(discover=False,expected_session=session)
+        self.core.configure_game_library.assert_not_called()
+
+    def test_restore_saved_preference_after_connection_and_deduplicate(self):
+        library=self.configured();before=dict(self.app.preferences.game_library_location)
+        self.view.connection_completed()
+        factory,done=self.app.run_file_job.call_args.args
+        self.assertIn('Loading configured Game Library…',self.view.main_message.get_text())
+        factory();self.core.load_managed_library.assert_called_once_with(discover=False,expected_session=self.session)
+        self.view.event(NS(kind='connected'))
+        self.view.connection_completed()
+        self.assertEqual(1,self.app.run_file_job.call_count)
+        done(NS(state='succeeded',result=LibraryState('valid','Loaded',(library,),'one')))
+        self.assertEqual(1,len(self.children(self.view.rows)))
+        self.assertEqual(before,self.app.preferences.game_library_location)
+        self.core.configure_game_library.assert_not_called()
+
+    def test_restore_no_preference_and_wrong_device_do_no_io(self):
+        self.view.connection_completed();self.app.run_file_job.assert_not_called()
+        self.configured();self.session=DeviceSession('other','two')
+        self.view.connection_completed();self.app.run_file_job.assert_not_called()
+        self.assertIn('configured for this',self.view.main_message.get_text())
+
+    def test_busy_restore_waits_for_admission_once(self):
+        self.configured();self.app.busy=True
+        self.view.connection_completed();self.view.try_restore()
+        self.app.run_file_job.assert_not_called()
+        self.app.busy=False;self.view.try_restore();self.view.try_restore()
+        self.assertEqual(1,self.app.run_file_job.call_count)
+
+    def test_pending_restore_invalidated_by_forget_change_disconnect_and_close(self):
+        for reason in ('forget','change','disconnect','close'):
+            with self.subTest(reason=reason):
+                self.configured();self.app.busy=True;self.view.connection_completed()
+                if reason=='forget':self.app.preferences.game_library_location=None
+                if reason=='change':self.app.preferences.game_library_location['library_id']='22222222-2222-4222-8222-222222222222'
+                if reason=='disconnect':
+                    self.session=DeviceSession('','');self.view.event(NS(kind='disconnected'))
+                if reason=='close':self.view.closed=True
+                self.app.busy=False;self.view.try_restore()
+                self.app.run_file_job.assert_not_called()
+                self.view.closed=False;self.session=DeviceSession('device','one')
+
+    def test_delayed_old_event_and_completion_cannot_clear_new_session(self):
+        library=self.configured();self.view.connection_completed()
+        old_done=self.app.run_file_job.call_args.args[1];old_session=self.session
+        self.session=DeviceSession('device','two');self.view.connection_completed()
+        new_done=self.app.run_file_job.call_args.args[1]
+        new_done(NS(state='succeeded',result=LibraryState('valid','new',(library,),'two')))
+        self.view.event(NS(kind='offline'),old_session,dict(self.app.preferences.game_library_location))
+        old_done(NS(state='succeeded',result=LibraryState('valid','old',(library,),'one')))
+        self.assertEqual('new',self.view.state.message)
+        self.assertEqual(1,len(self.children(self.view.rows)))
+
+    def test_restore_failures_keep_preference_and_retry_is_explicit(self):
+        for outcome in ('missing path','invalid manifest','UUID mismatch','transport failure','cancelled'):
+            with self.subTest(outcome=outcome):
+                self.configured();before=dict(self.app.preferences.game_library_location)
+                self.view.connection_completed();done=self.app.run_file_job.call_args.args[1]
+                if outcome=='cancelled':done(NS(state='cancelled'))
+                elif outcome=='transport failure':done(NS(state='failed',error=NS(message=outcome)))
+                else:done(NS(state='succeeded',result=LibraryState('unavailable',outcome)))
+                self.assertIn('Game Library Unavailable',self.view.main_message.get_text())
+                count=self.app.run_file_job.call_count
+                self.view.try_restore();self.view.connection_completed()
+                self.assertEqual(count,self.app.run_file_job.call_count)
+                self.assertEqual(before,self.app.preferences.game_library_location)
+                self.view.retry_button.emit('clicked')
+                self.assertEqual(count+1,self.app.run_file_job.call_count)
+        self.core.configure_game_library.assert_not_called()
+
+    def test_restore_factory_rechecks_preference_before_core_call(self):
+        self.configured();self.view.connection_completed()
+        factory=self.app.run_file_job.call_args.args[0]
+        self.app.preferences.game_library_location=None
+        with self.assertRaises(Exception):factory()
+        self.core.load_managed_library.assert_not_called()
+
+    def test_foreground_owner_defers_restore_and_preference_event_invalidates(self):
+        self.configured();self.app.foreground=NS(token='owned')
+        self.view.connection_completed();self.app.run_file_job.assert_not_called()
+        self.app.foreground.token=None;self.view.try_restore()
+        self.assertEqual(1,self.app.run_file_job.call_count)
+        self.view.event(NS(kind='library-location-changed'))
+        done=self.app.run_file_job.call_args.args[1]
+        done(NS(state='succeeded',result=LibraryState('valid','stale',(),'one')))
+        self.assertNotEqual('valid',self.view.state.status)
+
     def test_no_library_is_not_empty_catalog_and_offers_only_explicit_creation(self):
         self.assertEqual('none',self.view.state.status)
         self.assertIn('No Game Library Configured',self.view.main_message.get_text())
@@ -178,6 +371,23 @@ class ManagedViewGtk(unittest.TestCase):
 
 
 class ManagedSettingsGtk(unittest.TestCase):
+    def test_browser_initial_manual_and_recovery_completion_hooks(self):
+        from c64u_browser.gui import Browser
+        app=Mock();app.histories={}
+        app.core.selected_profile.return_value=NS(auto_connect=True)
+        result=NS(profile=NS(),device_info={},remote_path='/USB0',listing=('/USB0',[]))
+        app.core.connect_selected.return_value=result
+        app.tabs.get_current_page.return_value=0
+        app.run=lambda task,done:done(task())
+        app.activate_connection=lambda value:Browser.activate_connection(app,value)
+        Browser.auto_connect(app)
+        app.core.connect_selected.assert_called_once_with(require_bound=True)
+        self.assertEqual(1,app.managed_library_view.connection_completed.call_count)
+        Browser.activate_connection(app,result)
+        self.assertEqual(2,app.managed_library_view.connection_completed.call_count)
+        Browser.connection_restored(app,result)
+        self.assertEqual(3,app.managed_library_view.connection_completed.call_count)
+
     def test_real_settings_and_managed_notebook_preserve_legacy(self):
         from tests.test_preferences_ui import PreferencesUI
         from c64u_browser.app_preferences import show_preferences
@@ -226,6 +436,21 @@ class SettingsSelectionGtk(unittest.TestCase):
         factory();self.core.load_managed_library.assert_called_with(discover=True)
         done(NS(state='succeeded',result=LibraryState('multiple' if len(libraries)>1 else
             'valid' if libraries else 'none','Discovery complete.',tuple(libraries),'one')))
+
+    def test_partial_discovery_candidates_warning_and_explicit_selection(self):
+        library=parse_manifest(manifest(),'device',PATH)
+        self.view.discover();factory,done=self.app.run_file_job.call_args.args
+        warning='Discovery incomplete. /USB1 skipped — /USB1: directory listing, FTP 550.'
+        done(NS(state='succeeded',result=LibraryState('partial',warning,(library,),'one')))
+        self.assertEqual(1,len(self.children(self.view.choices)))
+        self.assertIn(warning,self.view.discovery_message.get_text())
+        self.assertIn('select it explicitly',self.view.discovery_message.get_text())
+        self.assertTrue(self.view.discovery_message.has_css_class('warning'))
+        self.assertIsNone(self.app.preferences.game_library_location)
+        self.core.configure_game_library.assert_not_called()
+        self.assertEqual([],self.children(self.view.rows))
+        self.candidates([library])
+        self.assertFalse(self.view.discovery_message.has_css_class('warning'))
 
     def test_zero_and_one_discovery_never_adopt(self):
         library=parse_manifest(manifest(),'device',PATH)
@@ -357,7 +582,7 @@ class PublishedRevisionGtk(unittest.TestCase):
             self.assertIn(value,self.view.main_message.get_text())
         self.core.configure_game_library.assert_not_called()
 
-    def test_disconnect_reconnect_requires_explicit_reload(self):
+    def test_disconnect_reconnect_restores_configured_library(self):
         state=self.published()
         self.session=DeviceSession('','')
         self.view.event(NS(kind='disconnected'))
@@ -366,9 +591,10 @@ class PublishedRevisionGtk(unittest.TestCase):
         self.session=DeviceSession('25EA78','two')
         self.view.event(NS(kind='reconnected'))
         self.assertEqual([],self.children(self.view.rows))
-        self.core.load_managed_library.assert_not_called()
-        self.view.load()
-        done=self.app.run_file_job.call_args.args[1]
+        self.view.connection_completed()
+        factory,done=self.app.run_file_job.call_args.args
+        factory()
+        self.core.load_managed_library.assert_called_once_with(discover=False,expected_session=self.session)
         done(NS(state='succeeded',result=LibraryState('valid',state.message,state.libraries,'two')))
         self.assertEqual(1,len(self.children(self.view.rows)))
 

@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """One managed-library controller for the catalog tab and native Settings page."""
 from gi.repository import Gtk, GLib, Pango
-from .managed_library import LibraryState
+from .managed_library import LibraryState, location
 from .storage import root_presentation
 
 
 class ManagedLibraryView:
     def __init__(self,app):
         self.app=app;self.generation=0;self.closed=False
+        self.restore_pending=None;self.restore_attempted=None;self.ready_session=None
         self.chooser=None;self.confirmation=None;self.forget_confirmation=None
         self.settings_dialog=None;self.available=();self.available_session=None
         from .import_review import ImportReview
@@ -18,6 +19,9 @@ class ManagedLibraryView:
         self.settings_button=Gtk.Button(label='Go to Settings')
         self.settings_button.connect('clicked',lambda *_:self.open_settings())
         self.box.append(self.settings_button)
+        self.retry_button=Gtk.Button(label='Retry Load')
+        self.retry_button.connect('clicked',lambda *_:self.connection_completed(retry=True))
+        self.box.append(self.retry_button)
         scroll=Gtk.ScrolledWindow(vexpand=True)
         self.rows=Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         scroll.set_child(self.rows);self.box.append(scroll)
@@ -55,8 +59,12 @@ class ManagedLibraryView:
         self.settings_box.append(Gtk.Label(label='Selection is saved separately from General settings. '
             'Forget keeps all files on the device. Libraries are never merged.',xalign=0,wrap=True))
         self.busy_controls=(self.refresh_button,self.select_button,self.create_button,
-                            self.forget_button,self.choices,self.settings_button,*self.import_review.busy_controls)
-        self.unsubscribe=app.core.add_listener(lambda event:GLib.idle_add(self.event,event))
+                            self.forget_button,self.choices,self.settings_button,self.retry_button,*self.import_review.busy_controls)
+        def enqueue(event):
+            session=app.core.device_session()
+            configured=app.preferences.game_library_location
+            GLib.idle_add(self.event,event,session,dict(configured) if configured else None)
+        self.unsubscribe=app.core.add_listener(enqueue)
         self.reset()
 
     @staticmethod
@@ -86,26 +94,64 @@ class ManagedLibraryView:
             and library.identity.path==configured['path']
             and (not configured['library_id'] or library.identity.library_id==configured['library_id']))
 
-    def event(self,event):
+    def event(self,event,emitted_session=None,emitted_preference=None):
         if self.closed:return False
+        if emitted_session is not None and (emitted_session!=self.app.core.device_session()
+                or emitted_preference!=self.app.preferences.game_library_location):return False
         if event.kind=='library-location-changed':
             # A successful explicit selection has already persisted and rendered.
             if (self.state.status=='valid' and self.matches(self.state.libraries[0],
                     self.app.preferences.game_library_location)
                     and self.state.session_id==self.app.core.device_session().session_id):return False
             self.reset()
-        elif event.kind in ('connected','reconnected','disconnected','offline'):self.reset()
+        elif event.kind in ('connected','reconnected'):
+            if self.ready_session!=self.app.core.device_session():self.reset()
+        elif event.kind in ('disconnected','offline'):self.reset()
+        return False
+
+    def connection_completed(self,retry=False):
+        """Called after GUI connection completion; never discovers or selects."""
+        if self.closed:return
+        session=self.app.core.device_session()
+        if retry and not session.session_id:return
+        try:configured=location(self.app.preferences.game_library_location)
+        except Exception as exc:
+            self.render(LibraryState('unavailable',str(exc)));return
+        key=(session,tuple(sorted(configured.items()))) if configured else None
+        if not retry and self.ready_session==session and key==self.restore_attempted:return
+        if self.restore_pending==key and key is not None:return
+        self.reset();self.ready_session=session
+        if not configured:return
+        if not session.session_id or configured['device_id']!=session.device_id:
+            self.render(LibraryState('unavailable','Connect to the device configured for this Game Library.'));return
+        self.restore_pending=key
+        self.try_restore()
+
+    def try_restore(self):
+        """Admission wakeup, not a retry loop. A failed/cancelled load stays stopped."""
+        key=self.restore_pending
+        if self.closed or key is None:return False
+        session,items=key
+        if (self.ready_session!=session or self.app.core.device_session()!=session
+                or self.app.preferences.game_library_location!=dict(items)):
+            self.reset();return False
+        foreground=getattr(self.app,'foreground',None)
+        if self.app.busy or (foreground is not None and foreground.token is not None):return False
+        self.restore_pending=None;self.restore_attempted=key
+        self.load(restore=True)
         return False
 
     def reset(self):
+        self.restore_pending=None;self.restore_attempted=None;self.ready_session=None
         self.import_review.invalidate()
         self.generation+=1
         if self.forget_confirmation:self.forget_confirmation.response(Gtk.ResponseType.CANCEL)
         self.available=();self.available_session=None
+        self.discovery_message.remove_css_class('warning')
         self.discovery_message.set_text('Choose Discover Libraries to check USB/SD storage.')
         configured=self.app.preferences.game_library_location
         self.render(LibraryState('unavailable' if configured else 'none',
-            'Configured library is not loaded. Connect to its device and discover libraries.' if configured
+            'Configured library is not loaded. Connect to its device, or choose Retry Load.' if configured
             else 'No Game Library Configured'))
 
     @staticmethod
@@ -123,6 +169,7 @@ class ManagedLibraryView:
     def render(self,state):
         self.import_review.invalidate()
         self.state=state
+        self.retry_button.set_visible(self.app.preferences.game_library_location is not None)
         configured=self.app.preferences.game_library_location
         self.create_button.set_visible(state.status=='none' and configured is None)
         self.forget_button.set_visible(state.status=='valid' or configured is not None)
@@ -145,8 +192,9 @@ class ManagedLibraryView:
             details=(f"Device: {configured['device_id']}\nStorage root: {configured['root']}\n"
                 f"{configured['path']}\nLibrary ID: {configured['library_id'] or 'Not yet verified'}\n"
                 'Revision and game count: not loaded')
-            self.message.set_text('Game Library Unavailable\n'+details+'\n'+state.message)
-            self.main_message.set_text('Game Library Unavailable\n'+details+'\n'+state.message)
+            heading='Loading configured Game Library…' if state.status=='loading' else 'Game Library Unavailable'
+            self.message.set_text(heading+'\n'+details+'\n'+state.message)
+            self.main_message.set_text(heading+'\n'+details+'\n'+state.message)
         else:
             self.main_message.set_text('No Game Library Configured\n'
                 'Choose an existing library or create a new one in Settings → Game Library.')
@@ -209,7 +257,7 @@ class ManagedLibraryView:
     def discover(self):
         self.load(discover=True)
 
-    def load(self,discover=False):
+    def load(self,discover=False,restore=False):
         if self.closed or self.app.busy:return
         self.generation+=1;generation=self.generation
         session=self.app.core.device_session()
@@ -223,6 +271,7 @@ class ManagedLibraryView:
                 message='Library loading cancelled.' if snapshot.state=='cancelled' else snapshot.error.message
                 if discover:
                     self.available=();self.available_session=None;self.render_available()
+                    self.discovery_message.remove_css_class('warning')
                     self.discovery_message.set_text(message)
                 else:self.render(LibraryState('unavailable',message))
                 return
@@ -231,6 +280,9 @@ class ManagedLibraryView:
                 self.available=result.libraries;self.available_session=session
                 self.discovery_message.set_text(result.message+' Choose a library and select it explicitly.'
                     if result.libraries else result.message)
+                self.discovery_message.set_selectable(True)
+                if result.status=='partial':self.discovery_message.add_css_class('warning')
+                else:self.discovery_message.remove_css_class('warning')
                 self.render_available()
                 if configured:self.load()
             else:self.render(result)
@@ -238,7 +290,19 @@ class ManagedLibraryView:
             if not self.closed and generation==self.generation:
                 if discover:self.discovery_message.set_text(str(exc))
                 else:self.render(LibraryState('unavailable',str(exc)))
-        factory=(lambda:self.app.core.load_managed_library(discover=True)) if discover else self.app.core.load_managed_library
+        if restore:
+            # Recheck inside foreground admission, before Core can interpret an
+            # absent preference as discovery. No preference is saved here.
+            def factory():
+                from .api import BrowserError
+                if (not configured or self.app.preferences.game_library_location!=configured
+                        or self.app.core.device_session()!=session
+                        or configured['device_id']!=session.device_id):
+                    raise BrowserError('Configured library or connection changed. Retry Load.')
+                return self.app.core.load_managed_library(discover=False,expected_session=session)
+            self.render(LibraryState('loading','Loading configured Game Library…'))
+        else:
+            factory=(lambda:self.app.core.load_managed_library(discover=True)) if discover else self.app.core.load_managed_library
         self.app.run_file_job(factory,finished,failed=failed)
 
     def forget(self):
@@ -328,6 +392,7 @@ class ManagedLibraryView:
         self.chooser.dialog.set_transient_for(self.parent_window())
 
     def close(self):
+        self.restore_pending=None;self.ready_session=None
         self.closed=True;self.generation+=1;self.unsubscribe()
         self.detach_settings()
         self.import_review.close()

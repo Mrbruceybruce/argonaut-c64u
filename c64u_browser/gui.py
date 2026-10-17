@@ -431,6 +431,9 @@ class Browser(Gtk.Application):
                     self.recovery.lost(str(exc))
                     if exc.kind=='authentication':self.recovery.paused=True
                 self.status.set_text(str(exc))
+            finally:
+                managed=getattr(self,'managed_library_view',None)
+                if managed is not None:managed.try_restore()
             return False
         future.add_done_callback(lambda _: GLib.idle_add(finish))
         return True
@@ -533,6 +536,7 @@ class Browser(Gtk.Application):
         if self.tabs.get_current_page() == 1: self.settings_tab.load_if_needed()
         if self.tabs.get_current_page() == 2: self.drives_tab.load_if_needed()
         self.update_connection_header()
+        self.managed_library_view.connection_completed()
 
     def disconnect_device(self):
         if self.busy: return
@@ -593,6 +597,7 @@ class Browser(Gtk.Application):
         self.game_library_tab.bind(True)
         self.update_connection_header()
         self.status.set_text('Reconnected to the same C64U. Choose Reload from C64U in Ultimate Menu to read its current values; retained edits were not sent.')
+        self.managed_library_view.connection_completed()
 
     def auto_connect(self):
         profile = self.core.selected_profile()
@@ -823,6 +828,8 @@ class Browser(Gtk.Application):
         finally:
             self._file_job_sensitivity = ()
             self.foreground.release(token, job)
+            managed=getattr(self,'managed_library_view',None)
+            if managed is not None:GLib.idle_add(managed.try_restore)
         return True
 
     def run_file_job(self, submit, done, *, started=None, failed=None, cancellable=True):

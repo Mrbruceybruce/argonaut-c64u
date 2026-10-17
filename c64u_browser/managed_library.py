@@ -5,7 +5,7 @@ from datetime import datetime
 import json
 import posixpath
 from uuid import UUID
-from .api import BrowserError
+from .api import BrowserError, ConnectionFailure
 from .storage import storage_root
 
 MAX_MANIFEST_BYTES = 4 * 1024 * 1024
@@ -153,9 +153,23 @@ class ManagedLibraryReader:
     def __init__(self, listing, read, session, check):
         self.listing,self.read,self.session,self.check=listing,read,session,check
 
+    def request(self, path, stage, operation):
+        """Attach application-requested context without copying FTP peer prose."""
+        self.check()
+        try:return operation()
+        except ConnectionFailure as exc:
+            self.check()  # Cancellation/session changes take precedence over skipping.
+            reply=getattr(exc,'reply_code',None)
+            phase=getattr(exc,'phase',None)
+            detail=f'{path}: {stage}'
+            if phase:detail+=f' ({phase})'
+            if reply is not None:detail+=f', FTP {reply}'
+            exc.args=(detail+': '+str(exc),)
+            raise
+
     def entries(self,path):
         self.check()
-        actual,entries=self.listing(path)
+        actual,entries=self.request(path,'directory listing',lambda:self.listing(path))
         self.check()
         if actual!=path:raise LibraryError('Storage returned a different library path.')
         return tuple(entries)
@@ -170,7 +184,8 @@ class ManagedLibraryReader:
             matches=[e for e in entries if e.name.casefold()==name]
             if len(matches)!=1 or matches[0].name!=name or matches[0].kind!='dir':
                 raise LibraryError('Invalid/incomplete library structure: '+name)
-        data=self.read(path+'/manifest.json',MAX_MANIFEST_BYTES)
+        manifest_path=path+'/manifest.json'
+        data=self.request(manifest_path,'manifest read',lambda:self.read(manifest_path,MAX_MANIFEST_BYTES))
         self.check()
         library=parse_manifest(data,self.session.device_id,path)
         if expected_id and library.identity.library_id!=expected_id:
@@ -187,18 +202,33 @@ class ManagedLibraryReader:
             return LibraryState('valid','Managed library loaded; game content has not been verified.',(library,),self.session.session_id)
         roots=sorted({ '/'+e.name for e in self.entries('/')
             if e.kind=='dir' and storage_root('/'+e.name)=='/'+e.name })
-        libraries=[];errors=[]
+        libraries=[];errors=[];skipped=[]
         for root in roots:
-            # A complete root listing distinguishes absence from an inaccessible path.
-            entries=self.entries(root)
-            candidate=next((e for e in entries if e.name=='ARGONAUT_LIBRARY'),None)
-            if candidate is None:continue
-            if candidate.kind!='dir':
-                errors.append(root+': ARGONAUT_LIBRARY is not a folder.');continue
-            try:libraries.append(self.load(root+'/ARGONAUT_LIBRARY'))
-            except LibraryError as exc:errors.append(root+': '+str(exc))
+            try:
+                # Only a complete listing establishes absence. An unavailable root
+                # remains explicitly unknown, never an empty or missing library.
+                entries=self.entries(root)
+                candidate=next((e for e in entries if e.name=='ARGONAUT_LIBRARY'),None)
+                if candidate is None:continue
+                if candidate.kind!='dir':
+                    errors.append(root+': ARGONAUT_LIBRARY is not a folder.');continue
+                try:libraries.append(self.load(root+'/ARGONAUT_LIBRARY'))
+                except LibraryError as exc:errors.append(root+': '+str(exc))
+            except ConnectionFailure as exc:
+                self.check()
+                if (exc.kind!='ftp' or getattr(exc,'ftp_code',None)!='path-unavailable'
+                        or getattr(exc,'reply_code',None)!=550
+                        or getattr(getattr(exc,'ftp_error',None),'code',None) not in
+                            ('listing-failed','retr-failed','size-unavailable')):raise
+                skipped.append(root+' skipped — '+str(exc))
         self.check()
-        if errors:return LibraryState('unavailable','Library discovery needs attention. '+' '.join(errors))
+        if errors:return LibraryState('unavailable','Library discovery needs attention. '+' '.join(errors+skipped))
+        if skipped:
+            message='Discovery incomplete. '+' '.join(skipped)
+            message+=f' {len(libraries)} validated libraries found on accessible roots; game content has not been verified.'
+            if len({v.identity.library_id for v in libraries})!=len(libraries):
+                message+=' Copied libraries share a UUID; select the exact device/location.'
+            return LibraryState('partial',message,tuple(libraries),self.session.session_id)
         if not libraries:return LibraryState('none','Game Library is not configured. No managed library was found.',(),self.session.session_id)
         if len(libraries)==1:
             return LibraryState('valid','Managed library loaded; game content has not been verified.',tuple(libraries),self.session.session_id)

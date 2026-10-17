@@ -155,6 +155,105 @@ class DiscoveryTests(TestCase):
         with self.assertRaises(JobCancelled):self.reader.discover()
         self.assertEqual([],self.calls)
 
+    @staticmethod
+    def unavailable():
+        from c64u_browser.ftp_reads import translate
+        from c64u_browser.c64u_ftp_types import FtpOperationError, ErrorCode
+        return translate(FtpOperationError(ErrorCode.LISTING,'control-reply',reply_code=550))
+
+    def test_partial_roots_before_and_after_published_usb0(self):
+        for root in ('/SD','/USB1'):
+            with self.subTest(root=root):
+                self.setUp()
+                self.library('/USB0',PublishedRevisionTests.published_manifest())
+                if root=='/USB1':self.tree['/'].append(E(name='USB1',kind='dir'))
+                original=self.reader.listing
+                self.reader.listing=lambda path: (_ for _ in ()).throw(self.unavailable()) if path==root else original(path)
+                state=self.reader.discover()
+                self.assertEqual('partial',state.status)
+                self.assertIn(root+' skipped',state.message)
+                self.assertIn(root+': directory listing (control-reply), FTP 550',state.message)
+                self.assertEqual('C64Robots v1.3',state.libraries[0].games[0].title)
+                self.assertEqual('/USB0/ARGONAUT_LIBRARY',state.libraries[0].identity.path)
+                self.assertEqual(1,self.read.call_count)
+
+    def test_partial_with_no_candidates_is_not_absence(self):
+        original=self.reader.listing
+        self.reader.listing=lambda path: (_ for _ in ()).throw(self.unavailable()) if path=='/SD' else original(path)
+        state=self.reader.discover()
+        self.assertEqual('partial',state.status);self.assertEqual((),state.libraries)
+        self.assertIn('Discovery incomplete',state.message)
+
+    def test_manifest_path_diagnostics_and_configured_strictness(self):
+        configured=self.library()
+        self.read.side_effect=self.unavailable()
+        state=self.reader.discover()
+        self.assertEqual('partial',state.status)
+        self.assertIn(PATH+'/manifest.json: manifest read',state.message)
+        self.calls.clear()
+        from c64u_browser.api import ConnectionFailure
+        with self.assertRaises(ConnectionFailure):self.reader.discover(configured)
+        self.assertEqual([PATH],self.calls)
+
+    def test_non_path_failures_abort_after_valid_candidate(self):
+        from c64u_browser.api import ConnectionFailure
+        from c64u_browser.jobs import JobCancelled
+        from c64u_browser.core import CoreError
+        for error in (ConnectionFailure('network','offline'),ConnectionFailure('authentication','denied'),
+                      CoreError('session','changed'),JobCancelled(),LibraryError('integrity')):
+            with self.subTest(error=type(error).__name__):
+                self.setUp();self.library('/SD')
+                original=self.reader.listing
+                def listing(path):
+                    if path=='/USB0':raise error
+                    return original(path)
+                self.reader.listing=listing
+                with self.assertRaises(type(error)):self.reader.discover()
+
+    def test_redirect_and_invalid_manifest_suppress_candidates(self):
+        self.library('/SD');self.library('/USB0')
+        original=self.reader.listing
+        self.reader.listing=lambda path:('/USB9',[]) if path=='/USB0/ARGONAUT_LIBRARY' else original(path)
+        state=self.reader.discover()
+        self.assertEqual('unavailable',state.status);self.assertEqual((),state.libraries)
+        self.reader.listing=original;self.data['/USB0/ARGONAUT_LIBRARY/manifest.json']=b'broken'
+        self.assertEqual((),self.reader.discover().libraries)
+
+    def test_session_check_overrides_path_unavailable(self):
+        from c64u_browser.core import CoreError
+        def listing(path):
+            self.check.side_effect=CoreError('session','changed')
+            raise self.unavailable()
+        self.reader.listing=listing
+        with self.assertRaises(CoreError):self.reader.discover()
+
+    def test_integrity_550_and_top_level_550_are_not_skipped(self):
+        from c64u_browser.api import ConnectionFailure
+        from c64u_browser.ftp_reads import translate
+        from c64u_browser.c64u_ftp_types import FtpOperationError, ErrorCode
+        original=self.reader.listing
+        for code in (ErrorCode.COMPLETION_UNKNOWN,ErrorCode.PROTOCOL,ErrorCode.SIZE_MISMATCH):
+            with self.subTest(code=code):
+                def listing(path):
+                    if path=='/SD':raise translate(FtpOperationError(code,'completion',reply_code=550))
+                    return original(path)
+                self.reader.listing=listing
+                with self.assertRaises(ConnectionFailure):self.reader.discover()
+        self.reader.listing=Mock(side_effect=self.unavailable())
+        with self.assertRaises(ConnectionFailure):self.reader.discover()
+
+    def test_cancellation_at_unavailable_root_aborts(self):
+        from c64u_browser.jobs import JobCancelled
+        original=self.reader.listing
+        def listing(path):
+            if path=='/SD':
+                self.check.side_effect=JobCancelled()
+                raise self.unavailable()
+            return original(path)
+        self.reader.listing=listing
+        with self.assertRaises(JobCancelled):self.reader.discover()
+        self.read.assert_not_called()
+
 
 class ManagedCoreTests(TestCase):
     def setUp(self):
