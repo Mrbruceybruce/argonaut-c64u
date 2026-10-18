@@ -1,4 +1,5 @@
 """Headless real-wire compatibility tests; synthetic content, loopback only."""
+import ast
 from dataclasses import replace
 import hashlib
 import io
@@ -16,6 +17,42 @@ from c64u_browser.c64u_ftp_types import (
     checked_path, parse_mlsd_line,
 )
 from c64u_ftp_server import FakeC64UFtp
+
+
+def prohibited_ftp_imports(source):
+    """Static import boundary; aliases do not change the imported identity.
+
+    The exact data-contract module is allowed, not arbitrary similarly named
+    modules or children. Runtime imports/reflection are outside this AST check.
+    """
+    type_modules = {'c64u_ftp_types', 'c64u_browser.c64u_ftp_types'}
+
+    def forbidden(module):
+        parts = module.split('.')
+        for part in parts:
+            if part.startswith('c64u_ftp'):
+                if module not in type_modules:
+                    return True
+        return False
+
+    errors = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            modules = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ''
+            modules = [module]
+            # `from . import c64u_ftp` and package-qualified equivalents name
+            # the transport in the imported member rather than node.module.
+            if module not in type_modules:
+                modules.extend('.'.join(filter(None, (module, alias.name)))
+                               for alias in node.names)
+            elif any(alias.name == 'C64UFtpClient' for alias in node.names):
+                errors.append((node.lineno, 'transport client from types'))
+        else:
+            continue
+        errors.extend((node.lineno, module) for module in modules if forbidden(module))
+    return errors
 
 
 class ProtocolTests(unittest.TestCase):
@@ -605,22 +642,54 @@ class ParserTests(unittest.TestCase):
             error=FtpOperationError(code,'phase',outcome=Outcome.UNKNOWN)
             self.assertEqual(code.value,json.loads(json.dumps(error.as_dict()))['code'])
 
+    def test_transport_import_guard_rejects_equivalent_spellings(self):
+        for source in (
+            'import c64u_ftp',
+            'import c64u_ftp as transport',
+            'import c64u_browser.c64u_ftp as transport',
+            'import c64u_browser.c64u_ftp.internal as transport',
+            'from c64u_ftp import C64UFtpClient as Client',
+            'from c64u_ftp.internal import Client',
+            'from .c64u_ftp import C64UFtpLeaseManager',
+            'from c64u_browser.c64u_ftp import *',
+            'from c64u_browser import c64u_ftp as transport',
+            'from . import c64u_ftp',
+            'from .. import c64u_ftp as transport',
+            'import c64u_ftp_extra',
+            'from .c64u_ftp_extra import Client',
+            'from . import c64u_ftp_extra',
+            'import other.c64u_ftp_types',
+            'from other import c64u_ftp_types as types',
+            'import c64u_ftp_types.internal',
+            'from .c64u_ftp_types.internal import Client',
+            'from .c64u_ftp_types import C64UFtpClient as Client',
+            'import c64u_browser.c64u_ftp_types, c64u_browser.c64u_ftp',
+        ):
+            with self.subTest(source=source):
+                self.assertTrue(prohibited_ftp_imports(source))
+
+    def test_transport_import_guard_permits_exact_type_contract(self):
+        for source in (
+            'import c64u_ftp_types',
+            'import c64u_browser.c64u_ftp_types as types',
+            'from c64u_ftp_types import Outcome as Result',
+            'from .c64u_ftp_types import MutationEvidence, Outcome',
+            'from c64u_browser.c64u_ftp_types import FtpOperationError',
+            'from c64u_browser import c64u_ftp_types as types',
+            'from . import c64u_ftp_types',
+            'from .. import c64u_ftp_types as types',
+            'import unrelated',
+        ):
+            with self.subTest(source=source):
+                self.assertEqual([], prohibited_ftp_imports(source))
+
     def test_only_core_read_adapter_imports_transport_and_headless_boundary(self):
         import ast
         from pathlib import Path
         root=Path(__file__).resolve().parents[1]/'c64u_browser'
         for path in root.glob('*.py'):
-            if path.name.startswith('c64u_ftp') or path.name in ('core.py','ftp_reads.py'):continue
-            tree=ast.parse(path.read_text())
-            for node in ast.walk(tree):
-                if isinstance(node,ast.ImportFrom):
-                    if path.name in ('simulated_ftp_reads.py','test_lab.py') and node.module == 'c64u_ftp_types':
-                        # Explicit offline fixtures/parser checks import data types only.
-                        self.assertFalse(any(a.name=='C64UFtpClient' for a in node.names))
-                        continue
-                    self.assertNotIn('c64u_ftp',node.module or '')
-                if isinstance(node,ast.Import):
-                    self.assertFalse(any('c64u_ftp' in a.name for a in node.names))
+            if path.name in ('c64u_ftp.py','c64u_ftp_types.py','core.py','ftp_reads.py'):continue
+            self.assertEqual([], prohibited_ftp_imports(path.read_text()), path.name)
         for name in ('c64u_ftp.py','c64u_ftp_types.py'):
             tree=ast.parse((root/name).read_text())
             for node in ast.walk(tree):
