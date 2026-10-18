@@ -262,6 +262,7 @@ class DialogContract(unittest.TestCase):
         self.d=ConnectionDialog.__new__(ConnectionDialog)
         d=self.d
         d.app=SimpleNamespace(busy=False,core=Mock(credentials_session_only=False),pool=Mock())
+        d._inspection_generation=0;d._inspection_unsubscribe=None
         d._closed=False;d._credential_generation=0;d._credential_state='ABSENT';d._credential_pending=False
         d._scanning=False;d._scan_generation=0;d._candidate_rows={};d._networks=('192.168.68.0/24',)
         d.current_id='fixture'

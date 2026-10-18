@@ -770,6 +770,20 @@ class ArgonautCore:
         except ConnectionFailure as exc:
             raise CoreError(exc.kind, str(exc), retryable=exc.kind in ('host', 'network')) from exc
 
+    def inspect_profile(self, profile, entered_password=''):
+        """Inspect without installing a client, acquiring FTP or saving credentials."""
+        from .compatibility import inspect
+        profile.validate()
+        client = self._new_client(profile, self._credential_for(profile, entered_password))
+        try:
+            identity = client.recognize_rest()
+            from .network_identity import peer_mac
+            identity['network_mac'] = peer_mac(profile.host)
+            profile.verify_identity(identity)
+            return inspect(client, identity)
+        except ConnectionFailure as exc:
+            raise CoreError(exc.kind, str(exc), retryable=exc.kind in ('host', 'network')) from exc
+
     def read_model(self, profile, entered_password=''):
         client = self._new_client(profile,
                                   self._credential_for(profile, entered_password))

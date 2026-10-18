@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Bruce Marcus
 """Connection UI delegates transport, discovery and persistence to shared components."""
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib, Pango
 from .api import BrowserError
 from .core import CoreError
 from .header import begin_connection, end_connection
@@ -16,6 +16,10 @@ class ConnectionDialog:
         self._credential_pending=False
         self._credential_generation=0
         self._closed=False
+        self._inspection_generation = 0
+        self._inspection_inflight = False
+        self._inspection_session = app.core.device_session()
+        self._inspection_unsubscribe = None
         self._networks=None
         self._scanning=False
         self._scan_generation=0
@@ -26,20 +30,31 @@ class ConnectionDialog:
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         for side in ('top','bottom','start','end'): getattr(outer,'set_margin_'+side)(16)
         page_scroll=Gtk.ScrolledWindow();page_scroll.set_overlay_scrolling(False);page_scroll.set_child(outer)
+        page_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.page=page_scroll
         if window is None:self.window.set_child(page_scroll)
-        self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16); outer.append(self.controls)
+        self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8); outer.append(self.controls)
         def section(title):
             box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=8)
             heading=Gtk.Label(label=title,xalign=0);heading.add_css_class('heading')
-            box.append(heading);self.controls.append(box)
+            box.append(heading)
             return box
-        self.identity_section=section('Device identity and details')
+        self.identity_section=Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.fields = {}
-        for key,label,default in [('name','Connection name',''),('host','Hostname / IP',''),('http','REST port','80'),('ftp','FTP port','21')]:
+        self.form_labels = {}
+        for key,label,default in [('name','Connection name',''),('host','Hostname / IP','')]:
             row = Gtk.Box(spacing=8); self.identity_section.append(row)
-            row.append(Gtk.Label(label=label,width_chars=15,xalign=0))
+            caption=Gtk.Label(label=label,width_chars=16,max_width_chars=16,wrap=True,xalign=0)
+            self.form_labels[key]=caption;row.append(caption)
             entry = Gtk.Entry(text=default,hexpand=True); row.append(entry); self.fields[key]=entry
+        self.ports_row = Gtk.Box(spacing=8)
+        self.advanced_expander = Gtk.Expander(label='Advanced Connection Settings', expanded=False)
+        self.advanced_expander.set_child(self.ports_row)
+        for key, label, default in [('http', 'REST port', '80'), ('ftp', 'FTP port', '21')]:
+            entry = Gtk.Entry(text=default, width_chars=5, max_width_chars=5)
+            caption = Gtk.Label(label=label, xalign=0)
+            caption.set_mnemonic_widget(entry)
+            self.ports_row.append(caption); self.ports_row.append(entry); self.fields[key] = entry
         details_box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=10)
         self.details_page=details_box
         self.device_identity=Gtk.Label(xalign=0,wrap=True,selectable=True)
@@ -47,39 +62,66 @@ class ConnectionDialog:
         self.details_profile=Gtk.Label(xalign=0,wrap=True);details_box.append(self.details_profile)
         for key,label in [('serial_number','Serial number'),('case_edition','Box model'),('notes','Notes')]:
             row=Gtk.Box(spacing=8);details_box.append(row)
-            row.append(Gtk.Label(label=label,width_chars=15,xalign=0))
+            row.append(Gtk.Label(label=label,width_chars=12,max_width_chars=12,wrap=True,xalign=0))
             entry=Gtk.Entry(hexpand=True);row.append(entry);self.fields[key]=entry
         self.fields['case_edition'].set_placeholder_text('Model checked on the shipping box')
         self.fields['case_edition'].set_tooltip_text('Enter the model checked on the shipping box. Saved with this profile; does not change the C64U hardware model.')
         details_box.append(Gtk.Label(label='Box model is your shipping-box label. C64U Model is read-only firmware information and may differ from the box label.',xalign=0,wrap=True))
         self.model=Gtk.Entry(editable=False,hexpand=True)
-        modelrow=Gtk.Box(spacing=8);modelrow.append(Gtk.Label(label='C64U Model',width_chars=15,xalign=0));modelrow.append(self.model);details_box.append(modelrow)
+        modelrow=Gtk.Box(spacing=8);modelrow.append(Gtk.Label(label='C64U Model',width_chars=12,max_width_chars=12,wrap=True,xalign=0));modelrow.append(self.model);details_box.append(modelrow)
         modelrow=Gtk.Box(spacing=8);details_box.append(modelrow)
         app.button(modelrow,'Read model from C64U',self.read_model)
+        self.inspection_target = Gtk.Label(xalign=0, wrap=True, selectable=True)
+        self.inspection_target.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        details_box.append(self.inspection_target)
+        self.inspect_button = app.button(details_box, 'Inspect REST Compatibility', self.inspect_compatibility)
+        self.compatibility_status = Gtk.Label(xalign=0, wrap=True, selectable=True)
+        self.compatibility_status.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        details_box.append(self.compatibility_status)
+        for field in self.fields.values():
+            field.connect('changed', self.invalidate_inspection)
         self.details_status=Gtk.Label(xalign=0,wrap=True);details_box.append(self.details_status)
         self.fields['name'].connect('changed',lambda *_:self.details_profile.set_text('Connection: '+(self.fields['name'].get_text() or 'New connection')))
         self.fields['host'].connect('changed',lambda *_:self.model.set_text('Not read'))
-        self.identity_section.append(details_box)
-        self.credentials_section=section('Credentials')
+        self.hardware_expander = Gtk.Expander(label='Hardware & REST Information', expanded=False)
+        caption = self.hardware_expander.get_label_widget()
+        caption.set_wrap(True); caption.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        caption.set_max_width_chars(30)
+        self.hardware_expander.set_child(details_box)
+        self.credentials_section=Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         row=Gtk.Box(spacing=8);self.credentials_section.append(row)
-        row.append(Gtk.Label(label='Password',width_chars=15,xalign=0))
+        self.form_labels['password']=Gtk.Label(label='Password',width_chars=16,max_width_chars=16,wrap=True,xalign=0)
+        row.append(self.form_labels['password'])
         self.password=Gtk.PasswordEntry(show_peek_icon=True,hexpand=True,placeholder_text='Network password')
         row.append(self.password)
         self.credential_status=Gtk.Label(xalign=0,wrap=True);self.credentials_section.append(self.credential_status)
-        row=Gtk.Box(spacing=8);self.credentials_section.append(row)
-        self.remember=Gtk.CheckButton(label='Remember password');row.append(self.remember)
-        self.forget_button=app.button(row,'Forget Password',self.forget)
-        self.retry_credential_button=app.button(row,'Retry credential check',self.refresh_credential_state)
+        self.credential_actions=Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE,
+            column_spacing=8, row_spacing=4, min_children_per_line=1, max_children_per_line=3)
+        self.credentials_section.append(self.credential_actions)
+        self.remember=Gtk.CheckButton(label='Remember password')
+        self.credential_actions.insert(self.remember, -1)
+        forget_box=Gtk.Box(); self.credential_actions.insert(forget_box, -1)
+        retry_box=Gtk.Box(); self.credential_actions.insert(retry_box, -1)
+        self.forget_button=app.button(forget_box,'Forget Password',self.forget)
+        self.retry_credential_button=app.button(retry_box,'Retry credential check',self.refresh_credential_state)
+        for widget in (self.remember, forget_box, retry_box):
+            widget.get_parent().set_focusable(False)
+        # Hide empty flow cells together with their existing credential controls.
+        self.remember.connect('notify::visible', lambda *_: self.remember.get_parent().set_visible(self.remember.get_visible()))
+        self.forget_button.connect('notify::visible', lambda *_: forget_box.get_parent().set_visible(self.forget_button.get_visible()))
+        self.retry_credential_button.connect('notify::visible', lambda *_: retry_box.get_parent().set_visible(self.retry_credential_button.get_visible()))
         self.retry_credential_button.set_visible(False)
         if app.core.credentials_session_only:
             self.remember.set_visible(False);self.remember.set_sensitive(False)
             self.forget_button.set_visible(False);self.forget_button.set_sensitive(False)
+        self.password.connect('changed', self.invalidate_inspection)
         self.password.connect('changed',lambda *_:self.paint_credential_state())
         for key in ('host','http','ftp'):
             self.fields[key].connect('changed',lambda *_:self.refresh_credential_state())
         self.status = Gtk.Label(label='Discover network connections or enter a hostname and ports manually.',wrap=True,xalign=0,selectable=True)
-        self.controls.append(self.status)
-        self.discovery_section=section('Network Discovery')
+        self.discovery_section=Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.discovery_expander=Gtk.Expander(label='Network Discovery', expanded=False)
+        self.discovery_expander.set_child(self.discovery_section)
         row=Gtk.Box(spacing=8);self.discovery_section.append(row)
         app.button(row,'Discover',lambda:self.scan(False))
         row=Gtk.Box(spacing=8);self.discovery_section.append(row)
@@ -94,30 +136,42 @@ class ConnectionDialog:
         self.devices=Gtk.ListBox();self.devices.connect('row-selected',self.discovered)
         scroll=Gtk.ScrolledWindow(min_content_height=110);scroll.set_child(self.devices);self.discovery_section.append(scroll)
         self._candidate_rows={}
-        self.controls.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
         self.profiles_section=section('Saved Network Connections')
-        self.profiles_section.append(Gtk.Label(label='Ethernet and Wi-Fi are separate connections, even for the same C64 Ultimate.',xalign=0,wrap=True))
         self.saved = Gtk.ComboBoxText(hexpand=True)
+        for cell in self.saved.get_cells():
+            cell.set_property('ellipsize', Pango.EllipsizeMode.END)
+            cell.set_property('max-width-chars', 24)
         self.saved.connect('changed', self.selected)
         row = Gtk.Box(spacing=8); self.profiles_section.append(row)
-        label=Gtk.Label(label='Connection',width_chars=15,xalign=0)
+        label=Gtk.Label(label='Connection',width_chars=12,max_width_chars=12,wrap=True,xalign=0)
         label.set_mnemonic_widget(self.saved);row.append(label);row.append(self.saved)
         self.selection_status=Gtk.Label(xalign=0,wrap=True)
         self.profiles_section.append(self.selection_status)
-        self.profile_actions=Gtk.Box(spacing=8);self.profiles_section.append(self.profile_actions)
+        self.profiles_section.append(Gtk.Label(label='Ethernet and Wi-Fi are separate connections, even for the same C64 Ultimate.',xalign=0,wrap=True))
+        self.profile_actions=Gtk.Box(spacing=8)
         app.button(self.profile_actions,'New',self.new)
         app.button(self.profile_actions,'Save Profile',self.save)
         app.button(self.profile_actions,'Delete Profile',self.delete)
         self.auto = Gtk.CheckButton(label='Connect automatically at startup when this connection is selected')
-        self.auto.set_halign(Gtk.Align.START)
-        self.profiles_section.append(self.auto)
+        self.auto.set_halign(Gtk.Align.FILL)
+        self.auto.set_child(Gtk.Label(label=self.auto.get_label(), xalign=0, wrap=True,
+                                     wrap_mode=Pango.WrapMode.WORD_CHAR))
         self.connection_actions=Gtk.Box(spacing=8,halign=Gtk.Align.END)
-        self.controls.append(self.connection_actions)
         app.button(self.connection_actions,'Test',self.test)
         app.button(self.connection_actions,'Connect',self.connect)
+        for widget in (self.profiles_section, self.identity_section, self.credentials_section,
+                       self.auto, self.profile_actions, self.connection_actions, self.status,
+                       self.advanced_expander, self.hardware_expander, self.discovery_expander):
+            self.controls.append(widget)
         # Keep Enter in Password mapped to Connect; no persistence action is default.
         self.password.connect('activate',lambda *_:self.connect())
+        for label in (self.selection_status, self.credential_status, self.status,
+                      self.details_profile, self.device_identity, self.details_status, self.subnet_validation):
+            label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
         self.reload()
+        self.update_inspection_target()
+        self._inspection_unsubscribe = app.core.add_listener(
+            lambda event: GLib.idle_add(lambda: self.inspection_context_changed(event)))
         self._background(self.app.core.discovery_networks,self.networks_loaded)
         if window is None:self.window.present()
 
@@ -126,8 +180,13 @@ class ConnectionDialog:
         return self.app.busy
 
     def window_closed(self, *_):
+        if self._closed:return
         self._closed=True
         self._credential_generation+=1
+        self._inspection_generation += 1
+        if self._inspection_unsubscribe:
+            self._inspection_unsubscribe()
+            self._inspection_unsubscribe = None
 
     def _background(self, task, done):
         # Auxiliary metadata work must not block GTK or claim the connection busy state.
@@ -215,6 +274,88 @@ class ConnectionDialog:
         self.subnet_validation.set_text(str(network)+' · '+str(len(tuple(network.hosts())))+' addresses to probe')
         return str(network)
 
+    def update_inspection_target(self):
+        try:
+            profile = self.profile()
+        except BrowserError:
+            self.inspect_button.set_sensitive(False)
+            self.inspection_target.set_text('Enter a valid hostname and REST/FTP ports in Device Details to inspect.')
+            return None
+        saved = next((p for p in self.app.core.profiles() if p.id == profile.id), None)
+        same_endpoint = saved is not None and (saved.host, saved.http_port, saved.ftp_port) == (
+            profile.host, profile.http_port, profile.ftp_port)
+        label = 'Saved profile: ' + saved.name if same_endpoint else 'Unsaved endpoint'
+        self.inspection_target.set_text(label + ' · ' + profile.host + ':' + str(profile.http_port))
+        self.inspect_button.set_sensitive(not self._inspection_inflight and not self._closed)
+        return profile
+
+    def invalidate_inspection(self, *_):
+        self._inspection_generation += 1
+        self.compatibility_status.set_text('Not inspected. Previous request is still running.'
+            if self._inspection_inflight else 'Not inspected')
+        self.update_inspection_target()
+
+    def inspection_context_changed(self, event):
+        if self._closed:return False
+        session = self.app.core.device_session()
+        if (session != self._inspection_session or
+                (event.kind in ('profile-saved', 'profile-deleted') and event.profile_id == self.current_id)):
+            self._inspection_session = session
+            self.invalidate_inspection()
+        return False
+
+    @staticmethod
+    def compact_compatibility(result):
+        from .compatibility import InspectionStatus
+        identity = dict(result.identity)
+        enumeration = result.observations[0]
+        metadata = result.observations[1:]
+        available = sum(row.status == InspectionStatus.AVAILABLE for row in metadata)
+        attempted = sum(row.attempted for row in metadata)
+        count = str(len(result.categories)) if enumeration.status == InspectionStatus.AVAILABLE else 'Unknown'
+        failures = [status.value for status in InspectionStatus
+                    if status != InspectionStatus.AVAILABLE and any(
+                        row.attempted and row.status == status for row in result.observations)]
+        return '\n'.join((
+            'Product: ' + identity.get('product', 'Not reported'),
+            'Firmware: ' + identity.get('firmware_version', 'Not reported') + ' · REST API: ' + result.api_version,
+            'REST interface recognized.',
+            'Configuration categories discovered: ' + count,
+            'Category metadata inspected successfully: ' + str(available) + ' · Requests attempted: ' + str(attempted),
+            'Inspection: ' + (', '.join(failures) if failures else 'Available'),
+            'REST recognition does not grant operational qualification.',
+            'Browse and edit configuration settings in Ultimate Menu.',
+        ))
+
+    def inspect_compatibility(self):
+        from .compatibility import classify_failure
+        if self._closed or self._inspection_inflight:return
+        profile = self.update_inspection_target()
+        if profile is None:return
+        self._inspection_generation += 1
+        generation = self._inspection_generation
+        session = self.app.core.device_session()
+        self._inspection_session = session
+        entered = self.password.get_text()
+        self._inspection_inflight = True
+        self.inspect_button.set_sensitive(False)
+        self.compatibility_status.set_text('Inspecting REST services…')
+        def done(value):
+            if self._closed:return
+            self._inspection_inflight = False
+            if generation != self._inspection_generation or session != self.app.core.device_session():
+                self._inspection_session = self.app.core.device_session()
+                self.invalidate_inspection()
+                return
+            self.update_inspection_target()
+            if isinstance(value, Exception):
+                kind = value.code if isinstance(value, CoreError) else None
+                text = 'Inspection: ' + classify_failure(value, kind=kind).value
+            else:
+                text = self.compact_compatibility(value)
+            self.compatibility_status.set_text(text)
+        self._background(lambda: self.app.core.inspect_profile(profile, entered), done)
+
     def read_model(self):
         try:p=self.profile()
         except BrowserError as exc:self.status.set_text(str(exc));return
@@ -230,9 +371,11 @@ class ConnectionDialog:
         if self.saved.get_active_id() is None: self.new()
 
     def selected(self, combo):
+        self.invalidate_inspection()
         profile = next((p for p in self.app.core.profiles() if p.id == combo.get_active_id()),None)
         if not profile: return
         self.current_id = profile.id
+        self.saved.set_tooltip_text(profile.name)
         self.selection_status.set_text('Editing saved connection: '+profile.name)
         self.device_identity.set_text('Saved device ID: '+(profile.device_id or 'Not bound'))
         for key,value in [('name',profile.name),('host',profile.host),('http',profile.http_port),('ftp',profile.ftp_port)]: self.fields[key].set_text(str(value))
@@ -243,7 +386,9 @@ class ConnectionDialog:
         self.refresh_credential_state()
 
     def new(self):
+        self.invalidate_inspection()
         self.current_id = None
+        self.saved.set_tooltip_text('')
         self.selection_status.set_text('New connection — not saved')
         self.device_identity.set_text('Saved device ID: Not bound')
         self.saved.set_active(-1)
@@ -284,6 +429,7 @@ class ConnectionDialog:
         if hasattr(self,'window') and hasattr(self.window,'pages'):self.window.pages.set_sensitive(False)
         def finish(result):
             end_connection(self.app, presentation)
+            if getattr(self, '_closed', False):return
             self.controls.set_sensitive(True)
             if hasattr(self,'window') and hasattr(self.window,'pages'):self.window.pages.set_sensitive(True)
             if getattr(self,'_scanning',False):
@@ -382,7 +528,7 @@ class ConnectionDialog:
             row=Gtk.ListBoxRow();self._candidate_rows[key]=row;self.devices.append(row)
         row.candidate=candidate
         name=candidate.info.get('info',candidate.info.get('ident',{})).get('hostname','Candidate')
-        row.set_child(Gtk.Label(label=f'{name} · {candidate.host}:{candidate.port} · {candidate.status}\n{candidate.source}',xalign=0,wrap=True))
+        row.set_child(Gtk.Label(label=f'{name} · {candidate.host}:{candidate.port} · {candidate.status}\n{candidate.source}',xalign=0,wrap=True,wrap_mode=Pango.WrapMode.WORD_CHAR))
 
     def scan(self, fallback):
         if self.app.busy:return

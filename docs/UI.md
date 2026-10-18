@@ -154,25 +154,25 @@ its detailed design and implementation boundary require review after inspection.
 
 ### Settings — Device Details
 
-**Approved structural direction:** keep Saved Connections at the top, followed
+**Accepted UI-DD.1/UI-DD.1a layout:** keep Saved Connections at the top, followed
 by the selected profile and accessible connection controls. Always visible:
 
 - Selected profile and Hostname/IP.
-- REST and FTP ports.
 - Password field and visibility control.
 - Test and Connect actions.
 - Profile management actions.
 
-Provide two independently expandable sections:
+Provide three independently expandable sections (superseding the original two-section direction):
 
 | Section | Default | Contents |
 | --- | --- | --- |
-| Hardware Information | Collapsed | Serial number, saved device ID, box model, firmware-reported C64U model, notes and relevant hardware details. |
+| Advanced Connection Settings | Collapsed | Existing REST and FTP ports, defaults 80 and 21, with custom overrides. |
+| Hardware & REST Information | Collapsed | Serial number, saved device ID, box model, firmware-reported C64U model, notes and relevant hardware details. |
 | Network Discovery | Collapsed | Discover, subnet input, Scan Subnet and associated feedback. |
 
-Both sections start collapsed. Either can expand independently, and expanded
-state persists while Settings remains open. Reopening Settings restores collapsed
-defaults. Reduce unnecessary window height and provide scrolling when expanded
+All three sections start collapsed. Any combination can expand independently;
+Settings reuse, tab changes and Keep editing retain expansion. Actual destruction
+and recreation restore collapsed defaults. Reduce unnecessary window height and provide scrolling when expanded
 content exceeds available space.
 
 Preserve the distinction between editable box label and firmware-reported model.
@@ -235,7 +235,7 @@ Acceptance notes preserve detailed contracts by reference to sections 7, 9 and 1
 | UI-17 | Standardize Settings tab styling | Settings General | UI-17 | Approved | P2 | UI-D2 | Native tabs and page routes; not a new navigation contract. |
 | UI-18 | Move Saved Connections to top | Device Details | UI-18 | Approved | P2 | UI-E1 | Presentation supersession only; saved profiles remain distinct. |
 | UI-19 | Compact connection fields and actions | Device Details | UI-19 | Approved | P2 | UI-E1 | Preserve Test/Connect and endpoint/profile identity rules. |
-| UI-20 | Collapsible Hardware Information | Device Details | UI-20 | Approved | P2 | UI-E1 | Initially collapsed; independent, open-session-only expansion. |
+| UI-20 | Collapsible Hardware Information | Device Details | UI-20 | Accepted | P2 | UI-E1 | Original finding retained verbatim; accepted UI-DD.1a title is Hardware & REST Information, one of three independent, initially collapsed sections. |
 | UI-21 | Collapsible Network Discovery | Device Details | UI-21 | Approved | P2 | UI-E1 | Initially collapsed; preserve bounded discovery and feedback. |
 | UI-22 | Improve credential presentation | Device Details | UI-22 | Proposed | P1 | UI-E1 | Specific presentation proposal; preserve credential matrix/UNKNOWN; no new persistence behavior. |
 | UI-23 | Reduce unnecessary Device Details window height | Device Details | UI-23 | Approved | P2 | UI-E1 | Device Details height/scrolling; related to shared sizing without collapsing scope. |
@@ -387,7 +387,7 @@ and successful implementation tests are distinct from release acceptance.
 | Baseline | HEAD and local `origin/development` both `c1f6e0db7c47702834856d3898a88f07560a3f31`; working tree clean before edits. Local reference verification only; no fetch. |
 | Original UI-01–UI-25 inventory | Missing during UI-00, so reservations were retained rather than guessed. The final UI-01 HOLD resolution supplies all 78 original entries; section 5 now preserves the established 01–25 meanings, provisional 26–78 references and four explicit aliases. |
 | Earlier header history | Roadmap B4 records separate Reconnect/Disconnect controls and prior acceptance. The new contextual control is Approved future direction; earlier behavior and acceptance remain historical evidence. Preserve recovery and stale-settings protections. |
-| Earlier Device Details history | Roadmap B3 records Saved Network Connections near the bottom and prior layout acceptance. Saved Connections at the top and new collapsible sections are Approved future direction, not already implemented or accepted. |
+| Earlier Device Details history | Roadmap B3 records Saved Network Connections near the bottom and prior layout acceptance. The original future direction is now superseded by accepted UI-DD.1/UI-DD.1a: Saved Connections first and three independent expanders. Earlier B3 acceptance remains historical evidence. |
 | Scaling | 100%–600% and 25% steps remain Proposed; renderer range, maximum and GTK logical pixels require verification. |
 | Presentation details | Storage-warning wording, exact preference groupings, status-bar layout remain design details. Primary Connect/Disconnect without manual Reconnect (UI-02B.1b) and preservation of B5 behavior are Approved. |
 | Functional boundaries | Test Lab placement and channel behavior are Approved as resolved below. Streams Fit to Window details and Instant Replay dependency review remain outstanding. |
@@ -624,7 +624,7 @@ user-reported audit directions, not independently observed screenshot defects.
 | Shared/header — §4 | Native GTK, subtle branding, consistent buttons/type/spacing/icons and all disabled/loading/warning/error states. Contextual primary Connect/Disconnect; no manual Reconnect (UI-02B.1b); compact Chicken Lips Ultimate Power. Structured status bar. | Preserve qualified Reset/Reboot and B5 cancellation/progress/errors/uncertainty/foreground ownership. Exact visual composition remains to be reviewed; no new lifecycle model. | UI-A, UI-B |
 | Files — §6 Files | Retain two panes; remove permanent blue borders while retaining keyboard focus; improve toolbar grouping, storage shortcuts, row alignment and headings. | Preserve selection, context menus, root permissions and C0–C4 accepted behavior. An inaccessible SD root must not imply overall disconnection. Exact root-warning copy remains Proposed. | UI-C |
 | General — §5 General | Group by function, standardize switches/checkboxes, improve folder rows and Undo/Defaults placement; retain autosave. Graduated slider; Fit to Window in Streams. | 100–600% at 25% remains Proposed subject to renderer qualification. Preserve hidden preference values; remove replay only after dependency/stability review. | UI-D, UI-F Streams |
-| Device Details — §5 Device Details | Saved Connections first; compact form; Hardware Information and Network Discovery independently collapsed by default; expansion lasts only for open Settings session. | Preserve identity, credentials, Test/Connect, profiles and Development session-only behavior. Scroll expanded content; do not turn Remember into immediate-saving preference. | UI-E |
+| Device Details — §5 Device Details | Saved Connections first; compact form; Advanced Connection Settings, Hardware & REST Information and Network Discovery independently collapsed by default; expansion lasts only for open Settings session. | Preserve identity, credentials, Test/Connect, profiles and Development session-only behavior. Scroll expanded content; do not turn Remember into immediate-saving preference. | UI-E |
 | About — §5 About | Final Settings tab; preserve artwork/aspect ratio; clearer version/build/platform, consistent links/copyright. | Existing artwork uses contain fit and build identity is selectable. Reordering must update all page-navigation routes; it is not merely moving the tab label. | UI-D About |
 | Settings Game Library — §5 Game Library Settings | Compact current-library summary; secondary technical details; grouped discovery/selection/Forget controls; clearer empty/unavailable states. | Keep partial-discovery warnings, strict selection and separate persistence, confirmed host-only Forget; no auto-adoption or file deletion. | UI-D Library |
 | Ultimate Menu — §6 Ultimate Menu | Preserve separately approved Regedit-style tree/property sheet; only shared styling on current accordions. | Preserve physical menu/F2 Advanced grouping and capability-filtering requirements. LED Rainbow P0 device-safety investigation cannot be bypassed. Tree redesign is separately scoped. | UI-A; UI-F Ultimate |
@@ -756,7 +756,7 @@ Release classes:
 | UI-D1 — General presentation | Functional preference groups, switch/checkbox roles, folder rows, Undo/Defaults placement. Keep scale/replay behavior unchanged until their slices. | UI-A1. | Autosave/Undo, hidden backup-root/library-location persistence and close/chooser focus semantics preserved. | Recommended before release |
 | UI-D2 — Settings navigation/About | Named navigation destinations, About final, artwork/identity/links. Prepare Developer page without bypassing gating. | UI-A1; coordinate UI-F Test Lab entry point. | About and Library routes open correct pages on new/reused dialog; image ratio, build identity, links and keyboard focus. | Recommended before release |
 | UI-D3 — Library Settings | Compact summary/details and grouped discovery/selection/Forget with truthful states. | UI-A1, UI-D2 navigation. | Strict explicit selection, separate persistence, partial-discovery warnings and host-only confirmed Forget. | Recommended before release |
-| UI-E1 — Device Details | Saved Connections first; compact form; two independent collapsed sections with session-only expansion. | UI-A1, UI-D2 navigation stable. | UNKNOWN/loading/error credentials, Test/Connect distinction, identity/profile semantics, scroll/resize, reopen defaults and Development session-only behavior. | Recommended before release |
+| UI-E1 — Device Details | Saved Connections first; compact form; three independent collapsed sections with session-only expansion (UI-DD.1a supersedes the original two-section plan). | UI-A1, UI-D2 navigation stable. | UNKNOWN/loading/error credentials, Test/Connect distinction, identity/profile semantics, scroll/resize, reopen defaults and Development session-only behavior. | Recommended before release |
 | UI-F Drives-1 — card presentation | Match A/B cards; keep existing picker, type/ROM actions and write modes. | UI-A1; inspect relevant state interactions. | Consistent cards without hidden functionality; C64U-only selector and confirmations unchanged. | Recommended before release |
 | UI-F Drives-2 — control changes | Enable switch, compact three-mode write selector with contextual explanations, and Run label. | Drives-1; preserve revised UI-36 mapping; type/ROM investigation before any relocation. | All three mount modes remain reachable; switch does not bypass action review; Run retains temporary-copy, reset/interruption and uncertainty semantics. | Recommended before release; revised UI-36 decision resolved |
 | UI-F SID-1 — SIDJuke presentation | User-facing rename, metadata hierarchy, playlist grouping, dedicated Now Playing and subtune placement within existing two columns. | UI-A1; agreed subtune layout. | Playback review, selected items versus playback cursor, playlist navigation/drag/keyboard, duration uncertainty and exactly scoped subtune change preserved. | Recommended before release |
@@ -1371,3 +1371,211 @@ Cancel & Clean Up, service recovery authority, diagnostics, and future resumable
 upload plans are unchanged. Rename, ordinary Delete and Paste conflict dialogs
 use native padded content and wrapped, selectable paths. This does not mark
 visual acceptance complete or change deletion/copy lifecycle contracts.
+
+## UC-1 read-only REST inspection
+
+Device Details offers **Inspect REST Compatibility** in its collapsible hardware section. Recognition validates both
+`/v1/version` and `/v1/info` envelopes and identity field types, accepting API
+`0.1` regardless of product spelling. Other API versions require qualification.
+This is protocol evidence, not authenticated hardware attestation or a grant to
+operate the device. Raw product and firmware identity remain diagnostic data.
+
+Inspection enumerates `/v1/configs` through the existing configuration parser.
+It retains up to 64 advertised categories and inspects at most four categories,
+256 settings per category, with the existing 64 KiB response and timeout limits.
+Unavailable categories/metadata remain unknown. Credential values are never
+returned in inspection observations. Existing hidden fields, validation and
+qualified read-only exceptions are unchanged. No settings are written or saved.
+
+Inspection never installs an operational Core session, saves credentials or
+persists capability grants. Reset/reboot, memory/DMA, cartridge execution, SID
+playback, streaming, drive/configuration mutation and FTP publication remain
+unqualified by inspection. FTP requires separate qualification. Existing
+operational admission and physically verified Beige/Founder's Edition behavior
+remain unchanged. Future capability-based command gating needs independent
+hardware/firmware and operation-specific evidence. Historical evidence above
+remains valid; recognition does not upgrade its qualification level.
+
+### UC-1a inspection diagnostics
+
+Configuration enumeration and each inspected category carry an immutable
+observation status: Available, Unsupported, Authentication required,
+Communication failed, Invalid response, or Unknown. Unsupported requires
+structured endpoint/operation evidence (HTTP 404/405/501); a timeout or invalid
+response does not establish lack of support. Error kinds, HTTP status codes and
+typed exception causes determine the status; exception messages are neither
+parsed nor displayed. Unclassified failures remain Unknown.
+
+Successful category observations survive failures elsewhere. Authentication
+failure stops further metadata requests, preserving earlier results and marking
+remaining categories Not inspected. Unexpected unclassified exceptions also stop
+further inspection. Existing request counts, limits, credential
+redaction and operational restrictions remain unchanged. Available describes
+read-only inspection evidence and grants no operational compatibility.
+
+### UC-1b compact hardware and REST presentation
+
+The dedicated Capabilities tab proposal is superseded. Device Details now groups
+hardware fields and REST inspection in the native **Hardware & REST Information**
+expander (the heading was shortened by UI-DD.1a). It starts collapsed, retains expansion while Settings
+remains open, and resets after actual destruction. Expansion is not persisted
+and does not contact the device. Existing scrolling and native spacing are used;
+other Settings pages are unchanged. The accepted UI-DD.1/UI-DD.1a layout adds
+independent Advanced Connection Settings and Network Discovery expanders; all
+three start collapsed, retain state during Settings reuse and Keep editing, and
+reset after actual destruction. Advanced contains the existing REST/FTP ports.
+Saved Connections, hostname/password, ordinary actions and shared feedback remain
+outside the expanders. Expansion itself performs no device operations.
+
+The summary shows reported product, firmware, API version, REST recognition,
+category count, successful metadata inspections, attempted metadata requests,
+and sanitized failure states. Failed enumeration shows an unknown count, not
+zero. No category list or configuration values are duplicated: Ultimate Menu
+remains the configuration browser/editor. REST recognition grants no operational
+qualification; the existing qualified-device admission remains unchanged.
+
+Inspection uses the Device Details editor endpoint and password, including valid
+unsaved drafts labeled **Unsaved endpoint**, never an unrelated active device.
+The endpoint is visible; invalid targets disable inspection. Saved identity and
+credential binding remain enforced by Core. One request sequence may be in
+flight; duplicate actions are blocked. Editing the endpoint/password, switching
+profiles or replacing the session invalidates results without claiming to cancel
+running transport work. Actual closure retires callbacks and listeners; Keep
+editing does not. No retries, polling, automatic inspection, or new REST requests
+were added. No credentials, profiles, or inspection results are saved by inspection.
+
+## UI-DD.1 — compact Device Details implementation
+
+Historical milestone: the port placement and two-expander presentation below
+were superseded by UI-DD.1a. Geometry and test observations remain historical
+evidence; the current accepted layout is recorded in UC-1c below.
+
+This bounded implementation advances the previously approved Device Details
+layout; it does not implement the separate UI-22 credential redesign or UI-25
+instructional-text reduction. The four Settings pages and 740 × 680 default
+remain unchanged. The Capabilities tab proposal remains superseded.
+
+Device Details now places Saved Network Connections and profile status first,
+then connection name, host, a shared REST/FTP port row, password/visibility,
+existing credential status and Remember/Forget/Retry controls, automatic-connect,
+grouped New/Save/Delete, distinct Test/Connect, and shared operation feedback.
+All ordinary connection controls remain outside the optional sections. Existing
+instructions are retained. Credential controls use native wrapping layout only;
+tri-state UNKNOWN, explicit-save semantics, stored-credential binding, and
+Development/Portable behavior are unchanged. Long selector names ellipsize with
+the full name available in a tooltip and the existing editable name field.
+
+Hardware Information & REST Compatibility and Network Discovery are independent
+native expanders, initially collapsed. Tab changes, Settings reuse and Keep
+editing retain each state; actual destruction/recreation resets both. Expansion
+neither dirties profiles nor starts device/credential operations. Collapse keeps
+candidate lists, subnet input, progress, feedback and running work intact. Shared
+operation feedback remains outside the expanders. Late operation completions no
+longer update destroyed dialog widgets. Core, transport, discovery and persistence
+semantics are unchanged, including UC-1/UC-1a/UC-1b inspection safeguards.
+
+### Measured X11/Xvfb geometry
+
+Measurements below are actual GTK logical allocations, not requested sizes.
+Temporary preferences, fake credentials/transports and pre-construction network
+guards were used. No physical device was contacted.
+
+| Scenario | Requested window | Actual window | Device Details viewport | Content extent / viewport height |
+| --- | --- | --- | --- | --- |
+| Normal Sans 10, collapsed | 740 × 680 | 740 × 680 | 738 × 607 | 607 / 607; no vertical scrolling required |
+| Normal Sans 10, narrow | 520 × 480 | 520 × 485 | 518 × 412 | 592 / 412; vertical scrolling |
+| Sans 18, long content, light | 520 × 480 | 637 × 689 | 635 × 612 | 2796 / 612; vertical scrolling |
+| Sans 18, long content, dark | 520 × 480 | 637 × 689 | 635 × 612 | 2796 / 612; vertical scrolling |
+
+At default size, ordinary connection and credential controls fit; the Test/Connect
+row ends at viewport y=472. At narrow size every ordinary control and the Close
+action remains reachable, with no horizontal clipping. Device Details' measured
+minimum width is 349 pixels at normal text and 507 at 18 points. The existing
+notebook tab strip and non-scrolling Game Library Settings page impose the shared
+window minimum at larger text, including the five-pixel normal narrow height
+excess. Those unrelated surfaces were not changed. Initial long-profile width
+growth was corrected locally using selector ellipsization, wrapped labels and
+native credential-control wrapping; no global CSS or dependencies were added.
+
+### Keyboard and remaining acceptance
+
+Isolated XTest Tab/Shift+Tab checks traverse ordinary controls and exclude
+collapsed children. Password Enter still invokes Connect, never Save. Native
+keyboard expansion works; collapse does not leave focus in hidden content.
+Focus remains usable after inspection, discovery and Settings closure. The
+normal native light/dark presentations and enlarged-text allocations were checked.
+
+The installed GTK emits a `gtk_root_get_focus` critical warning when traversing
+collapsed selectable labels. This was reproduced with a minimal native
+Gtk.Expander/selectable-label fixture without Argonaut; traversal assertions
+still pass. Retain it for toolkit/platform review rather than claiming it fixed.
+At this milestone, independent physical visual acceptance remained required:
+check both themes, normal and enlarged fonts, desktop scaling, long names/errors,
+both expanders, keyboard focus/reveal controls, scrolling and Close. This visual
+review can use fake devices; it does not authorize or qualify hardware operations.
+
+### UI-DD.1a — Device Details presentation refinement
+
+The connection form keeps Saved Network Connections first. Connection name,
+Hostname / IP and Password now use matching 16-character label columns with
+native wrapping; Connection name occupies one line at the normal Settings width.
+Input expansion, password visibility, validation and callbacks are unchanged.
+
+After the ordinary actions and shared feedback, three independent native
+expanders appear: **Advanced Connection Settings**, **Hardware & REST Information**,
+and **Network Discovery**. Advanced contains the existing compact REST/FTP port
+row (defaults 80/21). Custom ports, validation while collapsed, saved profile
+round trips and endpoint identity rules remain unchanged. Hardware's shorter
+heading replaces Hardware Information & REST Compatibility; its content and
+inspection contracts are unchanged.
+
+All three sections start collapsed, retain state across tab changes, Settings
+reuse and Keep editing, and reset after destruction. Collapse retains values
+and results. Expansion itself does not perform device, credential or persistence
+operations. Ordinary hostname/password fields and connection actions remain
+outside the expanders. Native Tab/Shift+Tab excludes collapsed ports and other
+collapsed content; expansion and focus recovery remain keyboard accessible.
+
+Offline X11/Xvfb measurements (actual allocations, not requested sizes):
+
+| Scenario | Requested | Actual Settings | Device Details viewport |
+| --- | --- | --- | --- |
+| Normal text, collapsed | 740 × 680 | 740 × 680 | 738 × 607 |
+| Narrow, normal text | 520 × 480 | 520 × 485 | 518 × 412 |
+| 18-point, long content, all expanded, light/dark | 520 × 480 | 637 × 689 | 635 × 612 |
+
+At normal default size ordinary controls fit without vertical scrolling; the
+Test/Connect row ends at y=430 in the viewport. Narrow and enlarged layouts use
+vertical scrolling without horizontal clipping. Device Details minimum width
+remains 349 pixels normally and 507 pixels at 18 points. Existing shared Settings
+minima described in UI-DD.1 remain unchanged; no shared window or global CSS
+changes were needed.
+
+The UI-DD.1a acceptance procedure, subsequently accepted within the supplied
+desktop scope recorded below, called for opening Settings with offline fake
+fixtures at normal and 18-point text in both themes, checking the aligned labels,
+all eight expansion combinations, long values, scrolling, visible focus and
+password Enter → Connect. The previously documented native GTK focus warnings
+remain a platform review item; automated focus assertions pass. No physical
+C64U or live REST/FTP operation is required for this presentation review.
+
+### UC-1c — supplied acceptance and publication reconciliation
+
+The supplied final review records acceptance of the UI-DD.1/UI-DD.1a desktop
+layout, independent expansion, keyboard navigation and focus checks. The current
+layout is Saved Connections first, aligned name/hostname/password labels,
+ordinary actions and shared feedback, followed by three independent, initially
+collapsed expanders: **Advanced Connection Settings**, **Hardware & REST
+Information**, and **Network Discovery**. REST/FTP ports belong to Advanced;
+hardware fields and the compact REST inspection summary belong to Hardware.
+Earlier two-expander and always-visible-port requirements are superseded.
+
+The supplied Beige and Founder's Edition read-only REST acceptance is recorded
+in [Ultimate compatibility](ULTIMATE-COMPATIBILITY.md#uc-1c--supplied-read-only-acceptance).
+This acceptance was supplied for publication reconciliation; UC-1c itself made
+no physical device contact. It does not newly qualify FTP or consequential
+machine operations. Desktop acceptance is limited to the supplied checks, not
+all platforms, themes, fonts, scaling or display configurations. The historical
+Xvfb geometry and GTK warning records above remain valid; other desktop/font/
+scaling combinations still need qualification, and the warnings are not claimed
+fixed by this documentation update.

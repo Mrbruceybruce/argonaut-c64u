@@ -211,8 +211,8 @@ def standard_scan(seconds=5, known_hosts=()):
 
 def verify(candidate):
     try:
-        candidate.info = UltimateClient(candidate.host, timeout=2, http_port=candidate.port).test_connection()
-        candidate.status = 'Verified Ultimate · '+candidate.info['info']['firmware_version']
+        candidate.info = UltimateClient(candidate.host, timeout=2, http_port=candidate.port).recognize_rest()
+        candidate.status = 'Ultimate REST recognized · '+candidate.info['info']['firmware_version']
     except ConnectionFailure as exc:
         if exc.kind == 'authentication' and candidate.info.get('ident'):
             candidate.status = 'Ultimate advertisement · password required; identity unverified'

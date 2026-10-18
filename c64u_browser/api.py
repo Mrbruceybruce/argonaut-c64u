@@ -338,6 +338,23 @@ class UltimateClient:
     def info(self):
         return {route: self.read_about(route) for route in ('version', 'info')}
 
+    def recognize_rest(self):
+        """Read-only protocol evidence; deliberately does not authorize a session."""
+        from .compatibility import validate_protocol, classify_failure, InspectionStatus
+        try:
+            return validate_protocol(self.info())
+        except ConnectionFailure as exc:
+            if exc.kind == 'api':
+                kind = {InspectionStatus.UNSUPPORTED: 'unsupported_api',
+                        InspectionStatus.INVALID: 'malformed',
+                        InspectionStatus.AUTHENTICATION: 'authentication',
+                        InspectionStatus.COMMUNICATION: 'network'}.get(classify_failure(exc))
+                if kind is not None:
+                    raise ConnectionFailure(kind, str(exc)) from exc
+            raise
+        except RecursionError as exc:
+            raise ConnectionFailure('malformed', 'Excessively nested REST response.') from exc
+
     def test_connection(self):
         result = self.info()
         info, version = result['info'], result['version']

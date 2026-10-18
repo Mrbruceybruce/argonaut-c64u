@@ -52,7 +52,7 @@ class Connections(unittest.TestCase):
             self.assertEqual(cm.exception.kind,'api')
 
     def test_password_candidate_not_verified(self):
-        with patch.object(UltimateClient,'test_connection',side_effect=ConnectionFailure('authentication','Denied')):
+        with patch.object(UltimateClient,'recognize_rest',side_effect=ConnectionFailure('authentication','Denied')):
             c=verify(Candidate('192.168.68.60'))
             self.assertIsNone(c)
             c=verify(Candidate('192.168.68.60',info={'ident':{'product':'C64 Ultimate'}}))

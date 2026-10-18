@@ -19,14 +19,22 @@ class Node:
         self.kind=kind;self.props=props;self.children=[];self.signals={};self.items={}
         self.text=props.get('text',props.get('label',''));self.active=False
         self.visible=True;self.sensitive=True;self.active_id=None;self.fraction=0
-        self.placeholder=props.get('placeholder_text','');self.inconsistent=False
+        self.placeholder=props.get('placeholder_text','');self.inconsistent=False;self.parent=None
     def connect(self, signal, callback):self.signals.setdefault(signal,[]).append(callback)
     def emit(self, signal, *args):
         for callback in self.signals.get(signal,[]):callback(self,*args)
     def append(self, *args):
         if len(args)==2:self.items[args[0]]=args[1]
-        else:self.children.append(args[0])
-    def set_child(self, child):self.children=[child]
+        else:self.children.append(args[0]);args[0].parent=self
+    def set_child(self, child):self.children=[child];child.parent=self
+    def get_label(self):return self.text
+    def get_parent(self):return self.parent
+    def get_child(self):return self.children[0] if self.children else Node('Label')
+    def get_label_widget(self):return Node('Label',label=self.text)
+    def get_cells(self):return []
+    def get_visible(self):return self.visible
+    def insert(self, child, position):
+        wrapper=Node('FlowBoxChild');self.append(wrapper);wrapper.append(child)
     def get_first_child(self):return next(iter(self.children),None)
     def remove(self, child):self.children.remove(child)
     def remove_all(self):self.items.clear();self.set_active_id(None)
@@ -45,7 +53,7 @@ class Node:
         if key=='placeholder-text':self.placeholder=value
         else:self.props[key]=value
     def set_sensitive(self, value):self.sensitive=value
-    def set_visible(self, value):self.visible=value
+    def set_visible(self, value):self.visible=value;self.emit('notify::visible',None)
     def set_inconsistent(self, value):self.inconsistent=value
     def set_fraction(self, value):self.fraction=value
     def __getattr__(self, name):
@@ -61,6 +69,9 @@ def descendants(node):
 
 class ConnectionLayoutTests(unittest.TestCase):
     def setUp(self):
+        for target in ('socket.socket.connect', 'socket.socket.sendto', 'socket.create_connection', 'ftplib.FTP'):
+            guard = patch(target, side_effect=AssertionError('No network in layout tests'))
+            guard.start(); self.addCleanup(guard.stop)
         self.fixture=test_core.CoreTests();self.fixture.setUp()
         self.addCleanup(self.fixture.tearDown)
         f=self.fixture
@@ -71,8 +82,8 @@ class ConnectionLayoutTests(unittest.TestCase):
         f.credentials.exists=lambda key:key in f.credentials.values
         f.credentials.get=Mock(side_effect=AssertionError('No secret reads in layout'))
         self.timers=[]
-        gtk=SimpleNamespace(Orientation=SimpleNamespace(VERTICAL=1,HORIZONTAL=0),Align=SimpleNamespace(START=0,END=1))
-        for kind in ('Window','Box','ScrolledWindow','ComboBoxText','Label','Entry','PasswordEntry','CheckButton','ProgressBar','ListBox','ListBoxRow','Separator'):
+        gtk=SimpleNamespace(SelectionMode=SimpleNamespace(NONE=0),PolicyType=SimpleNamespace(NEVER=0,AUTOMATIC=1),Orientation=SimpleNamespace(VERTICAL=1,HORIZONTAL=0),Align=SimpleNamespace(START=0,END=1,FILL=2))
+        for kind in ('Window','Expander','FlowBox','Box','ScrolledWindow','ComboBoxText','Label','Entry','PasswordEntry','CheckButton','ProgressBar','ListBox','ListBoxRow','Separator'):
             setattr(gtk,kind,lambda _kind=kind,**kwargs:Node(_kind,**kwargs))
         for target,value in [('c64u_browser.connection_dialog.Gtk',gtk),
                              ('c64u_browser.connection_dialog.GLib.timeout_add',lambda _,fn:self.timers.append(fn)),
@@ -104,16 +115,52 @@ class ConnectionLayoutTests(unittest.TestCase):
         self.assertEqual(1,len(matches));matches[0].emit('clicked')
     def test_sections_and_distinct_action_groups(self):
         d=self.d
-        self.assertEqual([d.identity_section,d.credentials_section,d.status,d.discovery_section,
-                          d.controls.children[4],d.profiles_section,d.connection_actions],d.controls.children)
-        self.assertEqual('Separator',d.controls.children[4].kind)
+        self.assertEqual([d.profiles_section, d.identity_section, d.credentials_section,
+                          d.auto, d.profile_actions, d.connection_actions, d.status,
+                          d.advanced_expander, d.hardware_expander, d.discovery_expander], d.controls.children)
         self.assertEqual(['New','Save Profile','Delete Profile'],[n.text for n in d.profile_actions.children])
         self.assertEqual(['Test','Connect'],[n.text for n in d.connection_actions.children])
-        labels=[n.text for n in descendants(d.controls) if n.kind=='Label']
-        for label in ('Saved Network Connections','Connection','Network Discovery','Credentials','Connection name'):
-            self.assertIn(label,labels)
-        self.assertNotIn('Machines',labels);self.assertNotIn('FTP Connection',labels)
-        self.assertNotIn('Save Password',[n.text for n in descendants(d.controls)])
+        self.assertIn(d.fields['http'], d.ports_row.children)
+        self.assertIn(d.fields['ftp'], d.ports_row.children)
+        self.assertEqual([d.ports_row], d.advanced_expander.children)
+        self.assertFalse(d.advanced_expander.props['expanded'])
+        optional = list(descendants(d.advanced_expander)) + list(descendants(d.hardware_expander)) + list(descendants(d.discovery_section))
+        for widget in (d.saved, d.selection_status, d.password, d.remember, d.forget_button,
+                       d.retry_credential_button, d.auto, d.profile_actions, d.connection_actions,
+                       d.status, *(d.fields[k] for k in ('name', 'host'))):
+            self.assertNotIn(widget, optional)
+        actions = [n.text for n in descendants(d.controls) if n.kind == 'Button']
+        for action in ('New', 'Save Profile', 'Delete Profile', 'Test', 'Connect', 'Forget Password',
+                       'Retry credential check', 'Discover', 'Scan Subnet', 'Read model from C64U',
+                       'Inspect REST Compatibility'):
+            self.assertEqual(1, actions.count(action), action)
+        self.assertEqual([], self.fixture.created)
+        self.assertFalse(self.fixture.prefs.path.exists())
+        self.assertEqual({self.first.id: 'fixture-secret'}, self.fixture.credentials.values)
+        self.assertEqual({}, self.fixture.core._session_passwords)
+    def test_collapsed_ports_defaults_round_trip_and_validation(self):
+        d=self.d;core=self.fixture.core
+        self.assertEqual(('80','21'),(d.fields['http'].text,d.fields['ftp'].text))
+        d.fields['http'].set_text('8080');d.fields['ftp'].set_text('2121');self.drain()
+        self.click('Save Profile');self.drain()
+        saved_id=d.current_id
+        self.assertNotEqual(self.first.id,saved_id)
+        d.saved.set_active_id(self.second.id);d.saved.set_active_id(saved_id);self.drain()
+        self.assertEqual(('8080','2121'),(d.fields['http'].text,d.fields['ftp'].text))
+        core.test_profile=Mock(return_value=SimpleNamespace(device_info=test_core.INFO,reported_device_id='ABC123'))
+        core.connect=Mock(return_value=SimpleNamespace(profile=d.profile()))
+        self.click('Test');self.click('Connect');self.drain()
+        self.assertEqual(d.profile(),core.test_profile.call_args.args[0])
+        self.assertEqual(d.profile(),core.connect.call_args.args[0])
+        core.test_profile.reset_mock();core.connect.reset_mock();core.save_profile=Mock()
+        for field in ('http','ftp'):
+            old=d.fields[field].text
+            for invalid in ('invalid','0','65536'):
+                d.fields[field].set_text(invalid);self.drain()
+                self.click('Test');self.click('Connect');self.click('Save Profile')
+                core.test_profile.assert_not_called();core.connect.assert_not_called();core.save_profile.assert_not_called()
+            d.fields[field].set_text(old)
+
     def test_saved_only_selector_and_unsaved_discovery_state(self):
         d=self.d;original=dict(d.saved.items)
         self.assertEqual({self.first.id:'Ethernet',self.second.id:'Wi-Fi'},original)
