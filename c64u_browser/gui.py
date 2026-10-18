@@ -3,6 +3,7 @@
 """GTK4 client; presentation work uses its worker and Core schedules its jobs."""
 from . import development
 from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 from pathlib import Path
 import posixpath
 import sys
@@ -57,6 +58,110 @@ def job_progress_message(operation, progress):
     return progress.message
 
 
+class _FileReview:
+    """Main-thread ownership of one ordinary Delete/Paste preparation result."""
+    def __init__(self, app, remote, client):
+        self.app, self.service = app, app.core.files
+        self.remote, self.client = remote, client
+        session = app.core.device_session()
+        self.session = (session.device_id, session.session_id)
+        self.plan_id = None
+        self.received = False
+        self.preparation = None
+        self._result_lock = Lock()
+        self.handled = False
+        self.state = 'preparing'
+        self.dialog = None
+        app._file_reviews.add(self)
+
+    def current(self):
+        if self.app.cleanup_closed or self.app.core.files is not self.service:
+            return False
+        if not self.remote:
+            return True
+        session = self.app.core.device_session()
+        return (self.app.client is self.client and
+                (session.device_id, session.session_id) == self.session)
+
+    def acquire(self, preview):
+        # Completion delivery is one-shot too; never reclaim an executed plan.
+        with self._result_lock:
+            if self.received:
+                return False
+            self.received = True
+        self.plan_id = preview.plan_id
+        if self.state == 'retired' or not self.current():
+            self.retire()
+            return False
+        self.state = 'reviewing'
+        return True
+
+    def preparing(self, job):
+        self.preparation = job
+        def completed(event):
+            if event.kind == 'finished':
+                self._discard_late_result(event.job)
+        job.add_listener(completed)
+        self._discard_late_result(job.snapshot())
+        return job
+
+    def _discard_late_result(self, snapshot):
+        # A shutdown need not run another GTK idle. Only service disposal occurs
+        # on this worker callback, never widget or presentation access.
+        with self._result_lock:
+            if self.state != 'retired' or self.received or snapshot.result is None:
+                return
+            self.received = True
+            plan = snapshot.result.plan_id
+        self.service.discard_plan(plan)
+
+    def attach(self, dialog):
+        self.dialog = dialog
+        dialog.connect('unrealize', self._unrealized)
+
+    def _unrealized(self, *_):
+        if not self.handled:
+            self.retire()
+
+    def respond(self):
+        if self.handled or self.state == 'retired':
+            return False
+        self.handled = True  # Before destroy and any reentrant GTK callbacks.
+        self.state = 'responding'
+        return True
+
+    def retire(self):
+        self.handled = True
+        with self._result_lock:
+            self.state = 'retired'
+        if self.preparation is not None:
+            self._discard_late_result(self.preparation.snapshot())
+        self.app._file_reviews.discard(self)
+        plan, self.plan_id = self.plan_id, None
+        try:
+            if plan is not None:
+                self.service.discard_plan(plan)
+        finally:
+            if self.dialog is not None:
+                dialog, self.dialog = self.dialog, None
+                dialog.destroy()
+
+    def submit(self, execute, done, **kwargs):
+        plan = self.plan_id
+        def factory():
+            job = execute(plan)
+            if job is not None and job is not False:
+                # Service accepted execution. Teardown must not cancel its job.
+                self.plan_id = None
+            return job
+        try:
+            if not self.current() or self.app.busy:
+                return False
+            return self.app.run_file_job(factory, done, **kwargs)
+        finally:
+            self.retire()
+
+
 class Browser(Gtk.Application):
     def __init__(self):
         super().__init__(application_id='org.local.Argonaut.Development' if development.enabled() else 'org.local.Argonaut')
@@ -72,6 +177,7 @@ class Browser(Gtk.Application):
         self.upload_cancel_dialog = None
         self.upload_cleanup = None
         self.cleanup_closed = False
+        self._file_reviews = set()
         self.foreground = ForegroundSlot()
         self.drag_payload = None
         self.file_clipboard = None
@@ -130,6 +236,7 @@ class Browser(Gtk.Application):
 
     def do_shutdown(self):
         self.cleanup_closed = True
+        for review in tuple(getattr(self, '_file_reviews', ())):review.retire()
         if self.upload_cleanup is not None:self.upload_cleanup.close()
         header = getattr(self, 'header_view', None)
         if header is not None:header.close()
@@ -458,6 +565,8 @@ class Browser(Gtk.Application):
         show_preferences(self,page=1)
 
     def update_connection_header(self):
+        for review in tuple(getattr(self, '_file_reviews', ())):
+            if not review.current():review.retire()
         refresh_header(self)
         if hasattr(self, 'remote_new_d64_button'):
             self.update_storage_actions()
@@ -1157,9 +1266,9 @@ class Browser(Gtk.Application):
         target=(FileLocation.core_host(destination) if local else
                 FileLocation.c64u(destination))
         request=CopyRequest(source,names,target)
+        review = _FileReview(self, not (local and source_local), client)
         def transfer(preview,decision):
-            if self.busy or (not (local and source_local) and self.client is not client): return
-            job=lambda: self.core.files.execute_copy(preview.plan_id,decision)
+            job=lambda plan: review.service.execute_copy(plan,decision)
             coordinator = [None]
             def started(job):
                 coordinator[0] = UploadCleanup(self, job, self.foreground.token)
@@ -1212,15 +1321,31 @@ class Browser(Gtk.Application):
                         self.show_remote(listing, remote_selection)
                     self.status.set_text(message + (' · Could not refresh C64 Ultimate: ' + error if error else ''))
                 self.run(refresh, refreshed)
-            self.run_file_job(job,finished,started=started)
+            review.submit(job,finished,started=started)
         def checked(snapshot):
-            if snapshot.state=='cancelled':
-                self.status.set_text('Transfer cancelled; nothing copied.');return
-            if snapshot.state=='failed':
-                self.status.set_text(snapshot.error.message);return
-            preview=snapshot.result;existing=preview.conflicts
-            if not existing: transfer(preview,'skip'); return
+            if snapshot.result is not None:
+                if not review.acquire(snapshot.result):return
+            elif review.state == 'retired':return
+            try:
+                if not review.current():
+                    review.retire();return
+                if snapshot.state=='cancelled':
+                    review.retire()
+                    self.status.set_text('Transfer cancelled; nothing copied.');return
+                if snapshot.state=='failed':
+                    review.retire()
+                    self.status.set_text(snapshot.error.message);return
+                present(snapshot.result)
+            except Exception:
+                review.retire()
+                raise
+        def present(preview):
+            existing=preview.conflicts
+            if not existing:
+                if review.respond():transfer(preview,'skip')
+                return
             dialog = Gtk.Dialog(title='Files already exist', transient_for=self.window, modal=True)
+            review.attach(dialog)
             dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
             dialog.add_button('Skip existing', Gtk.ResponseType.OK)
             replace_button=dialog.add_button('Replace', Gtk.ResponseType.APPLY)
@@ -1233,20 +1358,25 @@ class Browser(Gtk.Application):
             scroll, label = dialog_paths('\n'.join(existing))
             box.append(scroll)
             def response(widget, answer):
-                widget.destroy()
-                if answer == Gtk.ResponseType.APPLY:
-                    transfer(preview,'replace')
-                elif answer == Gtk.ResponseType.OK:
-                    if preview.operation_count: transfer(preview,'skip')
-                    else:
-                        self.core.files.discard_plan(preview.plan_id)
-                        self.status.set_text('All files skipped; nothing copied.')
-                else:
-                    self.core.files.discard_plan(preview.plan_id)
-                    self.status.set_text('Copy cancelled; nothing copied.')
+                if not review.respond():return
+                try:
+                    widget.destroy()
+                    if not review.current() or self.busy:return
+                    if answer == Gtk.ResponseType.APPLY:
+                        if preview.replaceable:transfer(preview,'replace')
+                    elif answer == Gtk.ResponseType.OK:
+                        if preview.operation_count:transfer(preview,'skip')
+                        else:self.status.set_text('All files skipped; nothing copied.')
+                    else:self.status.set_text('Copy cancelled; nothing copied.')
+                finally:
+                    review.retire()
             dialog.connect('response', response); dialog.present()
-        job=lambda: self.core.files.prepare_copy(request)
-        self.run_file_job(job,checked)
+        job=lambda: review.preparing(review.service.prepare_copy(request))
+        try:
+            if not self.run_file_job(job,checked):review.retire()
+        except Exception:
+            review.retire()
+            raise
 
     def copy_report(self, report):
         dialog = Gtk.Dialog(title='Copy stopped', transient_for=self.window, modal=True)
@@ -1605,18 +1735,21 @@ class Browser(Gtk.Application):
         scroll, label = dialog_paths('Preparing the deletion list…')
         box.append(scroll)
         button.set_sensitive(False)
-        reviewed = []
-        closed = [False]
+        review = _FileReview(self, not local, client)
+        review.attach(dialog)
         def response(_,code):
-            closed[0] = True
-            dialog.destroy()
-            if code!=Gtk.ResponseType.OK or self.busy or not reviewed:
-                if reviewed:self.core.files.discard_plan(reviewed[0].plan_id)
-                return
-            if not local and self.client is not client:
-                self.status.set_text('Connection changed. Review the deletion again.');return
-            preview = reviewed[0]
-            job=lambda: self.core.files.execute_delete(preview.plan_id)
+            if not review.respond():return
+            try:
+                dialog.destroy()
+                if code!=Gtk.ResponseType.OK or self.busy or review.plan_id is None:
+                    review.retire();return
+                if not review.current():
+                    review.retire()
+                    self.status.set_text('Connection changed. Review the deletion again.');return
+            except Exception:
+                review.retire()
+                raise
+            job=lambda plan: review.service.execute_delete(plan)
             def done(snapshot):
                 result=snapshot.result
                 if result is None:
@@ -1632,24 +1765,49 @@ class Browser(Gtk.Application):
                         if self.client is client and self.remote==parent and not isinstance(result,Exception):self.show_remote(result)
                         self.status.set_text(message+(' Refresh failed: '+str(result) if isinstance(result,Exception) else ''))
                     self.run(refresh,refreshed)
-            self.run_file_job(job,done)
-        dialog.connect('response',response);dialog.present()
-        dialog.get_widget_for_response(Gtk.ResponseType.CANCEL).grab_focus()
+            review.submit(job,done)
         def prepared(result):
-            if closed[0]:
-                if result.result:self.core.files.discard_plan(result.result.plan_id)
-                return
-            if result.state!='succeeded':
-                label.set_text('Could not prepare deletion: '+result.error.message+'\n\nNothing was deleted. Close this dialog and try again.'); return
-            preview=result.result;reviewed.append(preview)
-            summary.set_text(device+' · '+str(len(preview.items))+' items')
-            label.set_text('\n'.join(i.path+('/' if i.kind=='dir' else '') for i in preview.items))
-            button.set_sensitive(bool(preview.items))
+            if result.result is not None:
+                if not review.acquire(result.result):return
+            elif review.state == 'retired':return
+            try:
+                if not review.current():
+                    review.retire();return
+                if result.state!='succeeded':
+                    if review.plan_id is not None:
+                        review.service.discard_plan(review.plan_id)
+                        review.plan_id = None
+                    label.set_text('Could not prepare deletion: '+result.error.message+'\n\nNothing was deleted. Close this dialog and try again.')
+                    return
+                preview=result.result
+                summary.set_text(device+' · '+str(len(preview.items))+' items')
+                label.set_text('\n'.join(i.path+('/' if i.kind=='dir' else '') for i in preview.items))
+                button.set_sensitive(bool(preview.items))
+            except Exception:
+                review.retire()
+                raise
+        preparation_error = [False]
+        def failed(exc):
+            if review.state == 'retired':return
+            try:
+                preparation_error[0] = True
+                label.set_text('Could not prepare deletion: '+str(exc)+
+                    '\n\nNothing was deleted. Close this dialog and try again.')
+            except Exception:
+                review.retire()
+                raise
         locations=tuple(FileLocation.core_host(path) if local else FileLocation.c64u(path) for path in targets)
-        job=lambda: self.core.files.prepare_delete(locations)
-        self.run_file_job(job,prepared,failed=lambda exc:label.set_text(
-            'Could not prepare deletion: '+str(exc)+
-            '\n\nNothing was deleted. Close this dialog and try again.'))
+        job=lambda: review.preparing(review.service.prepare_delete(locations))
+        try:
+            dialog.connect('response',response);dialog.present()
+            dialog.get_widget_for_response(Gtk.ResponseType.CANCEL).grab_focus()
+            if not self.run_file_job(job,prepared,failed=failed):
+                # A submission error leaves the original error dialog available
+                # for dismissal, with no prepared plan and Delete still disabled.
+                if not preparation_error[0]:review.retire()
+        except Exception:
+            review.retire()
+            raise
         return dialog
 
     def prompt(self, title, text, callback, initial='', exact_confirmation=None, action_label='OK', polished=False):
@@ -1699,6 +1857,7 @@ class Browser(Gtk.Application):
             self.status.set_text('Wait for the current operation to finish before closing.')
             return True
         self.cleanup_closed = True
+        for review in tuple(getattr(self, '_file_reviews', ())):review.retire()
         if self.upload_cleanup is not None:self.upload_cleanup.close()
         header = getattr(self, 'header_view', None)
         if header is not None:header.close()

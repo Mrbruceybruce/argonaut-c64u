@@ -192,3 +192,112 @@ class FilesDialogs(unittest.TestCase):
             self.assertIsNotNone(dialog.get_focus())
             self.key(dialog,'Escape');discard.assert_called_once_with('cancel-plan')
             self.assertEqual(1,launch.call_count)
+
+    def paste_review(self, launch):
+        self.app.start_copy(True,self.app.local,('a',),False,'/USB1',self.client)
+        launch.call_args.args[1](NS(state='succeeded',result=NS(conflicts=['a'],replaceable=True,operation_count=1,plan_id='paste-owned')))
+        return next(w for w in Gtk.Window.get_toplevels() if w.get_title()=='Files already exist')
+
+    def test_destroy_without_response_disposes_delete_and_paste(self):
+        with patch.object(self.app.core.files,'discard_plan') as discard:
+            dialog,launch,prepared=self.prepare_delete();prepared(self.preview())
+            dialog.destroy();self.fixture.drain_events()
+            discard.assert_called_once_with('reviewed-plan')
+            discard.reset_mock()
+            dialog=self.paste_review(launch);dialog.destroy();self.fixture.drain_events()
+            discard.assert_called_once_with('paste-owned')
+            self.assertFalse(self.app._file_reviews)
+
+    def test_late_response_after_cancel_preserves_status(self):
+        with patch.object(self.app.core.files,'discard_plan') as discard:
+            dialog,launch,prepared=self.prepare_delete();prepared(self.preview())
+            dialog.response(Gtk.ResponseType.CANCEL)
+            self.app.status.set_text('New status')
+            dialog.response(Gtk.ResponseType.OK)
+            self.assertEqual('New status',self.app.status_label.get_text())
+            self.assertEqual(1,launch.call_count)
+            discard.assert_called_once_with('reviewed-plan')
+            dialog=self.paste_review(launch)
+            dialog.response(Gtk.ResponseType.CANCEL)
+            count=launch.call_count;self.app.status.set_text('Another status')
+            dialog.response(Gtk.ResponseType.APPLY)
+            self.assertEqual(count,launch.call_count)
+            self.assertEqual('Another status',self.app.status_label.get_text())
+
+    def test_busy_then_late_response_cannot_revive_review(self):
+        with patch.object(self.app.core.files,'discard_plan') as discard:
+            dialog,launch,prepared=self.prepare_delete();prepared(self.preview())
+            self.app.busy=True;dialog.response(Gtk.ResponseType.OK);self.app.busy=False
+            dialog.response(Gtk.ResponseType.OK)
+            self.assertEqual(1,launch.call_count);discard.assert_called_once_with('reviewed-plan')
+            discard.reset_mock();dialog=self.paste_review(launch);count=launch.call_count
+            self.app.busy=True;dialog.response(Gtk.ResponseType.APPLY);self.app.busy=False
+            dialog.response(Gtk.ResponseType.APPLY)
+            self.assertEqual(count,launch.call_count);discard.assert_called_once_with('paste-owned')
+
+    def test_same_client_replaced_session_rejects_both_reviews(self):
+        session=NS(device_id='device',session_id='one')
+        with patch.object(self.app.core,'device_session',side_effect=lambda:session), patch.object(self.app.core.files,'discard_plan') as discard:
+            dialog,launch,prepared=self.prepare_delete();prepared(self.preview())
+            session=NS(device_id='device',session_id='two')
+            dialog.response(Gtk.ResponseType.OK)
+            self.assertEqual(1,launch.call_count);discard.assert_called_once_with('reviewed-plan')
+            discard.reset_mock();dialog=self.paste_review(launch);count=launch.call_count
+            session=NS(device_id='device',session_id='three')
+            dialog.response(Gtk.ResponseType.APPLY)
+            self.assertEqual(count,launch.call_count);discard.assert_called_once_with('paste-owned')
+
+    def test_presentation_exception_disposes_exact_plan(self):
+        dialog,launch,prepared=self.prepare_delete()
+        with patch.object(self.app.core.files,'discard_plan') as discard:
+            with patch('c64u_browser.gui.Gtk.Label.set_text',side_effect=ValueError('presentation')):
+                with self.assertRaises(ValueError):prepared(self.preview())
+            discard.assert_called_once_with('reviewed-plan')
+            discard.reset_mock()
+            self.app.start_copy(True,self.app.local,('a',),False,'/USB1',self.client)
+            checked=launch.call_args.args[1]
+            with patch('c64u_browser.gui.dialog_layout',side_effect=ValueError('layout')):
+                with self.assertRaises(ValueError):checked(NS(state='succeeded',result=NS(plan_id='paste-error',conflicts=['a'],replaceable=True)))
+            discard.assert_called_once_with('paste-error')
+            self.assertFalse(self.app._file_reviews)
+
+    def test_preparation_failure_has_no_authority_and_keeps_message(self):
+        dialog,launch,prepared=self.prepare_delete()
+        prepared(NS(state='failed',result=None,error=NS(message='fixture failure')))
+        texts=[w.get_text() for w in self.fixture.walk(dialog) if isinstance(w,Gtk.Label)]
+        self.assertTrue(any('Could not prepare deletion: fixture failure' in t for t in texts))
+        self.assertFalse(dialog.get_widget_for_response(Gtk.ResponseType.OK).get_sensitive())
+        dialog.response(Gtk.ResponseType.OK)
+        self.assertEqual(1,launch.call_count)
+
+    def test_accepted_shutdown_discards_pending_review(self):
+        dialog,launch,prepared=self.prepare_delete();prepared(self.preview())
+        with patch.object(self.app.core.files,'discard_plan') as discard:
+            self.assertFalse(self.app.close())
+            discard.assert_called_once_with('reviewed-plan')
+            dialog.response(Gtk.ResponseType.OK)
+            self.assertEqual(1,launch.call_count)
+
+    def test_busy_shutdown_veto_retains_preparation_owner(self):
+        dialog,launch,prepared=self.prepare_delete()
+        self.app.busy=True
+        try:self.assertTrue(self.app.close())
+        finally:self.app.busy=False
+        self.assertEqual(1,len(self.app._file_reviews))
+        with patch.object(self.app.core.files,'discard_plan') as discard:
+            dialog.destroy();prepared(self.preview())
+            discard.assert_called_once_with('reviewed-plan')
+
+    def test_preparation_submission_error_preserves_disabled_error_dialog(self):
+        def refuse(factory, done, **kwargs):
+            kwargs['failed'](ValueError('submission error'))
+            return False
+        self.client.host='192.0.2.20'
+        with patch.object(self.app,'run_file_job',side_effect=refuse), patch.object(self.app.core.files,'discard_plan') as discard:
+            dialog=self.app.delete_dialog(False,['/USB1/a'],self.client)
+            self.assertTrue(dialog.get_visible())
+            self.assertFalse(dialog.get_widget_for_response(Gtk.ResponseType.OK).get_sensitive())
+            self.assertTrue(any('submission error' in w.get_text() for w in self.fixture.walk(dialog) if isinstance(w,Gtk.Label)))
+            dialog.response(Gtk.ResponseType.CANCEL)
+            discard.assert_not_called()
+            self.assertFalse(self.app._file_reviews)

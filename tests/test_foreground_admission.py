@@ -332,3 +332,84 @@ class Admission(unittest.TestCase):
         failed.assert_not_called();self.app.status.set_text.assert_not_called()
         self.assertTrue(self.app.busy);self.assertIs(b,self.app.transfer_job)
         self.assertTrue(self.app.foreground.owns(self.app.foreground.token,b))
+
+    def review(self, plan='owned'):
+        from c64u_browser.gui import _FileReview
+        self.app._file_reviews=set();self.app.cleanup_closed=False
+        self.app.client=None
+        self.app.core.files.discard_plan=Mock()
+        review=_FileReview(self.app,False,None)
+        review.acquire(SimpleNamespace(plan_id=plan));review.respond()
+        return review
+
+    def test_review_reservation_refusal_discards_exact_plan(self):
+        review=self.review()
+        token=self.app.foreground.reserve()
+        execute=Mock()
+        self.assertFalse(review.submit(execute,Mock()))
+        execute.assert_not_called()
+        self.app.core.files.discard_plan.assert_called_once_with('owned')
+        self.assertFalse(review.respond())
+        self.assertTrue(self.app.foreground.release(token))
+
+    def test_review_submission_exception_discards_without_retry(self):
+        review=self.review()
+        execute=Mock(side_effect=ValueError('submission refused'))
+        self.assertFalse(review.submit(execute,Mock()))
+        execute.assert_called_once_with('owned')
+        self.app.core.files.discard_plan.assert_called_once_with('owned')
+        self.assertFalse(self.app.busy)
+        self.assertIsNone(self.app.foreground.token)
+
+    def test_review_accepted_job_survives_retirement(self):
+        review=self.review();job=self.job();done=Mock()
+        self.assertTrue(review.submit(lambda plan:job,done))
+        review.retire()
+        self.app.core.files.discard_plan.assert_not_called()
+        self.assertEqual('pending',job.snapshot().state)
+        job.run();self.pump();done.assert_called_once()
+        self.assertFalse(review.respond())
+
+    def test_review_independent_owners_use_original_service(self):
+        from c64u_browser.gui import _FileReview
+        a=self.review('a');service=a.service
+        b=_FileReview(self.app,False,None);b.acquire(SimpleNamespace(plan_id='b'))
+        self.app.core.files=SimpleNamespace(discard_plan=Mock())
+        a.retire();a.retire()
+        service.discard_plan.assert_called_once_with('a')
+        self.assertEqual('b',b.plan_id)
+        b.retire()
+        self.assertEqual(['a','b'],[c.args[0] for c in service.discard_plan.call_args_list])
+        self.app.core.files.discard_plan.assert_not_called()
+
+    def test_retired_preparation_disposes_without_gtk_delivery(self):
+        from c64u_browser.gui import _FileReview
+        self.review().retire()
+        service=self.app.core.files;service.discard_plan.reset_mock()
+        review=_FileReview(self.app,False,None)
+        job=CoreJob('file.copy.prepare',lambda job:SimpleNamespace(plan_id='late'))
+        review.preparing(job);review.retire()
+        job.run()  # No GTK idle processing after shutdown.
+        service.discard_plan.assert_called_once_with('late')
+        self.assertFalse(review.acquire(job.snapshot().result))
+        service.discard_plan.assert_called_once_with('late')
+
+    def test_fresh_review_after_rejected_reservation_can_execute(self):
+        old=self.review('old');token=self.app.foreground.reserve()
+        self.assertFalse(old.submit(Mock(),Mock()))
+        self.app.foreground.release(token)
+        fresh=self.review('fresh');job=self.job();execute=Mock(return_value=job)
+        self.assertTrue(fresh.submit(execute,Mock()))
+        execute.assert_called_once_with('fresh')
+        self.assertFalse(old.respond())
+        job.run();self.pump()
+
+    def test_retire_terminal_preparation_before_idle_disposes_once(self):
+        from c64u_browser.gui import _FileReview
+        self.review().retire();service=self.app.core.files;service.discard_plan.reset_mock()
+        review=_FileReview(self.app,False,None)
+        job=CoreJob('file.delete.prepare',lambda job:SimpleNamespace(plan_id='ready'))
+        review.preparing(job);job.run()
+        service.discard_plan.assert_not_called()
+        review.retire();review.acquire(job.snapshot().result)
+        service.discard_plan.assert_called_once_with('ready')

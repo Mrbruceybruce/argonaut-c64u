@@ -146,3 +146,36 @@ class FileServiceTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+class ReviewPlanBoundaries(unittest.TestCase):
+    setUp = FileServiceTests.setUp
+    request = FileServiceTests.request
+    # Exercise the existing TTL contract: expiry is strictly beyond the TTL.
+    def test_copy_and_delete_exact_ttl_and_beyond(self):
+        now=[100.0]
+        service=FileService(lambda:None,lambda:self.session,plan_ttl=5,clock=lambda:now[0])
+        for kind in ('copy','delete'):
+            for age in (5,5.001):
+                with self.subTest(kind=kind,age=age):
+                    now[0]+=10
+                    (self.source/'ttl').write_text('data')
+                    if kind=='copy':
+                        preview=service.prepare_copy(self.request('ttl')).wait(5).result
+                        execute=lambda:service.execute_copy(preview.plan_id,'replace')
+                    else:
+                        preview=service.prepare_delete((FileLocation.core_host(self.source/'ttl'),)).wait(5).result
+                        execute=lambda:service.execute_delete(preview.plan_id)
+                    now[0]+=age
+                    if age==5:self.assertEqual('succeeded',execute().wait(5).state)
+                    else:
+                        with self.assertRaisesRegex(BrowserError,'expired'):execute()
+                    with self.assertRaisesRegex(BrowserError,'missing|already used'):execute()
+
+    def test_discard_one_review_does_not_discard_another(self):
+        (self.source/'a').write_text('a')
+        a=self.service.prepare_copy(self.request('a')).wait(5).result
+        b=self.service.prepare_copy(self.request('a')).wait(5).result
+        self.assertTrue(self.service.discard_plan(a.plan_id))
+        self.assertFalse(self.service.discard_plan(a.plan_id))
+        with self.assertRaises(BrowserError):self.service.execute_copy(a.plan_id)
+        self.assertEqual('succeeded',self.service.execute_copy(b.plan_id).wait(5).state)
