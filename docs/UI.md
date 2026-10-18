@@ -1359,3 +1359,15 @@ See [FTP recovery contracts](C64U-FTP.md#best-effort-cancel--clean-up-presentati
 
 Implementation remains pending independent review and controlled physical visual
 acceptance; this entry does not mark the UI audit Accepted.
+
+
+## UI-Files.1 — standalone recovery control superseded
+
+The approved Files UI removes the standalone **Delete Partial Upload** button
+and its exclusive Browser plumbing. Earlier requirements above to retain that
+control are historical and superseded. Ordinary reviewed Delete is the manual
+fallback after inspecting the remote folder; it remains a separate operation.
+Cancel & Clean Up, service recovery authority, diagnostics, and future resumable
+upload plans are unchanged. Rename, ordinary Delete and Paste conflict dialogs
+use native padded content and wrapped, selectable paths. This does not mark
+visual acceptance complete or change deletion/copy lifecycle contracts.

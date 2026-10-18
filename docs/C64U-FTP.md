@@ -1500,3 +1500,15 @@ selection. Existing manual Delete Partial Upload eligibility is unchanged;
 consumed authority is not renewed. Ordinary reviewed deletion remains a separate
 manual operation after inspecting the remote folder. See the
 [approved UI policy](UI.md#15-ui-fr4e2--approved-best-effort-upload-cleanup).
+
+
+## UI-Files.1 — standalone recovery control superseded
+
+The approved Files UI removes the standalone **Delete Partial Upload** button
+and its exclusive Browser plumbing. Earlier requirements above to retain that
+control are historical and superseded. Ordinary reviewed Delete is the manual
+fallback after inspecting the remote folder; it remains a separate operation.
+Cancel & Clean Up, service recovery authority, diagnostics, and future resumable
+upload plans are unchanged. Rename, ordinary Delete and Paste conflict dialogs
+use native padded content and wrapped, selectable paths. This does not mark
+visual acceptance complete or change deletion/copy lifecycle contracts.

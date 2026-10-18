@@ -9,7 +9,7 @@ call-site choices, never inferred from text. Prefer widget layout properties and
 Ordinary symbolic icons may use 16 logical pixels; preserve the branded 24-pixel
 Ultimate Power artwork. Do not override native focus, selection or disabled states.
 """
-from gi.repository import Gtk
+from gi.repository import Gtk, Pango
 from .diagnostics import diagnostic_event
 
 
@@ -56,3 +56,38 @@ def set_error(label, failed):
     change = label.add_css_class if failed else label.remove_css_class
     change('error')
     change('argonaut-error-message')
+
+
+def dialog_layout(dialog):
+    """Opt-in Files dialog content and native response-footer spacing."""
+    box = dialog.get_content_area()
+    box.set_spacing(12)
+    for side in ('top', 'start', 'end'):
+        getattr(box, 'set_margin_'+side)(20)
+    box.set_margin_bottom(0)  # The footer supplies the 16-pixel separation.
+    # GTK owns response dispatch/defaults; only adjust the existing action box.
+    button = dialog.get_widget_for_response(Gtk.ResponseType.CANCEL)
+    footer = button.get_parent()
+    footer.set_spacing(8)
+    footer.set_halign(Gtk.Align.END)
+    footer.set_margin_top(16)
+    footer.set_margin_bottom(20)
+    footer.set_margin_start(20)
+    footer.set_margin_end(20)
+    return box
+
+
+def dialog_label(text, *, selectable=False):
+    return Gtk.Label(label=text, xalign=0, yalign=0, wrap=True,
+                     wrap_mode=Pango.WrapMode.WORD_CHAR, selectable=selectable,
+                     max_width_chars=64)
+
+
+def dialog_paths(text):
+    """Bound long selectable lists without imposing a fixed dialog size."""
+    label = dialog_label(text, selectable=True)
+    scroll = Gtk.ScrolledWindow(hexpand=True, min_content_height=96,
+                               max_content_height=280, propagate_natural_height=True,
+                               hscrollbar_policy=Gtk.PolicyType.NEVER)
+    scroll.set_child(label)
+    return scroll, label

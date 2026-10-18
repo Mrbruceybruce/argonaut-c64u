@@ -5,7 +5,6 @@ import gi
 gi.require_version('Gtk','4.0')
 from gi.repository import Gtk
 import c1_gtk_check
-from c64u_browser.file_service import FileLocation,PartialUpload
 from c64u_browser.app_preferences import show_preferences
 from c64u_browser.profiles import Preferences
 
@@ -45,9 +44,9 @@ class BackupUiRetirement(unittest.TestCase):
         app=self.app;files=app.tabs.get_nth_page(0)
         children=[];w=files.get_first_child()
         while w:children.append(w);w=w.get_next_sibling()
-        self.assertEqual(2,len(children))
-        self.assertIsInstance(children[1],Gtk.Paned)
-        self.assertIs(app.partial_button,children[0].get_first_child())
+        self.assertEqual(1,len(children))
+        self.assertIsInstance(children[0],Gtk.Paned)
+        self.assertFalse(hasattr(app,'partial_button'))
         labels=[w.get_label() for w in self.fixture.walk(app.window) if isinstance(w,Gtk.Button)]
         self.assertNotIn('Back up USB/SD…',labels);self.assertNotIn('Restore USB/SD…',labels)
         for name in ('backup_usb','restore_usb','restore_preview','usb_report','usb_backup_button','usb_restore_button'):
@@ -77,14 +76,6 @@ class BackupUiRetirement(unittest.TestCase):
         app.popover.popdown();self.fixture.pump()
         tips=[w.get_tooltip_text() for w in self.fixture.walk(app.tabs.get_nth_page(0)) if isinstance(w,Gtk.Button)]
         for tip in ('Copy','Paste','New folder…','New D64 disk on C64 Ultimate…'):self.assertIn(tip,tips)
-
-    def test_partial_upload_recovery_keeps_exact_target(self):
-        app=self.app
-        partial=PartialUpload(FileLocation.c64u('/USB1/c64u-part-owned'),'device','session')
-        app.partial_upload=partial;app.partial_button.set_sensitive(True)
-        with patch.object(app,'delete_dialog') as delete:
-            app.partial_button.emit('clicked')
-            delete.assert_called_once_with(False,[partial.location.path],self.client,partial=partial)
 
     def test_hidden_legacy_root_survives_settings_changes_and_defaults(self):
         app=self.app;sentinel='/missing/legacy-backups'

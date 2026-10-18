@@ -1,13 +1,11 @@
 """Focused C4 presentation checks; isolated X11/XTest display, no device access."""
 import unittest
-from types import SimpleNamespace
 from unittest.mock import patch
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk
 import c1_gtk_check
 from c0_gtk_input import Input, pump
-from c64u_browser.file_service import FileLocation, PartialUpload
 
 
 class FilesPolish(unittest.TestCase):
@@ -96,26 +94,14 @@ class FilesPolish(unittest.TestCase):
             app.keyboard_file_menu(False)
             self.assertFalse(app.popover.get_visible())
 
-    def test_recovery_visibility_session_and_captured_target(self):
+    def test_manual_fallback_without_standalone_recovery_control(self):
         app = self.app
-        self.assertFalse(app.partial_button.get_visible())
-        partial = PartialUpload(FileLocation.c64u('/USB1/partial'), 'device', 'session')
-        app.partial_upload = partial
-        with patch.object(app.core, 'device_session', return_value=SimpleNamespace(
-                device_id='device', session_id='session')):
-            app.update_partial_recovery()
-            self.assertTrue(app.partial_button.get_visible())
-            with patch.object(app, 'delete_dialog') as delete:
-                app.partial_button.emit('clicked')
-                delete.assert_called_once_with(False, ['/USB1/partial'], self.client, partial=partial)
-            app.busy = True;app.update_partial_recovery()
-            self.assertFalse(app.partial_button.get_sensitive())
-            app.busy = False
-        app.update_partial_recovery()
-        self.assertFalse(app.partial_button.get_visible())
-        self.assertIs(partial, app.partial_upload)
-        app.partial_upload = None;app.update_partial_recovery()
-        self.assertFalse(app.partial_button.get_visible())
+        for name in ('partial_button', 'partial_upload', 'delete_partial', 'update_partial_recovery'):
+            self.assertFalse(hasattr(app, name), name)
+        self.assertTrue(callable(app.core.files.prepare_partial_delete))
+        with patch.object(app, 'delete_dialog') as delete:
+            app.delete_item(False, 'partial')
+            delete.assert_called_once_with(False, ['/USB1/partial'], self.client)
 
     def test_disconnected_no_roots_and_empty_folder_are_distinct(self):
         app = self.app

@@ -16,7 +16,7 @@ from .foreground import ForegroundSlot
 from .operation_status import OperationPresentation
 from .upload_cancel_dialog import UploadCancelDialog
 from .upload_cleanup import UploadCleanup
-from .ui_style import install_styles, set_error
+from .ui_style import install_styles, set_error, dialog_layout, dialog_label, dialog_paths
 from .appearance import AppearanceFollower
 from .header import ConnectionHeader, refresh_header, begin_connection, end_connection
 from .files import child
@@ -186,11 +186,6 @@ class Browser(Gtk.Application):
         self.controls.append(self.tabs)
         files = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.tabs.append_page(files, Gtk.Label(label='Files'))
-        actions=Gtk.Box(spacing=8);files.append(actions)
-        self.partial_upload=None
-        self.partial_button=self.button(actions,'Delete partial upload…',self.delete_partial)
-        self.partial_button.set_sensitive(False)
-        self.partial_button.set_visible(False)
         panes = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         panes.set_position(490)
         panes.set_shrink_start_child(False)
@@ -241,7 +236,7 @@ class Browser(Gtk.Application):
         self.status = self.operation
         self.status.set_text('Open Settings → Device details to select or discover a C64 Ultimate.')
         # The contextual bottom Cancel remains outside disabled feature controls.
-        self.busy_controls = [connection, panes, self.partial_button,
+        self.busy_controls = [connection, panes,
             self.settings_tab.box, self.drives_tab.box,
             self.streams_tab.box]
         self.busy_controls.extend(self.sid_jukebox_tab.busy_controls)
@@ -462,17 +457,7 @@ class Browser(Gtk.Application):
         from .app_preferences import show_preferences
         show_preferences(self,page=1)
 
-    def update_partial_recovery(self):
-        partial = self.partial_upload
-        session = self.core.device_session() if partial is not None else None
-        available = (partial is not None and self.client is not None and
-                     session.device_id == partial.device_id and
-                     session.session_id == partial.session_id)
-        self.partial_button.set_visible(available)
-        self.partial_button.set_sensitive(available and not self.busy)
-
     def update_connection_header(self):
-        self.update_partial_recovery()
         refresh_header(self)
         if hasattr(self, 'remote_new_d64_button'):
             self.update_storage_actions()
@@ -1188,21 +1173,14 @@ class Browser(Gtk.Application):
                     message = snapshot.error.message if snapshot.error else 'Copy did not complete.'
                     self.status.set_text(message + (' · '+cleanup_message if cleanup_message else ''))
                     return
-                message, partial = result.message, result.partial_upload
+                message = result.message
                 if cleanup_message:message += ' · '+cleanup_message
                 if not may_refresh or self.busy or self.foreground.token is not None:
                     self.status.set_text(message)
                     return
-                if removed:
-                    if self.partial_upload is partial:self.partial_upload = None
-                    partial = None
-                    self.update_partial_recovery()
                 copied = completed_roots(names, result.completed)
                 if snapshot.state=='failed' or (snapshot.state=='cancelled' and (result.replacements or result.folder_steps)):
                     self.copy_report(result)
-                if partial:
-                    self.partial_upload = partial
-                    self.update_partial_recovery()
                 local_selection = ()
                 if source_local and Path(parent).resolve() == self.local.resolve():
                     local_selection = copied
@@ -1248,11 +1226,12 @@ class Browser(Gtk.Application):
             replace_button=dialog.add_button('Replace', Gtk.ResponseType.APPLY)
             replace_button.set_sensitive(bool(preview.replaceable))
             dialog.set_default_response(Gtk.ResponseType.CANCEL)
-            label = Gtk.Label(label='These names already exist in the destination:\n\n' + '\n'.join(existing) + '\n\nReplace overwrites matching regular files. Existing folders merge; folder/file conflicts and copies onto themselves are skipped.\nDestination: '+str(destination), wrap=True, selectable=True)
-            label.set_margin_top(16); label.set_margin_bottom(16)
-            label.set_margin_start(16); label.set_margin_end(16)
-            scroll = Gtk.ScrolledWindow(min_content_width=440, min_content_height=180, max_content_height=400)
-            scroll.set_child(label); dialog.get_content_area().append(scroll)
+            box = dialog_layout(dialog)
+            box.append(dialog_label('These names already exist in the destination.'))
+            box.append(dialog_label('Replace overwrites matching regular files. Existing folders merge; folder/file conflicts and copies onto themselves are skipped.'))
+            box.append(dialog_label('Destination: '+str(destination), selectable=True))
+            scroll, label = dialog_paths('\n'.join(existing))
+            box.append(scroll)
             def response(widget, answer):
                 widget.destroy()
                 if answer == Gtk.ResponseType.APPLY:
@@ -1595,7 +1574,7 @@ class Browser(Gtk.Application):
                     previous = '' if same_session() else 'Rename on the previous connection: '
                     self.status.set_text(previous+snapshot.error.message+evidence+detail)
             self.run_file_job(job, done)
-        self.prompt('Rename', 'New name:', submit, name, action_label='Rename')
+        self.prompt('Rename', 'New name:', submit, name, action_label='Rename', polished=True)
 
     def delete_item(self, local, name):
         if not self.files_operation_allowed(local):return
@@ -1611,27 +1590,23 @@ class Browser(Gtk.Application):
         targets=[self.local/name if local else child(self.remote,name) for name in names]
         return self.delete_dialog(local,targets,self.client)
 
-    def delete_partial(self):
-        if self.busy or not self.partial_upload:return
-        if not self.client:
-            self.status.set_text('Connect to the original C64 Ultimate session before deleting this partial upload.');return
-        return self.delete_dialog(False,[self.partial_upload.location.path],self.client,
-                                  partial=self.partial_upload)
-
-    def delete_dialog(self,local,targets,client,partial=False):
+    def delete_dialog(self,local,targets,client):
         if self.busy or (not local and not client):return
         targets=tuple(targets)
-        dialog=Gtk.Dialog(title='Delete partial upload' if partial else 'Delete selected items',transient_for=self.window,modal=True)
-        dialog.set_default_size(650,350)
+        dialog=Gtk.Dialog(title='Delete selected items',transient_for=self.window,modal=True)
         dialog.add_button('Cancel',Gtk.ResponseType.CANCEL)
         button=dialog.add_button('Delete',Gtk.ResponseType.OK);button.add_css_class('destructive-action')
         dialog.set_default_response(Gtk.ResponseType.CANCEL)
         device='This Computer' if local else 'C64 Ultimate '+client.host
-        label=Gtk.Label(label='Preparing the deletion list…',xalign=0,yalign=0,wrap=True,selectable=True)
+        box = dialog_layout(dialog)
+        summary = dialog_label(device)
+        box.append(summary)
+        box.append(dialog_label('Delete permanently, including folder contents? This cannot be undone.'))
+        scroll, label = dialog_paths('Preparing the deletion list…')
+        box.append(scroll)
         button.set_sensitive(False)
         reviewed = []
         closed = [False]
-        scroll=Gtk.ScrolledWindow(vexpand=True,hexpand=True);scroll.set_child(label);dialog.get_content_area().append(scroll)
         def response(_,code):
             closed[0] = True
             dialog.destroy()
@@ -1646,8 +1621,6 @@ class Browser(Gtk.Application):
                 result=snapshot.result
                 if result is None:
                     self.status.set_text(snapshot.error.message);return
-                if partial and snapshot.state=='succeeded':
-                    self.partial_upload=None;self.update_partial_recovery()
                 message=result.message
                 self.refresh_local();self.status.set_text(message)
                 if not local and self.client is client:
@@ -1661,6 +1634,7 @@ class Browser(Gtk.Application):
                     self.run(refresh,refreshed)
             self.run_file_job(job,done)
         dialog.connect('response',response);dialog.present()
+        dialog.get_widget_for_response(Gtk.ResponseType.CANCEL).grab_focus()
         def prepared(result):
             if closed[0]:
                 if result.result:self.core.files.discard_plan(result.result.plan_id)
@@ -1668,25 +1642,25 @@ class Browser(Gtk.Application):
             if result.state!='succeeded':
                 label.set_text('Could not prepare deletion: '+result.error.message+'\n\nNothing was deleted. Close this dialog and try again.'); return
             preview=result.result;reviewed.append(preview)
-            label.set_text(device+'\n\nDelete permanently: '+str(len(preview.items))+' items, including folder contents?\n\n'+'\n'.join(i.path+('/' if i.kind=='dir' else '') for i in preview.items))
+            summary.set_text(device+' · '+str(len(preview.items))+' items')
+            label.set_text('\n'.join(i.path+('/' if i.kind=='dir' else '') for i in preview.items))
             button.set_sensitive(bool(preview.items))
         locations=tuple(FileLocation.core_host(path) if local else FileLocation.c64u(path) for path in targets)
-        job=(lambda: self.core.files.prepare_partial_delete(partial) if partial else
-                 self.core.files.prepare_delete(locations))
+        job=lambda: self.core.files.prepare_delete(locations)
         self.run_file_job(job,prepared,failed=lambda exc:label.set_text(
             'Could not prepare deletion: '+str(exc)+
             '\n\nNothing was deleted. Close this dialog and try again.'))
         return dialog
 
-    def prompt(self, title, text, callback, initial='', exact_confirmation=None, action_label='OK'):
+    def prompt(self, title, text, callback, initial='', exact_confirmation=None, action_label='OK', polished=False):
         dialog = Gtk.Dialog(title=title, transient_for=self.window, modal=True)
         dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
         confirm = dialog.add_button(action_label, Gtk.ResponseType.OK)
-        box = dialog.get_content_area()
-        box.append(Gtk.Label(label=text, wrap=True))
+        box = dialog_layout(dialog) if polished else dialog.get_content_area()
+        box.append(dialog_label(text) if polished else Gtk.Label(label=text, wrap=True))
         entry = Gtk.Entry(text=initial, hexpand=True)
         box.append(entry)
-        feedback = Gtk.Label(label='', wrap=True)
+        feedback = dialog_label('') if polished else Gtk.Label(label='', wrap=True)
         box.append(feedback)
         def validate(*_):
             matches = exact_confirmation is None or entry.get_text() == exact_confirmation
