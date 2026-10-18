@@ -1,0 +1,90 @@
+
+name: Development Slice
+description: Define a bounded Argonaut implementation task with review and acceptance gates.
+title: "[Slice] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for approved engineering work.
+        Record evidence and authorization explicitly.
+        Creating an Issue does not authorize hardware mutation,
+        release publication, or unsafe recovery operations.
+
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Issue or roadmap reference
+      description: Link the parent Issue and any legacy RM identifier.
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: Describe the specific outcome this slice must deliver.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Approved scope
+      description: Identify the permitted implementation boundaries.
+    validations:
+      required: true
+
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Explicit exclusions
+      description: State what must not change or be implemented.
+    validations:
+      required: true
+
+  - type: input
+    id: baseline
+    attributes:
+      label: Baseline branch and commit
+      description: Record the verified starting branch and commit.
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and prerequisites
+      description: Identify required predecessor work and review gates.
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and compatibility constraints
+      description: Include device, filesystem, session, and data-integrity restrictions.
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation requirements
+      description: Describe required behavior and preserved contracts.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Deterministic tests
+      description: Specify required regression and failure-path tests.
+    validations:
+      required: true
+
+  - type: textarea
+    id: physical
+    attributes:
+      label: Physical acceptance
+      description: Specify hardware tests or state that none are required.
+
+  - type: textarea
+    id: completion
+    attributes:
+      label: Review and completion criteria
+      description: Define evidence, independent review, publication, and acceptance gates.
+    validations:
+      required: true
