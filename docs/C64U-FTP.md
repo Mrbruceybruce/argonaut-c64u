@@ -845,10 +845,59 @@ Partial cleanup remains `PartialUpload → prepare_partial_delete → fresh revi
 → managed reviewed deletion`, with original device/session binding, reconnect
 invalidation, expiring/consumed plans and execution revalidation. Cleanup preview
 and execution use new operation leases after the failed upload has released its
-lease. Nothing is automatically deleted. `PartialUpload` remains a constructible
-session-bound record, not a provenance registry or unforgeable authorization
-token. Unknown publication requires ordinary inspection and independently
-reviewed deletion of an explicitly selected existing item.
+lease. Nothing is automatically deleted.
+
+UI-FR.2 supersedes the previous constructible-record cleanup policy: a
+`PartialUpload` value alone is evidence, never deletion authority. FileService
+registers the exact issued object only after qualifying interrupted managed copy
+or USB-restore staging evidence agrees with the target path. Unknown/completed
+publication, replacement uncertainty, MKD uncertainty and historical journal
+receipts cannot issue this authority. Constructed, copied, reconstructed and
+cross-service records are rejected.
+
+Authority is session-scoped, memory-only and limited to 32 unresolved entries;
+capacity exhaustion reports the limitation without eviction or loss of transfer
+accounting. Disconnect, session replacement and shutdown invalidate it. Restart
+does not restore it. Preparation atomically reserves the record, requires a file
+at the stored staging path (never traversing a substituted directory), and
+creates a fresh reviewed deletion plan. Failed/cancelled preparation, discarded
+review and expired plans release the reservation only within the original
+session. Concurrent preparation is rejected.
+
+Explicit execution consumes both authority and plan before dispatch, including
+admission refusal. Failure, cancellation or an uncertain outcome never restores
+authority or triggers automatic retry. Further cleanup requires explicit fresh
+inspection and independently reviewed ordinary deletion. Existing exact deletion
+accounting and session checks remain authoritative.
+
+UI-FR.2a enforces a separate file-only execution boundary for recovery. After
+consumption, the exact stored target must still match the reviewed file's name,
+type and size. Execution lists only its parent to revalidate the file; it never
+recursively prepares or traverses the target. A changed or substituted directory
+is rejected before dispatch when observable. The final mutation is explicitly
+FTP DELE, never dynamically selected RMD, and has no directory fallback. Session
+and cancellation checks run again before dispatch, with the managed transport's
+binding checks retained. A lost DELE response remains uncertain, not a definite
+rejection. No retry or authority restoration follows an execution attempt.
+Ordinary reviewed Delete retains its separate recursive directory behavior,
+bounds and snapshot checks.
+
+UI-FR.3 requires exact requested/returned directory identity for every deletion
+authorization listing: parent inspection, recursive child enumeration, execution
+snapshots, final target inspection and empty-folder verification. Recovery uses
+the same strict parent inspection without losing its file-only DELE boundary.
+No case folding, alias normalization, redirected-path substitution or retry is
+permitted. A mismatch is a non-retryable directory-identity integrity failure;
+the internal exception retains requested and reported paths as diagnostic
+evidence. Existing deletion-result wrappers retain their error contract and
+acknowledged removal prefix. No next mutation follows a detected mismatch;
+earlier acknowledged or uncertain outcomes are not rewritten. Preparation creates
+no deletion plan on mismatch; execution plans remain single-use. General
+browsing, USB identity rules and the transport's returned-PWD contract are
+unchanged.
+ FTP observations cannot pin durable object identity
+or prove exclusive ownership against concurrent external writers. Managed-import journals
+remain independent and cannot reconstruct partial-upload authority.
 
 ### Deterministic validation
 
@@ -1429,3 +1478,25 @@ offline checks and adapter-absent operations. See [closure evidence](FTP-OWNERSH
 for deterministic results, exact inventory and limitations. Physical qualification
 is unchanged from R1–R6; no hardware was contacted. Closure is uncommitted pending
 compact final review, and does not include Streams, Ultimate Menu or cartdumper.
+
+
+## Best-effort Cancel & Clean Up presentation
+
+The approved Argonaut 1.10 cancellation action is **Cancel & Clean Up** (formerly
+Cancel & Delete). It requests cooperative cancellation and one safe cleanup
+attempt after authoritative completion; it does not promise removal. The C64U may
+still be updating a staging file when snapshot verification occurs. No stability
+polling, fixed delay, second confirmation, or automatic mutation retry is added.
+This policy supersedes earlier wording promising deletion or requiring a future
+stabilization check; historical technical evidence is retained.
+
+Existing provenance, job/session binding, exact directory identity, file-only
+DELE, single-use authority, and acknowledged/uncertain result contracts remain
+unchanged. Completed files and uncertain publication are not eligible. Status
+presentation distinguishes successful acknowledged removal, unnecessary cleanup,
+unsafe verification, definite rejection, and uncertainty. A possibly remaining
+verified staging file is identified using its captured path, never current
+selection. Existing manual Delete Partial Upload eligibility is unchanged;
+consumed authority is not renewed. Ordinary reviewed deletion remains a separate
+manual operation after inspecting the remote folder. See the
+[approved UI policy](UI.md#15-ui-fr4e2--approved-best-effort-upload-cleanup).

@@ -184,3 +184,43 @@ def operation_event(transport, operation, target):
         if job_id:event['job_id'] = job_id
         if phase:event['phase'] = phase
         LOGGER.info('operation', extra={'operation_event': event})
+
+
+# One originating upload job has at most one accepted cleanup decision. Its
+# existing opaque ID is the attempt ID; no path/device identity is needed.
+_CLEANUP = ContextVar('argonaut_cleanup_diagnostic', default=None)
+_CLEANUP_FIELDS = frozenset((
+    'accepted', 'decision', 'state', 'error_code', 'session_match',
+    'kind', 'size', 'target_match', 'parent_match', 'snapshot_match',
+    'reviewed_kind', 'reviewed_size', 'reason', 'sender_confirmed_bytes',
+    'attempted_send_bytes', 'terminal_stor_acknowledged', 'publication',
+    'removed_count', 'not_attempted_count', 'mutation_outcome', 'admitted',
+    'started_at', 'finished_at', 'local_release', 'stage'))
+
+
+@contextmanager
+def cleanup_context(origin):
+    token = _CLEANUP.set(origin)
+    try:
+        yield
+    finally:
+        _CLEANUP.reset(token)
+
+
+def cleanup_event(event, *, origin=None, job_id=None, **fields):
+    """Best-effort scalar evidence only; logging must never affect authority."""
+    try:
+        origin = origin or _CLEANUP.get()
+        if not isinstance(origin, str) or not re.fullmatch(r'[0-9a-f]{32}', origin):
+            return
+        details = {'attempt_id': origin, 'origin_job_id': origin, 'event': event}
+        for key, value in fields.items():
+            if key in _CLEANUP_FIELDS and (value is None or type(value) in (bool, int, float)):
+                details[key] = value
+            elif key in _CLEANUP_FIELDS and type(value) is str:
+                # Call sites supply fixed categories, never exception prose.
+                details[key] = value[:64]
+        diagnostic_event('core', 'partial_cleanup', 'authorized-staging-file',
+                         details=details, job_id=job_id)
+    except Exception:
+        pass

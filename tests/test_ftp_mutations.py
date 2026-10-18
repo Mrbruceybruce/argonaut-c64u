@@ -449,20 +449,16 @@ class MutationCoreTests(unittest.TestCase):
             self.assertEqual(('/USB1/folder/b','/USB1/folder'),result.result.not_attempted)
             self.assertEqual(1,ftp.verbs.count(b'DELE'))
 
-    def test_partial_upload_reviewed_cleanup_is_session_bound(self):
+    def test_partial_upload_claim_does_not_authorize_cleanup(self):
         from c64u_browser.file_service import PartialUpload
         with server() as ftp:
             core,_=self.connect(ftp);session=core.device_session()
             ftp.files[b'/USB1/c64u-part-owned']=b'partial'
             partial=PartialUpload(FileLocation.c64u('/USB1/c64u-part-owned'),session.device_id,session.session_id)
-            preview=core.files.prepare_partial_delete(partial).wait(5)
-            self.assertEqual('succeeded',preview.state,preview.error)
-            result=core.files.execute_delete(preview.result.plan_id).wait(5)
-            self.assertEqual('succeeded',result.state,result.error)
-            self.assertEqual(('/USB1/c64u-part-owned',),result.result.removed)
-            self.assertNotIn(b'/USB1/c64u-part-owned',ftp.files)
-            core.disconnect()
+            before=list(ftp.verbs)
             with self.assertRaises(BrowserError):core.files.prepare_partial_delete(partial)
+            self.assertEqual(before,ftp.verbs)
+            self.assertIn(b'/USB1/c64u-part-owned',ftp.files)
 
     def test_unknown_with_cancellation_pending_is_failure_not_cancelled(self):
         with server(after_mutation={b'RNTO':None}) as ftp:

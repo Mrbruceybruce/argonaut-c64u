@@ -79,15 +79,20 @@ class Lifecycle(unittest.TestCase):
         task.assert_not_called();done.assert_not_called()
 
     def test_close_exits_app_even_if_child_windows_remain(self):
-        app=SimpleNamespace(busy=False,recovery=Mock(),streams_tab=Mock(),pool=Mock(),quit=Mock())
+        app=SimpleNamespace(busy=False,recovery=Mock(),streams_tab=Mock(),pool=Mock(),quit=Mock(),
+                            upload_cancel_dialog=None,upload_cleanup=Mock(),cleanup_closed=False)
         self.assertFalse(Browser.close(app))
         app.pool.shutdown.assert_called_once_with(wait=False)
+        app.upload_cleanup.close.assert_called_once_with()
+        self.assertTrue(app.cleanup_closed)
         app.quit.assert_called_once_with()
 
     def test_busy_close_preserves_active_worker(self):
-        app=SimpleNamespace(busy=True,status=Mock(),pool=Mock(),quit=Mock())
+        app=SimpleNamespace(busy=True,status=Mock(),pool=Mock(),quit=Mock(),
+                            upload_cancel_dialog=None,upload_cleanup=Mock(),cleanup_closed=False)
         self.assertTrue(Browser.close(app))
         app.pool.shutdown.assert_not_called();app.quit.assert_not_called()
+        app.upload_cleanup.close.assert_not_called();self.assertFalse(app.cleanup_closed)
 
 
 

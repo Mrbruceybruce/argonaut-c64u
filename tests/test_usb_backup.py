@@ -99,9 +99,9 @@ class UsbBackupTests(unittest.TestCase):
         self.session=DeviceSession('c64u-abc','session-1')
         self.scheduler=CoreScheduler(lambda:self.session)
         self.addCleanup(self.scheduler.close)
-        self.service=UsbBackupService(lambda:self.client,lambda:self.session,self.scheduler)
         self.files=FileService(lambda:self.client,lambda:self.session,
                                scheduler=self.scheduler)
+        self.service=UsbBackupService(lambda:self.client,lambda:self.session,self.scheduler,file_service=self.files)
         self.addCleanup(lambda:self.assertEqual(0,self.client.peer.active))
 
     def backup_request(self,name='backup',paths=()):
@@ -423,14 +423,11 @@ class UsbBackupTests(unittest.TestCase):
             self.files.prepare_partial_delete(arbitrary)
         claim=PartialUpload(arbitrary,self.session.device_id,self.session.session_id)
         self.client.add_file(arbitrary.path,b'partial')
-        reviewed=self.files.prepare_partial_delete(claim).wait(5).result
-        self.session=DeviceSession(self.session.device_id,'session-2')
-        changed=self.files.execute_delete(reviewed.plan_id).wait(5)
-        self.assertEqual('failed',changed.state)
-        self.assertEqual('session',changed.error.code)
-        self.assertIn(arbitrary.path,self.client.files)
-        with self.assertRaisesRegex(BrowserError,'connection changed'):
+        with self.assertRaisesRegex(BrowserError,'did not identify'):
             self.files.prepare_partial_delete(claim)
+        self.session=DeviceSession(self.session.device_id,'session-2')
+        self.assertIn(arbitrary.path,self.client.files)
+        with self.assertRaises(BrowserError):self.files.prepare_partial_delete(claim)
 
     def test_client_upload_is_rejected_and_import_is_headless(self):
         request=BackupRequest(FileLocation.c64u('/USB2'),(),

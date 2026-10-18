@@ -8,6 +8,7 @@ from gi.repository import Gtk, Gdk
 from c64u_browser.api import Entry, BrowserError
 from c64u_browser.storage import root_presentation
 import test_preferences_ui
+from gtk_layout_fixture import allocated_frame
 
 
 class StorageGtk(unittest.TestCase):
@@ -84,7 +85,8 @@ class StorageGtk(unittest.TestCase):
         with patch.object(app,'open_disk_image') as launch:
             app.activate_row(False,app.rlist.get_row_at_index(2));launch.assert_not_called()
         for width in (900,1200):
-            app.window.set_default_size(width,850);self.fixture.pump()
+            app.window.set_default_size(width,850)
+            allocated_frame(app.window, app.rpath, app.storage_description)
             self.assertGreater(app.rpath.get_width(),0)
             self.assertGreater(app.storage_description.get_height(),0)
         app.rpath.set_text('/Flash/html');app.rpath.emit('activate');self.fixture.pump()

@@ -24,13 +24,52 @@ def inspect(client, path):
     return next((e for e in entries if e.name.casefold() == name.casefold()), None)
 
 
+class DirectoryIdentityError(BrowserError):
+    """Non-retryable integrity failure; paths retained as diagnostic evidence."""
+    code = 'directory-identity'
+    retryable = False
+
+    def __init__(self, requested, reported):
+        super().__init__('Directory identity mismatch; deletion stopped.')
+        self.requested_directory = requested
+        self.reported_directory = reported
+
+
+def list_directory_exact(client, path):
+    """Deletion-only read: never authorize entries from a different directory."""
+    from .storage import require_file_operation
+    from .jobs import check_current_job
+    require_file_operation(path, parent=True)
+    check_current_job()
+    actual, entries = client.list_directory(path)
+    check_current_job()
+    from .diagnostics import cleanup_event
+    cleanup_event('parent_identity', parent_match=actual == path)
+    if actual != path:
+        raise DirectoryIdentityError(path, actual)
+    return entries
+
+
+def inspect_exact(client, path):
+    remote_file(path)
+    parent, name = posixpath.split(path)
+    entries = list_directory_exact(client, parent)
+    entry = next((e for e in entries if e.name.casefold() == name.casefold()), None)
+    from .diagnostics import cleanup_event
+    cleanup_event('target_observation', target_match=entry is not None and entry.name == name,
+                  kind=(entry.kind if entry.kind in ('file', 'dir') else 'unsupported') if entry else None,
+                  size=entry.size if entry else None,
+                  reason='target-missing' if entry is None else 'observed')
+    return entry
+
+
 def _operate(client, action, path, new_name, confirmation, managed):
     remote_file(path)
     parent, name = posixpath.split(path)
     child(parent, name)
     if action == 'delete' and confirmation != path:
         raise BrowserError('Deletion requires confirmation of the exact path, including letter case.')
-    entry = inspect(client, path)
+    entry = inspect_exact(client, path) if action == 'delete' else inspect(client, path)
     destination = None
     case_only = False
     temporary = None
@@ -57,7 +96,7 @@ def _operate(client, action, path, new_name, confirmation, managed):
         else:
             if confirmation != path:
                 raise BrowserError('Deletion requires confirmation of the exact path.')
-            if entry.kind == 'dir' and client.list_directory(path)[1]:
+            if entry.kind == 'dir' and list_directory_exact(client, path):
                 raise BrowserError('Folder is not empty; recursive deletion is disabled.')
     else:
         raise BrowserError('Unknown file operation.')

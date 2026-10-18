@@ -148,8 +148,15 @@ class OperationPresentation:
             self._emit()
         return bool(accepted)
 
-    def finish(self, job, token, snapshot):
-        if not self.matches(job, token):return
+    def finish(self, job, token, snapshot, *, present=True):
+        if not self.matches(job, token):return False
+        if not present:
+            # Retire only this presentation's ownership. The authoritative job
+            # retains its result; neither renderer nor old subscribers may
+            # overwrite a replacement session's status.
+            self.state = 'TERMINAL';self.cancellable = False
+            self.job = self.token = None;self._listeners = []
+            return True
         self.state = 'TERMINAL';self.cancellable = False
         self.message = terminal_text(snapshot)
         listeners = tuple(self._listeners);view = self.view

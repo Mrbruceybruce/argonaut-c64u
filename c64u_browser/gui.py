@@ -14,6 +14,8 @@ from gi.repository import Gtk, GLib, Gdk, Gio, Graphene, Pango
 from .api import BrowserError, ConnectionFailure
 from .foreground import ForegroundSlot
 from .operation_status import OperationPresentation
+from .upload_cancel_dialog import UploadCancelDialog
+from .upload_cleanup import UploadCleanup
 from .ui_style import install_styles, set_error
 from .appearance import AppearanceFollower
 from .header import ConnectionHeader, refresh_header, begin_connection, end_connection
@@ -67,6 +69,9 @@ class Browser(Gtk.Application):
         self.client = None
         self.busy = False
         self.transfer_job = None
+        self.upload_cancel_dialog = None
+        self.upload_cleanup = None
+        self.cleanup_closed = False
         self.foreground = ForegroundSlot()
         self.drag_payload = None
         self.file_clipboard = None
@@ -124,6 +129,8 @@ class Browser(Gtk.Application):
 
 
     def do_shutdown(self):
+        self.cleanup_closed = True
+        if self.upload_cleanup is not None:self.upload_cleanup.close()
         header = getattr(self, 'header_view', None)
         if header is not None:header.close()
         appearance = getattr(self, 'appearance', None)
@@ -215,10 +222,17 @@ class Browser(Gtk.Application):
             self.test_lab_tab = TestLabTab(self)
             self.tabs.append_page(self.test_lab_tab.box, Gtk.Label(label='Test Lab'))
         self.tabs.connect('switch-page', lambda _, page, index: self.settings_tab.load_if_needed() if index == 1 else self.drives_tab.load_if_needed() if index == 2 else None)
-        self.status_row = Gtk.Box(spacing=8)
-        self.status_label = Gtk.Label(xalign=0, wrap=True, selectable=True, hexpand=True)
-        self.status_row.append(self.status_label);outer.append(self.status_row)
+        self.status_region = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.status_region.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        outer.append(self.status_region)
+        self.status_row = Gtk.Box(spacing=8, margin_start=12, margin_end=12,
+                                  margin_top=8, margin_bottom=8)
+        self.status_label = Gtk.Label(xalign=0, yalign=0, wrap=True, selectable=True,
+                                     hexpand=True, width_chars=1, valign=Gtk.Align.START)
+        self.status_label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        self.status_row.append(self.status_label);self.status_region.append(self.status_row)
         self.cancel_button = self.button(self.status_row, 'Cancel', lambda:None)
+        self.cancel_button.set_valign(Gtk.Align.START)
         self.cancel_button.update_property([Gtk.AccessibleProperty.LABEL], ['Cancel'])
         self.cancel_button.set_visible(False);self.cancel_button.set_sensitive(False)
         self.operation = OperationPresentation(self.render_operation,
@@ -757,6 +771,8 @@ class Browser(Gtk.Application):
         self.run(lambda: self.client.list_directory(self.remote), refreshed)
 
     def render_operation(self, view):
+        dialog = self.upload_cancel_dialog
+        if dialog is not None:dialog.validate()
         self.status_label.set_text(view.message)
         if not view.cancel_available and self.cancel_button.has_focus():
             if not self.tabs.child_focus(Gtk.DirectionType.TAB_FORWARD):
@@ -780,6 +796,15 @@ class Browser(Gtk.Application):
         if not self.foreground.owns(token, job) or self.transfer_job is not job:
             return False
         if job.snapshot().state in ('succeeded', 'failed', 'cancelled'):return False
+        if not self.operation.matches(job, token) or not self.operation.view.cancel_available:
+            return False
+        if self.core.files._upload_cancel_eligible(job):
+            if self.upload_cancel_dialog is not None:
+                self.upload_cancel_dialog.dialog.present()
+            else:
+                self.upload_cancel_dialog = UploadCancelDialog(self, job, token)
+                self.upload_cancel_dialog.show()
+            return True
         def send():
             if job.operation.startswith('game-library.launch'):service=self.core.game_launch
             elif job.operation.startswith('game-library.'):service=self.core.game_library
@@ -841,7 +866,8 @@ class Browser(Gtk.Application):
             if managed is not None:GLib.idle_add(managed.try_restore)
         return True
 
-    def run_file_job(self, submit, done, *, started=None, failed=None, cancellable=True):
+    def run_file_job(self, submit, done, *, started=None, failed=None, cancellable=True,
+                     presentation_guard=None, presentation_abandoned=None):
         """Admit before calling a service. Never accept an already-submitted job.
 
         UI launchers supply a factory containing only service submission. Internal
@@ -880,12 +906,38 @@ class Browser(Gtk.Application):
                 'delayed' if delay>500 else 'ok',duration_ms=delay,
                 details=(('delayed',delay>500),('source',source)),
                 job_id=job.id,phase=job.operation)
+            if presentation_guard is not None:
+                snapshot = job.snapshot()
+                if snapshot.state not in ('succeeded','failed','cancelled'):return False
+            restore_cancel_focus = (presentation_guard is not None and
+                (self.cancel_button.has_focus() or self.window.get_focus() is self.cancel_button))
             delivered[0] = True
             if not self.end_file_job(job, token):return False
+            # Cleanup opts into a session/coordinator guard. Completion and the
+            # captured token release above always occur, even if UI authority
+            # expired. Unrelated jobs retain the original completion path.
+            if presentation_guard is not None:
+                try:present = bool(presentation_guard())
+                except Exception:present = False
+                if not present:
+                    retired = self.operation.finish(job, token, snapshot, present=False)
+                    if retired:
+                        if restore_cancel_focus or self.cancel_button.has_focus():
+                            if not self.tabs.child_focus(Gtk.DirectionType.TAB_FORWARD):
+                                self.status_label.grab_focus()
+                        self.cancel_button.set_sensitive(False)
+                        self.cancel_button.set_visible(False)
+                    if presentation_abandoned is not None:
+                        try:presentation_abandoned()
+                        except Exception:self.operation.diagnostic()
+                    return False
             self.operation.finish(job, token, snapshot)
             try:done(snapshot)
             except Exception as exc:
-                if self.foreground.token is None:self.status.set_text(str(exc))
+                # A callback may have replaced its session before failing.
+                try:current = presentation_guard is None or bool(presentation_guard())
+                except Exception:current = False
+                if current and self.foreground.token is None:self.status.set_text(str(exc))
             return False
         def observe(event):
             if event.kind=='finished':
@@ -1123,12 +1175,28 @@ class Browser(Gtk.Application):
         def transfer(preview,decision):
             if self.busy or (not (local and source_local) and self.client is not client): return
             job=lambda: self.core.files.execute_copy(preview.plan_id,decision)
+            coordinator = [None]
+            def started(job):
+                coordinator[0] = UploadCleanup(self, job, self.foreground.token)
             def finished(snapshot):
+                coordinator[0].complete(refreshed_after_cleanup)
+            def refreshed_after_cleanup(snapshot, cleanup_message, removed, may_refresh):
+                if (not coordinator[0].owns_presentation() or self.busy or
+                        self.foreground.token is not None):return
                 result=snapshot.result
                 if result is None:
-                    self.status.set_text(snapshot.error.message if snapshot.error else 'Copy did not complete.')
+                    message = snapshot.error.message if snapshot.error else 'Copy did not complete.'
+                    self.status.set_text(message + (' · '+cleanup_message if cleanup_message else ''))
                     return
                 message, partial = result.message, result.partial_upload
+                if cleanup_message:message += ' · '+cleanup_message
+                if not may_refresh or self.busy or self.foreground.token is not None:
+                    self.status.set_text(message)
+                    return
+                if removed:
+                    if self.partial_upload is partial:self.partial_upload = None
+                    partial = None
+                    self.update_partial_recovery()
                 copied = completed_roots(names, result.completed)
                 if snapshot.state=='failed' or (snapshot.state=='cancelled' and (result.replacements or result.folder_steps)):
                     self.copy_report(result)
@@ -1146,6 +1214,8 @@ class Browser(Gtk.Application):
                 current = self.client
                 folder = self.remote
                 def refresh():
+                    if (not coordinator[0].owns_presentation() or self.client is not current):
+                        return None, 'The device/session changed.'
                     try: return current.list_directory(folder), None
                     except Exception as exc: return None, str(exc)
                 def refreshed(result):
@@ -1158,11 +1228,13 @@ class Browser(Gtk.Application):
                             posixpath.normpath(str(destination)) == posixpath.normpath(folder)):
                         remote_selection = tuple(dict.fromkeys(
                             remote_selection + copied))
-                    if listing is not None and self.client is current:
+                    if (not coordinator[0].owns_presentation() or self.client is not current or
+                            self.busy or self.foreground.token is not None):return
+                    if listing is not None:
                         self.show_remote(listing, remote_selection)
                     self.status.set_text(message + (' · Could not refresh C64 Ultimate: ' + error if error else ''))
                 self.run(refresh, refreshed)
-            self.run_file_job(job,finished)
+            self.run_file_job(job,finished,started=started)
         def checked(snapshot):
             if snapshot.state=='cancelled':
                 self.status.set_text('Transfer cancelled; nothing copied.');return
@@ -1648,9 +1720,12 @@ class Browser(Gtk.Application):
         return False
 
     def close(self, *_):
+        if self.upload_cancel_dialog is not None:self.upload_cancel_dialog.dismiss()
         if self.busy:
             self.status.set_text('Wait for the current operation to finish before closing.')
             return True
+        self.cleanup_closed = True
+        if self.upload_cleanup is not None:self.upload_cleanup.close()
         header = getattr(self, 'header_view', None)
         if header is not None:header.close()
         appearance = getattr(self, 'appearance', None)

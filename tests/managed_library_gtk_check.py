@@ -10,6 +10,7 @@ from c64u_browser.managed_library_view import ManagedLibraryView
 from c64u_browser.scheduler import DeviceSession
 from tests.test_managed_library import manifest,game,PATH
 from c0_gtk_input import pump
+from gtk_layout_fixture import allocated_frame
 
 
 class ManagedViewGtk(unittest.TestCase):
@@ -541,7 +542,8 @@ class SettingsSelectionGtk(unittest.TestCase):
         self.window.set_child(self.view.settings_box)
         library=parse_manifest(manifest(),'device',PATH);self.candidates([library])
         for width in (600,900):
-            self.window.set_default_size(width,750);pump(.15)
+            self.window.set_default_size(width,750)
+            allocated_frame(self.window, self.view.settings_box, self.choices_first())
             self.assertGreater(self.view.settings_box.get_width(),0)
             for button in (self.view.refresh_button,self.view.select_button,self.view.create_button):
                 self.assertGreater(button.get_width(),0)

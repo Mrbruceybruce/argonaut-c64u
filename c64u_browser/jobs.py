@@ -12,6 +12,12 @@ from .api import BrowserError, ConnectionFailure
 from .diagnostics import operation_context
 
 
+_CURRENT_JOB = ContextVar('argonaut_current_job', default=None)
+
+def _current_job():
+    return _CURRENT_JOB.get()
+
+
 _CURRENT_CHECK = ContextVar('argonaut_current_job_check', default=None)
 
 def check_current_job():
@@ -201,6 +207,22 @@ class CoreJob:
                 self.state=JobState.CANCEL_REQUESTED
         return True
 
+    def _request_cancel_with_intent(self, install):
+        """Install owner state atomically with the first cancellation transition.
+
+        Private upload-owner hook. Caller holds its state lock; install must be
+        state-only and cannot notify or call back into a job. Notification is
+        deliberately left to the owner after both locks have been released.
+        Existing request_cancel semantics are unchanged.
+        """
+        with self._lock:
+            if self.state in TERMINAL_STATES or self._cancel.is_set():
+                return False
+            install(object())
+            self._cancel.set()
+            self.state = JobState.CANCEL_REQUESTED
+        return True
+
     def request_cancel(self):
         if not self._mark_cancel_requested():return False
         self._emit('cancel-requested')
@@ -221,8 +243,11 @@ class CoreJob:
             if preflight is not None: preflight()
             with operation_context(job_id=self.id, phase=self.operation):
                 token=_CURRENT_CHECK.set(self.check_cancel)
+                origin=_CURRENT_JOB.set(self)
                 try:result=self._task(self)
-                finally:_CURRENT_CHECK.reset(token)
+                finally:
+                    _CURRENT_JOB.reset(origin)
+                    _CURRENT_CHECK.reset(token)
             # A late cancellation request does not relabel completed consequential
             # work. Only a check that actually stopped work raises JobCancelled.
             with self._lock:

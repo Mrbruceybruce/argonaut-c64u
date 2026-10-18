@@ -29,7 +29,8 @@ class Admission(unittest.TestCase):
         for name in ('run_file_job','begin_file_job','end_file_job','cancel_transfer','bind_job_cancel','job_cancel_callback'):
             setattr(self.app,name,lambda *args,_name=name,**kw:getattr(Browser,_name)(self.app,*args,**kw))
         self.app.operation=OperationPresentation(lambda view:self.app.status.set_text(view.message))
-        self.app.core=SimpleNamespace(files=SimpleNamespace(cancel=self.cancel),
+        self.app.core=SimpleNamespace(files=SimpleNamespace(cancel=self.cancel,
+            _upload_cancel_eligible=lambda job:False),
             device_session=lambda:SimpleNamespace(device_id="",session_id=""))
         self.jobs={}
 

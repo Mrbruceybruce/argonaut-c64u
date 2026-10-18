@@ -30,22 +30,53 @@ class ForegroundGtk(unittest.TestCase):
         self.assertFalse(self.app.cancel_button.get_sensitive())
 
     def test_actual_chooser_acceptances_refuse_after_another_job_starts(self):
-        for tab,method in ((self.app.game_library_tab,'game_library_tab'),
-                           (self.app.sid_jukebox_tab,'sid_jukebox_tab')):
-            # Real Gtk chooser and response signal; hide native presentation.
-            with patch.object(Gtk.FileChooserNative,'show'):
+        from pathlib import Path
+        from gtk_layout_fixture import allocated_frame
+        for tab, name in ((self.app.game_library_tab, 'synthetic.d64'),
+                          (self.app.sid_jukebox_tab, 'synthetic.sid')):
+            path = Path(self.fixture.temp.name) / name
+            path.write_bytes(b'offline picker fixture')
+            self.app.local = str(path.parent)
+            # Complete the real picker listing synchronously; never submit IO.
+            with patch.object(self.app, 'run', side_effect=lambda task, done: (done(task()), True)[1]):
                 tab.add_local()
-            chooser=tab.chooser
-            fake_file=Mock();fake_file.get_path.return_value='/tmp/synthetic.sid'
-            files=Mock();files.get_n_items.return_value=1;files.get_item.return_value=fake_file
-            a=CoreJob('file.synthetic',lambda _:None)
-            self.app.run_file_job(lambda:a,Mock())
-            with patch.object(Gtk.FileChooserNative,'get_files',return_value=files), \
-                 patch.object(tab.client,'add_core_host') as submit:
-                chooser.emit('response',Gtk.ResponseType.ACCEPT)
-            submit.assert_not_called();self.assertIs(a,self.app.transfer_job)
+            chooser = tab.chooser
+            row = chooser.listing.get_first_child()
+            while row is not None and row.item[0] != name:
+                row = row.get_next_sibling()
+            self.assertIsNotNone(row)
+            chooser.listing.select_row(row)
+            self.assertTrue(chooser.select.get_sensitive())
+            callback = Mock(wraps=chooser.callback)
+            chooser.callback = callback
+            a = CoreJob('file.synthetic', lambda _: None)
+            self.assertTrue(self.app.run_file_job(lambda: a, Mock()))
+            with patch.object(tab.client, 'add_selection') as submit:
+                chooser.dialog.emit('response', Gtk.ResponseType.ACCEPT)
+                chooser.response(None, Gtk.ResponseType.ACCEPT)
+            callback.assert_called_once()
+            selection, = callback.call_args.args[0]
+            self.assertEqual(str(path), selection.path)
+            self.assertEqual('core-host', selection.scope)
+            submit.assert_not_called()
+            self.assertIs(a, self.app.transfer_job)
             self.assertFalse(tab.job_busy)
-            a.run();self.fixture.pump()
+            a.run(); self.fixture.pump()
+            # Cancellation delivers None once and must not submit any work.
+            with patch.object(self.app, 'run', side_effect=lambda task, done: (done(task()), True)[1]):
+                tab.add_local()
+            chooser = tab.chooser
+            callback = Mock(wraps=chooser.callback); chooser.callback = callback
+            with patch.object(tab.client, 'add_selection') as submit:
+                chooser.dialog.emit('response', Gtk.ResponseType.CANCEL)
+                chooser.response(None, Gtk.ResponseType.ACCEPT)
+            callback.assert_called_once_with(None); submit.assert_not_called()
+            allocated_frame(self.app.window)
+            self.assertIsNone(tab.chooser)
+            self.assertFalse(self.app.busy)
+            focus = self.app.window.get_focus()
+            self.assertIsNotNone(focus)
+            self.assertTrue(focus.get_mapped() and focus.is_sensitive())
 
     def test_immediate_terminal_job_updates_tab_once_and_releases(self):
         tab=self.app.game_library_tab

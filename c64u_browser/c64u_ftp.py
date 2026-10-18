@@ -93,6 +93,8 @@ class C64UFtpLeaseManager:
             client.close()
             with self._lock:
                 self._leases.pop(key, None)
+            from .diagnostics import cleanup_event
+            cleanup_event('lease_release', local_release=True)
 
 
 class C64UFtpClient:

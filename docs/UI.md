@@ -832,3 +832,530 @@ of this pass. Both final audit HOLD issues are resolved; no remaining material
 conflict was identified. Proposed visual details, deferred recommendations and
 implementation/release-cut approval remain future review, not claims of completed
 implementation. **PASS — ready for UI implementation-plan review.**
+
+## 13. UI-FR.4 — upload cancellation and future Transfer Recovery
+
+Historical design checkpoint: cancellation-action wording and cleanup promises
+below are superseded by [the approved 1.10 best-effort policy](#15-ui-fr4e2--approved-best-effort-upload-cleanup).
+Technical authority and lifecycle requirements remain applicable.
+
+Historical inspection record: section 14 supersedes the two-confirmation proposal
+and resolves this section's HOLD. Its single-dialog interaction is the current
+approved design; the lifecycle findings below remain relevant.
+
+### Authority and implementation status
+
+The UI-FR.4 request approves the three-choice upload-cancellation design below.
+This section records design and read-only lifecycle findings, not an implemented
+or accepted feature. Existing UI identifiers, seven unnumbered audit candidates,
+historical milestone evidence and feature contracts remain unchanged. No new
+numbered audit identifiers or release sequencing are assigned here. The roadmap
+remains authoritative for development priorities; no roadmap change is needed
+for this design record.
+
+Technical references remain [B5 in Current State](CURRENT-STATE.md),
+[FTP upload/deletion and UI-FR.2/2a/3 contracts](C64U-FTP.md), and
+[USB backup/restore](USB-BACKUP.md). The inspected UI-FR.2/2a/3 code is uncommitted
+work, not a claim of published or physically accepted behavior.
+
+### Approved cancellation choices
+
+Present these choices **before requesting cancellation**, when Cancel is invoked
+for an eligible active upload:
+
+| Choice | Approved behavior |
+|---|---|
+| Continue Upload | Dismiss the confirmation; make no cancellation request and preserve the active transfer. |
+| Cancel & Keep | Request cooperative cancellation once, wait for authoritative completion, retain any incomplete staging file and available recovery evidence, preserve completed batch files, and perform no deletion. |
+| Cancel & Delete | Request cooperative cancellation once; wait for authoritative completion and released transfer resources. If a verified incomplete staging file is available, use trusted file-only recovery to remove that file. Preserve completed files and published destinations. Never delete on uncertain publication. Report cleanup failure/uncertainty without automatic retry. |
+
+**Cancel & Keep is the safe default selection.** Escape and window close instead
+mean **Continue Upload**: they must not request cancellation. These response
+routes must be distinct; a generic GTK Cancel response must not accidentally
+activate Cancel & Keep. Cancellation is cooperative and does not promise to
+interrupt an FTP command already in progress. A late request can still end in
+acknowledged success or failure; terminal evidence wins over cancellation intent.
+
+A Core-issued `staging-candidate` is provenance, not proof that the file presently
+exists or is unchanged. "Verified incomplete staging file" requires fresh strict
+recovery preparation plus execution revalidation, not inference from a pathname,
+message text, a cancelled state, or the existence of a record alone. There is no
+cleanup when no qualifying record exists, publication is unknown, the session
+changed, authority is exhausted/consumed, or preparation cannot verify the file.
+Retain truthful evidence and report the limitation instead.
+
+### Inspected call paths and ownership
+
+Source links are repository-relative; function names identify the inspected code.
+
+| Stage | Current call path and consequence |
+|---|---|
+| Global Cancel | [Browser](../c64u_browser/gui.py) `bind_job_cancel()` installs a captured `job_cancel_callback(job)` with the foreground token. `cancel_transfer(job, token)` rejects stale/terminal jobs and selects Files, USB, Game Library or SID service cancellation. |
+| B5 request | [OperationPresentation](../c64u_browser/operation_status.py) `request_cancel()` consumes its one-shot presentation action before calling the service. Accepted requests enter sticky Cancelling; progress cannot overwrite it. Refusal is reported while awaiting the terminal result. |
+| Core cancellation | Service `cancel(job.id)` delegates to [CoreScheduler.cancel()](../c64u_browser/scheduler.py), then [CoreJob.request_cancel()](../c64u_browser/jobs.py). The request sets the cancellation event/state; only a cooperative check raising `JobCancelled` establishes cancellation as the terminal outcome. A request is not completion. |
+| Foreground admission | `Browser.run_file_job(submit, done)` reserves [ForegroundSlot](../c64u_browser/foreground.py) before invoking the submit factory, binds the returned job, then `begin_file_job()` disables busy controls and binds B5. The status region remains outside busy controls. |
+| Upload execution | `Browser.start_copy()` prepares a `CopyRequest`, resolves conflicts, then submits [FileService.execute_copy()](../c64u_browser/file_service.py). [folder_copy.execute_plan()](../c64u_browser/folder_copy.py) runs steps serially and [transfers.upload_managed()](../c64u_browser/transfers.py) handles staged additions. Folder steps and replacement evidence retain their separate contracts. |
+| USB restore | [UsbBackupService.execute_restore()](../c64u_browser/usb_backup.py) verifies backup/storage/classification, builds a step plan, calls the same executor, and uses the shared FileService issuer. Current Files GUI has no USB backup/restore entry points; the service remains available. |
+| Issuance | FileService `_partial_from_report()` registers the exact record only for qualifying copy/restore evidence and matching staging path/session. It runs after `execute_plan()` returns. Copy/restore preserve the result in failure or cancellation exceptions. |
+| Terminal delivery | `CoreJob.run()` unwinds the task, assigns authoritative state/result, sets its completion event, then emits `finished`. `run_file_job()` observes events, the initial snapshot and a 250 ms snapshot fallback; all converge on one guarded `finish()` callback. This is observation, not retry. |
+| Foreground release | `finish()` rejects stale ownership/duplicate delivery, calls `end_file_job()` to restore sensitivity and release the exact token, then `operation.finish()` and feature `done(snapshot)`. `render_operation()` restores usable focus when Cancel disappears. |
+| Existing recovery | `Browser.delete_partial()` opens `delete_dialog()`. Its preparation callback displays the exact reviewed target; its response callback executes only after explicit Delete. FileService `prepare_partial_delete()` reserves authority; `execute_delete()` consumes authority/plan before dispatch. [deletion._delete_recovery_file()](../c64u_browser/deletion.py) performs only DELE after fresh file/session checks; [strict Files readers](../c64u_browser/files.py) reject returned-directory mismatch. |
+| Session replacement | [Core](../c64u_browser/core.py) `_begin_session()`, `_end_session()` and `close()` invalidate recovery. `reconnect()` creates a new session even for the same device. [Recovery](../c64u_browser/recovery.py) cannot transfer old cleanup authority into that new session. |
+
+### Timing and safe cleanup handoff — implementation proposal
+
+B5 exposes Cancel for a foreground job marked cancellable while RUNNING and before
+its one-shot attempt; this includes queued work and does not mean every wire
+phase is immediately interruptible. Streaming checks and per-step checks are
+cooperative. The managed FTP layer defers cooperative cancellation around
+consequential mutation reply capture, including publication, so accepted outcomes
+are not relabelled as cancelled. Device/binding validation remains active.
+
+The managed adapter operation scopes unwind before the copy executor returns.
+[FtpReadAdapter.operation()](../c64u_browser/ftp_reads.py) releases its context/lease
+stack; [C64UFtpLeaseManager.lease()](../c64u_browser/c64u_ftp.py) closes the client and
+removes the lease in `finally`. Recovery issuance follows executor return and
+precedes terminal result publication. Do not trigger cleanup merely because
+issuance occurred or `cancel-requested` was received; wait for the terminal result
+and GTK foreground release.
+
+`CoreScheduler._worker()` calls `queue.task_done()` only after `job.run()` returns;
+a terminal callback may therefore arrive before that bookkeeping completes.
+Submitting the next job to the FIFO lane is safe; waiting for it inside the
+previous worker/listener is not. Never block GTK, call `wait()` from completion
+listeners, acquire nested device admission, or retain the previous foreground token.
+
+Use new submission factories and new foreground reservations for recovery
+preparation and deletion execution. Gate each continuation on captured job,
+device/session, dialog intent and exact issued record. Preserve plan discard on
+abandoned review, and consume a cleanup-intent latch before dispatch. Cancel &
+Delete is not permission to scan old records or clean other jobs' leftovers.
+
+The existing GUI provides a suitable released-foreground `done(snapshot)` point,
+but does **not** yet implement the chain safely: `start_copy().finished()` starts
+`self.run(refresh, refreshed)` immediately, which marks the application busy.
+A new coordinator must choose cleanup/review before refresh, or wait for an
+explicit refresh completion before requesting admission. It must also avoid
+stale refresh/status writes overwriting the cleanup result. Do not append a
+cleanup call after the current completion callback and assume admission succeeds.
+
+### Single-file, folder and batch evidence
+
+`folder_copy.Report` has one `partial` path, while `CopyResult` and `RestoreResult`
+have one optional `partial_upload`. Their upload/replacement/folder-step sequences
+retain per-step evidence and their completed/skipped/remaining lists retain batch
+accounting. Execution stops at the first failed/cancelled step; therefore a single
+current execution offers at most one recoverable incomplete staging file. This
+applies to one selected file, recursive folder plans, multiple selected files and
+USB restore plans. A directory-creation failure is not a staged-file authority;
+a completed publication or replacement uncertainty is not a cleanup shortcut.
+
+The FileService store can hold up to 32 unresolved records from different jobs,
+but `Browser.partial_upload` is a single presentation reference and can be
+replaced by a later result. It is not a batch manifest or an enumeration API.
+There is no current result field for multiple incomplete staging authorities.
+Never use one record to authorize deletion of an entire folder or batch, or
+expand cleanup from the current record to all retained records. A future recovery
+collection needs explicit per-record provenance, selection, accounting and
+consumption; it must not be inferred from historical paths.
+
+### Native GTK integration — implementation proposal
+
+Use a compact transient modal GTK dialog with natural word/character wrapping,
+20 logical pixels outer padding, 12 between text sections, 16 before actions and
+8 between buttons, following [power_dialog._content() and _text()](../c64u_browser/power_dialog.py).
+Do not reuse Ultimate Power's busy-operation admission rule: this dialog must open
+while the upload owns the foreground. Keep its actions outside disabled busy
+controls. Prefer about 480 logical pixels natural width, with narrow-width review
+and meaningful accessible labels/tooltips; no new CSS/theme is required.
+
+Bind the dialog to the captured upload job/token and allow only one live instance.
+Keep does not send a request until activated. Give Keep the default selection;
+map Escape/window close explicitly to Continue. Restore focus to a live sensitive
+control. Terminal completion while the dialog is open closes/disables its choices
+without retroactive cancellation or deletion. Duplicate responses and late
+callbacks are ignored. Maintain B5 status/progress while the dialog is open and
+sticky Cancelling only after a request is accepted. Preserve refusal reporting.
+
+Route only eligible staged-upload execution through this dialog; leave downloads,
+copy preparation, native Flash upload, managed publication, launches and other
+non-upload B5 cancellation on their existing route. Use explicit operation/request
+metadata rather than message parsing or the `file.copy.execute` name alone, since
+that operation also covers downloads and local copies. Existing modal cancellation
+surfaces must share one intent/one-shot authority rather than issuing parallel
+requests. Extension to future USB restore UI needs explicit eligibility metadata.
+
+### Future Transfer Recovery and standalone-control transition
+
+**Future design, not implemented:** a separate Transfer Recovery interface offers
+Resume, Restart and Discard where individually supported and authorized.
+
+- Verified batch-level recovery means revalidating sources, destinations and
+  completed items before preparing remaining work; it is not blind replay.
+- Byte-level FTP upload resumption is separate. FTP `REST` + `STOR` firmware
+  behavior, offsets, source identity, prefix integrity and interrupted publication
+  must be qualified before advertising Resume. Support is unverified here.
+- Persistent evidence is another workstream. Current authority is in-memory,
+  session-scoped and lost on restart/reconnect. A persisted journal or record must
+  not reconstruct deletion or resume authority without a separately reviewed design.
+- Restart requires fresh validation and conflict decisions, preserving already
+  published files. Discard means explicit reviewed cleanup of a specific supported
+  target, never recursive cleanup inferred from a batch or journal.
+
+Do not delete retained uploads merely because Resume is unavailable. No Resume
+implementation or firmware qualification is claimed, and no release milestone is
+silently inserted into the roadmap.
+
+Plan a transition from the standalone Files Delete Partial Upload control to
+contextual results/Transfer Recovery; **do not remove the existing control yet**.
+It is already contextual (hidden without matching session evidence), not an
+always-visible permanent button. The fallback assessment is:
+
+| Situation | Safe fallback requirement |
+|---|---|
+| Cancel & Keep or interruption without this dialog | Keep a discoverable reviewed-cleanup route for still-valid unconsumed authority. |
+| Network interruption | Retain evidence; cleanup is possible only if the original session/authority remains valid. Reconnection invalidates it. Never promise reconnect-and-delete using the old record. |
+| Failed/cancelled preparation or abandoned review | Reservation may be released within the same session, allowing a new explicit review. |
+| Failed, refused, cancelled or uncertain execution | Authority is already consumed. The old record cannot retry; offer outcome inspection and a separately reviewed ordinary deletion workflow where appropriate, not automatic reuse. |
+| Multiple jobs/restart/expired session | Preserve available historical evidence without inventing authority. A future collection/persistence design is required. |
+
+The current button visibility checks device/session and busy state, not authority
+consumption; a failed cleanup can leave it visible although another request is
+rejected by Core. Its existing copy suggesting reconnecting to the original
+session also does not grant authority across reconnect. These are future
+presentation corrections, not changes made in this documentation pass.
+
+### Implementation slices, decisions and acceptance plan
+
+Proposed slices, each requiring implementation authorization:
+
+1. Define explicit staged-upload eligibility and a job-bound cancellation intent
+   coordinator; preserve unrelated Cancel routes and B5 one-shot ownership.
+2. Implement the native choice dialog and terminal/stale-response lifecycle.
+3. Implement terminal-to-fresh-review-to-file-only-cleanup orchestration, ordered
+   before refresh, with separate admission and truthful combined result reporting.
+4. Replace stale fallback presentation with contextual recovery/outcome inspection;
+   only then consider removing the standalone control.
+5. Separately design multi-record recovery, verified batch restart/resume and
+   persistent evidence. Qualify byte-level REST/STOR before any Resume claim.
+
+**Historical safety decision — superseded by UI-FR.4a, section 14:** At this
+checkpoint, Cancel & Delete was approved as
+an early choice, but the existing GUI confirms an exact target only after fresh
+deletion preparation. The record/target might not yet exist when the early dialog
+is shown. Decide whether to retain a second exact-target review (recommended to
+preserve the current confirmation contract), or explicitly approve a narrowly
+scoped job-bound deferred confirmation contract after reviewing its presentation
+and safety conditions. Do not silently treat early intent as existing reviewed
+confirmation or bypass the post-interruption preparation/execution checks.
+
+Other implementation decisions: the structured eligibility metadata, handling
+natural completion while the dialog is open, combined transfer/cleanup result
+copy, and a future multi-record/persistence schema. Proposed handling of natural
+completion is no cancellation or cleanup when no eligible incomplete record is
+returned. None of these changes is implemented by this section.
+
+Deterministic test plan: fake Core/FTP services, isolated GTK and blocked physical
+networking; assert Continue/Escape/close send nothing, Keep sends once and never
+deletes, and Delete waits for terminal result plus lease/foreground release.
+Exercise queued cancellation, streaming, publication deferral, natural completion,
+refused cancellation, unknown publication, empty/no record, completed batch prefix,
+and multiple retained records without broad cleanup. Assert new FIFO submissions
+without nested waits, strict directory identity, DELE-only dispatch, session
+replacement, capacity exhaustion, discarded review, single-use plans, duplicate
+responses, late callbacks and admission failure. Fail/lose cleanup responses and
+verify exact acknowledged counts, uncertainty and no retries. Verify refresh
+ordering, shared B5 status, sticky Cancelling and usable focus restoration.
+
+Physical acceptance is a later separately authorized activity: first review the
+confirmation decision and deterministic results, then use disposable data to
+qualify observed cancellation timing, light/dark layout, narrow widths, keyboard
+routes, retained/completed files and failure presentation. REST/STOR qualification
+is a separate firmware/version-specific investigation, not implied by ordinary
+upload acceptance. No application launch, tests or device commands occur in this
+inspection. **Historical UI-FR.4 outcome: HOLD — subsequently resolved by the
+explicit single-dialog authorization in section 14.**
+
+
+## 14. UI-FR.4a — single-dialog cancellation and deferred cleanup
+
+Historical design checkpoint: the user-facing “Cancel & Delete” label is now
+“Cancel & Clean Up”; see [section 15](#15-ui-fr4e2--approved-best-effort-upload-cleanup).
+The internal Delete intent and technical safety contracts remain unchanged.
+
+### Final approved interaction; earlier confirmation proposal superseded
+
+The UI-FR.4a authorization resolves section 13's confirmation HOLD. Show exactly
+one **Cancel Upload?** dialog for an eligible upload. There is **no second
+confirmation dialog**. The earlier recommendation for post-interruption user
+confirmation is superseded, retained above only as historical context. This
+changes the approved future interaction, not the current implemented GUI.
+Fresh service preparation and execution revalidation remain mandatory; automatic
+continuation after the approved choice does not bypass those checks.
+
+| Action | Final approved behavior |
+|---|---|
+| Continue Upload | Dismiss; do not request cancellation or create cleanup intent. Leave the transfer running. |
+| Cancel & Keep | Request cooperative cancellation once, wait for the authoritative result, retain incomplete staging/evidence and completed batch files, and perform no deletion. |
+| Cancel & Delete | Capture cleanup intent for this transfer and cancellation request, request cooperative cancellation, wait for authoritative completion and released resources, then clean only a qualifying Core-issued staging file through the trusted file-only service. Preserve completed/published files. Never clean unknown publication or retry uncertain cleanup. Report acknowledged cleanup success, failure or uncertainty. |
+
+**Cancel & Keep is the default cancellation choice. Escape and window close mean
+Continue Upload.** The dialog must explain that Delete applies only to this
+upload's eligible incomplete staging file; it does not roll back completed files
+or a whole folder. Cancellation is cooperative, not an immediate FTP stop.
+
+### Inspected authority gaps and proposed minimal mechanism
+
+Existing building blocks are useful but insufficient alone:
+
+- Browser's captured B5 job/token and `ForegroundSlot.owns()` reject stale GUI
+  actions. A Browser token is not a Core-issued deletion capability and cannot
+  authorize cleanup after it has been released.
+- `FileService._Recovery` retains exact record identity, session, staging path,
+  operation name, evidence, state and deletion-plan identity. It currently lacks
+  the **originating job identity**; `file.copy.execute` or `usb.restore.execute`
+  alone cannot distinguish different transfers.
+- `CoreJob.request_cancel()` currently returns a boolean, not a unique request
+  receipt. Repeated calls before terminal state can return true. B5's one-shot
+  guard is valuable but cannot prove which Core cancellation request authorized
+  later cleanup.
+- Recovery reservation/consumption, strict snapshots and DELE-only execution
+  already provide the remaining target and mutation controls. Keep them.
+
+**Proposed mechanism, not implemented:** retain one optional, private, ephemeral
+cleanup-intent entry on the exact Core-owned transfer job (or its existing
+service-owned execution context). Do not add a persistent journal or make caller
+supplied UUIDs, paths, serialized results or Browser tokens into authority.
+
+At service submission, capture immutable eligibility metadata from the actual
+copy request/plan or restore plan, the originating CoreJob object, service owner,
+and DeviceSession. Extend the private recovery entry's issuance metadata to retain
+that originating job identity for both Files and USB restore. Its visible record
+can remain evidence; internal object registration proves provenance.
+
+For Cancel & Delete, the service must atomically associate a one-use request
+receipt with the accepted cancellation transition on that exact job and install
+the pending intent **before** notification can reenter completion handling. Use
+short state-only critical sections and a documented lock order; invoke listeners
+outside locks. CoreJob's existing `_mark_cancel_requested()`/notification split
+is a starting point, not an already-complete atomic intent API. Reject terminal
+jobs, duplicate receipts and attempts to upgrade a previously requested Keep or
+unrelated cancellation to Delete. An admission/request exception or refused
+cancellation invalidates the pending intent and never authorizes cleanup.
+
+The intent binds: exact job identity, owning service/Core, device/session,
+accepted cancellation receipt, lifecycle generation, and a one-use state. The
+Browser keeps the originating job/token only for UI response validation and
+continuation correlation; cleanup itself takes new foreground tokens.
+
+On authoritative completion, the service reads its own terminal job/result and
+requires all of the following before claiming the intent:
+
+1. The intent and cancellation receipt are still registered to this exact job,
+   owner and unchanged device/session; the lifecycle generation remains valid.
+2. The job ended as a qualifying interrupted execution (failed or cancelled),
+   not successful publication. Cancellation-request state alone is insufficient.
+3. The exact `partial_upload` object in that job's result is still registered
+   and available, with its private issuance origin equal to this job. Do not
+   accept another job's genuine record, even on the same device/session.
+4. Trusted evidence still classifies the stored staging path as a qualifying
+   staging candidate. Exclude unknown/completed publication, replacements,
+   directory uncertainty, absent authority and arbitrary caller paths.
+
+Claim intent once before cleanup preparation. Fresh preparation reserves the
+existing recovery authority and verifies the exact current file and returned
+parent-directory identity. Associate the resulting deletion plan with the claimed
+intent. A private deferred-execution gate accepts only that association, then
+consumes the intent and existing plan/recovery authority before dispatch. No
+caller-selected generic deletion plan can be substituted. Execute only the stored
+staging file with the existing file-only DELE boundary, snapshot/session checks
+and uncertainty accounting; never enter recursive deletion.
+
+Intent states are proposed as pending terminal result → claimed/preparing →
+prepared → consumed/finished, with invalidation from every live state. Duplicate
+claims, completion callbacks and execution responses cannot start another job.
+Preparation/admission failure ends this automatic chain without retry. Existing
+recovery reservation release may still permit a later explicit manual recovery
+workflow, but cannot resurrect the spent deferred intent. Once execution is
+requested, the existing recovery authority remains consumed even on rejection.
+
+Invalidate intent on terminal no-op classification, another session/device,
+Core/service shutdown, owner/coordinator closure, abandoned continuation, expired
+associated review plan, or completion of the chain. Session/lifecycle generation
+checks must also reject late issuance and callbacks after disconnect, even if the
+physical device is unchanged. Keep retention bounded with the originating job
+and existing recovery/plan bounds; no indefinite detached queue. If a scheduling
+conflict prevents the one continuation, report cleanup not started and retain
+available evidence rather than installing an automatic retry loop. Restart never
+restores this authority. No new persistent recovery journal is needed.
+
+### Exact post-completion handoff and refresh sequencing
+
+Current source path remains section 13's traced path:
+`bind_job_cancel()` → captured `job_cancel_callback()` → `cancel_transfer()` →
+`OperationPresentation.request_cancel()` → service/scheduler cancellation →
+`CoreJob.request_cancel()`. The proposed eligible-upload route first shows the
+single dialog; its confirmed action then uses B5's one-shot sender, with the
+Delete variant calling the intent-aware service transition described above.
+Unsupported jobs retain the current direct Cancel route.
+
+Upload adapter/lease scopes unwind before `execute_plan()` returns and before
+Core publishes the terminal result. `CoreJob.run()` assigns result/state, sets
+its completion event and emits `finished`. The GUI's event, initial-snapshot and
+snapshot-fallback paths converge on guarded `run_file_job().finish()`.
+That calls `end_file_job()` to release the old token and restore sensitivity,
+then `operation.finish()`, then the feature completion callback. **The cleanup
+coordinator begins from this released-foreground callback, on the GTK thread.**
+Do not begin from progress, cancel-requested, recovery issuance, or a worker-side
+listener; do not block GTK or wait inside a scheduler task.
+
+Refactor `start_copy().finished()` conceptually into outcome capture, optional
+cleanup chain, then refresh/report. The current callback immediately invokes
+`self.run(refresh, refreshed)` and would compete for busy/foreground admission.
+Do not run it first and then attempt cleanup. Capture the original result and
+intent; submit fresh preparation through `run_file_job()`; after preparation's
+own foreground release, submit its bound execution plan through a new factory.
+This internal review/validation has **no additional confirmation dialog**.
+Perform the ordinary refresh once after the chain has completed or been safely
+declined, with job/session/generation guards on its status updates.
+
+Scheduler lane bookkeeping can finish after terminal notification, but subsequent
+jobs queue normally on the same FIFO lane. Never acquire an inline nested lane or
+wait for queued cleanup from the old worker. If another action wins admission,
+stop/report the cleanup chain; do not steal ownership. Close/reconnect and managed
+restoration callbacks must not revive old intent. Old transfer progress and late
+refresh callbacks cannot overwrite a new cleanup job's B5 status.
+
+### Eligibility derived from actual execution plans
+
+| Operation | Proposed eligibility and exclusions |
+|---|---|
+| Single local-to-C64U staged addition | Eligible execution job; cancellation may still produce no partial file. |
+| Multiple selected files or folder upload | Eligible when the actual plan includes remote staged file additions. Only the interrupted file's issued record can be cleaned; retain completed files, created directories and remaining-step accounting. Directory-only and replacement-only plans are ineligible. |
+| Mixed addition/replacement upload plan | Eligible because additions can produce candidates, but a replacement interruption never authorizes cleanup. Explain this narrow scope rather than promise rollback. |
+| USB restore | Service design can support restore additions through the shared issuer and original restore job; replacement-only restore is ineligible. Current Files GUI has no restore entry point, so this is future UI eligibility, not a newly exposed control. |
+| Download, local copy, copy preparation | Ineligible; retain existing Cancel behavior. A `file.copy.execute` name alone cannot identify upload direction. |
+| Native Flash, managed transaction publication, launch, SID and other foreground jobs | Ineligible for this staged-upload dialog; retain existing feature-specific cancellation contracts. |
+
+Use explicit plan/request metadata, not message parsing or operation-name
+prefixes. Current serial batch execution stops at its first interruption and
+returns at most one `PartialUpload`; multiple historical records do not expand
+intent. If future code returns multiple records, require separately bound,
+explicit per-record semantics before extending this design. Do not silently
+iterate the recovery store. Resume and persisted recovery remain the separate,
+unimplemented work described in section 13.
+
+### Failure, uncertainty and closing policy
+
+| Condition | Required behavior |
+|---|---|
+| Transfer finishes while the choice dialog is open | Close/disable stale choices; no retroactive request or cleanup. |
+| Cancellation accepted too late; job succeeds | Preserve acknowledged completion; invalidate intent and report no eligible cleanup. |
+| No partial record | No deletion, even if job is cancelled; report the actual transfer result. |
+| Unknown publication | No staging/final-path guessing; no cleanup; retain uncertainty and inspection guidance. |
+| Changed device/session or lost authority | Reject the deferred chain; retain history, never reconnect-and-delete with old authority. |
+| Preparation fails, file absent/changed/directory, or returned-directory mismatch | No dispatch. End intent without retry; retain the exact failure and available evidence. |
+| Cleanup submission/admission rejected | Report not started/rejected according to evidence. Do not silently restore consumed execution authority or retry. |
+| DELE acknowledged | Count only the acknowledged staging-file removal; keep the original upload/batch result alongside cleanup outcome. |
+| DELE response lost | Report uncertain cleanup, not success or definite rejection. Do not retry or reuse authority. |
+| User closes Argonaut during cleanup | Preserve `Browser.close()` refusal while busy; closing is not deletion cancellation or another confirmation. At gaps before dispatch, closure invalidates pending intent. Forced shutdown can lose in-memory evidence; never claim cleanup completed or replay after restart. |
+
+No automatic cleanup follows Keep, Continue, Escape or window close. A later
+manual recovery action remains separately authorized. The standalone recovery
+control transition and consumed-record limitations from section 13 remain; this
+single-dialog design does not remove the fallback yet.
+
+### GTK interaction and implementation sequence
+
+Use one compact native transient modal **Cancel Upload?** dialog with 20 logical
+pixels outer padding, 12 section spacing, 16 before the footer and 8 between
+buttons, following `power_dialog._content()`/`_text()` conventions. Wrap long text
+and test narrow allocations without changing the application minimum dimensions.
+Keep dialog controls outside busy controls so an active upload does not disable
+them. One instance per captured job; no blocking waits.
+
+Give Cancel & Keep a dedicated response ID, default response and initial keyboard
+focus. Give Continue a different response ID. Explicitly map Escape, delete-event
+and close-request to Continue, never to the Keep default. Enter follows the
+focused/default action; Delete requires explicit activation and must never be
+triggered by dismissal. Use a responded latch before any callback, retain captured
+job/token/session validation, and restore focus to an existing sensitive widget.
+Use B5 for subsequent cancellation/preparation/cleanup status, preserving sticky
+Cancelling, one-shot requests, terminal precedence and focus restoration. No
+second dialog is introduced by internal cleanup preparation.
+
+Proposed implementation slices and dependencies:
+
+1. Core metadata and one-use intent/request receipt; exact origin-job registration
+   for Files and USB; lifecycle invalidation and authoritative terminal matching.
+2. Single GTK choice dialog and eligible-job routing; preserve unsupported jobs'
+   existing Cancel behavior and deduplicate all cancellation surfaces.
+3. Foreground-safe preparation/execution continuation, no second confirmation,
+   refresh sequencing and combined outcome presentation; depends on slices 1–2
+   and UI-FR.2/2a/3 safety boundaries.
+4. Independent review and deterministic acceptance, then separately authorized
+   physical qualification. Transfer Recovery collections/persistence/Resume remain
+   later work, not dependencies for this single-record workflow.
+
+### Regression and acceptance plan; disposition
+
+Use fake Core/FTP, isolated GTK and blocked physical networking. Test Continue,
+Keep and Delete separately, exact job/device/session/request binding, forged or
+other-job evidence, terminal races around intent registration, and duplicate
+responses/callbacks. Test no partial, queued cancellation, accepted late success,
+unknown publication, completed batch prefixes, mixed replacement/addition plans,
+capacity limits and consumed/reconstructed records. Assert lease release and old
+foreground release precede new admission, no nested waits, refresh-after-cleanup
+ordering, session replacement/close at every handoff, and no stale status updates.
+Exercise strict directory identity and DELE-only behavior, failed preparation,
+admission refusal, acknowledged removal, lost reply, single use and no retry.
+Verify Enter's Keep default separately from Escape/window-close Continue, busy
+close refusal and B5 focus restoration. Preserve existing generic deletion,
+unsupported-job cancellation and managed-library regression suites.
+
+Later physical acceptance requires separate authorization and disposable data:
+check actual timing and acknowledged outcomes, keyboard/dismissal behavior,
+light/dark and narrow-layout readability, retained completed files and contextual
+failure messages. FTP still cannot guarantee durable remote object identity;
+physical observations do not establish byte-level Resume or REST/STOR support.
+No application launch, networking, tests or device commands are part of this pass.
+
+The confirmation-policy decision is resolved by explicit UI-FR.4a authorization.
+Exact internal API/field names, lock ordering and expiry wiring remain implementation
+review details with the invariants above; they do not require a second dialog or
+a persistent journal. No unresolved authorization design blocker remains.
+**PASS — ready for UI-FR.4a implementation planning.** No implementation or
+publication is authorized by this documentation checkpoint.
+
+
+## 15. UI-FR.4e.2 — approved best-effort upload cleanup
+
+Argonaut 1.10 provides one cancellation dialog: **Continue Upload**,
+**Cancel & Keep**, and **Cancel & Clean Up**. The upload continues while the dialog
+is open. Cancellation is cooperative. Cancel & Keep remains the default
+cancellation choice; Escape and window close act as Continue Upload.
+
+Cancel & Clean Up authorizes one safe cleanup preparation/execution sequence
+after authoritative transfer completion and local resource release. It attempts
+to remove only the verified incomplete staging file from that upload. Cleanup is
+best effort: the C64U may still be updating the file, and verification may refuse
+cleanup. No second confirmation, fixed delay, stability polling, or automatic
+mutation retry is introduced. Any earlier deletion promise or proposed mandatory
+stabilization is superseded by this policy; historical evidence above is retained.
+
+Presentation distinguishes acknowledged removal, cleanup not necessary, unsafe
+verification/admission, definite deletion rejection, and uncertain outcome.
+Acknowledged removal is required to report success. When a verified partial file
+remains or may remain, report its captured remote path and suggest manual review;
+never substitute current selection or assert definite presence after uncertainty.
+
+Core-issued, job-bound authority, session checks, strict directory identity,
+file-only DELE, single-use plans, and uncertainty accounting remain mandatory.
+Completed files and uncertain publication are never cleanup candidates. Existing
+Delete Partial Upload remains in place with unchanged eligibility; consumed
+authority is never recreated automatically. Users can inspect the folder and use
+ordinary reviewed deletion where appropriate. UI-FR.4e.1 diagnostics remain intact.
+See [FTP recovery contracts](C64U-FTP.md#best-effort-cancel--clean-up-presentation).
+
+Implementation remains pending independent review and controlled physical visual
+acceptance; this entry does not mark the UI audit Accepted.

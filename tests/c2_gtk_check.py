@@ -10,7 +10,35 @@ from c64u_browser.app_preferences import show_preferences
 from c64u_browser.profiles import Preferences
 
 class BackupUiRetirement(unittest.TestCase):
-    setUp=c1_gtk_check.StorageGtk.setUp
+    def setUp(self):
+        c1_gtk_check.StorageGtk.setUp(self)
+        from test_core import FakeClient, FakeCredentials
+        from c64u_browser.profiles import Profile
+        self.app.core._client_factory = FakeClient
+        self.app.core._credentials = FakeCredentials()
+        self.app.recovery.next_check = float('inf')
+        self.profile = Profile.new('Offline fixture', '192.0.2.20', device_id='ABC123')
+        self.app.core.connect(self.profile)
+        self.session = self.app.core.device_session()
+        self.assertTrue(self.session.session_id)
+        self.client = self.app.core._client
+        from unittest.mock import Mock
+        from c64u_browser.api import Entry
+        self.client.list_directory = Mock(side_effect=lambda path: (path, [
+            Entry('folder', 'dir', None), Entry('file.d64', 'file', 3)]))
+        self.app.client = self.client
+        self.show('/USB1')
+
+    def test_bound_picker_selection_rejects_replaced_session(self):
+        from c64u_browser.drives_selection import remote_selection, validate_selection
+        from c64u_browser.picker_model import PickerError
+        selection = remote_selection('/USB1/file.d64', self.session)
+        self.assertEqual(selection, validate_selection(selection, self.app.core.device_session()))
+        self.app.core.connect(self.profile)
+        self.assertNotEqual(self.session, self.app.core.device_session())
+        with self.assertRaises(PickerError):
+            validate_selection(selection, self.app.core.device_session())
+
     show=c1_gtk_check.StorageGtk.show
 
     def test_files_layout_and_no_backup_entry_points(self):

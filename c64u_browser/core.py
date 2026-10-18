@@ -245,7 +245,7 @@ class ArgonautCore:
                                  bound_profile_provider=lambda:self.active_profile)
         self.usb = UsbBackupService(self._require_client,
                                     self.device_session,
-                                    self.scheduler)
+                                    self.scheduler,file_service=self.files)
         self.game_library = GameLibraryService(
             self.preferences.path.parent / 'game-library.json',
             remote_reader=self._read_game_source,
@@ -646,10 +646,12 @@ class ArgonautCore:
     def _begin_session(self, profile, info, session_id=None):
         self._device_identity=self._physical_identity(profile,info)
         self._session_id=session_id or uuid.uuid4().hex
+        self.files.invalidate_recovery()
 
     def _end_session(self, *, keep_device=True):
         self._ftp_manager.invalidate(self._device_identity)
         self._session_id=''
+        self.files.invalidate_recovery()
         if not keep_device:self._device_identity=''
 
     def add_listener(self, listener):
@@ -999,6 +1001,7 @@ class ArgonautCore:
 
     def close(self):
         """Release Core execution resources; jobs are not persisted."""
+        self.files.close()
         self._machine_targets.clear()
         self.managed_d64_preflight.close()
         self._import_admission.invalidate()

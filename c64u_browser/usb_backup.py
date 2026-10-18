@@ -245,11 +245,12 @@ def _local_hash(path,check=lambda:None):
 class UsbBackupService:
     """Core capability for verified USB/SD backup and non-mirroring restore."""
     def __init__(self,client_provider,session_provider,scheduler,*,
-                 plan_ttl=300,plan_limit=128,clock=time.time):
+                 plan_ttl=300,plan_limit=128,clock=time.time,file_service=None):
         self._client_provider=client_provider;self._session_provider=session_provider
         self._scheduler=scheduler;self._clock=clock
         self.plan_ttl=max(0,float(plan_ttl));self.plan_limit=max(0,int(plan_limit))
         self._backups={};self._restores={};self._lock=Lock()
+        self._file_service=file_service
 
     def cancel(self,job_id):return self._scheduler.cancel(job_id)
     def job(self,job_id):return self._scheduler.job(job_id)
@@ -298,8 +299,13 @@ class UsbBackupService:
             raise UsbBackupFailure('session','The C64U connection changed. Create a fresh preview.')
         return client
 
-    def _submit(self,operation,task,session):
-        return self._scheduler.submit(CoreJob(operation,task),JobBinding.device(session))
+    def _submit(self,operation,task,session,*,upload_eligible=None):
+        job=(self._file_service._observed_job(operation,task,session=session,
+                                              upload_eligible=upload_eligible)
+             if upload_eligible and self._file_service is not None else CoreJob(operation,task))
+        if upload_eligible is not None and self._file_service is not None:
+            self._file_service._register_upload_job(job,session,upload_eligible)
+        return self._scheduler.submit(job,JobBinding.device(session))
 
     @staticmethod
     def _volume_fingerprint(client, volume, check=lambda:None, progress=None,
@@ -729,9 +735,12 @@ class UsbBackupService:
             replaced=tuple(path for path in replacement_set if path in completed)
             added=tuple(path for path in stored.classification.additions if path.rstrip('/') in completed)
             skipped=tuple(path for path in stored.classification.replacements if path not in replacement_set)
-            partial=(PartialUpload(FileLocation.c64u(report.partial),
-                        stored.session.device_id,stored.session.session_id)
-                     if report.partial else None)
+            partial=None
+            if report.partial:
+                if self._file_service is not None:
+                    partial=self._file_service._partial_from_report(report,stored.session,'usb.restore.execute')
+                else:
+                    report.error+=' Partial cleanup authority was not issued: no shared FileService; inspect the remote state explicitly.'
             result=RestoreResult(added,replaced,stored.classification.unchanged,skipped,
                 stored.classification.conflicts,tuple(report.remaining),
                 sum(file_map[path].size for path in completed if path in file_map),
@@ -739,4 +748,5 @@ class UsbBackupService:
             if report.cancelled:raise JobCancelled(result=result)
             if report.error:raise UsbBackupFailure('restore',report.error,result)
             return result
-        return self._submit('usb.restore.execute',task,stored.session)
+        return self._submit('usb.restore.execute',task,stored.session,
+            upload_eligible=any(not path.endswith('/') for path in stored.classification.additions))

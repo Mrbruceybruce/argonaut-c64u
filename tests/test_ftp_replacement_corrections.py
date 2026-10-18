@@ -144,15 +144,17 @@ class CorrectionTests(unittest.TestCase):
 
     def test_copy_cancelled_completion_shows_replacement_report(self):
         tree=ast.parse(Path('c64u_browser/gui.py').read_text())
-        method=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='finished'
+        method=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='refreshed_after_cleanup'
                     and any(isinstance(call,ast.Attribute) and call.attr=='copy_report' for call in ast.walk(n)))
         e=self.evidence('refused')
         result=CopyResult((),(),('a',),failure='Operation cancelled by request.',replacements=(e,))
-        browser=SimpleNamespace(status=Mock(),copy_report=Mock(),refresh_local=Mock(),client=None)
+        browser=SimpleNamespace(status=Mock(),copy_report=Mock(),refresh_local=Mock(),client=None,
+                                busy=False,foreground=SimpleNamespace(token=None))
         namespace=dict(self=browser,names=('a',),source_local=False,local=False,
-                       completed_roots=lambda names,completed:())
+                       completed_roots=lambda names,completed:(),
+                       coordinator=[SimpleNamespace(owns_presentation=lambda:True)])
         exec(compile(ast.Module(body=[method],type_ignores=[]),'gui.py','exec'),namespace)
-        namespace['finished'](SimpleNamespace(result=result,state='cancelled'))
+        namespace['refreshed_after_cleanup'](SimpleNamespace(result=result,state='cancelled'),'',False,True)
         browser.copy_report.assert_called_once_with(result)
         self.assertIn('Inspection only',result.details())
 
