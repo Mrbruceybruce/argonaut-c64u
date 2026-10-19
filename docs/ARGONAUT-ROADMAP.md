@@ -1,5 +1,33 @@
 # Argonaut roadmap
 
+## Live planning authority — GitHub Project
+
+GitHub Project **Argonaut Development** is authoritative for live work status,
+priority, ordering and scheduling. Consult and update the Project when selecting
+or scheduling work and when its live status changes.
+
+This document retains roadmap scope, stable identifiers, technical history,
+design decisions, dependencies and acceptance evidence. Its existing status
+labels, priority wording, section order and proposed sequences are historical
+planning context, not the live queue. Where they differ from the Project, the
+Project governs live planning. This includes older claims below that this file
+is the single roadmap or supersedes earlier next-work sequencing.
+
+Preserve the established `RM-001` through `RM-031` identities and their historical
+A–N/B1–B6/C0–C4/G1–G4 aliases when linking Project items, issues and repository
+evidence. RM identifiers identify scope; they do not encode priority or order.
+Do not renumber or reuse them when work is reordered, renamed or retired; retain
+retired identifiers with successor references. R1–R6, PA-* and Managed Import
+phase identifiers retain their separate technical checkpoint meanings.
+
+Record live planning changes in the Project and retain technical decisions and
+acceptance results in the relevant repository documents, with links from the
+associated issue or Project item. A Project status change does not replace
+acceptance evidence, satisfy a dependency or safety gate, or authorize execution.
+Keep design approval, implementation, review, physical acceptance and Git
+publication distinct. Preserve historical PASS, FAIL and UNCERTAIN results and
+their scope and limitations; this authority change establishes no new acceptance.
+
 ## PA-5.1A publication prerequisites — offline foundation
 
 PA-5.1B adds focused offline corrections for the four PA-5.1AR findings:
