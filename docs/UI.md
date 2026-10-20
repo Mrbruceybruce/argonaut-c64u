@@ -6,8 +6,10 @@ This permanent design and audit record supports visual consistency, usability,
 and release readiness for Argonaut 1.10. UI-00 and UI-01 authorize documentation
 only; UI-01 additionally authorizes read-only structural source inspection.
 Implementation, device contact, publication, commits and pushes are not authorized.
-The [roadmap](ARGONAUT-ROADMAP.md) retains its priorities, historical evidence and
-release gates. Complete the interface audit before implementation, then deliver
+GitHub Project **Argonaut Development** owns live priority, status, ordering and
+scheduling. The [roadmap](ARGONAUT-ROADMAP.md) retains stable scope, dependencies,
+evidence links and release gates. At the original audit checkpoint, the direction
+was to complete the interface audit before implementation, then deliver
 small, independently testable slices.
 
 Major Ultimate Menu redesign and new Game Library features are outside the
@@ -20,8 +22,13 @@ Tracking statuses:
 - **Implemented** — change exists with recorded verification; acceptance pending.
 - **Accepted** — reviewed acceptance evidence meets the applicable requirements.
 
-Design approval alone never establishes implementation or acceptance. No new
-spit-shine item is Implemented or Accepted in this document. Stable finding IDs
+Design approval alone never establishes implementation or acceptance. At the
+original UI-00/UI-01 audit checkpoint, no new spit-shine item was Implemented or
+Accepted. Later [UC-1c supplied desktop acceptance](#uc-1c--supplied-acceptance-and-publication-reconciliation)
+records its bounded checks and three-expander layout; it does not accept every
+UI proposal. Other later decisions, including Test Lab placement, best-effort
+Cancel & Clean Up and standalone recovery-button removal, retain their recorded
+design/implementation/acceptance status and limitations. Stable finding IDs
 are UI-01 through UI-25; section 5 records their established meanings and all
 53 provisional UI-26–UI-78 screenshot-review references.
 Decision references below are stable descriptive anchors, not replacement finding IDs.
@@ -414,7 +421,8 @@ working changes were the two expected UI-00 documentation files.
 Authority boundaries are complementary, not an automatic conflict-resolution rule:
 
 - **UI.md:** current UI design decisions, visual standards, audit and implementation tracking.
-- **ARGONAUT-ROADMAP.md:** development priorities and release sequencing.
+- **Argonaut Development (GitHub Project):** live priority, status, ordering and scheduling.
+- **ARGONAUT-ROADMAP.md:** stable scope, technical dependencies, release gates and evidence links.
 - **CURRENT-STATE.md:** implemented and accepted project state, with checkpoint limitations.
 - **Feature documentation:** detailed functional, safety and technical contracts.
 
@@ -710,11 +718,11 @@ selection is authorized. `mount_run` independently uses a temporary copy, states
 that changes are not saved to the original, and ignores the selected mount-write
 mode. Renaming that action to Run preserves its explanation and confirmation.
 
-The affected [roadmap](ARGONAUT-ROADMAP.md), **E. Drives redesign**, is recorded here
-as superseded only on the Write Protect checkbox point. Its enabled switch,
-Run direction, shared-picker work and ROM/type investigation remain. Per scope,
-no roadmap text is modified; propose updating that sentence in a later authorized
-documentation pass to reference this three-mode decision.
+The earlier **E. Drives redesign** Write Protect checkbox direction was superseded
+by this decision. The [strategic roadmap](ARGONAUT-ROADMAP.md) has already been
+corrected to preserve all three modes. Its enabled switch, Run direction,
+shared-picker work and ROM/type investigation remain. This acknowledges the
+documentation correction, not implementation or acceptance of a revised selector.
 
 ### Remaining nonblocking design details
 
@@ -820,8 +828,9 @@ of cosmetic changes; this plan neither resolves the hazard nor waives existing g
    selection. Source already has `Select Disk Image…` using the shared C64U-only
    picker. Propose a scoped status note acknowledging that structure while retaining
    local-source support as separate work and avoiding unverified acceptance claims.
-   Also propose updating E's superseded Write Protect checkbox sentence to reference
-   revised UI-36. No roadmap modification is made in UI-01.
+   Historical UI-01 also proposed correcting E's Write Protect checkbox sentence.
+   That three-mode documentation correction is now recorded in the strategic
+   roadmap; it does not establish selector implementation or acceptance.
 
 Documentation validation checks all 78 source IDs, initial meaning/candidate preservation,
 source links, Markdown structure and whitespace, approved versus proposed wording,
@@ -849,9 +858,10 @@ The UI-FR.4 request approves the three-choice upload-cancellation design below.
 This section records design and read-only lifecycle findings, not an implemented
 or accepted feature. Existing UI identifiers, seven unnumbered audit candidates,
 historical milestone evidence and feature contracts remain unchanged. No new
-numbered audit identifiers or release sequencing are assigned here. The roadmap
-remains authoritative for development priorities; no roadmap change is needed
-for this design record.
+numbered audit identifiers or release sequencing are assigned here. GitHub Project
+**Argonaut Development** is authoritative for live priority, status, ordering and
+scheduling; the strategic roadmap retains stable scope, dependencies and release
+gates. No roadmap change is needed for this design record.
 
 Technical references remain [B5 in Current State](CURRENT-STATE.md),
 [FTP upload/deletion and UI-FR.2/2a/3 contracts](C64U-FTP.md), and

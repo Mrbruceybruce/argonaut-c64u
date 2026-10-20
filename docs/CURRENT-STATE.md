@@ -1,5 +1,14 @@
 # Current development state
 
+GitHub Project **Argonaut Development** is authoritative for live priority,
+status, ordering and scheduling. The [strategic roadmap](ARGONAUT-ROADMAP.md)
+defines stable scope, technical dependencies, release gates and evidence links;
+its order is not the live queue.
+This document records implemented capabilities and bounded acceptance evidence.
+Earlier milestone, workspace and next-step statements retain their checkpoint
+scope; they are not fresh workspace observations or live planning instructions.
+Design approval, implementation, acceptance and publication remain distinct.
+
 ## Current Game Library State — PA-5.13 Published
 
 This section records the current published managed Game Library state and the
@@ -9,6 +18,14 @@ historical evidence; they do not describe the current capabilities. Historical
 technical contracts in [Managed Library](MANAGED-LIBRARY.md) retain their original
 checkpoint scope. See [Game Library](GAME-LIBRARY.md#current-managed-game-library-status)
 for the distinction from the existing referenced-file catalog.
+
+Scope reconciliation: [RM-031](ARGONAUT-ROADMAP.md#rm-031)'s original pinned
+publisher/managed-display scope was approved **COMPLETE** during migration. This
+is a historical migration decision, not a fresh Project-status assertion.
+PA-5.10 pinned publication, PA-5.11 GUI, PA-5.12 discovery/restoration and PA-5.13
+managed D64 launch do not close [RM-030](ARGONAUT-ROADMAP.md#rm-030): general
+3B-2C workflow/lifecycle integration, 3B-3 recovery and general 3C manifest
+publication remain open. Their technical and physical qualification gates remain.
 
 ### PA-5.10 — Managed Game Publication
 
@@ -89,7 +106,8 @@ they are separate from the application's protocol-level Accepted outcome.
   recorded preflight and execution-time checks are not post-launch verification.
 - Physical qualification of managed D64 launching on Founder's Edition remains
   pending. Beige acceptance does not qualify that device.
-- The local `development` worktree in `argonaut-repository` may lag GitHub and
+- Historical PA-5.14 workspace observation (not a current Git-state claim):
+  the local `development` worktree in `argonaut-repository` may lag GitHub and
   contains unrelated local modifications and untracked files. It requires separate
   reconciliation; PA-5.14 does not modify it or reconcile its history.
 - Existing managed-import/staging limitations and historical uncertain outcomes
@@ -100,6 +118,11 @@ they are separate from the application's protocol-level Accepted outcome.
   their recorded attempts.
 
 ## PA-5.1A transport and lifecycle foundation — offline implementation
+
+Historical foundation checkpoint: publisher and publication restrictions below
+describe this attempt. Later capability evidence is recorded in
+[PA-5.10–13](#current-game-library-state--pa-513-published); it does not upgrade
+this attempt's verdicts or independent-resource-release evidence.
 
 PA-5.1B adds focused offline corrections for the four PA-5.1AR findings:
 shared persistence/cancellation/dispatch ordering, evidence location identity
@@ -322,6 +345,18 @@ checks. No physical device contact, staging, game publication, recovery engine,
 Import/Stage enablement or acceptance driver was part of this correction.
 
 ## Published baseline and future planning status
+
+Scope reconciliation: [RM-031](ARGONAUT-ROADMAP.md#rm-031)'s original pinned
+publisher/managed-display scope was approved **COMPLETE** during migration. This
+is a historical migration decision, not a fresh Project-status assertion.
+PA-5.10 pinned publication, PA-5.11 GUI, PA-5.12 discovery/restoration and PA-5.13
+managed D64 launch do not close [RM-030](ARGONAUT-ROADMAP.md#rm-030): general
+3B-2C workflow/lifecycle integration, 3B-3 recovery and general 3C manifest
+publication remain open. Their technical and physical qualification gates remain.
+See [PA-5.10–13 acceptance evidence](CURRENT-STATE.md#current-game-library-state--pa-513-published).
+The pending 3C wording below refers to the general workflow, not the completed
+pinned publication. Older future-planning recommendations are checkpoint context;
+GitHub Project **Argonaut Development** owns live priority, status and ordering.
 
 Managed Import E2/E2F is published in
 `d6c7ed62cf23d196928247177bd8b2a2cb07e88c`. Older uncommitted/pending-publication
@@ -1606,6 +1641,12 @@ instrumented. Stop for compact prerequisite re-review before starting the B5 pre
 
 ## B4 — bounded physical acceptance passed; publication approved, not executed
 
+Historical B4 acceptance: the separate Reconnect/Disconnect presentation below
+is evidence for this checkpoint. [Later approved UI direction](UI.md#global-controls-and-status)
+removes manual header Reconnect while preserving internal reconnect, automatic
+recovery, identity/session safeguards and stale-settings protections. That design
+direction is not an additional implementation or acceptance claim.
+
 **APPROVE COMMIT/PUSH — not executed.** The approved bounded physical acceptance
 used this current worktree through `./run-development`, not the installed package.
 Starting HEAD/local origin was `9d0c543b7f7497428463a4890098fae6c30d937b`, divergence
@@ -1976,7 +2017,10 @@ out of Git. No public 1.10 release/tag yet. Stop for Bruce/ChatGPT roadmap revie
 
 ## Authority and workspace
 
-This document describes the current accepted development state and next work.
+This document records accepted development state and checkpoint-specific evidence.
+GitHub Project **Argonaut Development** owns live priority, status, ordering and
+scheduling; this document does not select next work. The strategic roadmap owns
+stable scope, dependencies and release gates.
 [C64U-FTP.md](C64U-FTP.md) and [SERVER-FIRST.md](SERVER-FIRST.md) provide detailed
 subsystem and Core architecture/contracts. Older roadmap/pass documents,
 including NEXT-PASS.md, remain useful context, but sequencing demonstrably
@@ -2065,7 +2109,10 @@ different FTP implementations.
   the complete 34-directory traversal using a single session.
 - Cancellation during blocking I/O can remain bounded by the socket timeout.
 - Improved Reset/Reboot recovery UX remains future work.
-- Quick Connect → Reconnect is planned.
+- Historical plan: Quick Connect → Reconnect; B4 later recorded its bounded
+  acceptance. [Later UI direction](UI.md#global-controls-and-status) removes manual
+  header Reconnect while retaining internal reconnect and automatic recovery.
+  This direction does not establish implementation or new acceptance.
 - A System/Light/Dark theme preference is planned.
 
 ## Slice 3A — accepted, committed and pushed
@@ -2560,6 +2607,10 @@ Git publication and physical publication require their separate later checkpoint
 
 
 ## PA-5.10 physical publication and PA-5.11 offline GUI checkpoint
+
+Historical checkpoint: pending GUI acceptance and unavailable launch below are
+superseded within the scope of the [PA-5.10–13 current-status record](#current-game-library-state--pa-513-published).
+The original tests, outcomes and attempt-specific limitations remain evidence.
 
 This checkpoint supersedes the earlier pending physical-publication status for
 this Beige publication; earlier milestone entries remain historical records.

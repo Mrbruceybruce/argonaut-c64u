@@ -1,5 +1,16 @@
 # Linux-first development roadmap status
 
+**Historical sequence notice.** GitHub Project **Argonaut Development** is authoritative for live priority,
+status, ordering and scheduling. The [strategic roadmap](ARGONAUT-ROADMAP.md)
+defines stable scope, technical dependencies, release gates and evidence links;
+its order is not the live queue.
+The milestone sequence and “Next” labels below preserve an earlier planning
+checkpoint, not current scheduling authority. In particular, Stable 1.9 is
+released as `v1.9`, as recorded in [Current State](CURRENT-STATE.md#authority-and-workspace).
+Keep the historical headings, acceptance evidence, Core-first dependencies and
+platform/release qualification gates; do not infer that later work is implemented
+merely because it appears in this sequence.
+
 Linux is the active development and hardware-validation platform. It has both
 C64 Ultimates, Ollama, the local AI bridge, health alerts, and unattended fleet
 checks on one machine. Feature sections are implemented and physically accepted
@@ -13,11 +24,14 @@ duplicating its rules.
 
 The original feature roadmap remains historical context: it was written against
 Stable 1.5 before the server-first architecture and before later feature
-reordering. The implementation and release sequence below describes the current
-Development line; it does not rewrite the older roadmap to imply that today's
-sequence was always planned.
+reordering. The implementation and release sequence below describes the
+Development line at that checkpoint; it does not rewrite the older roadmap to
+imply that this sequence was always planned.
 
 ## Authoritative milestone sequence
+
+Historical heading retained for existing links. “Authoritative” and “Next” here
+describe the original checkpoint only; use Argonaut Development for live planning.
 
 1. **Complete on Linux:** USB/SD Backup & Restore.
 2. **Complete on Linux:** Game Library MVP for D64 and CRT at

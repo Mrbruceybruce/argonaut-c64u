@@ -1,6 +1,37 @@
 # Managed Library — foundation and explicit empty creation
 
+**Current-status bridge — PA-5.10–13.** See the
+[accepted managed Game Library record](CURRENT-STATE.md#current-game-library-state--pa-513-published):
+PA-5.10 physically published the pinned C64Robots D64 and manifest on Beige;
+PA-5.11 added the managed GUI; PA-5.12 added partial-root discovery handling and
+automatic restoration of the configured library after matching-device connection
+and reconnection; PA-5.13 published managed D64 launch with physical Beige gameplay
+acceptance. Protocol-level Accepted alone is not a gameplay guarantee.
+
+Scope reconciliation: [RM-031](ARGONAUT-ROADMAP.md#rm-031)'s original pinned
+publisher/managed-display scope was approved **COMPLETE** during migration. This
+is a historical migration decision, not a fresh Project-status assertion.
+PA-5.10 pinned publication, PA-5.11 GUI, PA-5.12 discovery/restoration and PA-5.13
+managed D64 launch do not close [RM-030](ARGONAUT-ROADMAP.md#rm-030): general
+3B-2C workflow/lifecycle integration, 3B-3 recovery and general 3C manifest
+publication remain open. Their technical and physical qualification gates remain.
+
+Managed CRT launch remains unimplemented; Founder qualification, the three
+optional GTK lifecycle regressions and post-launch remote integrity rechecking
+retain their recorded limitations. Referenced-catalog CRT launch is separate.
+Earlier publisher/loading/launch restrictions below are checkpoint-specific;
+contracts, historical FAIL/UNCERTAIN verdicts and attempt-specific resource-release
+limitations remain unchanged. Later success grants no new execution authority.
+
+GitHub Project **Argonaut Development** is authoritative for live priority,
+status, ordering and scheduling. The [strategic roadmap](ARGONAUT-ROADMAP.md)
+defines stable scope, technical dependencies, release gates and evidence links;
+its order is not the live queue.
+
 ## PA-5.1A additive rename and lifecycle evidence foundation
+
+Historical PA-5.1A/B checkpoint: unimplemented-publisher and unauthorized-physical-
+publication statements below describe this foundation work, before PA-5.10–13.
 
 Offline implementation awaiting independent inspection. The Managed Game Publisher
 remains unimplemented; physical publication is unauthorized. No staging codec,
@@ -451,6 +482,18 @@ staging, game publication, new recovery engine or Import/Stage enablement was
 performed. Earlier lifecycle, 3B-2C, 3B-3 and 3C gates remain unchanged.
 
 ## Published baseline and future planning status
+
+Scope reconciliation: [RM-031](ARGONAUT-ROADMAP.md#rm-031)'s original pinned
+publisher/managed-display scope was approved **COMPLETE** during migration. This
+is a historical migration decision, not a fresh Project-status assertion.
+PA-5.10 pinned publication, PA-5.11 GUI, PA-5.12 discovery/restoration and PA-5.13
+managed D64 launch do not close [RM-030](ARGONAUT-ROADMAP.md#rm-030): general
+3B-2C workflow/lifecycle integration, 3B-3 recovery and general 3C manifest
+publication remain open. Their technical and physical qualification gates remain.
+See [PA-5.10–13 acceptance evidence](CURRENT-STATE.md#current-game-library-state--pa-513-published).
+The pending 3C wording below refers to the general workflow, not the completed
+pinned publication. Older future-planning recommendations are checkpoint context;
+GitHub Project **Argonaut Development** owns live priority, status and ordering.
 
 Managed Import E2/E2F is published in
 `d6c7ed62cf23d196928247177bd8b2a2cb07e88c`. Older uncommitted/pending-publication
@@ -1324,6 +1367,9 @@ schema/durability boundary and then define Core execution admission and guarded
 snapshot ownership handoff. Remote-record encoding, transport metering and physical
 FTP staging qualification remain later work. Stop here with changes uncommitted.
 
+Historical managed-view checkpoint (before PA-5.11–13): the no-launch statement
+below is not the current D64 capability; see the current-status bridge above.
+
 Game Library now presents an explicitly managed C64U library, independently of
 its preserved legacy reference catalog. The legacy catalog and Add/Relink picker
 implementation remain intact for later reviewed adaptation. The Settings → Game Library
@@ -1334,6 +1380,13 @@ Files game Add/Scan shortcuts are not offered by this view. Other Files actions,
 SIDJuke and Drives are unchanged.
 
 ## Identity and discovery
+
+Historical discovery/loading checkpoint: the explicit foreground-loading model
+below predates PA-5.12 automatic restoration of the configured library for the
+matching device. PA-5.12 also retains validated accessible-root libraries when
+other advertised roots are inaccessible, with partial-discovery warnings. Explicit
+selection, identity checks and no silent fallback remain required; see
+[PA-5.12](CURRENT-STATE.md#pa-512--discovery-and-restoration).
 
 The single `game_library_location` host preference is either null or an object
 with `device_id`, `root`, `path` and `library_id`. A manually entered location has
@@ -2086,6 +2139,11 @@ manifest publication exists. Phases 3B-2B/3B-2C/3C remain unimplemented.
 
 
 ## PA-5.1C — offline managed publisher
+
+Historical offline checkpoint: GUI-publication/game-launch restrictions and
+pending physical qualification below apply to PA-5.1C. Later pinned publication,
+GUI, restoration and managed D64 launch evidence is linked in the current-status
+bridge; it does not qualify a general GUI publication workflow or recovery engine.
 
 The headless publisher uses the PA-5.1B dispatch-boundary cancellation contract.
 This explicitly supersedes PA-5.0's pair-wide deferral: accepted RNFR evidence
