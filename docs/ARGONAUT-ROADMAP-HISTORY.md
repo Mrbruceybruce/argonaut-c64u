@@ -1,0 +1,1723 @@
+<!-- P3-6 archive provenance notice; not part of the original roadmap. -->
+> **Historical archive — provenance**
+>
+> Source: `docs/ARGONAUT-ROADMAP.md` at commit
+> `ec1b03492af858b0275cd4c8badf80c7f78c3ce0`.
+> Original payload: 1,706 lines, 111,731 bytes.
+> Original payload SHA-256:
+> `ef1427eee43129f8224e767115121464ba0189462fe29ad8c84d12e9ffb72c9f`.
+>
+> Everything after the end-of-notice marker and its following blank line is the
+> exact original file, byte-for-byte. Historical status, priority, scheduling,
+> authority claims and stop markers remain evidence of their time, not current
+> instructions. GitHub Project **Argonaut Development** owns live planning.
+> See [the strategic roadmap](ARGONAUT-ROADMAP.md) and
+> [reconciled acceptance](CURRENT-STATE.md) for the current context.
+<!-- END P3-6 PROVENANCE NOTICE -->
+
+# Argonaut roadmap
+
+## Live planning authority — GitHub Project
+
+GitHub Project **Argonaut Development** is authoritative for live work status,
+priority, ordering and scheduling. Consult and update the Project when selecting
+or scheduling work and when its live status changes.
+
+This document retains roadmap scope, stable identifiers, technical history,
+design decisions, dependencies and acceptance evidence. Its existing status
+labels, priority wording, section order and proposed sequences are historical
+planning context, not the live queue. Where they differ from the Project, the
+Project governs live planning. This includes older claims below that this file
+is the single roadmap or supersedes earlier next-work sequencing.
+
+Preserve the established `RM-001` through `RM-031` identities and their historical
+A–N/B1–B6/C0–C4/G1–G4 aliases when linking Project items, issues and repository
+evidence. RM identifiers identify scope; they do not encode priority or order.
+Do not renumber or reuse them when work is reordered, renamed or retired; retain
+retired identifiers with successor references. R1–R6, PA-* and Managed Import
+phase identifiers retain their separate technical checkpoint meanings.
+
+Record live planning changes in the Project and retain technical decisions and
+acceptance results in the relevant repository documents, with links from the
+associated issue or Project item. A Project status change does not replace
+acceptance evidence, satisfy a dependency or safety gate, or authorize execution.
+Keep design approval, implementation, review, physical acceptance and Git
+publication distinct. Preserve historical PASS, FAIL and UNCERTAIN results and
+their scope and limitations; this authority change establishes no new acceptance.
+
+## PA-5.1A publication prerequisites — offline foundation
+
+PA-5.1B adds focused offline corrections for the four PA-5.1AR findings:
+shared persistence/cancellation/dispatch ordering, evidence location identity
+checks through receipt, sticky non-deferred cancellation at the new boundary,
+and transport-layer readiness validation. Diagnostic/listener callbacks remain
+outside the shared dispatch lock; late failures retain possible remote effects.
+The existing architecture regression remains unchanged. Independent reinspection
+is required before Git publication. The detailed synchronization boundary and
+filesystem race limitations are documented in Managed Library below.
+
+Implemented for independent inspection: explicit RNFR / durable owner checkpoint /
+RNTO continuation, separate exact command evidence, and owner-controlled required
+lifecycle persistence. Same lease, session, thread and paths bind continuation;
+uncertain effects and persistence failure block successors without automatic retry,
+reconnect, cleanup, rollback, adoption or recovery. Existing APIs and historical
+staging contracts remain compatible. See [Managed Library](MANAGED-LIBRARY.md#pa-51a-additive-rename-and-lifecycle-evidence-foundation).
+
+Next gate is independent inspection of this foundation. Then the PA-5.0 Managed
+Game Publisher still needs implementation, journal/capacity and upload/readback
+evidence integration, deterministic whole-publication failure tests and separate
+physical review/authorization. Publisher and publication UI remain unimplemented;
+physical publication is unauthorized. Internal lifecycle observations are not
+independent release proof. Historical PA-4.13 instruction-compliance **FAIL** and
+PA-4.2 **UNCERTAIN** remain unchanged.
+
+## PA-4.6B versioned FTP context evidence — offline implementation
+
+This section supersedes the earlier staging version and sizing status below.
+New Managed Staging attempts use journal schema 5, execution policy 4 and remote
+record format 3; resource policy remains 2. The historical schema-1/2/3/4 and
+policy-1/2/3 codecs and format-1/2 canonical fixtures retain their meanings and
+bytes. Reloaded journals remain inspection-only; there is no migration or resume.
+
+The existing mkdir operation now has durable context-intent, cwd-observed,
+pwd-observed, mkd-intent and mkd-observed barriers. One managed FTP connection and
+its operation lock span `CWD /`, independent `PWD` verification of exact `/`, and
+the unchanged absolute transaction MKD. The adapter and scheduler remain owned
+through terminal handling. Failure, stale session/ownership, cancellation or
+persistence uncertainty blocks the next command; accepted observations are saved
+before cooperative cancellation is honored. STOR requires durable qualified MKD
+proof. No reconnect, fallback, retry or context replay is provided.
+
+Retention and acceptance are separate. Each context observation retains the exact
+raw prefix up to 16384 bytes, including malformed framing, oversized lines and
+non-UTF-8 octets, as lowercase hex. Capture stops at 16385 observed bytes with a
+16384-byte retained prefix and explicit truncation. Complete, partial, truncated
+and unavailable states carry checked observed/retained counts. Acceptance requires
+exactly one CRLF line with body at most 4096 bytes, the strict CWD 250 / PWD 257
+byte grammar, current ownership and exact parsed root; no path normalization is
+allowed. Failure evidence is saved together with its terminal state. Immutable
+context bindings and observations repeat in successors; they grant no authority.
+
+For the actual one-item PA-4.2 Beige fixture, K=7 and R=2K+9=23 reserved checkpoints
+(22 on success). Continuing envelope S=37235 and largest terminal envelope F=62000
+include raw hex, escaping, all bindings, maximum counters/reasons, predecessor
+hashes and newline. Branch-aware reservation `(R-1)*S+F` is **881170 bytes** under
+the unchanged **1048576-byte** ceiling. The exact captured-budget boundary is
+881147 (shorter budget encoding); 881146 fails. The two-item counterpart requires
+1072716 and remains refused. Maximum supported path lengths are conservatively
+sized and refused when they cannot fit. The historical schema-4 admission floor,
+actual writer consumption checks and separate physical journal-space check remain.
+
+Remote format 3 declares `(format, journal, execution, resource) = (3,5,4,2)` with
+the prior field allowlist, sorted compact UTF-8 JSON and one LF. Bytes, length and
+SHA-256 are precomputed before MKD and independently read back after upload.
+CWD/PWD raw evidence stays local. A fixed format-3 fixture and digest are included.
+The exact pinned Beige triple-slash MKD rule is unchanged; the PA-4.2 duplicated
+path response remains unqualified. Generic FTP navigation and empty-library
+creation retain their existing behavior.
+
+PA-4.2 remains **UNCERTAIN**. Its empty transaction directory and all historical
+evidence remain untouched. Beige behavior after explicit root establishment has
+not been physically qualified; Founder remains unqualified. Connection-local CWD
+control does not prevent external writers racing directory checks or uploads.
+No recovery, cleanup, adoption or game publication is enabled. Independent review,
+publication and new explicit physical authorization are required before another
+staging attempt. Cleanup of the PA-4.2 leftover requires separate authorization
+and a reviewed bounded driver; it must not occur automatically.
+
+## PA-4F.3C targeted correction — pending independent reinspection
+
+The PA-4F.3R findings are corrected within the existing uncommitted 19-file scope.
+Schema-4 MKD `not-started` now requires both submission flags to be false; the
+existing no-reply/no-acknowledgment constraints remain in force. Contradictory
+observations fail capture, journal validation, canonical encoding and reload.
+Staging retains the original unresolved intent with an explicit validation error;
+it does not drop contradictory fields into a fabricated outcome. Legitimate
+unknown submission, including an observed positive acknowledgment followed by
+transport uncertainty, remains representable and never permits STOR.
+
+Both 256-character capacity binding fields now use four-byte UTF-8 scalars:
+1024 bytes each. The complete field audit retains the conservative full-checkpoint
+strategy and unchanged 1 MiB ceiling. The one-item Beige fixture now has
+M4=42978, R=20, reservation=859560 bytes, superseding the original PA-4F.3 sizing
+below. An exact captured allowance of 859540 passes (its six-digit value shortens
+each checkpoint by one byte); 859539 fails. Maximum raw reply, escaped identity,
+Unicode binding, terminal and actual-history-consumption regressions are retained.
+Two-item imports may still be refused even for small payloads; capacity optimization
+is deferred to a separate follow-up.
+
+Validation: 648 affected offline tests passed (15 new adversarial tests), zero
+failures/errors/skips, on Linux/Python 3.13.5 with the loopback-only runner.
+Tracked and all new-file whitespace checks passed.
+
+Historical schemas/policies and format-1/2 fixtures are unchanged. Qualified Beige
+and ordinary strict matching remain supported. Physical staging is unauthorized;
+one-item readiness is conditional on independent reinspection and separately
+authorized fresh physical checks. Founder remains unqualified. No recovery,
+publication, automatic retry, reconnect, adoption or cleanup is enabled.
+
+## PA-4F.3 versioned staging MKD evidence — pending independent inspection
+
+Uncommitted offline implementation against published baseline
+`dd6d17398326c307a2ee39b7314ba3fa9e903695`. New Core staging attempts use journal
+schema **4**, execution policy **3**, remote transaction record format **2**;
+captured resource policy remains **2**. Historical schema-1/2/3 journals,
+execution policies 1/2 and format-1 record bytes retain their original meaning.
+There is no implicit migration, reinterpretation of uncertain history or resume
+permission from loaded evidence. Unknown version combinations fail closed.
+
+An immutable MKD proof is attached to the exact transaction operation and derived
+destination. It retains request bytes, lossless lowercase-hex reply lines,
+submission/acknowledgment observations, explicit complete/unavailable/truncated
+availability, generic path status, separate acceptance decision and allowlisted
+rule/reason, live REST identity provenance and Core/adapter/session binding.
+The dedicated schema-4 validator leaves historical scalar limits unchanged.
+Reply bounds are 64 lines, 4096 raw bytes per line, 16384 total including CRLF;
+identity fields are bounded to 128 UTF-8 bytes each. Parsed returned paths are
+reconstructed from raw proof, not independently normalized or repaired.
+
+Ordinary strict matching remains supported. The separate staging rule is
+`c64u-25ea78-1.1.0s2-api0.1-staging-usb0-mkd-extra-two-slashes-v1`.
+It requires current REST-reported Beige `25EA78`, C64 Ultimate `1.1.0s2`/API `0.1`,
+matching live adapter binding, and the exact generated transaction directory
+under `/USB0/ARGONAUT_LIBRARY`. For destination bytes P, only the single completed
+257 reply `b'257 "//' + P + b'" created.'` qualifies. Generic path status stays
+`invalid`; the separate decision is `firmware-compatible`. Generic FTP validation
+and the initializer's existing four-path exception remain unchanged.
+Founder remains unqualified; the observed slash convention is not claimed to be
+Beige-exclusive. Physical staging acceptance remains pending.
+
+Ordering remains durable intent, one MKD, actual observation/classification,
+durable outcome plus proof, then first STOR. Cooperative cancellation does not
+interrupt acknowledgment-to-persistence. Changed identity/session/adapter,
+unqualified evidence or persistence uncertainty blocks uploads. The parser may
+lose partial reply bytes before returning evidence; absence is recorded honestly.
+No observation is fabricated, and unsaved proof is not claimed durable. Scheduler,
+snapshot, one-use authorization, exclusive-writer acknowledgment and FTP lease
+boundaries remain in force. No retry, adoption, cleanup, UI enablement, recovery,
+game publication or modification of the game manifest is added.
+
+Format 2 preserves the existing remote field allowlist and declares schema 4,
+execution policy 3 and resource policy 2. It is sorted compact UTF-8 JSON with one
+trailing LF, exact length/SHA-256 expectations and independent readback. Raw proof
+and session data remain local. The fixed 783-byte format-2 fixture has SHA-256
+`07f857f75eaa7e3f358be469ee958b2c77bcb56e441854e133113e77f0ec39ce`.
+
+Capacity reserves K=2N+5 operations and R=4N+16 full maximum checkpoints, including
+terminal evidence and repeated maximum proof. `R * M4(tx)` must fit both captured
+journal allowance and the unchanged 1 MiB ceiling; the live writer also meters
+actual canonical bytes. For the retained Beige library identity and intended
+174848-byte D64 metadata fixture, M4=42466, R=20 and reservation=849320 bytes.
+Normal one-payload success retains 19 checkpoints. Two-payload fixtures are refused
+before an FTP lease or MKD; no unchanged maximum batch size is promised. Logical
+reservation is not physical disk-space insurance. Missing trailing history remains
+undetectable solely from the hash chain.
+
+Validation: 633 affected deterministic tests passed on Linux/Python 3.13.5,
+zero failures, errors or skips, using `tests/run_import_regressions.py` with a
+loopback-only socket guard. Tracked and new-file whitespace checks passed.
+
+Independent code inspection and separately authorized physical acceptance are
+still required. No physical device was contacted for this implementation. Earlier
+milestone entries below are retained as historical checkpoint descriptions.
+
+## PA-3E.2 MKD path evidence compatibility — pending independent inspection
+
+Uncommitted correction against `305ac47bb37a642d6958530bcbd163c85d2c848d`.
+Initializer-only compatibility accepts the exact observed triple-slash 257 reply
+only for live session-bound Beige `25EA78`, C64 Ultimate firmware `1.1.0s2`,
+API `0.1`, and the four exact library-creation MKD paths under USB0.
+The managed adapter preserves raw reply/path evidence and records the separate
+stable compatibility-rule identifier; generic FTP parsing and path validation,
+ordinary mutation semantics, and Managed Staging remain unchanged.
+
+The original PA-3E attempt remains failed/uncertain. PA-3E.1 observed an empty
+`/USB0/ARGONAUT_LIBRARY` leftover; its separate disposition is not authorized.
+Child-MKD and rename physical qualification, a reviewed driver baseline/checksum
+update after manual publication, and fresh one-use creation authorization remain
+pending. No physical contact, game staging or publication occurred in this pass.
+See [the detailed qualification and evidence contract](MANAGED-LIBRARY.md#pa-3e2-mkd-path-evidence-compatibility--pending-independent-inspection).
+
+Offline validation: **434 tests passed, zero failures/errors/skips**, including
+12 new permanent adversarial test methods. Architecture checks remain unchanged.
+`git diff --check` and new-file whitespace checks passed. Exact command and
+initial-run correction are recorded in the detailed contract linked above.
+
+## PA-3F library creation safety correction — pending independent review
+
+Uncommitted correction against `1edd5ae9ce19b893671969ecddcc4d447c0061e1`.
+Managed-library initialization now requires an exact, unambiguous quoted 257 MKD
+path for the library root and all three child directories. Accepted status alone
+never establishes ownership. Unknown MKD/STOR/rename outcomes stop further remote
+operations and automatic cleanup. Definite failures retain bounded cleanup of
+operation-owned, freshly verified empty directories; an uncertain cleanup stops
+at that command and retains its evidence. Creation results preserve the observed
+operation outcomes and bounded reply/path evidence. Generic FTP defaults are
+unchanged; creation opts into exact RNFR 350 / RNTO 250 acknowledgment.
+
+Offline validation: **781 affected tests passed, zero failures/errors/skips**;
+the focused creation/mutation/architecture run passed **98 tests**. Both PA-3
+reproductions now fail closed. `git diff --check` and the new-file whitespace
+check passed. See [the detailed contract and commands](MANAGED-LIBRARY.md#pa-3f-library-creation-safety-correction--pending-independent-review).
+Firmware-specific exact MKD reply qualification and Beige `/USB0` initialization
+remain pending, requiring separate approval and fresh identity/session/collision
+checks. No physical device contact, staging, game publication, recovery engine,
+Import/Stage enablement or acceptance driver was part of this correction.
+
+## Published baseline and future planning status
+
+Managed Import E2/E2F is published in
+`d6c7ed62cf23d196928247177bd8b2a2cb07e88c`. Older uncommitted/pending-publication
+entries below are historical checkpoint records, retained without rewriting them.
+Publication does not complete physical FTP acceptance. Exclusive-writer consent,
+residual external-writer races and point-in-time receipts with mandatory later
+verification remain part of the contract. 3B-2C workflow/lifecycle integration,
+3B-3 recovery, 3C manifest publication and earlier C0/native-chooser/focus/lifecycle
+and physical qualification gates remain pending.
+
+The separate [ARGONAUT OFFLINE LIBRARIES AND PLAYBACK](#n-argonaut-offline-libraries-and-playback--planned-future-track)
+track below is **PLANNED** only; it does not change existing Managed Import behavior.
+
+## Managed Import Phase 3B-2B.3E2F — exclusive-writer correction; pending inspection
+
+Baseline remains `2a03ab4b29d4b91c46e59cb39bffb8c060bed712`; all E2 changes remain
+uncommitted. The approved Option A is an exclusive-writer operating contract, not
+an atomic technical lock. Core staging confirmation now requires the separate
+`exclusive_writer_acknowledged=True` argument (exact True) alongside ordinary
+confirmation. The exact reviewed device, root/library, transaction and staging-only
+consequences include the requirement that no other FTP client, Argonaut instance
+or C64U-side operation modify selected managed-library storage during staging.
+Only this acknowledged confirmation issues the existing one-use staging capability;
+read-only consent cannot substitute. Existing identity checks, consumption before
+admission, 120-second admission deadline and continuous ownership remain intact.
+
+Collision and membership checks still refuse detected existing targets or changed
+contents. Argonaut's scheduler/lease excludes competing managed operations on its
+controlled device path; it does not lock out external clients. A writer violating
+the operating requirement can create a target after absence checking and before
+STOR, and ordinary FTP can overwrite that target. No automatic overwrite, retry,
+adoption or cleanup workflow is provided. This explicit residual risk qualifies
+all earlier E2 no-overwrite wording.
+
+Verified-staged receipts are point-in-time readback evidence, not current-content
+or immutability guarantees. They expose `evidence_scope='point-in-time'` and
+`requires_publication_revalidation=True`, with no execution or publication authority.
+A later phase must independently rehash record/payload bytes and revalidate manifest
+identity, destination collisions and device/library bindings, refusing any mismatch.
+Equal-length external edits after readback may pass final membership/size checks.
+
+Permanent loopback regressions now demonstrate both residual races and enforce the
+new acknowledgment prerequisite. Journal format/order/capacity, independent staging
+readback, cancellation, partial-send accounting and cleanup blocking are unchanged.
+Physical acceptance remains pending, including the exclusive-writer operating
+procedure. No Import/Stage UI, recovery or manifest publication is enabled. Earlier
+C0/native-chooser/focus/lifecycle qualifications remain open.
+
+Validation: **649 affected tests passed**, zero failures/errors/skips (96.630 s),
+including six new regressions. Focused staging: 36 passed (20.745 s). Both permanent
+race reproductions passed as residual-risk demonstrations. Loopback-only testing;
+diff and new-file whitespace checks passed. See MANAGED-LIBRARY for exact commands.
+PASS for independent inspection under approved Option A; physical acceptance and
+publication remain pending.
+
+## Managed Import Phase 3B-2B.3E2 — Core staging executor; pending inspection
+
+Baseline: `2a03ab4b29d4b91c46e59cb39bffb8c060bed712` (published E1 prerequisites).
+Older pending-publication statuses below are historical. This pass remains uncommitted.
+
+Core now provides worker-only review/confirm/stage methods for managed-library staging.
+Staging uses a distinct, identity-checked, one-use confirmation/capability registry and
+schema-3 execution policy 2. Read-only execution confirmation still cannot mutate.
+The 120-second deadline survives admission through the final pre-MKD gate, then stops
+being a transfer deadline. Device/session, library, policy and cancellation checks continue.
+No Import/Stage UI action is enabled; no game manifest or game content is published.
+
+The exact snapshot set, device scheduler reservation, managed FTP lease and live journal
+writer cover admission, staging, independent readback and durable terminal handling.
+Intent precedes each operation. Accepted MKD/STOR outcomes become durable before later
+cooperative cancellation or commands. Execution performs one MKD, canonical transaction
+record/payload uploads, separate SIZE/RETR/SIZE hash verification, and final manifest,
+directory-membership and destination-collision checks before verified-staged. Its receipt
+is non-executable evidence. No rename, overwrite of an observed target, retry, reconnect,
+resume, adoption, remote cleanup or recovery is dispatched.
+
+Logical capacity (K=2N+5, R=4N+16) is reserved before mutation eligibility. Actual bounded
+snapshot/control/payload accounting includes failed sends and reads. Persistence failures,
+snapshot identity uncertainty and every unsuccessful attempt with possible remote effects
+retain evidence and block snapshot cleanup. Definite pre-persistence refusal remains
+separate. Release order is FTP lease, scheduler reservation, then snapshot ownership.
+
+Physical C64U acceptance and workflow integration remain pending. Exact path/manifest
+checks do not exclude external-writer races; FTP atomic create-if-absent, durable storage
+and a remote filesystem lock are not claimed. Unexpected observations stop execution and
+retain leftovers; there is no automatic disposition. Logical capacity cannot guarantee
+physical disk space; loaded journals remain inspection-only and missing trailing history
+is not detectable solely from the hash chain. 3B-2C lifecycle work, 3B-3 recovery and 3C
+manifest publication remain separate. Earlier C0/native-chooser/focus/lifecycle physical
+qualification limits remain open. No device access, fetch, commit or push occurred.
+
+Final validation: **643 tests passed**, zero failures/errors/skips (94.340 s),
+including 30 new staging tests and all 613 affected baseline regressions. The focused
+staging-plus-architecture run passed 31 tests. Loopback-only networking; Linux/Python
+3.13.5. Diff and new-file whitespace checks passed. Independent inspection is next.
+
+See MANAGED-LIBRARY's E2 entry for lifecycle, limits and exact validation commands.
+
+## Managed Import Phase 3B-2B.3E1 — transport/evidence prerequisites; pending inspection
+
+Baseline: `7ca9212c943afabbf417351248bec71792afda9f` (published policy-2
+journal foundation). This entry supersedes the historical pending statuses below.
+Changes remain uncommitted. No managed staging executor, staging authorization,
+Import/Stage enablement, recovery, remote cleanup or game publication was added.
+
+- A hand-authored format-1 record fixture fixes exact UTF-8 bytes, sorted compact
+  keys, escaping, one LF, length (783 bytes) and SHA-256 independently of the encoder.
+  Policy-1's 36,581-byte historical fixture and original capacity remain unchanged.
+- Permanent capacity tests cover all payload counts 1–64 and maximum identities,
+  paths, UTF-8/escaping; operation-prefix and terminal checkpoint boundaries at
+  N=1,2,10,32,64; maximum counters/reasons/digests; exact and one-byte-low allowances.
+  K=2N+5, R=4N+16 and an independent serialized envelope constrain B*R. Structurally
+  valid batches can exceed 1 MiB and are refused; this is not an all-batches-fit claim.
+- Transport evidence separates actual reply acknowledgment from sender bytes.
+  Lost STOR completion and lost/ambiguous MKD replies fail closed. Rejection alone
+  does not prove absence, cleanup or ownership. Existing generic reply behavior stays.
+- Uploads count attempted blocks before sendall; only returned sends count as
+  confirmed. A failed block remains entirely uncertain. Optional shared byte budgets
+  charge attempted exposure once without refunds. Sender success is not durability.
+- MKD retains bounded private reply/path evidence; only an unambiguous quoted 257
+  path matching the exact requested bytes passes the separate staging prerequisite.
+  Unavailable, relative, malformed, mismatched and ambiguous paths fail that check.
+  Raw paths/peer text stay out of diagnostic dictionaries. No atomicity is assumed.
+
+Final offline validation: **613 tests passed**, zero failures/errors/skips (6 record/
+capacity + 607 affected regressions, including 13 new transport tests). Diff and
+new-file whitespace checks passed.
+
+Validation commands/results and proof limits are recorded in MANAGED-LIBRARY's
+3B-2B.3E1 entry. Tests use synthetic content and loopback only; physical C64U FTP
+compatibility and staging acceptance remain unqualified. Existing C0/native-chooser/
+focus/lifecycle qualification limits remain open. Journal capacity is logical, not
+physical disk reservation; loaded journals remain inspection-only and missing trailing
+history is still undetectable from the chain alone. Capacity reservation remains
+mandatory before execution admission or remote mutation. Independent inspection is
+next; executor work requires a separate checkpoint. 3B-2C, 3B-3 recovery and 3C
+manifest publication remain outside this pass. No fetch, commit or push occurred.
+
+## Managed Import Phase 3B-2B.3C.1 — policy-2 journal foundation; pending inspection
+
+Baseline: `f6c8e77304088f14be554052fa4a2386d4e5cb58` (published 3B-2B.2).
+Older pending-publication entries below are historical. This pass remains uncommitted.
+
+Schema 3 now explicitly isolates execution policy 2 while preserving policy-1
+canonical fields, bytes, histories and combined-record semantics. Schema-1/2 and
+Core's policy-1 read-only admission are unchanged. No execution authorization,
+FTP dispatch, Import/Stage action, recovery or game publication was added.
+
+Policy 2 separates record-upload acknowledgment from record-readback, orders payload
+uploads/readbacks exactly, and requires a final-validation operation before success.
+The pure format-1 record encoder uses an explicit transaction-derived allowlist,
+canonical UTF-8 JSON plus LF, strict byte bounds and exact-byte SHA-256 expectations.
+Control upload attempted exposure is control_upload_bytes; operation size records
+confirmed control sender bytes and their difference records uncertain exposure.
+Payload counters retain their existing meaning. Accepted upload is not verification.
+
+Reservation uses K=2N+5, R=2K+6=4N+16 and a policy-specific canonical checkpoint
+upper bound B. B*R must fit the captured journal allowance. This is logical capacity,
+not physical disk allocation. Existing writer synchronization, uncertainty blocking,
+inspection-only loading and missing-trailing-history limitations remain in force.
+
+Validation: 432 tests passed, zero failures/errors/skips: 26 new policy-2 tests plus
+the existing 406 affected regressions. Linux/Python 3.13.5; 17.334 seconds. The
+15-checkpoint baseline policy-1 fixture round-trips all 36,581 bytes exactly and
+preserves its original reservation and hash chain. No device/external-service test.
+New tests forbid sockets; the runner restricts other networking to loopback.
+
+```sh
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 /tmp/argonaut-3b2b1/run_regressions.py tests.test_import_execution_policy2 tests.test_import_admission tests.test_import_execution tests.test_import_transaction tests.test_import_policy tests.test_import_snapshots tests.test_import_plan tests.test_managed_library tests.test_scheduler tests.test_ftp_ownership tests.test_ftp_reads tests.test_c64u_ftp tests.test_ftp_streaming tests.test_core
+```
+
+Working diff and new-file whitespace checks passed. Initial focused testing found
+three fixture errors (copied checkpoint permissions and an overflowing aggregate
+counter); these were corrected before the successful combined run.
+
+See MANAGED-LIBRARY's 3B-2B.3C.1 entry for the full contract, accounting and proof.
+Independent inspection is next. The FTP staging executor and physical C64U staging
+qualification remain pending; no 3B-2C work has begun. 3B-3 recovery and 3C manifest
+publication remain separate. Earlier C0/native-chooser/focus/lifecycle qualification
+limits remain open. No fetch, commit or push was performed.
+
+## Managed Import Phase 3B-2B.2 — read-only admission; pending independent review
+
+Baseline: `3137bd28fbd2b0392cf80e5880d96de8ba348a1c` (published 3B-2B.1).
+Older uncommitted/publication entries below are historical. This implementation
+remains uncommitted and pending independent inspection and publication.
+
+3B-2B.2F correction: the execution store now explicitly identifies a definite
+pre-write refusal using an internal, non-serialized identity marker. Read-only
+validation and collision checks precede the first persistence boundary. From before
+the first directory fsync onward, failures are uncertain, including temporary-file
+creation/partial writes, file fsync, replacement, directory fsync and cleanup. Unknown
+or unclassified failures remain uncertain; exception class/message alone is never
+proof of safety. The permanent advisory lock is coordination metadata, not checkpoint
+or temporary evidence. Existing journal bytes remain unchanged on duplicate refusal.
+
+Admission consumes authorization in both cases. A store-proven creation refusal
+reports `not-created`, releases its snapshot pin and permits explicit discard or
+normal shutdown cleanup, provided no independent blocker exists. Genuine uncertainty
+still retains snapshots and blocks unsafe cleanup. A live writer's failed outcome
+persistence remains blocked even if its particular append failed before writing.
+No authority is restored, no retry/recovery is introduced, and no schema, reservation
+formula or read-only terminal semantics changed.
+
+Core now owns a separate exact-object, one-use execution confirmation with the
+existing 120-second deadline, captured device/client/session/library/manifest/policy,
+Core generation and exact snapshot owner/evidence. Authorization is consumed before
+busy or failed admission and is never persisted or restored. Exclusive snapshot
+handoff blocks discard/shutdown cleanup while bounded independent size/SHA-256 and
+sealed-identity checks run. Cancellation, failure and shutdown release FTP and the
+scheduler reservation before releasing snapshot ownership; uncertain evidence stays
+retained and blocks cleanup/preparation.
+
+Read-only admission checks the current manifest, complete library/games listings,
+transaction/final-path collisions, policy, ownership and bounded actual read accounting.
+It uses only the managed FTP lease, rejects contention, and disables fallback/retry.
+Logical journal capacity is reserved using canonical worst-case checkpoint bytes and
+revision slots, including terminal evidence. The reserved writer enforces the planned
+operation prefix and actual encoded consumption. This is not physical disk allocation
+or a guarantee against storage failure; conservative sizing can reject larger batches.
+
+No remote staging or FTP mutation, Import/Stage UI action, manifest change, recovery,
+automatic resume or game-content publication is enabled. Read-only success ends the
+journal as canceled with reason `read-only-admission-complete`; its inspection report
+has `mutation_enabled=False` and cannot authorize later staging. Schemas 1/2/3 remain
+compatible; loaded schema-3 journals are inspection-only. Missing trailing history
+remains a limitation. Future remote execution must require a live capacity reservation
+and freshly reviewed live admission; this report and old journals are insufficient.
+
+Validation after 3B-2B.2F: 406 deterministic tests passed: 55 admission/capacity/localhost
+checks and 351 affected regressions, with zero failures, errors or skips. Final
+combined command (from the repository root):
+
+```sh
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 python3 /tmp/argonaut-3b2b1/run_regressions.py tests.test_import_admission tests.test_import_execution tests.test_import_transaction tests.test_import_policy tests.test_import_snapshots tests.test_import_plan tests.test_managed_library tests.test_scheduler tests.test_ftp_ownership tests.test_ftp_reads tests.test_c64u_ftp tests.test_ftp_streaming tests.test_core
+```
+
+The existing offline runner rejects non-loopback socket addresses; new pure admission
+tests forbid sockets and wire tests use localhost fake FTP only. The final run took
+9.995 seconds on the Linux/Python 3.13 host. `git diff --check` passed. No physical
+device or external-service testing occurred.
+The focused admission/journal run also passed 103 tests without failures, errors
+or skips. Seven new tests include both refusal cases with explicit discard and
+shutdown variants, seven persistence-fault subcases, unknown-error fail-closed behavior,
+and actual managed-lease release ordering. Existing cross-Core and shutdown tests
+were strengthened.
+
+See [the admission contract](MANAGED-LIBRARY.md#phase-3b-2b2--read-only-execution-admission-pending-independent-review)
+for the precise ownership sequence, capacity proof and limits. No physical C64U, GTK,
+cross-platform durability or power-loss acceptance was performed. Earlier C0/native-
+chooser/focus/lifecycle qualifications remain open. Independent review is the next
+checkpoint; remote staging, 3B-3 recovery and 3C manifest publication are not started
+by this pass. No fetch, commit or push.
+
+
+## Managed Import Phase 3B-2B.1 — journal infrastructure; uncommitted review checkpoint
+
+Baseline: `6c35c5fb19c294ff8fa8a1c7438f0cf8a5bf9e52`. Schema 3 adds immutable,
+redacted execution evidence and an internal host-only persistence writer. No Core
+execution admission, snapshot handoff, FTP writes, Stage/Import action, recovery,
+cleanup or publication is enabled. Schema-1/2 and 3B-2A behavior remain unchanged.
+
+Durable, bounded, hash-linked checkpoints retain prior intents. Expected-previous
+checks and mandatory file/directory synchronization precede acknowledgment; any
+persistence failure blocks the writer without advancing its in-memory checkpoint.
+Loaded evidence remains inspection-only. Verified-staged is evidence, never
+publication or execution permission. Actual accounting remains distinct from policy.
+
+Proposed phase division: 3B-2B owns admission, remote staging/upload/readback,
+durable evidence and cancellation safety; 3B-2C owns supported workflow integration,
+progress/results, snapshot lifecycle and integrated physical qualification; 3B-3
+owns explicit recovery inspection/reconciliation/disposition; 3C owns separately
+authorized final placement and manifest publication. Bounded physical C64U FTP
+staging acceptance is required before 3B-2B's Core FTP-write portion is complete.
+This journal-only pass does not authorize or complete those later portions.
+
+See [the schema-3 contract](MANAGED-LIBRARY.md#phase-3b-2b1--execution-journal-foundation-uncommitted-review-checkpoint)
+for states, accounting, durability, limits, tests and remaining review decisions.
+
+3B-2B.1F correction: schema-3 operation hashes now require exact string type at
+construction and journal validation. Empty strings are accepted only where the
+operation permits absence; nonempty values must be 64 lowercase hexadecimal
+characters. No coercion or repair occurs. Schema-1/2 behavior is unchanged.
+
+Validation after correction: 236 deterministic tests passed, no skips (48 schema-3
+tests, including nine new adversarial tests, and 188 existing transaction/journal,
+policy, snapshot, planner and managed-library tests). The focused execution,
+transaction and policy run separately passed 111 tests with no skips. All six
+requested suites ran using the existing offline runner with a non-loopback socket
+guard; new journal tests forbid sockets. `git diff --check` passed. No physical
+device contact, remote staging/publication, package/GTK acceptance, fetch, commit
+or push occurred.
+
+No journal capacity reservation exists yet; it is mandatory before execution
+admission or FTP writes. The hash chain alone cannot detect missing trailing
+history. Loaded journals remain inspection-only. Earlier C0/native-chooser/focus/
+lifecycle qualifications and POSIX-only durability limitations remain open.
+Changes remain uncommitted for final review; no 3B-2B.2 work is authorized.
+
+## Managed Import Phase 3B-2A — authorization and host snapshots approved; pending manual publication
+
+Published compatibility baseline: `9b04bbe748a2216c32114116f3e2880c72d87cb5`
+(`Add versioned managed import resource policies`). Earlier publication/status
+entries below describe historical checkpoints.
+
+Core now exposes internal review, explicit confirmation, one-use preparation and
+owned-snapshot discard methods. No new UI action is exposed; Import remains
+disabled. Confirmation states: “Stage and Verify prepares files but does not
+import them into the Game Library.” In this slice all preparation is host-only;
+there is no remote staging, upload, remote readback or manifest publication.
+
+Consent lives only in bounded Core memory, binds the immutable schema-2 transaction,
+device/session/library, manifest and policy, and expires after 120 seconds
+(including preparation). A copied token, transaction UUID or journal is not consent.
+Reconnect/selection changes invalidate pending consent. Preparation consumes it
+once, even on admission failure, and uses the existing device scheduler lane with
+busy rejection. Manifest identity/revision/digest are reread before and after
+snapshots; state and captured policy are checked between streaming chunks.
+
+Local sources are revalidated and read with fixed 8192-byte buffers; remote sources
+use the existing session-bound managed FTP streaming reader. Exact size and SHA-256
+must match the approved transaction. Source bytes consumed are charged even on
+failure/cancellation, separately from payload and planned future transfers.
+Private host snapshots enforce disk limits using allocated file blocks/logical
+size and directory allocation, with space checks and bounded writes.
+
+Snapshot ownership is descriptor-based, exclusive, restrictive and rejects symlinks.
+Failure/cancellation cleans only proven owned files, releases FTP leases and returns
+non-ready accounting evidence. Successful snapshots need explicit discard or Core
+shutdown; restart never adopts/resumes or automatically cleans old directories.
+Uncertain cleanup preserves unexpected content and blocks further preparation in
+that Core session. Runtime evidence is volatile; durable transaction journals
+remain separate and unchanged. No journal schema or reserved state is added.
+
+Validation: 341 combined affected offline tests passed without skips, followed by
+31 passing snapshot/admission tests including four additional lifecycle probes.
+Fake FTP checks verified lease release and absence of mutation verbs. No physical
+C64U contact or acceptance. Phase 3A's 256 MiB planning-read budget, schema-1/2
+compatibility and POSIX/cooperating-writer journal limitations remain unchanged.
+Remote staging, execution/publication, importing and Phases 3B-2B/3B-2C/3C remain
+unimplemented by this checkpoint.
+
+Independent final review approved this authorization and host-snapshot checkpoint
+for publication. The review confirmed Core-owned one-use authorization with a
+120-second deadline and captured transaction/device/session/library/manifest/policy
+identity; bounded 8192-byte local and remote streaming; exact size and SHA-256
+verification; actual source-read and temporary-disk accounting; and incremental
+filesystem allocation accounting. Cleanup retains admission until proven complete.
+Initialization failures preserve primary and cleanup-error evidence; uncertain
+cleanup blocks further preparation. Cancellation and managed FTP lease release
+remain protected. No remote mutation or enabled Import action was introduced.
+
+Evidence: 178 previously passing targeted offline tests; 23 independently rerun
+focused tests all passed with no skips, including the eight initialization-cleanup
+regressions and the original allocation-setup/interrupted-removal reproduction.
+No physical acceptance is required for this offline checkpoint.
+
+Limits remain: POSIX filesystem assumptions, allocation races and conservative
+estimates rather than OS disk quotas, no implemented recovery for uncertain
+cleanup, and non-resumable snapshots. No remote staging, upload, readback or
+manifest publication exists. Phases 3B-2B/3B-2C/3C remain unimplemented.
+
+### Bounded cleanup/admission and disk-accounting correction — approved in final review
+
+Cleanup now retains snapshot ownership/admission until its definitive outcome.
+Concurrent preparation and repeated discard are refused while cleanup runs.
+Failure or interruption retains a blocking uncertainty state and cleanup evidence;
+shutdown neither races active cleanup nor retries uncertain content. No recovery
+mechanism or deletion of unrelated files is introduced.
+
+Disk reservation now charges only the increase beyond already-counted allocation.
+Fragmented writes reuse existing capacity, including a one-byte append at the
+1 MiB allocation boundary. Runtime evidence records host bytes written separately
+from peak disk footprint. Actual allocation is checked after partial writes and
+exceptions. Missing/insufficient allocation evidence uses a labeled conservative
+rounded-logical-size fallback; an unavailable allocation unit stops preparation.
+
+Validation: 170 targeted offline tests passed without skips, including 15 new
+cleanup/admission and disk regressions, existing snapshots, managed FTP,
+foreground/scheduler and schema-1/2 compatibility tests. No physical acceptance,
+remote mutation or transfer execution is claimed. Authorization, session/library/
+manifest guards, hashes, journals and Phase 3A planning remain unchanged.
+
+## Managed Import Phase 3B-2A — approved; pending manual publication
+
+Baseline: `d2e37e3949690f935f4bf79388db9f33f47c15e0`, published
+Phase 3B-1 transaction/journal foundation. Older pending-publication entries
+below are historical.
+
+This checkpoint adds an explicit schema-2 offline transaction policy alongside
+unchanged schema-1 budget semantics. Schema-1 journals retain their original
+128 MiB ceilings and validation/state restrictions; loading never upgrades,
+resumes or authorizes either version. Execution/publication states remain reserved.
+
+Validated host preferences use existing atomic preference persistence:
+Maximum Import Batch Size (`import_batch_mib`) defaults to 128 MiB, range
+1–4096 MiB; Maximum Temporary Disk Usage (`import_temp_mib`) defaults to
+512 MiB, range 1–8192 MiB. These are preference-model fields, without new
+Settings controls in this compatibility checkpoint. Invalid values are rejected;
+missing fields receive bounded defaults. There is no unlimited option.
+
+New explicit schema-2 attempts freeze the effective policy, separately recording
+selected payload, temporary disk ceiling, planned upload/readback payload,
+cumulative I/O allowances and measured accounting evidence. Preference changes
+do not alter existing attempts. Verification rereads are not additional game
+payload. These records are contracts and evidence, not actual I/O enforcement,
+free-disk checks or consent.
+
+Phase 3A is unchanged: its aggregate 256 MiB source-read budget includes
+verification rereads. A configured 4096 MiB batch does not guarantee eligibility.
+No snapshots, execution admission, transfers, remote staging/readback, manifest
+publication, recovery cleanup, retries or Import UI are added. POSIX journal
+publication and cooperating-writer locking retain their existing guarantees.
+Phase 3B-2B and later work remain pending.
+
+Validation: 142 affected offline tests passed, no skips (49 existing transaction/
+journal, 44 planner, 27 managed-library, eight existing preference and 14 new
+compatibility/preference tests). No physical device acceptance was performed.
+
+Independent compact review approved this schema-2 compatibility checkpoint for
+publication. It confirmed unchanged schema-1 limits and state restrictions,
+byte-for-byte round trips for five existing schema-1 journal fixtures, immutable
+schema-2 policy capture and separation of payload, temporary disk, planned
+transfers and actual-I/O allowances. Reserved execution states remain unavailable.
+
+Review evidence: 142 previously passing tests, plus 63 independently rerun focused
+tests, all passing with no skips. Additional published-format compatibility and
+eight schema-version/evidence rejection probes passed with network access forbidden.
+No physical acceptance was required for this offline-only checkpoint.
+
+Documentation closure prepares manual publication only. No actual transfer
+metering, execution or remote staging exists; Phase 3A's 256 MiB planning-read
+budget and POSIX/cooperating-writer journal limitations remain unchanged.
+No later-phase work is complete, and no staging, commit or push was performed.
+
+## Managed Import Phase 3B-1 — approved; pending manual publication
+
+Published Phase 3A baseline: `5996d7081411dfd1a17f55112ddad7679165c054`
+(`Add managed game import planning and review`). The older pending-publication
+headings below record the pre-publication checkpoint and are historical.
+
+Phase 3B-1, including the reviewed safety correction, adds immutable
+transaction/item/budget/evidence records, strict matching
+original/revalidated plan admission, safe visible staging-path construction, an
+offline state model and bounded durable host journals. It has no Core execution
+entry point, network operation, source spooling, remote directory/record creation,
+upload, remote readback, cleanup or UI changes. Import remains unavailable.
+
+Proposed offline limits are 64 selected files, separately capped 128 MiB source
+snapshots, 128 MiB host spool, 128 MiB upload and 128 MiB readback, 1 MiB per
+journal/record, 256 operation records per journal and 64 journals per store.
+Phase 3A's 268,435,456-byte planning-read allowance is unchanged. Execution policy,
+resource accounting and physical staging qualification require later approval.
+
+Host journals record intents before outcomes, preserve partial/uncertain evidence,
+and use private files, file fsync, atomic host replacement and directory fsync.
+Unsupported directory fsync is reported; other persistence errors stop the caller.
+Loading is inspection only, never transfer/retry/cleanup permission. Prepared and
+awaiting-confirmation remain available; staging, verifying, verified-staged and
+published are reserved and rejected on construction, transition and journal load.
+Canceled/failed/uncertain recovery records cannot resume. Fields, nesting and
+collections are bounded before incremental UTF-8 JSON encoding; contradictory
+operation/checkpoint evidence is rejected. Planned payload ceilings are not actual
+I/O metering, which remains a 3B-2 concern.
+
+Correction validation: 120 affected offline tests passed, including 49
+transaction/journal tests (14 added safety regressions), 44 Phase 3A tests and
+27 managed-library tests; no skips. Production modules
+from Phase 3A and existing tests are unchanged. No physical acceptance is claimed.
+See MANAGED-LIBRARY.md for the contract, durability scope and future authorization
+boundary. Phases 3B-2, 3B-3 and 3C remain pending; transfers/imports are not operational.
+
+Independent compact re-review approved Phase 3B-1 for publication. Reviewed
+capabilities include immutable transaction/recovery contracts, strict plan
+eligibility and safe staging paths, reserved execution/publication states and
+rejection of forged authorization fields, consistent operation ordering and
+acknowledged checkpoints, bounded encoding/validation, durable POSIX host-journal
+publication and inspection-only restart recovery.
+
+Evidence: 120 previously passing tests, no skips (49 contract/journal, 44 planner,
+27 managed-library). The final review additionally passed the 1 MiB journal-load
+boundary, one-byte overflow, quoted structural-character and multibyte UTF-8
+encoding boundary probes. These are prior results; tests were not rerun during
+documentation closure. No physical acceptance is required for this offline-only
+checkpoint.
+
+Limitations remain: POSIX host filesystem guarantees and cooperating-process
+locking only; planned payload ceilings are not actual-I/O metering. There is no
+execution admission, FTP upload, remote staging, automatic retry, recovery cleanup,
+manifest publication or enabled Import action. Phases 3B-2, 3B-3 and 3C remain
+pending. Documentation closure prepares manual publication only; no Git staging,
+commit or push was performed in this pass.
+
+## Managed Library Phase 3A — accepted; pending manual publication
+
+Against published Settings baseline `b45828c39d7521732569a6ec3350a84de397cb81`,
+Add Games now offers shared-picker selection, explicit Prepare Plan and read-only
+review in the main Game Library tab. Import remains unavailable; configuration
+stays exclusively in Settings. No game importing is operational.
+
+Immutable plans bind typed sources to the selected device/session/root/path/UUID,
+manifest revision and exact-byte digest. Local and managed remote reads validate
+D64/CRT content and SHA-256. Relevant catalog duplicates require actual-byte
+verification; missing/unverified content and filename conflicts block candidates.
+Identical content is skipped deterministically. Sources and relevant destination
+content are reread before completion. Revalidate Review rejects changed evidence.
+Plans are point-in-time observations, never execution authority.
+
+Preparation uses existing Core scheduling, B5 foreground admission and contextual
+Cancel. No writes, staging, metadata publication, manifest changes, legacy catalog
+changes, mount/launch, recovery or cleanup are implemented. Phase 3B/3C/3D remain
+pending. Review bounds are 64 sources, 256 MiB of aggregate source bytes read
+(including failed reads and verification rereads), and at most 128 relevant
+catalog entries totaling 256 MiB. Required verification must fit the source budget.
+
+Validation: 227 affected unit tests passed, including 31 new planner/Core/managed
+wire tests. The 38 planning/managed-library/creation GTK checks passed, including
+10 new planning UI/foreground checks. Tests use fake or localhost transports;
+no physical C64U was contacted. The old foreground chooser test still calls
+`FilePicker.emit`, which does not exist; the same error was reproduced on an
+isolated copy of the published baseline. Dedicated B5 and picker regressions pass.
+The previously documented GTK focus warning and native lifecycle issue are not
+claimed fixed. Compact re-review and bounded physical acceptance subsequently
+passed; their evidence and limitations are recorded below.
+
+
+Source-budget correction — re-review passed: the original success-only counter
+was replaced by one operation-wide 268,435,456-byte source-read allowance. Known
+sizes are checked before payload reads; local reads and optional managed FTP
+receives are capped to the remaining allowance and charged before buffering.
+Failed/rejected reads retain their charges, including final-reply/length failures.
+Verification rereads use the same allowance. Exhaustion returns
+`import-source-budget` and no complete plan; it never skips hashing/verification.
+Manifest and relevant-catalog reads retain their separate existing bounds.
+The existing read stack gained an optional budget; no-budget consumers retain
+existing behavior. No transfer execution or mutation was added.
+
+Correction validation: the combined planner/FTP/foreground selection passed 286
+tests; the final planner suite passed 44 tests after one additional end-to-end
+case (13 new budget regressions in total). All 11 focused planning GTK checks
+passed, including a new budget-error review-invalidation check. Localhost wire
+checks cover misleading SIZE, exact EOF, streaming exhaustion, cancellation,
+lease release, unchanged files/preferences and no mutation commands. Those checks
+were offline; subsequent physical acceptance is recorded below. Earlier broad-suite
+evidence below is historical.
+
+Additional offline GTK checks passed: B5 (3), shared picker (16), game picker (9),
+SID picker (4), Drives picker (3), C1 storage (6) and C4 layout (6): 47 checks,
+or 85 with the 38 checks above. Broader foreground testing has one baseline
+native-chooser error. Full C0 input testing reported six failures in 28 checks
+on both current and baseline, with differing cases; two current keyboard failures
+passed individually, while one also failed individually on baseline. C0 input
+qualification remains incomplete; no new 3A-attributable failure was established.
+
+### Phase 3A GNOME Wayland physical acceptance — passed; pending manual publication
+
+Read-only acceptance used source Development on C64 Founder's Edition `25BE71`,
+with destination `/USB1/ARGONAUT_LIBRARY`, revision `0`. UI results were reported
+by Bruce; process exit and repository authority were checked separately.
+
+- Local planning classified one new game, proposing 1,050,688 transfer bytes.
+  Explicit revalidation passed with unchanged classification and workload.
+- Remote planning classified one new game, proposing 174,848 transfer bytes.
+- Cancellation reported "operation canceled by request": no completed plan was
+  returned, the UI returned to idle, and no automatic retry occurred.
+- USB1 remained at revision `0`, with zero games. Import remained disabled;
+  no game import or device-storage mutation occurred.
+- Normal shutdown returned exit code `0`; no Argonaut runtime or launcher remained.
+
+Limits: source filenames and SHA-256 values were not independently inspected;
+the displayed library UUID and SD contents were not independently verified.
+Session/library-change invalidation was not physically exercised. This is bounded,
+user-reported UI acceptance, not broader physical qualification. The known
+`GtkText - did not receive a focus-out event` warning appeared and remains
+unresolved. No crash occurred in this run; the previously documented native
+GTK/PyGObject lifecycle fault remains unresolved.
+
+The source-budget re-review approved physical acceptance: 77 targeted tests
+passed (44 planner, including 13 budget regressions, plus 33 shared-read/download
+tests), as did 11 focused GTK checks and 10 additional exact-limit/one-byte-over
+wire probes. No skips were reported; these are prior review results, not test
+runs repeated during documentation closure. Phase 3B/3C/3D remain unimplemented.
+Publication is prepared only; no staging, commit or push was performed in closure.
+
+## Game Library Settings relocation — accepted; pending manual publication
+
+The pending Forget correction is retained within a dedicated native Settings →
+Game Library page. Current identity/status, explicit discovery and selection,
+Create Library and confirmed host-only Forget now live there. The main Game
+Library tab presents the selected library and read-only catalog, or an explicit
+unconfigured/unavailable state with Go to Settings. Importing remains deferred.
+Discovery lists candidates without adoption or merging. Selection revalidates the
+captured device/session/path/UUID before saving; persistence must succeed before
+the selected view changes. Creation protocol and storage restrictions are unchanged.
+
+Physical evidence supplied by Bruce is separate from these offline implementation
+checks: SD recognition passed for Founder `25BE71`, `/SD/ARGONAUT_LIBRARY`, UUID
+`2b8b17e2-6778-49f1-9fef-f8ee9bd5a691`. Subsequent USB1 fresh creation also passed,
+for `/USB1/ARGONAUT_LIBRARY`, UUID `56dc72d1-d607-4a7e-9174-d72f82155fb6`.
+Both libraries are revision 0 with zero games. The prior outstanding-fresh-creation
+wording below is historical and superseded by this supplied USB1 acceptance.
+Neither library was contacted or changed during this implementation. This does
+not qualify importing, populated manifests, recovery, moves, deletion or scanning.
+Compact review approved physical acceptance; the user-confirmed result is recorded
+below. No packaging, release or Phase 3 work is included.
+
+### User-confirmed Settings physical acceptance — passed
+
+Bruce confirmed the following on GNOME Wayland using C64 Founder's Edition
+`25BE71`. The two existing libraries remained distinct:
+
+- SD: `/SD/ARGONAUT_LIBRARY`, UUID `2b8b17e2-6778-49f1-9fef-f8ee9bd5a691`.
+- USB1: `/USB1/ARGONAUT_LIBRARY`, UUID `56dc72d1-d607-4a7e-9174-d72f82155fb6`.
+
+Both were revision `0` with zero games. Settings → Game Library displayed
+correctly and discovered both libraries. Explicit USB1 selection updated the
+main Game Library without restarting; the selected library persisted after an
+application restart. Explicit Discover Libraries populated the available choices.
+Switching from USB1 to SD then updated the main Game Library to SD. Cancelling
+the Forget Library confirmation preserved the selected host association.
+Normal shutdown returned to the terminal with exit code `0`, as reported by Bruce.
+No game imports or device-storage mutations were performed during this acceptance.
+
+The existing warning `GtkText - did not receive a focus-out event` appeared;
+it remains unresolved and is nonblocking for this acceptance. The separately
+reproduced native GTK/PyGObject lifecycle crash also remains unresolved; no fix
+is claimed. This acceptance does not certify screen-reader use, comprehensive
+keyboard navigation, or new library creation. The earlier USB1 fresh-creation
+acceptance and SD recognition evidence remain separate.
+
+The reviewed Settings/Forget implementation and this acceptance record are ready
+for manual publication preparation, but remain uncommitted and unpublished.
+No Managed Import, Folder Scan, migration, Move Library, Delete Library or Phase 3
+work is included.
+
+
+## Managed Library Forget correction — historical implementation checkpoint
+
+Against published Phases 1–2 baseline `74f0a766f208404e688e6718966e0b9533119742`,
+Game Library now offers confirmed **Forget Library** for a loaded library or a
+stored association. Confirmation identifies device, path and UUID and explains
+that files are not deleted. Forget clears only the host library association and
+current view, returning to the unconfigured state with Create Library available.
+The existing library remains discoverable through explicit Load managed library;
+there is no automatic rediscovery, replacement selection or remote mutation.
+Active foreground operations and stale confirmations refuse the action.
+
+This historical implementation checkpoint preceded review and the physical
+acceptance recorded above. The correction remains uncommitted and unpublished.
+SD recognition and subsequent USB1 fresh creation passed in separate acceptance
+work; no USB1 creation or device contact was part of this implementation.
+Creation protocol, manifest format, picker, legacy catalog, SIDJuke, Drives,
+storage permissions and B5 handling are unchanged. Move/Delete Library, managed
+imports, Folder Scan and migration remain outside this correction.
+
+**7 October 2026 layout follow-up:** broader B3 Device Details grouping and saved
+network-connection/profile relocation passed review and small physical/UI acceptance against
+published credential/discovery checkpoint `b075bddd795b1b104dc5632477444bd85bb7ba39`.
+117 focused tests and offline real-GTK checks passed before acceptance. The current
+Development worktree then passed saved-profile/New-return, keyboard, Password Enter,
+one Test, one Discover and resize checks on Founder; no subnet scan or device mutation.
+**Commit/push approved, not executed.** Production/tests were unchanged by acceptance.
+Credential/discovery contracts remain unchanged. Quick Connect removal belongs to
+B4 header cleanup and is not included. Streaming remains OPEN / intermittent /
+instrumented. See CURRENT-STATE for scope, acceptance observations and limitations.
+
+**7 October 2026 update:** B2 credentials and the bounded Discover / Scan Subnet
+portion of B3 passed compact review and bounded Development physical acceptance.
+Publication is approved but not executed. UNKNOWN blocks persistence until an
+authoritative retry; 109 focused tests pass. One Discover and one /24 scan passed
+with the documented password-protected subnet-discovery limitation. Live native
+credential-store acceptance remains later packaging/release work. See
+[Device Details stabilization](DEVICE-DETAILS-STABILIZATION.md) for the approved
+contract, Windows exception, mechanisms, safety and deterministic evidence.
+Streaming B1 remains **OPEN / intermittent / instrumented**. Other decisions and
+scope below are preserved. The documentation-only status immediately below is
+historical context for the preceding consolidation, not the current pass.
+
+**Status: documentation-only consolidation, pending Bruce/ChatGPT review.**
+No roadmap implementation has begun in this pass, including item B1. This is the
+single consolidated product roadmap for future work; settled directions below
+are recorded decisions, not claims that the UI already implements them.
+
+## Authority, sources, and status vocabulary
+
+Consolidated on 6 October 2026 from the explicit roadmap handoff, the referenced
+[Branch · Plan Slice 3 Inspection conversation](chatgpt-conversation://6ac26cc1-6c2c-83ea-9a3e-53f63517059b),
+and repository records. The retrieved conversation confirms Flash/Temp, shared
+picker/SIDJuke, contextual cancellation, Developer Mode, and stability-first
+sequencing; the detailed handoff supplies the full walkthrough decision set.
+Walkthrough observations below are user-reported unless linked repository
+evidence establishes otherwise. No device or behavior investigation occurred here.
+
+- **Complete:** accepted foundation; preserve it.
+- **Settled / planned:** recorded product direction, awaiting implementation.
+- **Investigate / candidate:** evidence or review required; do not silently decide.
+- **Later / deferred:** retained scope without a new implementation commitment.
+- **P0:** highest reliability or device-safety concern. B1 is the first work item;
+  G2 is a safety gate within the major Ultimate Menu redesign, not permission to
+  reproduce the device lockup now.
+
+[CURRENT-STATE.md](CURRENT-STATE.md) records accepted implementation.
+[NEXT-PASS.md](NEXT-PASS.md) retains historical release/milestone evidence;
+this roadmap supersedes its older next-work sequencing. Historical R1–R6 and
+closure reports remain intact, including their contemporaneous stop markers.
+
+## A. Baseline / completed foundation
+
+- Verified checkout: `/home/bruce/Documents/ChatGPT/Local Projects/argonaut-network-slice2`.
+  Starting worktree clean; HEAD = local `origin/development` =
+  `17ad4e2bb7acd441560a3160fbcc224d13d30536`, divergence `0 0`.
+  Subject: `Close FTP ownership compatibility paths`; parent R6:
+  `f9457acd3bcef4269d9d98e95ef3c6dc33f90ff1`. No fetch was needed.
+- [FTP ownership closure](FTP-OWNERSHIP-CLOSURE.md) is published at that baseline:
+  supported FTP uses managed ownership; raw compatibility paths are removed.
+  FTP/Network Foundation ownership work is complete. Do not reopen without
+  evidence. Separate product work below remains outstanding.
+- [R4](R4-MANAGED-C64-AI-INSTALL.md): managed C64 AI installation/upgrade;
+  [R5](R5-CORE-OWNED-HEADLESS-READS.md): Core-owned headless reads;
+  [R6](R6-MANAGED-FLASH-PUBLICATION.md): managed Flash publication and exact-path
+  cleanup. Physical qualification on Beige and Founder is recorded in those
+  documents. Preserve their scope/limitations: R5 was read-only; R6 used existing
+  `/Flash/roms` and disposable one-byte fixtures, without activation or reset;
+  missing-directory MKD remained deterministic-only. Closure required no new
+  physical qualification. These are prior results, not tests rerun in this pass.
+- Per the current handoff, local Debian `argonaut-c64u-development` version
+  `1.10~dev1` was built from this exact closure commit for packaged walkthrough.
+  Packaging output is ignored and must not be added to Git. Stable `v1.9` remains
+  the released baseline; there is no public 1.10 release/tag yet.
+
+## B. Stabilization / spit-shine — do first
+
+Highest priority: reliability and UI clarity before major redesigns.
+
+See [UI design and audit](UI.md) for the 1.10 spit-shine direction, punch-list
+inventory reconciliation and proposed implementation slices. Design approval does
+not establish implementation or acceptance; existing release gates remain in force.
+
+### 1. P0 — streaming/navigation permanent hang
+
+Observed in the packaged Debian build with a C64U stream active while navigating,
+especially Streams ↔ Ultimate Menu comparison. GNOME reports Argonaut Development
+not responding; Wait does not recover; Force Quit is required. Instant Replay is
+suspected, not proven causal. Diagnose the hung process/thread state before
+assuming replay removal fixes it. Replay removal is independently settled (F).
+
+### 2. Credential / saved-network-connection UX
+
+**Reviewed; bounded Development acceptance passed:** Test and Connect never persist passwords.
+Save Profile + Remember stores a real typed password without implicit validation;
+unchecked Save Profile removes the exact-profile stored credential while the
+session credential may remain. Forget removes both stored and session fallback,
+retaining the active connection/profile. Fixed saved indication uses boolean
+metadata state; Windows may read/free an opaque credential buffer without touching
+the blob, as explicitly approved. Development and Portable have distinct
+session-only labels and no persistence controls. Final Core close clears its
+session-password dictionary. Connect reports the connection outcome truthfully.
+The prior investigation bullets below are retained as history; their unresolved
+semantics are superseded by this approved implementation contract.
+
+Verify working behavior and keyring mechanisms before changing them.
+
+- Observed experiment: Forget Password → type password → Connect succeeds →
+  `Profile saved` → restart → connect without password fails authentication.
+  Connect can save/update the connection profile while the typed password remains
+  session-only. This does not establish what Save Profile writes to the keyring.
+- Investigate exactly when Save Profile and other paths write, replace, retrieve,
+  or remove credentials. Add an explicit **Remember password** choice; do not add
+  a separate Save Password button.
+- Intended semantics, **subject to verification/review**: Test/Connect do not
+  persist; Save Profile + Remember password persists to the system keyring;
+  unchecked saves the connection without a password; Forget Password removes the
+  stored credential without deleting the connection. Resolve what unchecked Save
+  Profile does to a previously stored credential explicitly, not by assumption.
+- Show a fixed masked placeholder when a saved keyring credential exists, never
+  its actual length or secret. Reconnect must preserve the saved-credential
+  indication. Preserve useful HTTP rejection status such as `403`.
+- Replace misleading `Profile saved` after ordinary Connect with clear connection
+  outcome reporting; distinguish profile changes from connection results.
+- Portable Mode Password is reported disabled/nonfunctional even in portable
+  release. Desired portable model: passwords live only in session memory; never
+  persist or retrieve installed-mode keyring credentials; discard on exit.
+  Replace/remove the misleading checkbox with informational state such as
+  `Portable mode — passwords are not saved`.
+
+### 3. Device Details / connection-profile UX
+
+**Reviewed and physically qualified portion:** separate **Discover** and **Scan Subnet**.
+The normal discovery mechanisms are unchanged. Explicit subnet probing accepts
+and normalizes IPv4 CIDR, requires a connected private LAN and at most 1,024
+addresses, gates invalid input, reports actual completed-host progress, displays
+incremental subnet results, and counts network connections. Existing prepopulation
+is retained without overwriting input. No cancellation framework or physical-device
+grouping was added. The following layout follow-up does not change those contracts.
+
+**Layout follow-up reviewed and physically accepted:** saved entries are network
+**connections**, not physical machines; one C64U may have Ethernet and Wi-Fi entries.
+The selector contains saved profiles only. Device identity/details, credentials,
+status/errors, and Network Discovery are visually separated. Saved Network
+Connections now sits toward the bottom with a Connection selector and grouped
+New / Save Profile / Delete Profile actions; Test / Connect is a separate row.
+Saved versus new/discovered-unsaved form state is explicit. The saved device ID is
+read-only binding metadata, not a new physical-device grouping model. Existing
+selection, identity, save/delete, credential and discovery semantics are preserved.
+
+Argonaut connects using multiple services; this area is not called FTP Connection.
+**Remove Quick Connect** remains settled but belongs to the global header (B4),
+so it is deliberately unchanged by this component layout pass.
+
+### 4. Global header/navigation cleanup
+
+**Bounded physical acceptance passed; commit/push approved, not executed.**
+Current `./run-development` worktree connected to saved C64 Founders / Founder
+25BE71 in session-only Development mode. One Reconnect preserved active identity;
+previously loaded Ultimate Menu settings became stale with rows/Apply/Flash gated,
+and read-only reload restored usability. Settings, original blue/red icon, tooltip
+(user-confirmed), keyboard access, Machine/Quick Connect retirement and modest
+resize passed. Actual widths were 1121 and 1300 pixels; the full-window minimum
+constrained the smaller requested width. Reset and Reboot confirmations were both
+cancelled: zero machine commands and no device mutation. Normal close cleared
+session credentials and exited. Prior 207 focused / 16 GTK evidence is unchanged;
+no suites rerun. Streaming stays OPEN/intermittent/instrumented; H stays pending.
+This acceptance supersedes the historical B4 review/pending markers below.
+
+Compact B4 review exposed a connected-Reconnect stale-settings gate defect.
+The narrow correction now shares the existing refresh gate across loss and
+restoration: retain drafts, block stale editing/Apply/Flash even without edits,
+and require the existing discard/reload flow while keeping Core connected.
+159 focused tests and 12 offline real-GTK checks pass, including four new real
+restoration-path regressions. **Pending compact B4 re-review before physical
+acceptance.** Broader prerequisite evidence remains unchanged; no device contact.
+
+Final narrow review additionally found an already-open Save to Flash confirmation
+could bypass the gate after restoration. Its final callback now rechecks freshness
+before submission. Four new real-dialog regressions prove stale refusal after
+recovery/Reconnect (including repeated responses and retained drafts), and exactly
+one save while fresh. 207 focused tests and 16 offline GTK checks pass, no skips.
+**Pending final B4 re-review; physical acceptance remains blocked until approval.**
+No other B4 behavior or later scope changes; no device contact.
+
+Final amended prerequisite review: **APPROVE PREREQUISITE — B4 MAY RESUME**.
+The one-shot, exact-session Reset/Reboot admission path is preserved unchanged
+in the global dialog. See CURRENT-STATE for prerequisite review/test history.
+
+Settled and implemented order: `[ Reconnect ] [ Disconnect ] [ Settings ] [ C= ]`.
+Connected Reconnect targets the active identity-bound profile; disconnected
+Reconnect targets the selected saved bound profile. Missing/unbound selection and
+busy recovery refuse. Existing Core/recovery machinery owns connection semantics;
+no credential persistence. Quick Connect's old route is retired.
+
+Settings replaces user-facing Preferences in the header/dialog without redesigning
+its pages. Far-right Ultimate Power uses the original blue/red Commodore SVG,
+24 px, icon-only with accessible name `Ultimate Power` and tooltip description
+`Power, reset, and memory actions for the connected C64 Ultimate.` Source/license
+(CC BY-SA 4.0) and trademark review note are bundled alongside the asset.
+
+Ultimate Power contains only the existing Reset C64 / Reboot C64 operations.
+Machine removal is earned: no other live functionality existed, both operations
+retain confirmations, captured-session safety, recovery/reporting and keyboard
+access, and actual GTK button-route regressions pass. No duplicate Machine tab.
+Broader physical F1 capabilities remain H; Test Lab relocation remains I.
+
+146 focused/affected tests and eight explicit offline real-GTK checks passed;
+no new skips and no device contact. Existing full prerequisite evidence was not
+rerun for this presentation/wiring change. Normal resource inclusion covers SVG
+and attribution without a package build. Before physical acceptance, stop for B4
+review. Later acceptance should reconnect once and CANCEL Reset/Reboot prompts;
+executing a hardware command requires separate authorization.
+
+### 5. Contextual operation status/cancellation
+
+**B5 COMPLETE / PUBLISHED** at `627698b1dd0a3e0a7ebd7b9384a86b0332a507eb`.
+Foreground-admission prerequisite and contextual presenter passed review and physical acceptance.
+One Browser-managed foreground operation is reserved before submission, with busy
+attempts refused without queueing. Cancellation retains admission until terminal
+cleanup. The short ownership mutex never spans submission/execution/cancellation.
+CoreScheduler's independent local/device lanes and service semantics are unchanged.
+
+The bottom presenter now owns IDLE/RUNNING/CANCELLATION_REQUESTED/TERMINAL for the
+admitted job/token. One contextual **Cancel** replaces permanent Files/SIDJuke/Game
+Library controls. Bulk Import keeps **Cancel import**, sharing the same view and
+one-shot cancellation authority. Cancelling remains sticky against delayed progress
+and ordinary messages; stale callbacks cannot affect a newer job. Completion/fallback
+uses authoritative results and preserves existing nuanced consequence handlers.
+Phase text/counts/optional totals are shown without invented percentages. Ordinary
+workers have no new cancellation; noncancellable foreground presentation hides Cancel.
+
+446 focused/affected tests and 17 offline GTK checks passed with no skips; compact
+review reran 40 focused tests and eight offline GTK checks successfully.
+Bounded physical acceptance then passed using the current `./run-development`
+worktree and saved C64 Founders profile. One existing 993,232-byte Lykia CRT on USB1
+was downloaded toward temporary local storage and cancelled once through global
+Cancel. Bruce visually confirmed sticky Cancelling (too brief for automated sampling).
+The authoritative result reported zero completed and one unfinished, cancelled by
+request; local staging was cleaned. Read-only browsing and ordinary status recovered,
+Cancel stayed absent, and normal Quit exited cleanly. No remote mutation or stream.
+Details and physical-observation limitations are in CURRENT-STATE.
+
+Publication verified local/remote equality, divergence 0 0 and clean worktree.
+Streaming remains OPEN / intermittent / instrumented. B6 is the current section.
+
+### 6. Packaging spit-shine
+
+**Review and local package acceptance PASSED; reviewed dev2 installed.**
+Stable remains 1.9; source Development is `1.10-dev`. Reviewed, installed local Debian
+Development version is `1.10~dev2`, displaying `1.10-dev2`. Development uses explicit
+maintained notes with missing-note failure instead of the historical 0.1.0 fallback.
+Stable release checks and Development isolation/session-only credentials remain.
+General module/asset staging and package self-test cover current B4/B5 resources.
+
+Current packaging/build docs are reconciled, with one local build command in
+RELEASING; historical evidence is preserved. Shared `1.8-replay.3` workflow
+modernization is deferred; do not dispatch it for B6. Windows/macOS packaging,
+public Stable 1.10 and trademark-release review remain future work.
+52 focused tests and 49 offline staged-runtime GTK self-test checks passed; no skips.
+Compact review reran 52 focused tests. Exactly one local `1.10~dev2` Development
+archive was built and inspected; extracted-package self-test passed all 49 checks
+in an isolated offline namespace. Offline Development/About/status/session-credential
+smoke, Commodore SVG decoding and normal Quit passed. Build stamp is published B5
+`627698b1dd0a3e0a7ebd7b9384a86b0332a507eb-modified`, not a published B6 commit.
+Artifact size/hash and isolation limitations are recorded in CURRENT-STATE.
+Bruce subsequently confirmed installation of the reviewed `1.10~dev2` package.
+Read-only closure checks confirm its version and all 122 modules/assets plus notes
+match current source. The offline smoke above was on the extracted package.
+Source publication follows final review and remote-base safety gates; no rebuild,
+reinstall, device contact or workflow dispatch is part of closure.
+Streaming remains OPEN / intermittent / instrumented.
+
+## C. Files / storage UX
+
+Approved bounded checkpoints:
+
+- **C0 — Conventional file selection and activation:** implemented/deterministically
+  verified, final re-review and combined read-only physical acceptance passed;
+  published and complete in `4b77705510d9`.
+  Native GTK multiple selection/theme highlighting, independent panes, focus,
+  nonselectable parent rows and refresh retention are retained or corrected.
+  Optional read-only live Nautilus activation policy uses a modifier/drag-safe
+  adapter; GTK continues owning selection. Existing operation safety is unchanged.
+  Compact review's rapid click-then-drag blocker is corrected: pointer activation
+  waits for a qualified release; Enter stays immediate and GTK owns selection.
+  28 C0 checks (eight new regressions), 33 affected tests and 16 C1/B5 GTK checks
+  passed after correction, no skips; the prior broader affected evidence remains.
+  Bruce approved the native selection/highlighting on actual GNOME Wayland using
+  source Development and C64 Founders. Selection, keyboard, right-click, canceled
+  rapid drag and normal shutdown passed without transfer or remote mutation.
+  GNOME policy stayed double; physical single-click remains unqualified.
+  Full acceptance evidence and limitations are in CURRENT-STATE.
+- **C1 — Storage roots and safe browsing:** implemented/deterministically verified,
+  compact-review and read-only physical acceptance passed; published and complete
+  in `4b77705510d9`.
+  Advertised exact
+  USB/SD/Flash/Temp locations are visible. Flash/Temp directory browsing uses the
+  existing managed listing, independently of USB/SD operation authorization.
+  No generic Flash/Temp copy, download, mutation, backup or launch capability is
+  added; separate validated R6 Flash workflows remain available. Unavailable roots
+  report errors rather than empty success. 444 focused tests and 16 offline GTK
+  checks passed, no skips. Physical USB/SD, Flash carts/html/roms and empty Temp
+  browsing passed; Bruce approved icons and read-only restrictions. Unavailable-root
+  faults were not induced. Acceptance changed documentation only; limitations are
+  recorded in CURRENT-STATE.
+- **C2 — Remove redundant Backup/Restore UI:** published in `9dbbb29d3e95`.
+  This approved product decision supersedes the dedicated Storage & Backups page.
+  Files backup/restore controls and unreachable UI callbacks are removed; no new
+  backup tab, dialog or alternative entry point is planned. Ordinary copying,
+  managed transfers and contextual partial-upload recovery remain supported.
+  Tested Core/service implementations and legacy backup-root configuration remain;
+  the unused backup-root editor is hidden from Settings.
+  Controlled Founder 16 MiB reads measured SD 0.357, USB1 0.489 and USB0 0.488 MiB/s;
+  these workload-specific observations are not hardware specifications. Bruce
+  prefers preparing bulk removable media and retaining source libraries on PC/Mac.
+  Incremental USB/SD backup and PC-created baseline adoption are deferred
+  indefinitely. Flash backup remains a possible future feature requiring separate
+  feasibility/safety review; Flash restore is unapproved. No Temp backup expansion.
+  94 focused tests and 44 offline GTK checks passed, no skips; C2 is published.
+- **C3 — Flash/Temp operations design review:** complete; Bruce approved retaining
+  current C1 behavior as the final current policy. No production implementation or
+  additional generic Files operations are approved. Generic Flash/Temp mutation is
+  deferred; specialized Flash workflows remain separate and unchanged.
+- **C4 — Files polish and acceptance:** compact review and physical acceptance
+  passed; published in `43a3f6ae28e41a6a3a3a6ae604e281d3062eb11e`.
+  Filename labels are bounded with aligned sizes and full-name tooltips/accessibility.
+  Menu/Shift+F10 opens existing context actions without changing selection;
+  dismissal restores focus. Path/list accessible names, contextual recovery
+  visibility and Files terminology/disconnected wording are refined. Core,
+  C0/C1/C2/C3 and B5 contracts are preserved. 93 affected unit tests and 49
+  distinct offline GTK checks passed, no skips; evidence and warning limits are
+  recorded in CURRENT-STATE. Bruce passed the read-only checklist on actual GNOME
+  Wayland using source Development and C64 Founders: layout/long-name tooltips,
+  native selection, keyboard menus/focus, right-click, canceled drags, roots/icons,
+  Flash/Temp restrictions and normal shutdown. Exit code 0, no remaining GUI
+  process and an empty runtime log were verified. No transfers or remote mutations
+  were exercised; accessibility and recovery limitations are in CURRENT-STATE.
+
+Section C is **complete**, with C4 published in
+`43a3f6ae28e41a6a3a3a6ae604e281d3062eb11e`. The acceptance evidence above remains
+historical: no staging, commit or push occurred during that acceptance pass.
+Shared picker remains Section D.
+Streaming remains **OPEN / intermittent / instrumented**.
+
+**Approved C3 closure: retain current C1 Flash/Temp behavior.** This supersedes
+older generic Flash copy/add and Temp copyable-storage direction; visibility does
+not confer permission to perform file operations.
+
+- **Flash — Internal Memory:** visible and browsable, including its actual
+  directory tree. Generic Files mutation remains disabled. Existing specialized
+  R6 validated publication, save-copy, configuration preview and reviewed exact-file
+  cleanup remain separate, with their existing validation and safety contracts.
+- **Temp — RAM Disk:** visible and browsable; generic mutation remains disabled.
+  Identify its temporary nature without any persistence guarantee.
+- No additional generic download, upload, copy, delete, rename, overwrite,
+  folder creation or mount/launch capability is approved for either root.
+- Preserve distinct storage icons and existing C1 root authorization, file-service
+  permissions, C0 selection and B5 foreground/cancellation handling.
+- Flash export/snapshot, Flash recovery workflows, Flash restore and incremental
+  backup systems are future possibilities only, not planned implementation items.
+  Future Flash export/recovery or any other expansion requires separate design
+  review and approval. Flash restore remains unapproved; no backup/export UI is
+  introduced by C3.
+
+C3 closure is documentation-only. No production implementation or physical device
+acceptance is part of this closure.
+
+## D. Shared Argonaut file picker — reusable component
+
+**Published:** picker foundation and SIDJuke migration are complete in
+`fbb974c7ef04ab539188de232817189e6c55d566`
+(`Integrate SIDJuke with shared file picker`). Section D remains open for the
+remaining consumers. Migration order and bounded scope require separate design
+review; this status reconciliation authorizes no further implementation.
+
+Provide one picker for **This Computer** (local filesystem) and connected
+**C64 Ultimate** storage (USB/SD/Flash/Temp as appropriate). Do not require a
+selection on Files followed by a return to another tab. Each context supplies
+allowed types and actions; preserve Core ownership of filesystem semantics.
+
+Remaining consumers: Drives disk images; Game Library supported
+media including CRT/disk images; Cartridge Tools and other suitable workflows;
+ROM/config selection where appropriate after safety review. SIDJuke multi-select
+or directory add is a possible later enhancement, not an initial requirement.
+
+## E. Drives redesign
+
+**Drives tab = operate drives; Ultimate Menu = configure drives.**
+
+Settled: Drive Enabled becomes one GTK-style toggle switch instead of On/Off
+buttons; Write Protect becomes a checkbox; `Mount & Run` becomes `Run`, retaining
+mount-if-needed then run behavior. Replace `Use selected C64U file` and the split
+local workflow with shared `Select Disk Image…` supporting local and C64U files.
+
+Investigate before removing controls:
+
+- Physical Ultimate has separate configured 1541/1571/1581 ROMs for each drive.
+  Determine firmware behavior for D64/D71/D81 and the active drive mode.
+- Determine whether operational drive-model/ROM controls are needed. Removal is
+  only a candidate if firmware handles format/mode and ROM configuration belongs
+  in Ultimate Menu Memory & ROMs.
+- JiffyDOS is the main user-interest case; investigate whether configured ROMs
+  alone cover it instead of per-mount controls.
+- Validate image format where useful without inventing firmware-owned
+  compatibility logic. Keep enable/disable if operationally useful for physical
+  IEC conflicts, represented by one switch.
+
+## F. Streams — stability then interaction
+
+Near-term sequence:
+
+1. Fix the P0 streaming/navigation permanent hang (B1).
+2. Remove Instant Replay entirely: UI and replay-specific implementation if
+   unneeded elsewhere. Verify the hang independently after removal.
+3. Increase scale limit; add Fit to Window with aspect-ratio-preserving resizing.
+4. Integrate remote control into Streams.
+5. Support real-time keyboard input sufficient to interact at BASIC `READY.`.
+6. Make keyboard capture obvious and escapable; do not unexpectedly steal app
+   shortcuts.
+7. Add a C64 keyboard map/visual overlay for RUN/STOP, RESTORE, C=, and other
+   C64-specific keys.
+8. Polish Streams UI/audio.
+
+Move Ultimate Menu `Video Setup → Stream VIC` and `Audio Setup → Stream Audio`
+into a Streams group because these configure streaming. Later OBS/YouTube work
+is separate from Instant Replay and is not current priority (M).
+
+## G. Ultimate Menu redesign — major category, not spit-shine
+
+### 1. Firmware/hardware capability investigation — first engineering phase
+
+Study official Ultimate firmware/menu source **before structural implementation**.
+Trace U64/U64E/C64U hardware/product/revision/capability detection → config objects
+→ conditional menu visibility → REST exposure. Determine whether Argonaut exposes
+settings without firmware hardware filtering/dependency rules; this is a possible
+common cause of menu problems, not an established diagnosis.
+
+Go beyond LEDs: SID sockets/voltage/filter capabilities; keyboard/LED controller;
+Wi-Fi/Ethernet; video/HDMI; cartridge/bus generation; user-port; FPGA/core
+generation; drives; and Founder/Beige/Starlight differences. Use source/API
+evidence, not assumptions imported from older Ultimate 64 hardware.
+
+### 2. LED safety investigation — P0 device-safety gate
+
+Observed: Ultimate Menu `LED Lighting → Mode = Rainbow` then Review & Apply
+locked up the C64U itself. Rainbow is a profile/mode name. Do not casually
+reproduce until the transaction can be observed safely. The walkthrough reports
+that its public search found no matching C64U LED-setting hang; that is not proof
+of absence and was not independently searched again in this documentation pass.
+
+Compare Beige versus Founder/Starlight hardware and valid fields per mode/profile.
+Inspect exactly what Review & Apply sends and its ordering; investigate stale or
+inactive fields after Mode changes and combinations REST permits that the
+physical menu prevents. Establish a safe transition contract before enhancements.
+
+### 3. Tree/property-sheet redesign — settled direction
+
+Remove Favorites. Replace left navigation with a Regedit-style hierarchical tree
+using GTK disclosure presentation, not literal Windows styling. Fully collapsed
+shows major Ultimate categories; meaningful groups provide controlled depth,
+not a node for every setting. Keep a persistent right property pane whose
+settings do not collapse; labels left, corresponding controls/values aligned right.
+
+Preserve physical menu organization/familiarity wherever practical. Memory & ROMs
+example: General, Drive A, Drive B, Advanced. Advanced corresponds to physical F2
+expanded settings; the user confirmed close parity. **Keep Advanced and physical
+menu/F2 grouping parity.** Keep Command Interface and Ultimate Audio in their
+traditional Memory & ROMs location. Stream VIC/Stream Audio moving to Streams is
+the explicit desktop-workflow exception, not license for general reorganization.
+
+### 4. LED enhancements — later within redesign
+
+Saved LED profiles, random generator, and single-color swatch/selector/wheel/dial.
+The keyboard appears to have about 25 selections; verify rather than treating
+that as a capability specification. Hardware/capability and lockup investigation
+must finish before implementation.
+
+## H. Machine / global power controls
+
+B4 retired the Reset/Reboot-only Machine tab after safe global migration. Physical
+F1 Power & Reset offers more, including Reboot C64, Reboot C64 (Mem), Power Off,
+Power Cycle, Save C64 Memory, and Save REU Memory. Do not simply expand Machine:
+the settled destination is the global Commodore C= icon, hover `Ultimate Power`,
+opening Ultimate Power. B4 exposes only the existing Reset/Reboot pair. Verify safe API support for each action before exposure.
+Power Off likely needs deliberate confirmation; confirm its exact interaction in
+review. Remove Machine only if global controls cover all useful existing actions.
+
+Configuration → Ultimate Menu; feature operation → feature tab; global machine
+actions → global header.
+
+## I. Test Lab / Developer Mode
+
+Remove Test Lab from the normal top-level user experience while preserving its
+functionality, offline simulation, hardware diagnostics, structured evidence,
+and regression tests. Expose through Developer Mode, likely
+Settings → Developer / Open Test Lab; exact placement remains for review.
+Long-term AI analysis may diagnose structured deterministic results; AI does
+not decide pass/fail. Preserve the existing foundation described in
+[TEST-LAB.md](TEST-LAB.md) and [DEVELOPER-MODE.md](DEVELOPER-MODE.md).
+
+## J. SIDJuke
+
+Rename user-facing SID Jukebox to **SIDJuke**. Integrate the shared local/C64U SID
+picker. Preserve playlists/playback behavior; consider multi-select/directory add
+later. Internal class/module renames are unnecessary without separate justification.
+Retain [SID duration policy](SID-JUKEBOX.md#duration-policy-and-deferred-work):
+manual navigation remains; timer/silence alone is not trustworthy tune duration.
+
+## K. Game Library
+
+CRT images are first-class media alongside disk games; existing CRT launch
+acceptance (for example Bomberland in walkthrough evidence) must carry forward.
+Show media type cleanly and let users launch without understanding the mechanism.
+Consider Disk/Cartridge distinction/icons, missing/moved files, and later
+search/filter/artwork polish as justified; verify existing capabilities before
+calling them new. Preserve current launch/import/identity safety documented in
+[GAME-LIBRARY.md](GAME-LIBRARY.md).
+
+Physical cartridge dumping belongs to Cartridge Tools. A successful dump should
+naturally offer adding the resulting `.crt` to Game Library.
+
+## L. Cartridge Tools — separate feature category
+
+Integrate the planned MIT-licensed `darkuni/c64-ultimate-cartdumper` (Go), as
+recorded in the handoff. Prior physical success: Planet X2.1 GMOD2 dumped to CRT
+and the result launched successfully. These are existing walkthrough claims,
+not new integration or qualification in this pass.
+
+Safety prerequisite: C64U must clean reboot without a cartridge saved to Flash
+before dumping. Investigate configuration capture/restore or another guard to
+avoid leaving machine state wrong. Keep dumping distinct from launching/copying
+existing CRTs. Intended handoff: physical cartridge → dump `.crt` → optionally
+add to Game Library → later launch without the physical cart.
+
+## M. Later / deferred — including recovered existing roadmap items
+
+- OBS/YouTube: audit existing code and settle UI/scope later, separate from replay.
+  NEXT-PASS records reviewed capture/worker/diagnostic components on
+  `feature/obs-capture`, outside then-current Development and not fully qualified
+  across platforms. Audit current state before reuse; do not merge wholesale.
+  Preserve its direct-YouTube go/no-go decision after OBS/media qualification.
+- Public 1.10 packaging/release/tag only after stabilization/spit-shine acceptance.
+- Recovered from CURRENT-STATE: System/Light/Dark theme preference and improved
+  Reset/Reboot recovery UX. Retain as planned/later; header power work alone does
+  not establish recovery behavior.
+- Recovered from NEXT-PASS and [SERVER-FIRST.md](SERVER-FIRST.md): persistent Core
+  hosting/versioned API with CLI/automation proof client; remote-client artifact
+  staging/ownership/limits/cleanup; then iPad/browser PWA. Preserve Core-first
+  contracts and Core-host versus client filesystem distinction. These remain
+  later work; old sequencing does not displace stabilization.
+- Recovered from SID-JUKEBOX: song-length database, silence detection, automatic
+  advance, and SID socket/model/address reconfiguration remain deferred. Any
+  automatic advance needs trustworthy duration evidence, initial opt-in, and
+  manual navigation when duration is unknown.
+- Recovered from GAME-LIBRARY/NEXT-PASS: ZIP/7z sources, additional media formats
+  (including earlier PRG deferral), Tested/Playable user state, and Game Launch
+  fingerprint-performance optimization. Structural validity is not playability.
+- Tape/Datasette and physical cassette-to-`.TAP` imaging remain later
+  hardware/firmware/API investigations, retained from GAME-LIBRARY and R2;
+  neither is ordinary file copying or included in Cartridge Tools by inference.
+- Preserve NEXT-PASS Linux-first development/hardware acceptance and major-release
+  cross-platform qualification principles, with portable code and automated
+  platform checks throughout. Old Stable 1.9 gates are completed history, not a
+  newly reopened release task.
+
+## N. ARGONAUT OFFLINE LIBRARIES AND PLAYBACK — PLANNED future track
+
+**Status: PLANNED — no implementation or acceptance is claimed for the new
+capabilities below.** Extend Argonaut's existing C64U management and catalog
+foundations into a C64 library manager usable without a connected C64U, including
+local playback and preparation of removable media for later C64U use.
+
+This is an explicitly separate future development track, not a replacement for
+Managed Import. E2/E2F is published at
+`d6c7ed62cf23d196928247177bd8b2a2cb07e88c`; physical FTP acceptance remains pending.
+Preserve 3B-2C workflow/lifecycle integration, 3B-3 recovery, 3C final placement and
+manifest publication, plus outstanding C0/native-chooser/focus/lifecycle and
+physical qualification gates. Planning this track does not authorize implementation,
+change current managed-library formats, or broaden existing import/launch actions.
+
+### Existing foundations and proposed reuse
+
+Repository authority already separates metadata-only catalogs (`game_library.py`,
+`sid_jukebox.py`) from reviewed device execution (`game_launch.py`, `sid_playback.py`).
+`sid_format.py` provides bounded PSID/RSID metadata parsing, including subtunes,
+chip configuration and compatibility evidence. `file_service.py` and
+`picker_model.py` distinguish Core-host, C64U and client file references. Existing
+local catalog references are not evidence that the new offline managed-library
+preparation or emulator integration is implemented.
+
+Reuse candidates are Core-owned planning/review, explicit destination selection,
+UUID and path validation, bounded hashing, metadata extraction, resource accounting,
+transaction intent/outcome concepts and independent verification. Evaluate each
+candidate against the new storage and playback contracts before reuse. **Do not
+reuse FTP staging unchanged for local filesystems:** local identity, permissions,
+symlinks, case handling, rename/flush behavior, interrupted writes and media removal
+need their own reviewed implementation and platform qualification. Core-host storage
+must remain distinct from a future remote UI client's filesystem.
+
+### PLANNED — offline preparation and multiple libraries
+
+Prepare managed libraries on explicitly selected internal PC/Mac storage, USB thumb
+drives, SD cards and other supported removable media. Validate the destination
+filesystem, access rights and available capacity; prepare directories/manifests;
+copy and independently verify local files while preserving sources. No destructive
+formatting or automatic cleanup. Define safe completion, outstanding-write handling
+and removable-media ejection guidance. Design for Debian/Linux, Windows and macOS
+where supported; a mounted or writable volume alone does not prove C64U compatibility.
+
+**ONE PHYSICAL STORAGE DEVICE MAY CONTAIN MULTIPLE INDEPENDENT ARGONAUT LIBRARIES.**
+Each library has its own UUID, manifest and managed root directory, with independent
+content/catalog identity and explicit selection/adoption. Distinguish a physical
+volume root from a library's managed root. Prevent overlapping managed roots and
+conflicting paths, including platform-specific path aliases. Capacity is shared
+across libraries on the same medium; removal invalidates availability for all of
+them. Do not permanently encode a one-drive/one-library assumption.
+
+Current `managed_library.py` uses a device/root/path/UUID binding, one selected
+library preference and bounded discovery of `ARGONAUT_LIBRARY` at supported remote
+storage roots. These are current constraints, not the future general model.
+Existing Managed Import behavior stays unchanged until a separately reviewed
+extension or migration is approved. Define how copied manifests/duplicate UUIDs
+are distinguished from the same library returning at a different mount location;
+never silently merge, reidentify or rewrite them.
+
+### PLANNED — discovery, explicit adoption and availability
+
+Automatically discover compatible manifests through read-only, bounded scanning.
+Present locations and identities; optional discovery notifications may invite
+review. Detection must not modify a library, rewrite its manifest, adopt it or
+switch the active selection. Explicit user approval is required to adopt a library
+for management; any migration requires its own reviewed consent and contract.
+
+Distinguish **detected** (found but not adopted), **adopted** (explicitly selected
+for management) and **unavailable** (a known location cannot currently be accessed).
+Retain adopted identity and catalog references when media is disconnected or
+missing. Do not substitute another drive, infer identity from a mount path alone,
+or silently forget a temporarily unavailable location.
+
+### PLANNED — offline Game Library and external VICE
+
+Provide offline browsing/catalog management and local launch of supported CRT,
+D64 and PRG content without C64U connectivity. Initially invoke installed external
+VICE executables rather than embedding an emulator. Investigate `x64sc` and other
+suitable VICE targets; do not assume executable names, command-line flags, supported
+versions or format compatibility are identical across platforms.
+
+Plan configurable executable paths, installation/version/capability checks and clear
+unavailable/incompatible outcomes. Review Linux, Windows and macOS process launching,
+argument handling, working directories and emulator configuration. Preserve user
+files and define protection from emulator-side writes to disk images or other media;
+do not assume external playback is read-only. PRG support in this future local
+backend does not change the current managed-import format allowlist or C64U launch
+qualification. Keep local playback and separately reviewed C64U launch distinct.
+
+### PLANNED — SID Music Library and external VSID
+
+Add a dedicated music catalog sharing common library identity, locations, discovery,
+verification and transaction infrastructure while keeping music metadata/playback
+separate from game behavior. Plan import/cataloging of supported SID files and
+appropriate PSID/RSID parsing for title, author, release information/year, subtunes
+and SID configuration. Preserve original release text where it cannot safely be
+interpreted as a year; parsing is not proof that a tune is playable.
+
+Plan offline playback through installed VSID, with executable/capability selection
+and compatibility warnings. Investigate selected-subtune control, multi-SID models/
+addresses and format restrictions rather than assuming all tunes work with every
+player. Offline playlists and selected-subtune playback are future capabilities;
+existing C64U SIDJuke navigation is not VSID integration. Later preparation/transfer
+of music for C64U storage needs explicit destination and compatibility review; it
+must not silently reuse the game-only manifest or import contract.
+
+### PLANNED — catalog, content and location identities
+
+| Identity | Planned meaning and constraints |
+| --- | --- |
+| Catalog | Logical game or musical work; title and filename are descriptive metadata, not proof of identity. |
+| Content | Exact file bytes/version and SHA-256 digest; matching content does not itself authorize merging catalog records. |
+| Location | Specific local, removable or C64U storage reference, with library/volume/device identity and availability. |
+
+Allow one logical catalog item to reference multiple content versions and each
+version to have multiple locations. Preserve independent per-library catalog
+identity; cross-library relationships or merges must be explicit. A location going
+offline must not delete the logical item or silently redirect execution to a
+look-alike filename. Define fresh identity/content validation before use, and safe
+handling of missing, changed or disconnected locations.
+
+### PLANNED — UI concepts, not enabled actions
+
+Explore **Game Library**, **SID Music Library**, **Library Locations**, **Prepare
+USB/SD Library**, **Discover / Adopt Existing Library**, **Settings → Emulators**,
+**Play Locally** and **Launch on C64U** as user-facing concepts. Existing tabs and
+actions are not redesigned or enabled by this plan. Make the selected library,
+location availability and playback target clear; keep Core responsible for identity,
+permissions, transactions and execution authority.
+
+### Proposed development sequence — all PLANNED, separate approval per slice
+
+1. **Identity and compatibility contract:** library/volume/catalog/content/location
+   model, versioning, adoption, non-overlap and migration rules; review against the
+   existing managed-library format and phase boundaries before implementation.
+2. **Read-only locations and discovery:** bounded discovery, explicit adoption,
+   unavailable-state retention and portable media identity; prove no manifest writes
+   or silent library switching.
+3. **Local preparation backend:** resource planning, source preservation, local
+   transaction evidence, independent copy verification and interruption handling;
+   qualify supported filesystems and safe completion/ejection behavior.
+4. **Offline game catalog and VICE launch:** multiple versions/locations, emulator
+   configuration and guarded external process launch; qualify CRT/D64/PRG support
+   and user-file protection per supported OS/player combination.
+5. **SID Music Library and VSID:** music-specific metadata and compatibility, local
+   playback, followed by reviewed subtune/playlist capabilities and future C64U-media
+   preparation. Share infrastructure without merging game/music execution rules.
+6. **Integrated workflow and platform acceptance:** review the proposed UI concepts,
+   media removal/reinsertion, multiple-library behavior and cross-platform playback.
+   Do not declare implementation or physical qualification complete from this plan.
+
+### Unresolved architecture and safety decisions
+
+| Question | Required later design/acceptance decision |
+| --- | --- |
+| Manifest compatibility/versioning | Separate or shared game/music schema; compatibility with C64U managed libraries; explicit migration/adoption and rollback policy. |
+| Discovery scope/performance | Search roots, nesting/depth limits, scan budgets, removable/network filesystem exclusions and optional notifications. |
+| Filesystem compatibility | Supported desktop/C64U combinations; names, case, permissions, file-size limits, links and durability semantics. |
+| Media identity/ejection | Stable volume/library identity, duplicate/copied UUIDs, drive-letter/mount changes, shared capacity, removal and OS-specific safe-eject guidance. |
+| Local transaction safety | Atomicity/durability guarantees actually available per filesystem, exclusive-writer requirements, interruption evidence and separately approved recovery/cleanup. |
+| Metadata and merging | Extraction limits/provenance, release-year interpretation, catalog merge consent and conflict handling. |
+| Emulator support | Discovery, supported VICE versions/targets including x64sc and VSID, launch arguments, lifecycle and protection from emulator writes. |
+| SID compatibility | PSID/RSID scope, selected subtunes, multi-SID configuration and warnings; no universal playback assumption. |
+| Duplicate content/locations | Digest-based detection versus logical-work identity, multiple versions/copies, offline locations and explicit cross-library relationships. |
+
+## Design principles
+
+- Preserve proven managed ownership/safety; UI redesign must not regress Network
+  Foundation. Keep device rules, credentials, scheduling, and safety in Core.
+- Physical Ultimate menu parity/familiarity first; improve presentation without
+  gratuitous relocation of established settings.
+- Configuration belongs in Ultimate Menu; operation in feature tabs; global
+  machine actions in the global header.
+- Expose power-user capability without forcing it into everyday UI; use
+  Developer Mode/Advanced where appropriate.
+- Prefer intent labels (`Run`) to implementation labels (`Mount & Run`).
+- Persistent binary state → switch; option/property → checkbox; action → button.
+- Do not hide real storage because destructive operations need stronger safeguards.
+- Verify current behavior before changing working credential/security mechanisms.
+- Derive hardware/capability awareness from firmware/source/API evidence, not
+  assumptions about older U64 hardware.
+
+## Open investigations and review reconciliation
+
+| Investigation | Required evidence / unresolved decision |
+| --- | --- |
+| Streaming hang | Hung process/thread state; root cause; independent verification after replay removal. |
+| Credential/keyring Save Profile | Reviewed; bounded Development credential UX/403/session-clearing acceptance passed. UNKNOWN correction and native existence tests passed; live native stores remain later acceptance. See Device Details stabilization record. |
+| Discover / Scan Subnet | Reviewed; one Discover and one /24 scan physically passed, including progress and network-connection counts. Password-protected subnet omission remains documented; existing scan scope preserved. |
+| Firmware capability/menu filtering | Detection → config → visibility/dependencies → REST; variant-specific settings. |
+| LED lockup | Exact apply payload/order, inactive fields, safe transitions, and hardware-valid combinations; no casual reproduction. |
+| Drive image/mode/ROM | Firmware handling of D64/D71/D81, configured ROMs/JiffyDOS, and whether operational controls can be removed. |
+| Power & Reset API | Per-action support/safety, confirmation needs, and sufficient coverage before Machine removal. |
+| Existing OBS integration | Current branch/code state and qualification; later UI/scope and YouTube decision. |
+
+Older CURRENT-STATE says Quick Connect → Reconnect; the latest settled instruction
+is removal of Quick Connect with a distinct global Reconnect action. Historical
+replay completion remains valid evidence, but the new decision is removal; neither
+proves replay caused the hang. Older pre-publication stop markers do not override
+verified closure HEAD. The handoff's intended credential non-persistence differs
+from observed Connect profile saving: record both, investigate, and review before
+changing behavior. Exact Developer Mode placement, Machine removal, drive-control
+removal, and power confirmation details remain candidates, not silently chosen.
+
+**Review stop:** this consolidation changes documentation only. No implementation,
+including B1 diagnosis, tests, device contact, packaging, staging, commit, push,
+tag, release, or branch/worktree creation is authorized by this document.
+
+
+## PA-5.1C offline implementation checkpoint
+
+A headless, one-use managed publisher now implements the pinned one-item sequence:
+two small JSON uploads, four controlled rename pairs and no D64 reupload. A separate
+versioned journal, permanent source-attempt exclusion, bounded capacity admission,
+phase-aware collision checks and independent readback precede receipt issuance.
+Manifest schema 1 advances revision 0 to 1 while preserving library identity and
+creation timestamp. Existing managed discovery displays the confirmed title;
+unmanaged catalog behavior is unchanged. There is no GUI publication or launch.
+
+PA-5.1B's cancellation check at the actual RNTO dispatch boundary supersedes
+PA-5.0's pair-wide deferral. Cancellation before dispatch prevents RNTO; accepted
+RNFR evidence is retained. Post-dispatch consequences remain definitive or uncertain
+according to captured evidence. No retry, rollback, cleanup or adoption is added.
+
+The attempt owns one Core job and requires explicit terminal/lifecycle completion
+before returning a publication receipt. The journal reserves 13631488 bytes within
+the unchanged 16 MiB ceiling, with additional actual-filesystem admission. Historical
+staging schemas and fixtures remain unchanged. See MANAGED-LIBRARY.md for APIs,
+exact paths, canonical hashes, resource limits and failure semantics.
+
+This checkpoint is offline implementation pending independent inspection. It does
+not qualify physical publication or Founder. PA-4.13 historical FAIL and PA-4.2
+historical UNCERTAIN remain unchanged; independent resource release is unverified.
+Git publication and physical publication require their separate later checkpoints.
