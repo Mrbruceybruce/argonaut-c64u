@@ -1,0 +1,17 @@
+{
+  "name": "argonaut-markdown-validation",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test check.test.mjs",
+    "check": "node check.mjs"
+  },
+  "dependencies": {
+    "github-slugger": "2.0.0",
+    "markdownlint": "0.38.0",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "unified": "11.0.5"
+  }
+}
