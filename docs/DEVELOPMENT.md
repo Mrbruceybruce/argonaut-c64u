@@ -47,6 +47,39 @@ Ollama and firewall configuration remain separate, visible prerequisites.
 
 ## Bounded offline CI (P4-2)
 
+### Hosted qualification exception — October 2026
+
+P4-2 infrastructure is implemented and administratively accepted
+with one unresolved GTK regression. Hosted GitHub Actions run
+[39543869234](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/39543869234)
+at commit `7701e215951311579b3afbd3dd7bb8d00c826626`
+completed six of seven jobs successfully.
+
+Docker network isolation, nonroot execution, GTK initialization,
+private D-Bus authentication, and independent container cleanup
+were demonstrated. The GTK regression job executed 27 tests:
+26 passed and one failed, with zero errors and zero skips.
+
+The remaining failure is
+`test_device_details_compact.GeometryAndKeyboard.test_narrow_controls_reachable_by_vertical_scroll`.
+The requested dialog size was 520 × 480 pixels; the expected
+maximum height was 500 pixels, but GTK allocated 578 pixels.
+The failure occurred before subsequent scrolling and keyboard
+reachability assertions could execute.
+
+The investigation is deferred under
+[Issue #18](https://github.com/Mrbruceybruce/argonaut-c64u/issues/18),
+with [Issue #21](https://github.com/Mrbruceybruce/argonaut-c64u/issues/21)
+referenced for the Game Library Settings component.
+
+The workflow conclusion remains **FAILURE**. This administrative
+deferral does not establish full hosted CI qualification, satisfy
+the seven-job acceptance requirement, or authorize release
+acceptance. Preserve the existing test, its 500-pixel assertion,
+failure reporting, and diagnostic evidence.
+
+
+
 `.github/workflows/test-lab.yml` retains pushes and pull requests targeting
 `development` and manual dispatch. It runs only on GitHub-hosted `ubuntu-24.04`;
 there is no publishing, hardware input, live Test Lab, device discovery, local AI
