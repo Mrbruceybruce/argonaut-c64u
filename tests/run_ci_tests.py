@@ -5,6 +5,8 @@ import ast
 import faulthandler
 import importlib
 import ipaddress
+import pwd
+import grp
 import shutil
 import uuid
 import json
@@ -447,25 +449,79 @@ def cleanup_container(name, output, creation_unresolved=False):
         raise RuntimeError('Container cleanup failed: ' + '; '.join(errors))
 
 
+def validate_runtime_ids(uid, gid):
+    # Linux reserves (uid_t)-1; accept only nonroot numeric IDs, never text fields.
+    if any(type(value) is not int or not 0 < value < 2**32 - 1 for value in (uid, gid)):
+        raise ValueError('Docker requires valid nonroot UID/GID')
+
+
+def write_container_identity(directory, uid, gid):
+    """Generate private account databases; never copy host passwd/group entries."""
+    validate_runtime_ids(uid, gid)
+    directory.mkdir(mode=0o755)
+    for name, content in {
+        'passwd': f'root:x:0:0:root:/nonexistent:/usr/sbin/nologin\n'
+                  f'argonaut-ci:x:{uid}:{gid}:CI:/nonexistent:/usr/sbin/nologin\n',
+        'group': f'root:x:0:\nargonaut-ci:x:{gid}:\n',
+    }.items():
+        path = directory / name
+        path.write_text(content)
+        path.chmod(0o444)
+
+
+def verify_account_identity(uid, gid, container=False):
+    validate_runtime_ids(uid, gid)
+    try:
+        user, group = pwd.getpwuid(uid), grp.getgrgid(gid)
+        if (user.pw_uid != uid or user.pw_gid != gid or group.gr_gid != gid
+                or pwd.getpwnam(user.pw_name) != user
+                or grp.getgrnam(group.gr_name) != group
+                or (container and (user.pw_name != 'argonaut-ci' or group.gr_name != 'argonaut-ci'))):
+            raise RuntimeError('Runtime passwd/group identity mismatch')
+    except KeyError as exc:
+        raise RuntimeError('Runtime UID/GID missing from passwd/group') from exc
+    return {'uid': uid, 'gid': gid, 'user': user.pw_name, 'group': group.gr_name}
+
+
+def verify_session_bus(Gio, GLib, uid):
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    name = bus.get_unique_name()
+    if bus.is_closed() or not name:
+        raise RuntimeError('Private session D-Bus connection unavailable')
+    reply = bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                          'org.freedesktop.DBus', 'GetConnectionUnixUser',
+                          GLib.Variant('(s)', (name,)), GLib.VariantType.new('(u)'),
+                          Gio.DBusCallFlags.NONE, 5000, None)
+    if reply.unpack() != (uid,):
+        raise RuntimeError('Private session D-Bus UID mismatch')
+    print('Session D-Bus authenticated UID', uid, flush=True)
+
+
 def docker_suite(args, budget):
     uid, gid = os.getuid(), os.getgid()
-    if uid == 0 or gid == 0:
-        raise RuntimeError('Docker requires nonroot host UID/GID')
+    validate_runtime_ids(uid, gid)
     name = 'argonaut-ci-' + uuid.uuid4().hex
     output = args.output
     results = output / 'container-results'
     results.mkdir(mode=0o700)  # Never reuse writable suite results.
     write_json(output / 'container.json', {'name': name, 'uid': uid, 'gid': gid})
     with tempfile.TemporaryDirectory(prefix='argonaut-source-') as temporary:
-        snapshot = Path(temporary)
-        snapshot.chmod(0o755)
+        workspace = Path(temporary)
+        workspace.chmod(0o755)
+        snapshot = workspace / 'source'
+        snapshot.mkdir(mode=0o755)
+        identity = workspace / 'identity'
+        write_container_identity(identity, uid, gid)
         tracked_snapshot(snapshot)
         command = ['create', '--name', name, '--label', 'argonaut.ci-job=' + os.environ.get('ARGONAUT_CI_JOB', name),
                    '--network', 'none', '--user', f'{uid}:{gid}', '--cap-drop', 'ALL',
                    '--security-opt', 'no-new-privileges=true', '--init', '--pull', 'never',
                    '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,mode=1777',
                    '--mount', f'type=bind,src={snapshot},dst=/source,readonly',
-                   '--mount', f'type=bind,src={results},dst=/results', '--workdir', '/source',
+                   '--mount', f'type=bind,src={results},dst=/results',
+                   '--mount', f'type=bind,src={identity / "passwd"},dst=/etc/passwd,readonly',
+                   '--mount', f'type=bind,src={identity / "group"},dst=/etc/group,readonly',
+                   '--workdir', '/source',
                    '--env', 'PYTHONDONTWRITEBYTECODE=1', '--env', 'LANG=C.UTF-8',
                    args.docker_image, '/usr/bin/python3', '-u', '/source/tests/run_ci_tests.py',
                    '--inside', '--isolation', 'docker', '--parent-netns', os.readlink('/proc/self/ns/net'),
@@ -511,6 +567,8 @@ def docker_suite(args, budget):
 
 
 def preflight(kind):
+    if kind == 'gtk-regression':
+        print('Runtime identity', json.dumps(verify_account_identity(os.getuid(), os.getgid())), flush=True)
     import gi
     gi.require_version('Gtk', '4.0')
     gi.require_version('Secret', '1')
@@ -528,10 +586,10 @@ def preflight(kind):
                 raise RuntimeError('Missing GStreamer element: ' + name)
         GstPbutils.Discoverer.new(5 * Gst.SECOND)
     if kind == 'gtk-regression':
-        from gi.repository import Gio, Gdk
+        from gi.repository import Gio, Gdk, GLib
         if not Gtk.init_check() or Gdk.Display.get_default() is None:
             raise RuntimeError('GTK display unavailable')
-        Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        verify_session_bus(Gio, GLib, os.getuid())
         import ctypes
         ctypes.CDLL('libXtst.so.6')
         window = Gtk.Window(); window.present(); window.destroy()
@@ -541,6 +599,7 @@ def preflight(kind):
 def inside(args, data, report):
     out = args.output
     if args.isolation == 'docker':
+        write_json(out / 'identity.json', verify_account_identity(args.expected_uid, args.expected_gid, container=True))
         shutil.copyfile('/usr/local/share/argonaut-ci/dependencies.txt', out / 'dependencies.txt')
     write_json(out / 'network.json', verify_network(args.parent_netns, args.expected_uid, args.expected_gid))
     suite = data['suites'].get(args.suite)

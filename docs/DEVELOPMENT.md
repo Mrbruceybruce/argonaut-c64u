@@ -207,6 +207,17 @@ private `/tmp` and Docker's private shared memory. No Docker socket, host device
 host D-Bus, display sockets or credentials are mounted or passed in the environment.
 The trusted host launcher and Docker daemon remain outside the test boundary.
 
+The launcher generates minimal container-local `/etc/passwd` and `/etc/group`
+files for the actual nonzero host UID/GID and mounts them read-only separately
+from the tracked source snapshot. They contain only root and the `argonaut-ci`
+runtime identity, with no login shell; no host account database is read or mounted.
+IDs must be integers from 1 through 4294967294. This avoids missing-UID failures
+in the private D-Bus daemon without image-specific UID assumptions or root startup.
+Before preflight, `identity.json` records validated numeric and named passwd/group
+lookups. GTK preflight also checks account resolution and asks the private session
+bus to confirm its connection's Unix UID; failure blocks the suite. Docker runtime
+and hosted acceptance of this correction remain unverified locally.
+
 Creation requires `--network none`, the nonzero host UID/GID, `--cap-drop ALL`,
 `--security-opt no-new-privileges=true` and `--init`. Default Docker seccomp and
 AppArmor policies remain in place; no unconfined/privileged options are supplied.

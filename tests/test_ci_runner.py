@@ -30,6 +30,66 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'inventory drift'):
             runner.audit(data)
 
+    def test_generated_identity_accepts_actual_ids_without_host_accounts(self):
+        for uid, gid in ((1001, 1001), (1000, 2000), (65534, 65534), (2**32 - 2, 123)):
+            with self.subTest(uid=uid, gid=gid), tempfile.TemporaryDirectory() as folder:
+                directory = Path(folder) / 'identity'
+                with patch.object(runner.pwd, 'getpwuid', side_effect=AssertionError('host lookup')):
+                    runner.write_container_identity(directory, uid, gid)
+                users = [line.split(':') for line in (directory / 'passwd').read_text().splitlines()]
+                groups = [line.split(':') for line in (directory / 'group').read_text().splitlines()]
+                self.assertEqual(['0', str(uid)], [row[2] for row in users])
+                self.assertEqual(str(gid), users[1][3])
+                self.assertEqual(['0', str(gid)], [row[2] for row in groups])
+                self.assertEqual('/usr/sbin/nologin', users[1][6])
+                for name in ('passwd', 'group'):
+                    self.assertEqual(0o444, (directory / name).stat().st_mode & 0o777)
+
+    def test_invalid_runtime_ids_fail_before_writes_or_docker(self):
+        for value in (0, -1, 2**32 - 1, 2**32, True, '1001', '1001\nroot:x:0:0'):
+            for uid, gid in ((value, 1001), (1001, value)):
+                with self.subTest(uid=uid, gid=gid), tempfile.TemporaryDirectory() as folder:
+                    directory = Path(folder) / 'identity'
+                    with self.assertRaises(ValueError):
+                        runner.write_container_identity(directory, uid, gid)
+                    self.assertFalse(directory.exists())
+                    with patch.object(runner.os, 'getuid', return_value=uid), patch.object(runner.os, 'getgid', return_value=gid), patch.object(runner, 'docker_call') as docker:
+                        with self.assertRaises(ValueError): runner.docker_suite(None, 120)
+                        docker.assert_not_called()
+
+    def test_account_lookup_fails_closed(self):
+        user = runner.pwd.struct_passwd(('argonaut-ci', 'x', 1001, 2001, 'CI', '/nonexistent', '/usr/sbin/nologin'))
+        group = runner.grp.struct_group(('argonaut-ci', 'x', 2001, []))
+        for failure in (None, 'missing-user', 'missing-group', 'wrong-primary', 'wrong-name', 'reverse-user', 'reverse-group'):
+            actual = user
+            if failure == 'wrong-primary': actual = runner.pwd.struct_passwd((*user[:3], 1002, *user[4:]))
+            if failure == 'wrong-name': actual = runner.pwd.struct_passwd(('other', *user[1:]))
+            with self.subTest(failure=failure), patch.object(runner.pwd, 'getpwuid', return_value=actual, side_effect=KeyError(1001) if failure == 'missing-user' else None), patch.object(runner.grp, 'getgrgid', return_value=group, side_effect=KeyError(2001) if failure == 'missing-group' else None), patch.object(runner.pwd, 'getpwnam', return_value=None if failure == 'reverse-user' else actual), patch.object(runner.grp, 'getgrnam', return_value=None if failure == 'reverse-group' else group):
+                if failure:
+                    with self.assertRaises(RuntimeError): runner.verify_account_identity(1001, 2001, container=True)
+                else:
+                    self.assertEqual('argonaut-ci', runner.verify_account_identity(1001, 2001, container=True)['user'])
+
+    def test_session_bus_authentication_and_failure_gates(self):
+        from unittest.mock import MagicMock
+        for failure in (None, 'closed', 'no-name', 'wrong-uid', 'connect', 'call'):
+            Gio, GLib = MagicMock(), MagicMock()
+            bus = Gio.bus_get_sync.return_value
+            bus.is_closed.return_value = failure == 'closed'
+            bus.get_unique_name.return_value = None if failure == 'no-name' else ':1.0'
+            bus.call_sync.return_value.unpack.return_value = (0 if failure == 'wrong-uid' else 1001,)
+            if failure == 'connect': Gio.bus_get_sync.side_effect = RuntimeError('closed')
+            if failure == 'call': bus.call_sync.side_effect = RuntimeError('denied')
+            with self.subTest(failure=failure):
+                if failure:
+                    with self.assertRaises(RuntimeError): runner.verify_session_bus(Gio, GLib, 1001)
+                else:
+                    runner.verify_session_bus(Gio, GLib, 1001)
+                    self.assertEqual('GetConnectionUnixUser', bus.call_sync.call_args.args[3])
+                    self.assertEqual(5000, bus.call_sync.call_args.args[-2])
+                    GLib.Variant.assert_called_once_with('(s)', (':1.0',))
+                if failure in ('closed', 'no-name', 'connect'): bus.call_sync.assert_not_called()
+
     def synthetic(self, source, seconds=5, selector='fixture.Case'):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); (root / 'fixture.py').write_text(source)
@@ -303,6 +363,10 @@ class RunnerTests(unittest.TestCase):
                         if mode == 'missing': raise FileNotFoundError('docker')
                         return '[{"Id":"sha256:dependency-image"}]'
                     if command[0] == 'create':
+                        mounts = [command[i+1] for i, v in enumerate(command) if v == '--mount']
+                        account = Path(mounts[2].split('src=')[1].split(',')[0])
+                        self.assertIn('argonaut-ci:x:1000:1000:', account.read_text())
+                        self.assertNotEqual(Path('/etc/passwd'), account)
                         if mode == 'rejected': raise RuntimeError('launch rejected')
                         return 'bad' if mode == 'malformed-id' else 'a' * 64
                     return '{}'
@@ -333,8 +397,10 @@ class RunnerTests(unittest.TestCase):
                         self.assertIn('--init', create); self.assertIn('--read-only', create)
                         self.assertIn('sha256:dependency-image', create)
                         mounts = [create[i+1] for i, v in enumerate(create) if v == '--mount']
-                        self.assertEqual(2, len(mounts)); self.assertTrue(mounts[0].endswith(',dst=/source,readonly'))
+                        self.assertEqual(4, len(mounts)); self.assertTrue(mounts[0].endswith(',dst=/source,readonly'))
                         self.assertTrue(mounts[1].endswith(',dst=/results'))
+                        self.assertTrue(mounts[2].endswith('/identity/passwd,dst=/etc/passwd,readonly'))
+                        self.assertTrue(mounts[3].endswith('/identity/group,dst=/etc/group,readonly'))
                         self.assertNotIn('--privileged', create); self.assertNotIn('--device', create)
                         self.assertEqual(os.readlink('/proc/self/ns/net'), create[create.index('--parent-netns')+1])
                     if launch.called:
