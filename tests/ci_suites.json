@@ -68,9 +68,9 @@
         },
         {
           "selector": "test_ci_runner.RunnerTests",
-          "tests": 11,
+          "tests": 23,
           "timeout_seconds": 120,
-          "audit": "Synthetic subprocesses only; verifies runner failures, timeouts and cleanup."
+          "audit": "Synthetic subprocesses and mocked Docker only; verifies launch rejection, malformed isolation evidence, UID/capability/interface/route and child gates, timeout/real TERM and INT delivery through shell/supervisor/child chains, tracked snapshots, partial diagnostics, delayed creation uncertainty and cleanup failures."
         }
       ]
     },

@@ -4,6 +4,9 @@ import argparse
 import ast
 import faulthandler
 import importlib
+import ipaddress
+import shutil
+import uuid
 import json
 import os
 from pathlib import Path
@@ -126,6 +129,8 @@ def bounded(command, seconds, log, env=None, supervisor=False):
     timed_out = False
     try:
         with Path(log).open('w') as output:
+            output.write(json.dumps(command) + '\n')
+            output.flush()
             proc = subprocess.Popen(command, cwd=ROOT, env=env, stdout=output,
                                     stderr=subprocess.STDOUT, start_new_session=True)
             if pending_signal is not None:
@@ -266,27 +271,68 @@ def child(selector, output):
     return 0 if report.get('ok') else 1
 
 
-def verify_network(parent):
-    current = os.readlink('/proc/self/ns/net')
-    if current == parent or not parent:
-        raise RuntimeError('Network namespace did not change')
-    security = dict(line.split(':', 1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
-    if os.getuid() == 0 or any(int(security[k].strip(), 16) for k in ('CapEff', 'CapPrm', 'CapInh', 'CapBnd', 'CapAmb')) or security['NoNewPrivs'].strip() != '1':
-        raise RuntimeError('Tests must run unprivileged with all capabilities dropped')
-    links = json.loads(subprocess.check_output(['ip', '-j', 'address'], timeout=5))
-    if len(links) != 1 or links[0]['ifname'] != 'lo' or 'UP' not in links[0]['flags']:
+CAPS = ('CapEff', 'CapPrm', 'CapInh', 'CapBnd', 'CapAmb')
+
+
+def security_evidence():
+    status = dict(line.split(':', 1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
+    return {'current': os.readlink('/proc/self/ns/net'), 'uid': os.getuid(),
+            'euid': os.geteuid(), 'gid': os.getgid(), 'egid': os.getegid(),
+            'capabilities': {k: status[k].strip() for k in CAPS + ('NoNewPrivs',)}}
+
+
+def validate_security(evidence, uid, gid):
+    if (uid == 0 or gid == 0 or evidence['uid'] != uid or evidence['euid'] != uid
+            or evidence['gid'] != gid or evidence['egid'] != gid
+            or any(int(evidence['capabilities'][k], 16) for k in CAPS)
+            or evidence['capabilities']['NoNewPrivs'] != '1'):
+        raise RuntimeError('Tests must run with expected nonroot UID/GID and zero capabilities')
+
+
+def validate_network(links, routes):
+    if (not isinstance(links, list) or len(links) != 1 or links[0]['ifname'] != 'lo'
+            or 'UP' not in links[0]['flags']):
         raise RuntimeError('Expected only active loopback')
-    import ipaddress
-    for address in links[0]['addr_info']:
-        if not ipaddress.ip_address(address['local']).is_loopback:
-            raise RuntimeError('Non-loopback address')
-    routes = {}
-    for family in ('-4', '-6'):
-        routes[family] = json.loads(subprocess.check_output(
-            ['ip', family, '-j', 'route', 'show', 'table', 'all'], timeout=5))
-        if any(r.get('dev') != 'lo' or r.get('dst') == 'default' for r in routes[family]):
-            raise RuntimeError('Non-loopback route')
-    # Actual local TCP traffic; no external probe or device packet is sent.
+    addresses = links[0]['addr_info']
+    if not addresses or any(not ipaddress.ip_address(a['local']).is_loopback for a in addresses):
+        raise RuntimeError('Non-loopback or missing address')
+    for family, rows in routes.items():
+        if not isinstance(rows, list):
+            raise ValueError('Malformed route evidence')
+        allowed = ipaddress.ip_network('127.0.0.0/8' if family == '-4' else '::1/128')
+        for route in rows:
+            destination = ipaddress.ip_network(route['dst'], strict=False)
+            if (destination.version != allowed.version or not destination.subnet_of(allowed)
+                    or route.get('dev') != 'lo' or 'gateway' in route or 'multipath' in route):
+                raise RuntimeError('Non-loopback route')
+
+
+def verify_network(parent, uid=None, gid=None):
+    evidence = security_evidence()
+    if evidence['current'] == parent or not parent:
+        raise RuntimeError('Network namespace did not change')
+    uid = os.getuid() if uid is None else uid
+    gid = os.getgid() if gid is None else gid
+    validate_security(evidence, uid, gid)
+    links = json.loads(subprocess.check_output(['ip', '-j', 'address'], timeout=5))
+    routes = {family: json.loads(subprocess.check_output(
+        ['ip', family, '-j', 'route', 'show', 'table', 'all'], timeout=5)) for family in ('-4', '-6')}
+    validate_network(links, routes)
+    lookups = {}
+    for family, address in (('-4', '192.0.2.1'), ('-6', '2001:db8::1')):
+        lookup = subprocess.run(['ip', family, 'route', 'get', address],
+                                capture_output=True, text=True, timeout=5)
+        # This is a kernel route lookup, never a packet. Reject command errors too.
+        if lookup.returncode != 2 or 'Network is unreachable' not in lookup.stderr:
+            raise RuntimeError('External route lookup was not unreachable: ' + address)
+        lookups[address] = lookup.stderr.strip()
+    child = json.loads(subprocess.check_output(
+        ['/usr/bin/python3', '-I', '-c',
+         'import runpy,json; r=runpy.run_path(' + repr(str(Path(__file__).resolve())) +
+         '); print(json.dumps(r["security_evidence"]()))'], timeout=5))
+    validate_security(child, uid, gid)
+    if child['current'] != evidence['current']:
+        raise RuntimeError('Child network namespace changed')
     with socket.socket() as listener:
         listener.bind(('127.0.0.1', 0)); listener.listen(); listener.settimeout(2)
         with socket.create_connection(listener.getsockname(), timeout=2) as client:
@@ -295,9 +341,173 @@ def verify_network(parent):
                 client.sendall(b'ci'); peer.settimeout(2)
                 if peer.recv(2) != b'ci':
                     raise RuntimeError('Loopback probe failed')
-    return {'parent': parent, 'current': current, 'links': links, 'routes': routes,
-            'loopback_tcp': 'pass', 'external_probe': 'none', 'uid': os.getuid(),
-            'capabilities': {k: security[k].strip() for k in ('CapEff', 'CapPrm', 'CapInh', 'CapBnd', 'CapAmb', 'NoNewPrivs')}}
+    return dict(evidence, parent=parent, links=links, routes=routes, child=child,
+                route_lookups=lookups, loopback_tcp='pass', external_probe='none')
+
+
+def tracked_snapshot(destination, root=ROOT):
+    """Copy current tracked regular files, never .git, untracked files or symlinks."""
+    names = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
+    for name in filter(None, names):
+        relative = Path(name)
+        source = root / relative
+        if (relative.is_absolute() or '..' in relative.parts or '.git' in relative.parts
+                or any(part.is_symlink() for part in (source, *source.parents))
+                or not source.is_file()):
+            raise ValueError('Unsafe tracked snapshot entry: ' + name)
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        target.chmod(0o755 if source.stat().st_mode & 0o111 else 0o644)
+
+
+def docker_call(arguments, output, timeout=20):
+    old = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+    pending = None
+    interruptible = False
+
+    def interrupted(signum, frame):
+        nonlocal pending, interruptible
+        pending = pending or signum
+        if interruptible:
+            # Disarm before raising: even a signal during exception handling is deferred.
+            interruptible = False
+            raise InterruptedError('Docker client interrupted: ' + str(pending))
+
+    try:
+        for sig, handler in old.items():
+            # Container cleanup deliberately ignores cancellation; preserve that policy.
+            if handler != signal.SIG_IGN:
+                signal.signal(sig, interrupted)
+        with (output / 'docker-control.log').open('a') as log:
+            log.write(json.dumps(['docker', *arguments]) + '\n')
+            log.flush()
+            # Defer signals until Popen returns and ownership of the child is recorded.
+            proc = subprocess.Popen(['docker', *arguments], stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True)
+            try:
+                try:
+                    interruptible = True
+                    if pending is not None:
+                        interrupted(pending, None)
+                    stdout, stderr = proc.communicate(timeout=timeout)
+                finally:
+                    interruptible = False
+            except BaseException as exc:
+                proc.kill()
+                stdout, stderr = proc.communicate()
+                log.write(stdout + stderr + '\n' + repr(exc) + '\n')
+                log.flush()
+                raise
+            log.write(stdout + stderr + '\n')
+        # Log close/flush is also protected. A late cancellation must still fail.
+        if pending is not None:
+            raise InterruptedError('Docker client interrupted: ' + str(pending))
+        if proc.returncode:
+            raise RuntimeError('Docker command failed: ' + arguments[0])
+        return stdout.strip()
+    finally:
+        for sig, handler in old.items():
+            signal.signal(sig, handler)
+
+
+def cleanup_container(name, output, creation_unresolved=False):
+    """Attempt all cleanup stages; absence must be proved by a successful daemon query."""
+    errors = []
+    if creation_unresolved:
+        # No finite series of empty listings proves an interrupted create completed.
+        # Reconcile late registration, but never promote this uncertainty to success.
+        errors.append('Creation unresolved; daemon-side creation may still complete')
+        for attempt in range(10):
+            try:
+                if docker_call(['ps', '-aq', '--filter', 'name=^/' + name + '$'], output):
+                    docker_call(['rm', '--force', name], output)
+            except Exception as exc:
+                errors.append(str(exc))
+            time.sleep(1)
+    for arguments in (['stop', '--time', '10', name], ['rm', '--force', name]):
+        present = True  # A failed query must not suppress the removal attempt.
+        try:
+            # A failed create may never have made a container. Query before each action.
+            present = docker_call(['ps', '-aq', '--filter', 'name=^/' + name + '$'], output)
+        except Exception as exc:
+            errors.append(str(exc))
+        if present:
+            try:
+                docker_call(arguments, output)
+            except Exception as exc:
+                errors.append(str(exc))
+    try:
+        if docker_call(['ps', '-aq', '--filter', 'name=^/' + name + '$'], output):
+            errors.append('Container still exists')
+    except Exception as exc:
+        errors.append(str(exc))
+    write_json(output / 'cleanup.json', {'name': name, 'ok': not errors, 'creation_unresolved': creation_unresolved, 'errors': errors})
+    if errors:
+        raise RuntimeError('Container cleanup failed: ' + '; '.join(errors))
+
+
+def docker_suite(args, budget):
+    uid, gid = os.getuid(), os.getgid()
+    if uid == 0 or gid == 0:
+        raise RuntimeError('Docker requires nonroot host UID/GID')
+    name = 'argonaut-ci-' + uuid.uuid4().hex
+    output = args.output
+    results = output / 'container-results'
+    results.mkdir(mode=0o700)  # Never reuse writable suite results.
+    write_json(output / 'container.json', {'name': name, 'uid': uid, 'gid': gid})
+    with tempfile.TemporaryDirectory(prefix='argonaut-source-') as temporary:
+        snapshot = Path(temporary)
+        snapshot.chmod(0o755)
+        tracked_snapshot(snapshot)
+        command = ['create', '--name', name, '--label', 'argonaut.ci-job=' + os.environ.get('ARGONAUT_CI_JOB', name),
+                   '--network', 'none', '--user', f'{uid}:{gid}', '--cap-drop', 'ALL',
+                   '--security-opt', 'no-new-privileges=true', '--init', '--pull', 'never',
+                   '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,mode=1777',
+                   '--mount', f'type=bind,src={snapshot},dst=/source,readonly',
+                   '--mount', f'type=bind,src={results},dst=/results', '--workdir', '/source',
+                   '--env', 'PYTHONDONTWRITEBYTECODE=1', '--env', 'LANG=C.UTF-8',
+                   args.docker_image, '/usr/bin/python3', '-u', '/source/tests/run_ci_tests.py',
+                   '--inside', '--isolation', 'docker', '--parent-netns', os.readlink('/proc/self/ns/net'),
+                   '--expected-uid', str(uid), '--expected-gid', str(gid),
+                   '--suite', args.suite, '--output', '/results']
+        if args.optimized:
+            command.append('--optimized')
+        completed = None
+        creation_unresolved = False
+        old = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+        def interrupted(signum, frame):
+            raise InterruptedError('Docker runner interrupted: ' + str(signum))
+        try:
+            for sig in old:
+                signal.signal(sig, interrupted)
+            image = json.loads(docker_call(['image', 'inspect', args.docker_image], output))
+            write_json(output / 'image.json', image)
+            # Use the recorded immutable image ID even if a tag changes subsequently.
+            command[command.index(args.docker_image)] = image[0]['Id']
+            creation_unresolved = True
+            write_json(output / 'create-pending.json', {'name': name})
+            cid = docker_call(command, output, timeout=30)
+            if len(cid) != 64 or any(c not in '0123456789abcdef' for c in cid):
+                raise RuntimeError('Malformed container ID')
+            write_json(output / 'container.json', {'name': name, 'id': cid, 'uid': uid, 'gid': gid})
+            (output / 'create-pending.json').unlink()
+            creation_unresolved = False
+            docker_call(['inspect', cid], output)
+            completed = bounded(['docker', 'start', '--attach', cid], budget + 45,
+                                output / 'docker.log')
+        finally:
+            for sig in old:
+                signal.signal(sig, signal.SIG_IGN)
+            try:
+                cleanup_container(name, output, creation_unresolved=creation_unresolved)
+            finally:
+                for sig, handler in old.items():
+                    signal.signal(sig, handler)
+        summary = json.loads((results / 'summary.json').read_text())
+        if completed['timeout'] or completed['returncode'] or summary.get('ok') is not True:
+            return 1
+        return 0
 
 
 def preflight(kind):
@@ -330,7 +540,9 @@ def preflight(kind):
 
 def inside(args, data, report):
     out = args.output
-    write_json(out / 'network.json', verify_network(args.parent_netns))
+    if args.isolation == 'docker':
+        shutil.copyfile('/usr/local/share/argonaut-ci/dependencies.txt', out / 'dependencies.txt')
+    write_json(out / 'network.json', verify_network(args.parent_netns, args.expected_uid, args.expected_gid))
     suite = data['suites'].get(args.suite)
     budget = 120 if args.suite == 'offline-checks' else suite['budget_seconds']
     deadline = time.monotonic() + budget
@@ -374,6 +586,10 @@ def inside(args, data, report):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--suite', choices=['offline-checks', 'python-unit', 'python-regression', 'media-regression', 'gtk-regression'])
+    parser.add_argument('--isolation', choices=['namespace', 'docker'], default='namespace')
+    parser.add_argument('--docker-image', default='argonaut-ci:local')
+    parser.add_argument('--expected-uid', type=int, help=argparse.SUPPRESS)
+    parser.add_argument('--expected-gid', type=int, help=argparse.SUPPRESS)
     parser.add_argument('--optimized', action='store_true')
     parser.add_argument('--audit', action='store_true')
     parser.add_argument('--output', type=Path, default=ROOT / 'ci-results')
@@ -406,6 +622,12 @@ def main():
             raise ValueError('Choose a suite; optimization is only for Python suites')
         if args.inside:
             return inside(args, data, report)
+        if args.isolation == 'docker':
+            budget = 120 if args.suite == 'offline-checks' else data['suites'][args.suite]['budget_seconds']
+            code = docker_suite(args, budget)
+            report.update(ok=code == 0, isolation='docker', isolation_or_suite_exit=code)
+            write_json(args.output / 'summary.json', report)
+            return code
         # No sudo, sysctl change, privileged container, or host-network fallback.
         command = ['unshare', '--user', '--map-current-user', '--keep-caps', '--net', '--',
                    'sh', '-ec', 'ip link set lo up; exec setpriv --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all "$@"', 'ci',

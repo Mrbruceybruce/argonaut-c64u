@@ -134,7 +134,7 @@ PYTHONPATH=tests /usr/bin/python3 -m unittest test_ci_runner.RunnerTests
 PYTHONPATH=tests /usr/bin/python3 -O -m unittest test_ci_runner.RunnerTests
 ```
 
-The suite launcher creates an unprivileged user/network namespace with the current
+The local `--isolation namespace` backend (the default) creates an unprivileged user/network namespace with the current
 user mapped. `--keep-caps` retains capabilities only inside that new user namespace
 long enough to enable loopback. Before Python runs, `setpriv` drops all capability
 sets and enables no-new-privileges. Runtime verification requires a changed network
@@ -144,7 +144,7 @@ sent. Native libraries and subprocesses inherit the network namespace. Each suit
 uses a clean environment and temporary HOME/XDG directories, with no user profiles
 or credentials. Xvfb disables TCP listening.
 
-**Isolation is a hard gate:** namespace or capability restrictions on the actual
+**Isolation is a hard gate:** failed Docker launch or isolation evidence on the actual
 GitHub-hosted image must fail the job before application tests run. Do not add
 `sudo unshare`, privileged containers, host-network execution, or disable AppArmor/
 sysctl restrictions as a fallback. Any such alternative requires separate review.
@@ -168,3 +168,92 @@ IDs/outcomes/tracebacks, class durations and partial JSON summaries are retained
 Workflow artifacts upload with `if: always()`, unique job/mode/attempt names and
 14-day retention. The initial manifest is deliberately partial coverage, not
 full-suite or physical-hardware acceptance.
+
+
+### Explicit Docker backend for hosted CI
+
+The seven hosted job entries explicitly select `--isolation docker`; local runs
+retain `--isolation namespace`. Neither backend falls back to the other.
+**Hosted Docker compatibility remains unverified until an authorized hosted run
+passes all seven entries.** Synthetic local contracts do not establish runtime
+compatibility. Publication and dispatch are separate approvals.
+
+`tests/ci/Dockerfile` installs dependencies on Ubuntu 24.04 only. The workflow
+pulls the base, records its repository digest, substitutes that immutable digest
+into the Dockerfile, and builds with the Dockerfile on stdin and no source context.
+No application source is copied or executed during the build. `base-image.json`,
+`built-image.json`, `image.json`, build logs and the image's full `dpkg-query -W`
+inventory (`container-results/dependencies.txt`) record exact inputs and installed
+versions. Versions are recorded rather than apt-pinned; a later build may differ.
+The runner resolves the built tag to its immutable image ID before creating a
+container. Host kernel, hosted image identifiers, Docker client/server versions
+and daemon security configuration are retained in `environment.txt`.
+
+For a Docker-equipped local host, build and run explicitly:
+
+```sh
+docker build --tag argonaut-ci:local - < tests/ci/Dockerfile
+/usr/bin/python3 tests/run_ci_tests.py --isolation docker --suite python-unit --output ci-results/docker-unit
+```
+
+The launcher snapshots current **tracked regular files** into a temporary directory;
+no `.git`, untracked fixtures, host profiles or credentials are included. Symlinks
+and nonregular entries fail closed. Tracked edits are included so review builds
+exercise the working tree. Commit the new Dockerfile only under separate publication
+authorization; it is build input, not required in the mounted runtime snapshot.
+Source is mounted read-only at `/source`; a fresh `container-results` directory is
+mounted writable at `/results`. The container root is read-only with writable
+private `/tmp` and Docker's private shared memory. No Docker socket, host devices,
+host D-Bus, display sockets or credentials are mounted or passed in the environment.
+The trusted host launcher and Docker daemon remain outside the test boundary.
+
+Creation requires `--network none`, the nonzero host UID/GID, `--cap-drop ALL`,
+`--security-opt no-new-privileges=true` and `--init`. Default Docker seccomp and
+AppArmor policies remain in place; no unconfined/privileged options are supplied.
+Before application imports, the internal runner checks the actual host network
+namespace differs, real/effective UID/GID match, all five capability sets are zero,
+and NoNewPrivs is set. It inspects IPv4 and IPv6 addresses and every route table,
+rejecting external destinations even via `lo`. Only `127.0.0.0/8` and `::1/128`
+routes are allowed; an IPv6 loopback address is not required. Kernel route lookups
+to documentation addresses must report unreachable without emitting packets.
+A fresh Python child must inherit the same namespace, identity and restrictions.
+Only the loopback TCP exchange sends traffic. `network.json` records this evidence.
+GTK retains private Xvfb (`-nolisten tcp`), private D-Bus sessions and temporary
+HOME/XDG directories; media retains real VP8/Vorbis/WebM preflight and tests.
+
+A UUID container name is recorded before creation; the daemon ID is retained after
+creation. Results live on the host, so partial JSON reports and logs survive removal.
+On success, failure, timeout or TERM/INT, `finally` attempts a graceful ten-second
+stop, force-removes the container, and positively verifies absence using a successful
+daemon listing. Repeated TERM/INT cannot interrupt that cleanup. Any cleanup error
+fails the suite, even if tests passed. `cleanup.json` and `docker-control.log` retain
+evidence. An independent workflow `always()` step queries the unique job/attempt
+label, stops/removes leftovers and verifies absence; its failures fail the job.
+Artifact upload still runs afterward. Runner loss or forced cancellation can prevent
+cleanup or upload; there is no claim that `always()` survives destruction of the host.
+
+Review acceptance requires synthetic contracts in normal and optimized modes,
+source inventory, and then separately authorized container/hosted validation:
+all expected counts, zero skips/errors/failures, GTK/media preflight, network and
+child evidence, retained partial reports, and verified removal after success,
+failure, timeout and interruption. Privileged containers, host networking, socket
+mounts, application-code edits or weaker isolation require stopping for approval.
+
+Creation is marked pending on disk before the Docker command is attempted. Only a
+validated container ID recorded on disk clears that marker. On interrupted,
+timed-out or otherwise unconfirmed creation, cleanup polls the unique name ten
+times with one-second delays and force-removes late arrivals, then performs the
+normal stop/remove/absence checks. It still reports `creation_unresolved: true`
+and fails: no finite observation window proves daemon-side creation cannot finish
+later. The independent `always()` cleanup similarly retries the job label when
+the pending marker remains, preserves that uncertainty, and fails the job.
+Each Docker control command is flushed to the log before execution; timeout and
+interruption retain captured stdout/stderr after killing and reaping the client.
+
+Local signal tests deliver real SIGTERM and SIGINT through shell/Python supervisor
+and child process chains, including repeated signals during cleanup. These prove
+local process cleanup only. Synthetic Docker clients and mocked daemon responses
+do not establish real Docker create/start/stop cancellation semantics or GitHub
+runner cancellation grace periods. Real container and all seven hosted acceptance
+runs remain unverified; SIGKILL, host loss and cancellation deadlines can prevent
+cleanup and artifact retention.

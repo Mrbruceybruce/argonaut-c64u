@@ -14,25 +14,54 @@ jobs:
   offline-checks:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      ARGONAUT_CI_JOB: argonaut-${{ github.run_id }}-offline-checks-normal-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - name: Install system test dependencies
+      - name: Build dependency-only image and record environment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
-      - name: Record environment
-        run: |
+          set -euo pipefail
           mkdir -p ci-results
           uname -a > ci-results/environment.txt
-          /usr/bin/python3 --version >> ci-results/environment.txt
-          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
-          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+          printf '%s\n' "${ImageOS:-unknown} ${ImageVersion:-unknown}" >> ci-results/environment.txt
+          docker version >> ci-results/environment.txt
+          docker info >> ci-results/environment.txt
+          docker pull ubuntu:24.04 2>&1 | tee ci-results/base-pull.log
+          docker image inspect ubuntu:24.04 > ci-results/base-image.json
+          base=$(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:24.04)
+          test -n "$base"
+          # Dockerfile on stdin: no repository build context, COPY, or application execution.
+          sed "s|^FROM ubuntu:24.04$|FROM $base|" tests/ci/Dockerfile | docker build --tag argonaut-ci:local - 2>&1 | tee ci-results/image-build.log
+          docker image inspect argonaut-ci:local > ci-results/built-image.json
       - name: Audit explicit selections
         run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
-      - name: Run bounded suite in verified loopback-only namespace
-        run: /usr/bin/python3 tests/run_ci_tests.py --suite offline-checks --output ci-results
+      - name: Run bounded suite with explicit Docker isolation
+        run: /usr/bin/python3 tests/run_ci_tests.py --isolation docker --suite offline-checks --output ci-results
+      - name: Independently remove job containers and verify absence
+        if: always()
+        run: |
+          mkdir -p ci-results
+          exec > >(tee -a ci-results/workflow-cleanup.log) 2>&1
+          failed=0
+          # A killed/timed-out create can register after an empty listing.
+          # Retry independently, retaining uncertainty even if all listings are empty.
+          attempts=1
+          if [ -f ci-results/create-pending.json ]; then attempts=10; failed=1; fi
+          for ((attempt=1; attempt<=attempts; attempt++)); do
+            ids=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || { failed=1; ids=; }
+            for id in $ids; do
+              timeout 25s docker stop --time 10 "$id" || failed=1
+              timeout 20s docker rm --force "$id" || failed=1
+            done
+            if [ "$attempts" -gt 1 ]; then sleep 1; fi
+          done
+          remaining=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || exit 1
+          if [ -n "$remaining" ]; then failed=1; fi
+          if [ -f ci-results/create-pending.json ]; then echo 'Creation unresolved; late daemon registration remains possible'; fi
+          echo "Cleanup status: $failed; remaining: $remaining"
+          exit "$failed"
       - name: Keep partial results and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -49,30 +78,59 @@ jobs:
       fail-fast: false
       matrix:
         mode: [normal, optimized]
+    env:
+      ARGONAUT_CI_JOB: argonaut-${{ github.run_id }}-python-unit-${{ matrix.mode }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - name: Install system test dependencies
+      - name: Build dependency-only image and record environment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
-      - name: Record environment
-        run: |
+          set -euo pipefail
           mkdir -p ci-results
           uname -a > ci-results/environment.txt
-          /usr/bin/python3 --version >> ci-results/environment.txt
-          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
-          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+          printf '%s\n' "${ImageOS:-unknown} ${ImageVersion:-unknown}" >> ci-results/environment.txt
+          docker version >> ci-results/environment.txt
+          docker info >> ci-results/environment.txt
+          docker pull ubuntu:24.04 2>&1 | tee ci-results/base-pull.log
+          docker image inspect ubuntu:24.04 > ci-results/base-image.json
+          base=$(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:24.04)
+          test -n "$base"
+          # Dockerfile on stdin: no repository build context, COPY, or application execution.
+          sed "s|^FROM ubuntu:24.04$|FROM $base|" tests/ci/Dockerfile | docker build --tag argonaut-ci:local - 2>&1 | tee ci-results/image-build.log
+          docker image inspect argonaut-ci:local > ci-results/built-image.json
       - name: Audit explicit selections
         run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
-      - name: Run bounded suite in verified loopback-only namespace
+      - name: Run bounded suite with explicit Docker isolation
         env:
           CI_MODE: ${{ matrix.mode }}
         run: |
           flags=()
           if [ "$CI_MODE" = optimized ]; then flags+=(--optimized); fi
-          /usr/bin/python3 tests/run_ci_tests.py --suite python-unit "${flags[@]}" --output ci-results
+          /usr/bin/python3 tests/run_ci_tests.py --isolation docker --suite python-unit "${flags[@]}" --output ci-results
+      - name: Independently remove job containers and verify absence
+        if: always()
+        run: |
+          mkdir -p ci-results
+          exec > >(tee -a ci-results/workflow-cleanup.log) 2>&1
+          failed=0
+          # A killed/timed-out create can register after an empty listing.
+          # Retry independently, retaining uncertainty even if all listings are empty.
+          attempts=1
+          if [ -f ci-results/create-pending.json ]; then attempts=10; failed=1; fi
+          for ((attempt=1; attempt<=attempts; attempt++)); do
+            ids=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || { failed=1; ids=; }
+            for id in $ids; do
+              timeout 25s docker stop --time 10 "$id" || failed=1
+              timeout 20s docker rm --force "$id" || failed=1
+            done
+            if [ "$attempts" -gt 1 ]; then sleep 1; fi
+          done
+          remaining=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || exit 1
+          if [ -n "$remaining" ]; then failed=1; fi
+          if [ -f ci-results/create-pending.json ]; then echo 'Creation unresolved; late daemon registration remains possible'; fi
+          echo "Cleanup status: $failed; remaining: $remaining"
+          exit "$failed"
       - name: Keep partial results and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -89,30 +147,59 @@ jobs:
       fail-fast: false
       matrix:
         mode: [normal, optimized]
+    env:
+      ARGONAUT_CI_JOB: argonaut-${{ github.run_id }}-python-regression-${{ matrix.mode }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - name: Install system test dependencies
+      - name: Build dependency-only image and record environment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
-      - name: Record environment
-        run: |
+          set -euo pipefail
           mkdir -p ci-results
           uname -a > ci-results/environment.txt
-          /usr/bin/python3 --version >> ci-results/environment.txt
-          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
-          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+          printf '%s\n' "${ImageOS:-unknown} ${ImageVersion:-unknown}" >> ci-results/environment.txt
+          docker version >> ci-results/environment.txt
+          docker info >> ci-results/environment.txt
+          docker pull ubuntu:24.04 2>&1 | tee ci-results/base-pull.log
+          docker image inspect ubuntu:24.04 > ci-results/base-image.json
+          base=$(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:24.04)
+          test -n "$base"
+          # Dockerfile on stdin: no repository build context, COPY, or application execution.
+          sed "s|^FROM ubuntu:24.04$|FROM $base|" tests/ci/Dockerfile | docker build --tag argonaut-ci:local - 2>&1 | tee ci-results/image-build.log
+          docker image inspect argonaut-ci:local > ci-results/built-image.json
       - name: Audit explicit selections
         run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
-      - name: Run bounded suite in verified loopback-only namespace
+      - name: Run bounded suite with explicit Docker isolation
         env:
           CI_MODE: ${{ matrix.mode }}
         run: |
           flags=()
           if [ "$CI_MODE" = optimized ]; then flags+=(--optimized); fi
-          /usr/bin/python3 tests/run_ci_tests.py --suite python-regression "${flags[@]}" --output ci-results
+          /usr/bin/python3 tests/run_ci_tests.py --isolation docker --suite python-regression "${flags[@]}" --output ci-results
+      - name: Independently remove job containers and verify absence
+        if: always()
+        run: |
+          mkdir -p ci-results
+          exec > >(tee -a ci-results/workflow-cleanup.log) 2>&1
+          failed=0
+          # A killed/timed-out create can register after an empty listing.
+          # Retry independently, retaining uncertainty even if all listings are empty.
+          attempts=1
+          if [ -f ci-results/create-pending.json ]; then attempts=10; failed=1; fi
+          for ((attempt=1; attempt<=attempts; attempt++)); do
+            ids=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || { failed=1; ids=; }
+            for id in $ids; do
+              timeout 25s docker stop --time 10 "$id" || failed=1
+              timeout 20s docker rm --force "$id" || failed=1
+            done
+            if [ "$attempts" -gt 1 ]; then sleep 1; fi
+          done
+          remaining=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || exit 1
+          if [ -n "$remaining" ]; then failed=1; fi
+          if [ -f ci-results/create-pending.json ]; then echo 'Creation unresolved; late daemon registration remains possible'; fi
+          echo "Cleanup status: $failed; remaining: $remaining"
+          exit "$failed"
       - name: Keep partial results and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -125,25 +212,54 @@ jobs:
   media-regression:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    env:
+      ARGONAUT_CI_JOB: argonaut-${{ github.run_id }}-media-regression-normal-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - name: Install system test dependencies
+      - name: Build dependency-only image and record environment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
-      - name: Record environment
-        run: |
+          set -euo pipefail
           mkdir -p ci-results
           uname -a > ci-results/environment.txt
-          /usr/bin/python3 --version >> ci-results/environment.txt
-          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
-          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+          printf '%s\n' "${ImageOS:-unknown} ${ImageVersion:-unknown}" >> ci-results/environment.txt
+          docker version >> ci-results/environment.txt
+          docker info >> ci-results/environment.txt
+          docker pull ubuntu:24.04 2>&1 | tee ci-results/base-pull.log
+          docker image inspect ubuntu:24.04 > ci-results/base-image.json
+          base=$(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:24.04)
+          test -n "$base"
+          # Dockerfile on stdin: no repository build context, COPY, or application execution.
+          sed "s|^FROM ubuntu:24.04$|FROM $base|" tests/ci/Dockerfile | docker build --tag argonaut-ci:local - 2>&1 | tee ci-results/image-build.log
+          docker image inspect argonaut-ci:local > ci-results/built-image.json
       - name: Audit explicit selections
         run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
-      - name: Run bounded suite in verified loopback-only namespace
-        run: /usr/bin/python3 tests/run_ci_tests.py --suite media-regression --output ci-results
+      - name: Run bounded suite with explicit Docker isolation
+        run: /usr/bin/python3 tests/run_ci_tests.py --isolation docker --suite media-regression --output ci-results
+      - name: Independently remove job containers and verify absence
+        if: always()
+        run: |
+          mkdir -p ci-results
+          exec > >(tee -a ci-results/workflow-cleanup.log) 2>&1
+          failed=0
+          # A killed/timed-out create can register after an empty listing.
+          # Retry independently, retaining uncertainty even if all listings are empty.
+          attempts=1
+          if [ -f ci-results/create-pending.json ]; then attempts=10; failed=1; fi
+          for ((attempt=1; attempt<=attempts; attempt++)); do
+            ids=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || { failed=1; ids=; }
+            for id in $ids; do
+              timeout 25s docker stop --time 10 "$id" || failed=1
+              timeout 20s docker rm --force "$id" || failed=1
+            done
+            if [ "$attempts" -gt 1 ]; then sleep 1; fi
+          done
+          remaining=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || exit 1
+          if [ -n "$remaining" ]; then failed=1; fi
+          if [ -f ci-results/create-pending.json ]; then echo 'Creation unresolved; late daemon registration remains possible'; fi
+          echo "Cleanup status: $failed; remaining: $remaining"
+          exit "$failed"
       - name: Keep partial results and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -156,26 +272,54 @@ jobs:
   gtk-regression:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      ARGONAUT_CI_JOB: argonaut-${{ github.run_id }}-gtk-regression-normal-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - name: Install system test dependencies
+      - name: Build dependency-only image and record environment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
-          sudo apt-get install -y xvfb xauth dbus-x11 libxtst6 fonts-dejavu-core
-      - name: Record environment
-        run: |
+          set -euo pipefail
           mkdir -p ci-results
           uname -a > ci-results/environment.txt
-          /usr/bin/python3 --version >> ci-results/environment.txt
-          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
-          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+          printf '%s\n' "${ImageOS:-unknown} ${ImageVersion:-unknown}" >> ci-results/environment.txt
+          docker version >> ci-results/environment.txt
+          docker info >> ci-results/environment.txt
+          docker pull ubuntu:24.04 2>&1 | tee ci-results/base-pull.log
+          docker image inspect ubuntu:24.04 > ci-results/base-image.json
+          base=$(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:24.04)
+          test -n "$base"
+          # Dockerfile on stdin: no repository build context, COPY, or application execution.
+          sed "s|^FROM ubuntu:24.04$|FROM $base|" tests/ci/Dockerfile | docker build --tag argonaut-ci:local - 2>&1 | tee ci-results/image-build.log
+          docker image inspect argonaut-ci:local > ci-results/built-image.json
       - name: Audit explicit selections
         run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
-      - name: Run bounded suite in verified loopback-only namespace
-        run: /usr/bin/python3 tests/run_ci_tests.py --suite gtk-regression --output ci-results
+      - name: Run bounded suite with explicit Docker isolation
+        run: /usr/bin/python3 tests/run_ci_tests.py --isolation docker --suite gtk-regression --output ci-results
+      - name: Independently remove job containers and verify absence
+        if: always()
+        run: |
+          mkdir -p ci-results
+          exec > >(tee -a ci-results/workflow-cleanup.log) 2>&1
+          failed=0
+          # A killed/timed-out create can register after an empty listing.
+          # Retry independently, retaining uncertainty even if all listings are empty.
+          attempts=1
+          if [ -f ci-results/create-pending.json ]; then attempts=10; failed=1; fi
+          for ((attempt=1; attempt<=attempts; attempt++)); do
+            ids=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || { failed=1; ids=; }
+            for id in $ids; do
+              timeout 25s docker stop --time 10 "$id" || failed=1
+              timeout 20s docker rm --force "$id" || failed=1
+            done
+            if [ "$attempts" -gt 1 ]; then sleep 1; fi
+          done
+          remaining=$(timeout 20s docker ps -aq --filter "label=argonaut.ci-job=$ARGONAUT_CI_JOB") || exit 1
+          if [ -n "$remaining" ]; then failed=1; fi
+          if [ -f ci-results/create-pending.json ]; then echo 'Creation unresolved; late daemon registration remains possible'; fi
+          echo "Cleanup status: $failed; remaining: $remaining"
+          exit "$failed"
       - name: Keep partial results and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
