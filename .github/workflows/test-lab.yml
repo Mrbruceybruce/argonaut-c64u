@@ -12,24 +12,175 @@ permissions:
 
 jobs:
   offline-checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - name: Install replay test runtime
+        with:
+          persist-credentials: false
+      - name: Install system test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
-      - name: Run deterministic Test Lab checks
-        run: /usr/bin/python3 -m c64u_browser.test_lab --suite offline > test-lab-report.json
-      - name: Run unit tests
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
+      - name: Record environment
         run: |
-          /usr/bin/python3 -m unittest discover -s tests -p 'test_*.py'
-          /usr/bin/python3 -O -m unittest discover -s tests -p 'test_*.py'
-      - name: Keep the Test Lab report
+          mkdir -p ci-results
+          uname -a > ci-results/environment.txt
+          /usr/bin/python3 --version >> ci-results/environment.txt
+          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
+          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+      - name: Audit explicit selections
+        run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
+      - name: Run bounded suite in verified loopback-only namespace
+        run: /usr/bin/python3 tests/run_ci_tests.py --suite offline-checks --output ci-results
+      - name: Keep partial results and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-lab-report
-          path: test-lab-report.json
+          name: offline-checks-${{ github.run_attempt }}
+          path: ci-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+  python-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [normal, optimized]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Install system test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
+      - name: Record environment
+        run: |
+          mkdir -p ci-results
+          uname -a > ci-results/environment.txt
+          /usr/bin/python3 --version >> ci-results/environment.txt
+          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
+          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+      - name: Audit explicit selections
+        run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
+      - name: Run bounded suite in verified loopback-only namespace
+        env:
+          CI_MODE: ${{ matrix.mode }}
+        run: |
+          flags=()
+          if [ "$CI_MODE" = optimized ]; then flags+=(--optimized); fi
+          /usr/bin/python3 tests/run_ci_tests.py --suite python-unit "${flags[@]}" --output ci-results
+      - name: Keep partial results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-unit-${{ matrix.mode }}-${{ github.run_attempt }}
+          path: ci-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+  python-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [normal, optimized]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Install system test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
+      - name: Record environment
+        run: |
+          mkdir -p ci-results
+          uname -a > ci-results/environment.txt
+          /usr/bin/python3 --version >> ci-results/environment.txt
+          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
+          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+      - name: Audit explicit selections
+        run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
+      - name: Run bounded suite in verified loopback-only namespace
+        env:
+          CI_MODE: ${{ matrix.mode }}
+        run: |
+          flags=()
+          if [ "$CI_MODE" = optimized ]; then flags+=(--optimized); fi
+          /usr/bin/python3 tests/run_ci_tests.py --suite python-regression "${flags[@]}" --output ci-results
+      - name: Keep partial results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-regression-${{ matrix.mode }}-${{ github.run_attempt }}
+          path: ci-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+  media-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Install system test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
+      - name: Record environment
+        run: |
+          mkdir -p ci-results
+          uname -a > ci-results/environment.txt
+          /usr/bin/python3 --version >> ci-results/environment.txt
+          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
+          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+      - name: Audit explicit selections
+        run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
+      - name: Run bounded suite in verified loopback-only namespace
+        run: /usr/bin/python3 tests/run_ci_tests.py --suite media-regression --output ci-results
+      - name: Keep partial results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: media-regression-${{ github.run_attempt }}
+          path: ci-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+  gtk-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Install system test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-secret-1 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools iproute2 util-linux
+          sudo apt-get install -y xvfb xauth dbus-x11 libxtst6 fonts-dejavu-core
+      - name: Record environment
+        run: |
+          mkdir -p ci-results
+          uname -a > ci-results/environment.txt
+          /usr/bin/python3 --version >> ci-results/environment.txt
+          dpkg-query -W 'python3*' 'gir1.2-*' 'gstreamer1.0-*' 'util-linux' 'iproute2' >> ci-results/environment.txt
+          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >> ci-results/environment.txt 2>/dev/null || true
+      - name: Audit explicit selections
+        run: /usr/bin/python3 tests/run_ci_tests.py --audit --output ci-results
+      - name: Run bounded suite in verified loopback-only namespace
+        run: /usr/bin/python3 tests/run_ci_tests.py --suite gtk-regression --output ci-results
+      - name: Keep partial results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gtk-regression-${{ github.run_attempt }}
+          path: ci-results/
+          retention-days: 14
           if-no-files-found: warn

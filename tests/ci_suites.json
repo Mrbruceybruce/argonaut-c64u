@@ -1,0 +1,482 @@
+{
+  "version": 1,
+  "baseline": "fa6ba88f426746f086e7fba8b8c4aae41fe1fdc2",
+  "policy": "Explicit audited classes only. No physical hardware, live Test Lab, discovery, local AI, or external traffic. Inventory enumeration never authorizes execution.",
+  "suites": {
+    "python-unit": {
+      "budget_seconds": 300,
+      "requirements": [
+        "system-python",
+        "GI",
+        "GTK4",
+        "Secret"
+      ],
+      "selectors": [
+        {
+          "selector": "test_sid_format.SidFormatTests",
+          "tests": 10,
+          "timeout_seconds": 120,
+          "audit": "Pure synthetic SID bytes and parser validation."
+        },
+        {
+          "selector": "test_settings_safety.SettingsSafetyTests",
+          "tests": 3,
+          "timeout_seconds": 120,
+          "audit": "Pure warning lookup, no device writes."
+        },
+        {
+          "selector": "test_jobs.JobTests",
+          "tests": 5,
+          "timeout_seconds": 120,
+          "audit": "In-memory jobs, callbacks and cancellation."
+        },
+        {
+          "selector": "test_version.VersionTests",
+          "tests": 2,
+          "timeout_seconds": 120,
+          "audit": "Temporary build metadata; read-only source identity."
+        },
+        {
+          "selector": "test_media.MediaTests",
+          "tests": 4,
+          "timeout_seconds": 120,
+          "audit": "UltimateClient request methods patched; no GStreamer playback."
+        },
+        {
+          "selector": "test_streaming.DecodeTests",
+          "tests": 4,
+          "timeout_seconds": 120,
+          "audit": "Synthetic frame/audio bytes; Receiver and REST transports mocked."
+        },
+        {
+          "selector": "test_streaming.StreamTests",
+          "tests": 4,
+          "timeout_seconds": 120,
+          "audit": "Synthetic frame/audio bytes; Receiver and REST transports mocked."
+        },
+        {
+          "selector": "test_c64u_ftp.ParserTests",
+          "tests": 7,
+          "timeout_seconds": 120,
+          "audit": "Parser/static source checks or FakeC64UFtp bound to 127.0.0.1; no real device."
+        },
+        {
+          "selector": "test_hardware_checks.HardwareChecksTests",
+          "tests": 4,
+          "timeout_seconds": 120,
+          "audit": "Mock REST plus MemoryReads fake FTP; network identity lookup patched."
+        },
+        {
+          "selector": "test_ci_runner.RunnerTests",
+          "tests": 11,
+          "timeout_seconds": 120,
+          "audit": "Synthetic subprocesses only; verifies runner failures, timeouts and cleanup."
+        }
+      ]
+    },
+    "python-regression": {
+      "budget_seconds": 600,
+      "requirements": [
+        "system-python",
+        "GI",
+        "GTK4",
+        "Secret"
+      ],
+      "selectors": [
+        {
+          "selector": "test_disk_image.D64ImageTests",
+          "tests": 15,
+          "timeout_seconds": 120,
+          "audit": "Read-only tracked VICE disk image fixtures; edits saved only to temporary directories."
+        },
+        {
+          "selector": "test_disk_image_d71.D71ImageTests",
+          "tests": 8,
+          "timeout_seconds": 120,
+          "audit": "Read-only tracked VICE disk image fixtures; edits saved only to temporary directories."
+        },
+        {
+          "selector": "test_disk_image_d81.D81ImageTests",
+          "tests": 8,
+          "timeout_seconds": 120,
+          "audit": "Read-only tracked VICE disk image fixtures; edits saved only to temporary directories."
+        },
+        {
+          "selector": "test_disk_image_edit.D64EditTests",
+          "tests": 13,
+          "timeout_seconds": 120,
+          "audit": "Read-only tracked VICE disk image fixtures; edits saved only to temporary directories."
+        },
+        {
+          "selector": "test_disk_image_edit_d71.D71EditTests",
+          "tests": 5,
+          "timeout_seconds": 120,
+          "audit": "Read-only tracked VICE disk image fixtures; edits saved only to temporary directories."
+        },
+        {
+          "selector": "test_disk_image_edit_d81.D81EditTests",
+          "tests": 7,
+          "timeout_seconds": 120,
+          "audit": "Read-only tracked VICE disk image fixtures; edits saved only to temporary directories."
+        },
+        {
+          "selector": "test_import_plan.ImportPlanTests",
+          "tests": 23,
+          "timeout_seconds": 120,
+          "audit": "Synthetic content, CoreTests fake client and loopback FakeC64UFtp; tracked VICE fixture."
+        },
+        {
+          "selector": "test_import_plan.ImportCoreTests",
+          "tests": 7,
+          "timeout_seconds": 120,
+          "audit": "Synthetic content, CoreTests fake client and loopback FakeC64UFtp; tracked VICE fixture."
+        },
+        {
+          "selector": "test_import_plan.ImportWireTests",
+          "tests": 1,
+          "timeout_seconds": 120,
+          "audit": "Synthetic content, CoreTests fake client and loopback FakeC64UFtp; tracked VICE fixture."
+        },
+        {
+          "selector": "test_import_plan.SourceBudgetTests",
+          "tests": 6,
+          "timeout_seconds": 120,
+          "audit": "Synthetic content, CoreTests fake client and loopback FakeC64UFtp; tracked VICE fixture."
+        },
+        {
+          "selector": "test_import_plan.SourceBudgetWireTests",
+          "tests": 7,
+          "timeout_seconds": 120,
+          "audit": "Synthetic content, CoreTests fake client and loopback FakeC64UFtp; tracked VICE fixture."
+        },
+        {
+          "selector": "test_import_transaction.TransactionTests",
+          "tests": 23,
+          "timeout_seconds": 120,
+          "audit": "TransactionFixture synthetic planner and temporary host journals; no device transport."
+        },
+        {
+          "selector": "test_import_transaction.JournalTests",
+          "tests": 12,
+          "timeout_seconds": 120,
+          "audit": "TransactionFixture synthetic planner and temporary host journals; no device transport."
+        },
+        {
+          "selector": "test_import_transaction.SafetyCorrectionTests",
+          "tests": 14,
+          "timeout_seconds": 120,
+          "audit": "TransactionFixture synthetic planner and temporary host journals; no device transport."
+        },
+        {
+          "selector": "test_import_policy.PolicyTests",
+          "tests": 12,
+          "timeout_seconds": 120,
+          "audit": "Temporary preferences and synthetic transaction fixture; no real GTK window or device."
+        },
+        {
+          "selector": "test_import_policy.ImportPreferenceTests",
+          "tests": 2,
+          "timeout_seconds": 120,
+          "audit": "Temporary preferences and synthetic transaction fixture; no real GTK window or device."
+        },
+        {
+          "selector": "test_import_execution.ExecutionTests",
+          "tests": 48,
+          "timeout_seconds": 120,
+          "audit": "Synthetic transaction fixture, crash injection, temporary journals; sockets forbidden."
+        },
+        {
+          "selector": "test_ftp_reads.ReadMigrationTests",
+          "tests": 18,
+          "timeout_seconds": 120,
+          "audit": "Mock REST identity with loopback FakeC64UFtp or in-memory transport."
+        },
+        {
+          "selector": "test_ftp_reads.ManagedDiscoveryTransportTests",
+          "tests": 2,
+          "timeout_seconds": 120,
+          "audit": "Mock REST identity with loopback FakeC64UFtp or in-memory transport."
+        },
+        {
+          "selector": "test_ftp_uploads.UploadTests",
+          "tests": 34,
+          "timeout_seconds": 120,
+          "audit": "Synthetic files and loopback FTP fixture; REST identity mocked."
+        },
+        {
+          "selector": "test_ftp_replacements.ReplacementTests",
+          "tests": 48,
+          "timeout_seconds": 120,
+          "audit": "Temporary files and loopback FTP mutation fixture; no physical media."
+        },
+        {
+          "selector": "test_c64u_ftp.ProtocolTests",
+          "tests": 43,
+          "timeout_seconds": 120,
+          "audit": "Parser/static source checks or FakeC64UFtp bound to 127.0.0.1; no real device."
+        }
+      ]
+    },
+    "media-regression": {
+      "budget_seconds": 180,
+      "requirements": [
+        "system-python",
+        "GI",
+        "GTK4",
+        "Secret",
+        "GStreamer encoders and muxers"
+      ],
+      "selectors": [
+        {
+          "selector": "test_replay_buffer.ReplayBufferTests",
+          "tests": 4,
+          "timeout_seconds": 180,
+          "audit": "Real GStreamer WebM encode/export with synthetic video/audio and temporary files."
+        }
+      ]
+    },
+    "gtk-regression": {
+      "budget_seconds": 300,
+      "requirements": [
+        "system-python",
+        "GI",
+        "GTK4",
+        "Secret",
+        "Xvfb",
+        "private D-Bus",
+        "XTest"
+      ],
+      "selectors": [
+        {
+          "selector": "test_device_details_compact.IndependentSections",
+          "tests": 3,
+          "timeout_seconds": 180,
+          "audit": "Real GTK with fake core/transport and temporary preferences; X11 XTest keyboard helper. PreferencesUI used as fixture only."
+        },
+        {
+          "selector": "test_device_details_compact.SettingsSectionLifecycle",
+          "tests": 1,
+          "timeout_seconds": 180,
+          "audit": "Real GTK with fake core/transport and temporary preferences; X11 XTest keyboard helper. PreferencesUI used as fixture only."
+        },
+        {
+          "selector": "test_device_details_compact.GeometryAndKeyboard",
+          "tests": 6,
+          "timeout_seconds": 180,
+          "audit": "Real GTK with fake core/transport and temporary preferences; X11 XTest keyboard helper. PreferencesUI used as fixture only."
+        },
+        {
+          "selector": "test_uc1b_presentation.HardwarePresentation",
+          "tests": 13,
+          "timeout_seconds": 180,
+          "audit": "Real GTK, mocked inspection workers/transports and temporary preferences; no device requests."
+        },
+        {
+          "selector": "test_uc1b_presentation.SettingsHardware",
+          "tests": 1,
+          "timeout_seconds": 180,
+          "audit": "Real GTK, mocked inspection workers/transports and temporary preferences; no device requests."
+        },
+        {
+          "selector": "test_uc1_compatibility.GtkPresentation",
+          "tests": 3,
+          "timeout_seconds": 180,
+          "audit": "GtkPresentation only: mocked client and callbacks rendered into real GTK labels."
+        }
+      ]
+    }
+  },
+  "deferred_modules": {
+    "test_ai_analysis": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ai_gateway": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ai_presentation": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_api": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_app_lifecycle": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_app_preferences": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_backups": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_bridge": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_bridge_alert": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_bridge_background": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_bridge_check": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_bridge_cli": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_bridge_control": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_health_alert": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_install": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_launch": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_c64_ai_preparation": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_cancel_copy": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_cleanup_corrections": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_cleanup_diagnostics": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_cleanup_intent": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_cleanup_presentation": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_compatibility_retirement": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_configuration": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_connection_layout": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_connections": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_core": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_creation_path_evidence": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_debian_packaging": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_deferred_upload_cleanup": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_deletion": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_deletion_identity": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_dependencies": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_development": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_device_details": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_dhcp": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_diagnostics": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_disk_image_io": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_disk_image_navigation": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_disk_run": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_drives": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_drives_picker": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_empty_upload": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_evidence_lifecycle": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_favorites": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_file_copy": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_file_navigation": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_file_service": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_files": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_flash_cleanup": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_folder_copy": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_foreground_admission": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_fresh_folder": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_fresh_folder_cli": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ftp_evidence": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ftp_folder_steps": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ftp_mutations": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ftp_ownership": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ftp_replacement_corrections": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ftp_streaming": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_game_launch": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_game_library": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_game_library_bulk": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_game_library_client": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_game_picker": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_header_navigation": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_import_admission": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_import_context_evidence": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_import_evidence_prerequisites": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_import_execution_policy2": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_import_execution_policy3": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_import_snapshots": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_import_staging": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_import_staging_proof": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_keyboard_input": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_library_creation": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_library_creation_safety": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_local_directory_listing": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_local_networks": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_machine_safety": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_macos_bundle_verification": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_macos_support": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_macos_verifier": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_managed_d64_execution": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_managed_d64_preflight": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_managed_library": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_managed_publication": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_managed_rename_boundary": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_native_files": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_network_identity": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_next_pass": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_operation_status": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_package_credential_channel": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_package_identity": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_package_self_test": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_partial_authority": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_picker_model": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_platform_support": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_preferences_ui": "PreferencesUI is imported only as a fixture by selected GTK classes; its test suite remains deferred.",
+    "test_r5_headless_reads": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_r6_flash": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_recovery": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_release_contract": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_rename_safety_corrections": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_replacement_source": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_runtime_environment": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_scheduler": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_service_migration": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_sid_catalog": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_sid_jukebox_client": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_sid_picker": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_sid_playback": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_sid_readonly": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_storage": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_storage_c1": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_storage_c1_managed": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_access": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_alert": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_auto_analysis": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_background": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_cli": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_fleet": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_history": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_presentation": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_probe": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_replay": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_saved": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_schedule": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_snapshot": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_timer": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_test_lab_watch": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_testing_checklist": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_text_input": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_transfers": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_upload_cleanup": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_usb_backup": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_usb_backup_preferences": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_wired_status": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment."
+  },
+  "deferred_classes": {
+    "test_uc1_compatibility.Protocol": "Outside approved class selection; requires separate audit and assignment.",
+    "test_uc1_compatibility.Isolation": "Outside approved class selection; requires separate audit and assignment.",
+    "test_uc1_compatibility.CallbackIsolation": "Outside approved class selection; requires separate audit and assignment."
+  },
+  "deferred_gtk_scripts": {
+    "appearance_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "b4_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "b5_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "c0_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "c1_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "c2_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "c4_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "cleanup_completion_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "drives_picker_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "files_dialog_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "foreground_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "game_picker_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "header_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "import_plan_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "library_creation_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "managed_launch_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "managed_library_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "managed_row_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "picker_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "power_dialog_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "preferences_cleanup_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "sid_picker_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "status_layout_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "ui_style_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "upload_cancel_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",
+    "upload_cleanup_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment."
+  },
+  "offline_checks": [
+    "ftp.listing_parser",
+    "rest.sid_path_validation",
+    "disk.d64_parser",
+    "disk.d71_parser",
+    "disk.d81_parser",
+    "sim.rest.success",
+    "sim.rest.malformed",
+    "sim.rest.authentication",
+    "sim.ftp.mlsd",
+    "sim.ftp.list_fallback",
+    "sim.ftp.authentication",
+    "sim.identity.wrong_device",
+    "sim.hardware.complete",
+    "sim.transfer.download",
+    "sim.transfer.interrupted",
+    "sim.transfer.upload",
+    "sim.transfer.collision"
+  ]
+}
