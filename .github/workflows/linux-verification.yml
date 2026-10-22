@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  SOURCE_SHA: 670cedf84247044d963aa11e2dd855be31271f6e
+  SOURCE_SHA: 5f7d22889d495545ac8ecf37bc37179f18a4ba8a
 
 jobs:
   linux-build:
@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: 670cedf84247044d963aa11e2dd855be31271f6e
+          ref: 5f7d22889d495545ac8ecf37bc37179f18a4ba8a
           persist-credentials: false
       - name: Verify approved candidate identity and clean checkout
         shell: bash
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: 670cedf84247044d963aa11e2dd855be31271f6e
+          ref: 5f7d22889d495545ac8ecf37bc37179f18a4ba8a
           persist-credentials: false
           # Only orchestration files enter the host checkout; no app source in runtime.
           sparse-checkout: tools/linux
