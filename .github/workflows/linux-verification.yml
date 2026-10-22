@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  SOURCE_SHA: 8f0941971d06dd85b2dc955a925d00510eca2592
+  SOURCE_SHA: 728359a6ba01b0a4be3b16cfdaa99bb5375dc668
 
 jobs:
   linux-build:
@@ -28,14 +28,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: 8f0941971d06dd85b2dc955a925d00510eca2592
+          ref: 728359a6ba01b0a4be3b16cfdaa99bb5375dc668
           persist-credentials: false
       - name: Verify approved candidate identity and clean checkout
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          test "$(git rev-parse HEAD:.github/workflows/linux-verification.yml)" = "c2e67aa11b82a886ac1a371bf677df2992166519"
+          test "$(git rev-parse HEAD:.github/workflows/linux-verification.yml)" = "3bd15130f736eb6a183b29d54a245b178f3f2b87"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
       - name: Static and synthetic contracts
         run: |
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: 8f0941971d06dd85b2dc955a925d00510eca2592
+          ref: 728359a6ba01b0a4be3b16cfdaa99bb5375dc668
           persist-credentials: false
           # Only orchestration files enter the host checkout; no app source in runtime.
           sparse-checkout: tools/linux
@@ -90,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          test "$(git rev-parse HEAD:.github/workflows/linux-verification.yml)" = "c2e67aa11b82a886ac1a371bf677df2992166519"
+          test "$(git rev-parse HEAD:.github/workflows/linux-verification.yml)" = "3bd15130f736eb6a183b29d54a245b178f3f2b87"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
       - uses: actions/download-artifact@v8
         with:
