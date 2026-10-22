@@ -149,6 +149,85 @@ class ReportTests(unittest.TestCase):
                 verify.identity(sha, epoch)
 
 
+class InstalledCheckTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.name = 'usr/share/doc/argonaut-c64u-development/BUILD-EVIDENCE.txt'
+        self.path = self.root / self.name
+        self.path.parent.mkdir(parents=True)
+        self.content = b'synthetic build evidence\n'
+        self.path.write_bytes(self.content)
+        self.path.chmod(0o644)
+        self.expected = {'sha256': verify.digest(self.content), 'mode': 0o644}
+        self.manifest = {'payload': {self.name: self.expected}}
+        paths = patch.object(run, 'Path', return_value=self.root)
+        self.paths = paths.start()
+        self.addCleanup(paths.stop)
+        capture = patch.object(run, 'capture', return_value=(
+            'install ok installed ' + verify.CONTRACT['version'] + ' all'))
+        self.capture = capture.start()
+        self.addCleanup(capture.stop)
+
+    def reject(self, message):
+        with self.assertRaises(ValueError) as error:
+            run.installed_check(self.manifest)
+        self.assertEqual(str(error.exception), message)
+        self.capture.assert_not_called()
+
+    def test_valid_payload_and_identity(self):
+        run.installed_check(self.manifest)
+        self.paths.assert_called_once_with('/')
+        self.capture.assert_called_once_with([
+            'dpkg-query', '-W', '-f=${Status} ${Version} ${Architecture}',
+            verify.CONTRACT['control']['Package']])
+
+    def test_missing(self):
+        self.path.unlink()
+        self.reject('installed missing: ' + self.name)
+
+    def test_symlink_with_matching_bytes_and_mode(self):
+        target = self.root / 'target'
+        self.path.rename(target)
+        self.path.symlink_to(target)
+        self.reject('installed symlink: ' + self.name)
+
+    def test_dangling_symlink(self):
+        self.path.unlink()
+        self.path.symlink_to(self.root / 'absent')
+        self.reject('installed symlink: ' + self.name)
+
+    def test_directory(self):
+        self.path.unlink()
+        self.path.mkdir()
+        self.reject('installed not a regular file: ' + self.name)
+
+    def test_sha256_mismatch(self):
+        self.path.write_bytes(b'changed evidence\n')
+        self.reject(f"installed SHA-256 mismatch: {self.name}: "
+                    f"expected {self.expected['sha256']}, actual {verify.digest(self.path.read_bytes())}")
+
+    def test_mode_mismatch_including_special_bits(self):
+        for mode in (0o600, 0o755, 0o4644):
+            with self.subTest(mode=oct(mode)):
+                self.path.chmod(mode)
+                self.reject(f'installed mode mismatch: {self.name}: expected 0o0644, actual {mode:#06o}')
+
+    def test_later_payload_entry_is_checked(self):
+        name = 'usr/share/argonaut-development/later.py'
+        self.manifest['payload'][name] = dict(self.expected)
+        self.reject('installed missing: ' + name)
+
+    def test_invalid_identity_still_fails(self):
+        for status in ('', 'install ok installed wrong all',
+                       'install ok installed ' + verify.CONTRACT['version'] + ' amd64'):
+            with self.subTest(status=status):
+                self.capture.return_value = status
+                with self.assertRaisesRegex(ValueError, '^installed identity$'):
+                    run.installed_check(self.manifest)
+
+
 class OrchestrationTests(unittest.TestCase):
     def test_timeout_and_partial_log(self):
         with tempfile.TemporaryDirectory() as directory:

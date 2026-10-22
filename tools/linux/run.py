@@ -153,9 +153,16 @@ def preflight(output):
 def installed_check(manifest):
     for name, expected in manifest['payload'].items():
         path = Path('/') / name
-        require(path.is_file() and not path.is_symlink() and
-                digest(path.read_bytes()) == expected['sha256'] and
-                path.stat().st_mode & 0o7777 == expected['mode'], 'installed bytes: ' + name)
+        # Check links first so dangling symlinks are not reported as missing.
+        require(not path.is_symlink(), 'installed symlink: ' + name)
+        require(path.exists(), 'installed missing: ' + name)
+        require(path.is_file(), 'installed not a regular file: ' + name)
+        actual_sha256 = digest(path.read_bytes())
+        require(actual_sha256 == expected['sha256'],
+                f"installed SHA-256 mismatch: {name}: expected {expected['sha256']}, actual {actual_sha256}")
+        actual_mode = path.stat().st_mode & 0o7777
+        require(actual_mode == expected['mode'],
+                f"installed mode mismatch: {name}: expected {expected['mode']:#06o}, actual {actual_mode:#06o}")
     require(capture(['dpkg-query', '-W', '-f=${Status} ${Version} ${Architecture}',
                      CONTRACT['control']['Package']]) ==
             'install ok installed ' + CONTRACT['version'] + ' all', 'installed identity')
