@@ -153,9 +153,16 @@ def preflight(output):
 def installed_check(manifest):
     for name, expected in manifest['payload'].items():
         path = Path('/') / name
-        require(path.is_file() and not path.is_symlink() and
-                digest(path.read_bytes()) == expected['sha256'] and
-                path.stat().st_mode & 0o7777 == expected['mode'], 'installed bytes: ' + name)
+        # Check links first so dangling symlinks are not reported as missing.
+        require(not path.is_symlink(), 'installed symlink: ' + name)
+        require(path.exists(), 'installed missing: ' + name)
+        require(path.is_file(), 'installed not a regular file: ' + name)
+        actual_sha256 = digest(path.read_bytes())
+        require(actual_sha256 == expected['sha256'],
+                f"installed SHA-256 mismatch: {name}: expected {expected['sha256']}, actual {actual_sha256}")
+        actual_mode = path.stat().st_mode & 0o7777
+        require(actual_mode == expected['mode'],
+                f"installed mode mismatch: {name}: expected {expected['mode']:#06o}, actual {actual_mode:#06o}")
     require(capture(['dpkg-query', '-W', '-f=${Status} ${Version} ${Architecture}',
                      CONTRACT['control']['Package']]) ==
             'install ok installed ' + CONTRACT['version'] + ' all', 'installed identity')
@@ -196,7 +203,10 @@ def internal(args):
             sentinel.parent.mkdir(parents=True, exist_ok=True)
             sentinel.write_text('preserve development configuration\n')
             for _ in range(2):
-                command(['dpkg', '--install', str(package)], out / 'install.log', 60)
+                # Minimal Ubuntu images may exclude documentation during unpack.
+                # Re-include this package's docs; still verify every payload byte/mode.
+                command(['dpkg', '--path-include=/usr/share/doc/argonaut-c64u-development/*',
+                         '--install', str(package)], out / 'install.log', 60)
                 installed_check(manifest)
                 require(sentinel.read_text() == 'preserve development configuration\n', 'reinstall config')
             command(['dpkg', '--audit'], out / 'install.log')
