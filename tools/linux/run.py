@@ -203,7 +203,10 @@ def internal(args):
             sentinel.parent.mkdir(parents=True, exist_ok=True)
             sentinel.write_text('preserve development configuration\n')
             for _ in range(2):
-                command(['dpkg', '--install', str(package)], out / 'install.log', 60)
+                # Minimal Ubuntu images may exclude documentation during unpack.
+                # Re-include this package's docs; still verify every payload byte/mode.
+                command(['dpkg', '--path-include=/usr/share/doc/argonaut-c64u-development/*',
+                         '--install', str(package)], out / 'install.log', 60)
                 installed_check(manifest)
                 require(sentinel.read_text() == 'preserve development configuration\n', 'reinstall config')
             command(['dpkg', '--audit'], out / 'install.log')

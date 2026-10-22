@@ -529,5 +529,68 @@ class StatusEvidenceTests(unittest.TestCase):
         self.check_status(fail, primary, [])
 
 
+
+class InstallPolicyTests(unittest.TestCase):
+    """Exercise install orchestration without executing dpkg or touching host paths."""
+
+    def exercise(self, failures=None, package_error=None):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            incoming = root / 'input'
+            incoming.mkdir()
+            manifest = {'payload': {}}
+            (incoming / 'verified.json').write_text(json.dumps(manifest))
+            def mapped_path(value):
+                return root / str(value).lstrip('/')
+            events = []
+            def command(args, *unused):
+                events.append(('command', args))
+            def checked(value):
+                self.assertEqual(value, manifest)
+                events.append(('check', None))
+                if failures == sum(kind == 'check' for kind, _ in events):
+                    raise ValueError('installed missing: synthetic')
+            def package_check(*args):
+                events.append(('archive', None))
+                if package_error:
+                    raise ValueError('package checksum')
+            with patch.object(run, 'Path', side_effect=mapped_path), \
+                 patch.object(run.os, 'getuid', return_value=0), \
+                 patch.object(run, 'verify_package', side_effect=package_check), \
+                 patch.object(run, 'command', side_effect=command), \
+                 patch.object(run, 'installed_check', side_effect=checked):
+                args = SimpleNamespace(phase='install-child', output=root / 'results')
+                if failures or package_error:
+                    with self.assertRaises(ValueError):
+                        run.internal(args)
+                else:
+                    run.internal(args)
+            return events
+
+    def test_both_installs_include_only_package_docs_and_verify_each_time(self):
+        events = self.exercise()
+        self.assertEqual([kind for kind, _ in events],
+                         ['archive', 'command', 'check', 'command', 'check', 'command'])
+        installs = [args for kind, args in events if kind == 'command' and '--install' in args]
+        self.assertEqual(len(installs), 2)
+        for args in installs:
+            self.assertEqual(args[:3], ['dpkg',
+                '--path-include=/usr/share/doc/argonaut-c64u-development/*', '--install'])
+            self.assertEqual(len(args), 4)
+        self.assertEqual(events[-1], ('command', ['dpkg', '--audit']))
+
+    def test_first_payload_failure_stops_before_reinstall(self):
+        self.assertEqual([kind for kind, _ in self.exercise(failures=1)],
+                         ['archive', 'command', 'check'])
+
+    def test_second_payload_failure_stops_before_audit(self):
+        self.assertEqual([kind for kind, _ in self.exercise(failures=2)],
+                         ['archive', 'command', 'check', 'command', 'check'])
+
+    def test_invalid_archive_stops_before_install(self):
+        self.assertEqual(self.exercise(package_error=True), [('archive', None)])
+
+
 if __name__ == '__main__':
     unittest.main()
