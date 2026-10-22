@@ -193,14 +193,14 @@ def run(package_metadata, report_path):
             _require(_connection_header_valid(app) and
                      app.new_d64_button.get_tooltip_text() == 'New D64 disk…' and
                      app.remote_new_d64_button.get_tooltip_text() ==
-                     'New D64 disk on C64U…' and
+                     'New D64 disk on C64 Ultimate…' and
                      not app.remote_new_d64_button.get_sensitive() and
                      app.tabs.get_tab_label_text(app.settings_tab.box) ==
                      'Ultimate Menu',
                      'ui.connection_header',
                      'Main-window connection or disk controls are incorrect.', checks)
-            _require(app.file_pane_labels[True].get_text() == 'Local files · Active' and
-                     app.file_pane_labels[False].get_text() == 'C64 Ultimate files' and
+            _require(app.file_pane_labels[True].get_text() == 'This Computer · Active' and
+                     app.file_pane_labels[False].get_text() == 'C64 Ultimate' and
                      app.file_pane_boxes[True].has_css_class(
                          'argonaut-file-pane-active') and
                      app.file_pane_boxes[False].has_css_class(
