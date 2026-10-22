@@ -301,3 +301,88 @@ do not establish real Docker create/start/stop cancellation semantics or GitHub
 runner cancellation grace periods. Real container and all seven hosted acceptance
 runs remain unverified; SIGKILL, host loss and cancellation deadlines can prevent
 cleanup and artifact retention.
+
+## Linux package verification (P4-4)
+
+`.github/workflows/linux-verification.yml` adds two independent hosted Ubuntu
+24.04 jobs: `linux-build`, then `linux-package-smoke` on successful artifact
+verification. Only explicit `workflow_dispatch` starts this workflow; pushes and
+pull requests cannot start it. Dispatch requires separate execution approval and
+uses the actual checkout SHA.
+Neither job publishes a release. Existing P4-2 executions, P4-3 Markdown checks,
+and the unresolved GTK geometry exception above remain unchanged.
+
+The bounded contract in `tools/linux/contract.json` fixes Development version
+`1.10~dev2` (`1.10-dev2`), the exact payload inventory, Debian control fields,
+and the complete installed self-test ID set. Payload or test-ID changes require
+reviewing this contract. The runner uses `git archive` of the verified HEAD,
+rejects tracked changes, links and submodules, and excludes untracked fixtures
+and Git metadata. It supplies the full source SHA and positive commit epoch to
+the existing `packaging/build_deb.py`; it never stamps the checkout. Final archive
+contents must match that builder's staging output byte for byte, alongside the
+independent inventory, control, metadata, path, ownership, mode and epoch checks.
+No maintainer scripts, links, extra control files or unresolved unit placeholders
+are accepted. Build evidence is embedded; every payload hash is retained.
+
+Dependency-only images are acquired before isolation, using a recorded Ubuntu
+base digest. Separate build and runtime targets record installed apt versions.
+Build code runs nonroot with no network, read-only source/root, no capabilities,
+no-new-privileges, two CPUs, 2 GiB memory, 256 processes and a 512 MiB temporary
+filesystem. Only evidence/output is writable outside temporary storage. The
+runtime has no application source mount, host sockets or passed-through devices.
+Root is confined to disposable install/reinstall/removal containers with narrowly
+limited filesystem capabilities. Services and timers are never enabled or started.
+
+The smoke job downloads only the verified package, verification manifest and
+checksum file. The build job passes the manifest SHA-256 separately as a job
+output; the smoke job verifies it, the source SHA, package checksum and complete
+archive before installation. It installs and reinstalls those exact bytes,
+checks installed hashes/identity, then runs the installed launcher with private
+HOME/XDG directories, Xvfb without TCP, and a private D-Bus session. GTK, Secret,
+GStreamer and GstPbutils preflight checks use only the runtime dependency closure;
+`gir1.2-gst-plugins-base-1.0` is declared in shared Stable/Development Depends,
+the runtime image and the exact contract. Runtime image build arguments map the
+host UID/GID to the container runtime account, reusing an existing group ID and
+replacing an existing user at that UID. Preflight checks numeric and named account
+resolution and the private bus connection authenticated UID before GTK testing.
+Identity, D-Bus, typelib, GTK and factory results/errors are persisted incrementally.
+Missing dependencies fail instead of silently expanding that closure. Preflight
+and the existing `--self-test` share a 180-second deadline. Every expected ID must
+appear exactly once and pass. Removal runs after a smoke failure only when daemon
+container termination is verified, and checks
+payload removal and retention of a synthetic Development configuration marker.
+This is not a real-user upgrade or configuration migration test.
+
+The host supervisor bounds commands, records container names before creation,
+kills timed-out child process groups, then bounds daemon stop/kill and inspects
+container state before proceeding. Unverified termination skips removal testing;
+termination errors and final state are retained. Global cleanup removes all
+job-labelled containers and reports cleanup errors.
+An independent `always()` cleanup repeats the absence check. Pending creation,
+OOM, nonzero exit, timeout, malformed/missing reports and cleanup failures fail
+closed. Evidence includes stage status, logs, container state, cleanup history,
+source SHA/epoch, base/built/installed image identities, dependency inventories,
+GTK/media versions and factories, the verified package and SHA-256 records.
+Artifacts are retained for 14 days, including available failure evidence. Runner
+loss or cancellation can still prevent final cleanup or artifact upload.
+
+Static/synthetic validation requires no Docker, packages, GUI or device access:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p test_debian_packaging.py
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/linux -p test_verify.py
+PYTHONDONTWRITEBYTECODE=1 python3 -O -m unittest discover -s tools/linux -p test_verify.py
+```
+
+Actual image/package builds, installations and hosted execution need separate
+approval. After approval, use a committed candidate in a disposable checkout and
+a fresh output directory; `python3 tools/linux/run.py --help` lists the bounded
+build/smoke/cleanup interfaces. Internal child phases are not isolation entry
+points. Local unstaged implementation files are intentionally absent from a Git
+archive and do not establish candidate qualification.
+
+Implementation and synthetic passes are not hosted acceptance. Both jobs must
+pass on the exact candidate, including artifact transfer, isolation and cleanup;
+failure/timeout/interruption paths also need hosted qualification. Ubuntu success
+does not qualify Debian 13, physical C64U hardware, streaming, Windows/macOS or
+release acceptance, and cannot close the documented GTK geometry failure.

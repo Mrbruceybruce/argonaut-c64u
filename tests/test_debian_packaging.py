@@ -20,6 +20,11 @@ def no_package_build(command, *args, **kwargs):
     return real_run(command,*args,**kwargs)
 
 class DebianPackaging(unittest.TestCase):
+    def assert_dependencies(self, root):
+        lines=(root/'DEBIAN/control').read_text().splitlines()
+        depends=[line.removeprefix('Depends: ') for line in lines if line.startswith('Depends: ')]
+        self.assertEqual(['python3 (>= 3.11), python3-gi, gir1.2-gtk-4.0 (>= 4.8), gir1.2-secret-1, gir1.2-gstreamer-1.0, gir1.2-gst-plugins-base-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, iproute2, adwaita-icon-theme'],depends)
+
     def test_development_notes_override_versioned_and_historical_notes(self):
         with tempfile.TemporaryDirectory() as directory:
             assets=Path(directory)
@@ -52,6 +57,7 @@ class DebianPackaging(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{},clear=True),patch.object(builder.subprocess,'run',side_effect=no_package_build):
             root=Path(directory)
             package,epoch=builder.stage_package(ROOT,root,'1.10~dev2',True)
+            self.assert_dependencies(root)
             self.assertEqual('argonaut-c64u-development',package);self.assertGreater(epoch,0)
             modules=root/'usr/lib/argonaut-development/c64u_browser'
             data=json.loads((modules/'_build.json').read_text())
@@ -79,6 +85,7 @@ class DebianPackaging(unittest.TestCase):
     def test_stable_staging_keeps_stable_identity_and_notes(self):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{},clear=True),patch.object(builder.subprocess,'run',side_effect=no_package_build):
             root=Path(directory);package,_=builder.stage_package(ROOT,root,'1.9')
+            self.assert_dependencies(root)
             self.assertEqual('argonaut-c64u',package)
             data=json.loads((root/'usr/lib/argonaut/c64u_browser/_build.json').read_text())
             self.assertEqual('1.9',data['version']);self.assertNotIn('development',data)

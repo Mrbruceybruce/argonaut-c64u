@@ -1,0 +1,89 @@
+name: Linux package verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ARGONAUT_LINUX_JOB: argonaut-${{ github.run_id }}-linux-build-${{ github.run_attempt }}
+    outputs:
+      manifest_sha: ${{ steps.handoff.outputs.manifest_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Static and synthetic contracts
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p test_debian_packaging.py
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/linux -p test_verify.py
+          PYTHONDONTWRITEBYTECODE=1 python3 -O -m unittest discover -s tools/linux -p test_verify.py
+      - name: Build and verify tracked-source Development package
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: python3 tools/linux/run.py build --source "$GITHUB_WORKSPACE" --sha "$SOURCE_SHA" --output linux-results
+      - name: Independently verify container cleanup
+        if: always()
+        run: python3 tools/linux/run.py cleanup --output linux-results
+      - name: Select exact verified handoff
+        id: handoff
+        run: |
+          set -euo pipefail
+          mkdir linux-handoff
+          cp linux-results/argonaut-c64u-development_1.10~dev2_all.deb linux-results/verified.json linux-results/SHA256SUMS linux-handoff/
+          echo "manifest_sha=$(sha256sum linux-handoff/verified.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-package-${{ github.run_attempt }}
+          path: linux-handoff/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain build evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-build-evidence-${{ github.run_attempt }}
+          path: linux-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  linux-package-smoke:
+    needs: linux-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ARGONAUT_LINUX_JOB: argonaut-${{ github.run_id }}-linux-smoke-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          # Only orchestration files enter the host checkout; no app source in runtime.
+          sparse-checkout: tools/linux
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-package-${{ github.run_attempt }}
+          path: linux-handoff
+      - name: Offline install, installed self-test, reinstall and removal
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          MANIFEST_SHA: ${{ needs.linux-build.outputs.manifest_sha }}
+        run: |
+          python3 tools/linux/run.py smoke --input linux-handoff --sha "$SOURCE_SHA" \
+            --manifest-sha "$MANIFEST_SHA" --output linux-results
+      - name: Independently verify container cleanup
+        if: always()
+        run: python3 tools/linux/run.py cleanup --output linux-results
+      - name: Retain smoke evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-smoke-evidence-${{ github.run_attempt }}
+          path: linux-results/
+          if-no-files-found: warn
+          retention-days: 14

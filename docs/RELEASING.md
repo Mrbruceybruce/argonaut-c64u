@@ -150,3 +150,38 @@ their tags and retained Actions evidence remain. Do not recreate those downloads
 or dispatch publishers from historical commits. Removing current workflow files
 does not erase copies in historical commits or tags. Versioned release notes and
 old test records describe their original period, not current release instructions.
+
+## Nonpublishing Linux verification (P4-4)
+
+The separate `linux-verification.yml` workflow verifies the Development
+`1.10~dev2` package on hosted Ubuntu 24.04. It uses the existing Debian builder
+and installed launcher self-test. It runs only through explicitly approved manual
+`workflow_dispatch`, with no push or pull-request triggers. Stable and Development
+staging tests explicitly check the full dependency declaration before build.
+It has no tag, release, signing or publication
+path and does not replace the local Debian acceptance gate above. The retained
+historical cross-platform workflows remain unchanged.
+
+See [Linux package verification](DEVELOPMENT.md#linux-package-verification-p4-4)
+for the two-job contract, isolation, validation commands and evidence. The build
+artifact contains exactly one `.deb`, `verified.json` and `SHA256SUMS`. A separately
+passed manifest digest binds smoke testing to the exact verified package; smoke
+never rebuilds it. Evidence artifacts retain source SHA/epoch, per-file hashes,
+control metadata, embedded build evidence, image identities, dependency versions,
+logs, self-test/preflight reports where available, and cleanup results. Apt/base
+resolution is recorded per run; this is traceability, not a reproducible-build
+claim or a signed release manifest.
+
+Both new jobs and their artifact-transfer/cleanup gates require hosted validation
+on the exact candidate before P4-4 acceptance. Static and synthetic validation
+alone does not qualify a package. Package builds, disposable installations,
+hosted execution and any later publication remain separate approval gates.
+The shared dependency declaration, runtime image and exact contract include
+`gir1.2-gst-plugins-base-1.0`. Preflight persists incremental identity, authenticated
+private D-Bus UID, typelib, GTK and factory evidence. Removal testing is skipped
+if bounded stop/kill cannot verify smoke-container termination. Cleanup errors
+remain failures. Runtime preflight fails on missing GTK/media typelibs or factories;
+changing package dependencies or adding another platform needs separate scope
+approval. Ubuntu success does not establish Debian 13 or physical C64U
+qualification, close the existing GTK geometry regression, qualify streaming,
+or authorize a Stable release. P4-1 inventory reconciliation remains open.
