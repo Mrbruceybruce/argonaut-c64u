@@ -2,30 +2,47 @@ name: Linux package verification
 
 on:
   workflow_dispatch:
+    inputs:
+      qualify:
+        description: Qualify the approved Linux development candidate
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
 
+env:
+  SOURCE_SHA: 8f0941971d06dd85b2dc955a925d00510eca2592
+
 jobs:
   linux-build:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.qualify }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       ARGONAUT_LINUX_JOB: argonaut-${{ github.run_id }}-linux-build-${{ github.run_attempt }}
     outputs:
       manifest_sha: ${{ steps.handoff.outputs.manifest_sha }}
+      artifact_name: ${{ steps.handoff.outputs.artifact_name }}
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: 8f0941971d06dd85b2dc955a925d00510eca2592
           persist-credentials: false
+      - name: Verify approved candidate identity and clean checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD:.github/workflows/linux-verification.yml)" = "c2e67aa11b82a886ac1a371bf677df2992166519"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
       - name: Static and synthetic contracts
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p test_debian_packaging.py
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/linux -p test_verify.py
           PYTHONDONTWRITEBYTECODE=1 python3 -O -m unittest discover -s tools/linux -p test_verify.py
       - name: Build and verify tracked-source Development package
-        env:
-          SOURCE_SHA: ${{ github.sha }}
         run: python3 tools/linux/run.py build --source "$GITHUB_WORKSPACE" --sha "$SOURCE_SHA" --output linux-results
       - name: Independently verify container cleanup
         if: always()
@@ -36,10 +53,11 @@ jobs:
           set -euo pipefail
           mkdir linux-handoff
           cp linux-results/argonaut-c64u-development_1.10~dev2_all.deb linux-results/verified.json linux-results/SHA256SUMS linux-handoff/
+          echo "artifact_name=linux-package-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
           echo "manifest_sha=$(sha256sum linux-handoff/verified.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
-          name: linux-package-${{ github.run_attempt }}
+          name: ${{ steps.handoff.outputs.artifact_name }}
           path: linux-handoff/
           if-no-files-found: error
           retention-days: 14
@@ -53,6 +71,7 @@ jobs:
           retention-days: 14
 
   linux-package-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.qualify }}
     needs: linux-build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -61,17 +80,24 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: 8f0941971d06dd85b2dc955a925d00510eca2592
           persist-credentials: false
           # Only orchestration files enter the host checkout; no app source in runtime.
           sparse-checkout: tools/linux
           sparse-checkout-cone-mode: false
+      - name: Verify approved candidate identity and clean checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD:.github/workflows/linux-verification.yml)" = "c2e67aa11b82a886ac1a371bf677df2992166519"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
       - uses: actions/download-artifact@v8
         with:
-          name: linux-package-${{ github.run_attempt }}
+          name: ${{ needs.linux-build.outputs.artifact_name }}
           path: linux-handoff
       - name: Offline install, installed self-test, reinstall and removal
         env:
-          SOURCE_SHA: ${{ github.sha }}
           MANIFEST_SHA: ${{ needs.linux-build.outputs.manifest_sha }}
         run: |
           python3 tools/linux/run.py smoke --input linux-handoff --sha "$SOURCE_SHA" \
