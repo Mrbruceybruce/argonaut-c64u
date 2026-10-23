@@ -388,6 +388,7 @@
     "test_package_credential_channel": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_package_identity": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_package_self_test": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_package_ui_predicates": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_partial_authority": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_picker_model": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_platform_support": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
