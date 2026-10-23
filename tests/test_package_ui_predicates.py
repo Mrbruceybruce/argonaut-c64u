@@ -3,7 +3,7 @@ import ast
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from c64u_browser import package_self_test
 
@@ -18,7 +18,8 @@ class PackageUiPredicates(unittest.TestCase):
         run = next(node for node in tree.body
                    if isinstance(node, ast.FunctionDef) and node.name == 'run')
         cls.checks = {}
-        for check_id in ('ui.connection_header', 'ui.active_file_pane'):
+        for check_id in ('ui.connection_header', 'ui.active_file_pane',
+                         'development.preferences_ui'):
             calls = [node for node in ast.walk(run)
                      if isinstance(node, ast.Call)
                      and isinstance(node.func, ast.Name)
@@ -52,9 +53,9 @@ class PackageUiPredicates(unittest.TestCase):
         self.app.file_pane_boxes[False].has_css_class.side_effect = (
             lambda name: name == 'argonaut-file-pane-inactive')
 
-    def exercise(self, check_id, passed):
+    def exercise(self, check_id, passed, **extra):
         checks = []
-        namespace = dict(vars(package_self_test), app=self.app, checks=checks)
+        namespace = dict(vars(package_self_test), app=self.app, checks=checks, **extra)
         if passed:
             eval(self.checks[check_id], namespace)
             self.assertEqual(checks, [{'id': check_id, 'status': 'pass'}])
@@ -108,6 +109,124 @@ class PackageUiPredicates(unittest.TestCase):
                 self.app.file_pane_boxes[local].has_css_class.side_effect = None
                 self.app.file_pane_boxes[local].has_css_class.return_value = False
                 self.exercise('ui.active_file_pane', False)
+
+    def test_complete_settings_predicate(self):
+        for pages, model_editable, case_editable, passed in (
+            (4, False, True, True), (3, False, True, False),
+            (5, False, True, False), (4, True, True, False),
+            (4, False, False, False),
+        ):
+            with self.subTest(pages=pages, model=model_editable, case=case_editable):
+                dialog = SimpleNamespace(
+                    pages=Mock(get_n_pages=Mock(return_value=pages)),
+                    connections=SimpleNamespace(
+                        model=Mock(get_editable=Mock(return_value=model_editable)),
+                        fields={'case_edition': Mock(
+                            get_editable=Mock(return_value=case_editable))}))
+                self.exercise('development.preferences_ui', passed,
+                              preferences_dialog=dialog)
+
+
+class PackageDriveSelection(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Execute the real setup, call, verdict and finally from run(), without
+        # starting the packaged application or creating a device transport.
+        source = Path(package_self_test.__file__)
+        tree = ast.parse(source.read_text(encoding='utf-8'))
+        blocks = [node for node in ast.walk(tree) if isinstance(node, ast.Try)
+                  and any(isinstance(child, ast.Name)
+                          and child.id == 'saved_device_session'
+                          for final in node.finalbody for child in ast.walk(final))]
+        if len(blocks) != 1:
+            raise AssertionError('Expected one scoped drive selection block')
+        block = blocks[0]
+        parent = next(node for node in ast.walk(tree)
+                      if isinstance(getattr(node, 'body', None), list)
+                      and block in node.body)
+        index = parent.body.index(block)
+        cls.setup_and_call = compile(ast.Module(
+            body=parent.body[index - 4:index + 1], type_ignores=[]), str(source), 'exec')
+
+    def setUp(self):
+        import gi
+        gi.require_version('Gtk', '4.0')
+        from c64u_browser.drives_tab import DrivesTab
+        from c64u_browser.scheduler import DeviceSession
+        self.original = Mock(return_value=DeviceSession('', ''))
+        # Strict core has no connection, execution, or transport methods.
+        self.core = SimpleNamespace(device_session=self.original)
+        self.tab = DrivesTab.__new__(DrivesTab)
+        self.app = SimpleNamespace(core=self.core, drives_tab=self.tab)
+        self.tab.app = self.app
+        self.path = Mock()
+        self.path.set_text.side_effect = lambda text: setattr(self.path.get_text, 'return_value', text)
+        self.tab.cards = {'a': {'path': self.path, 'selection': None}}
+        self.tab.message = Mock()
+        self.tab.message.set_text.side_effect = lambda text: setattr(
+            self.tab.message.get_text, 'return_value', text)
+        self.tab.setting_path = False
+        self.checks = []
+
+    def exercise(self):
+        try:
+            exec(self.setup_and_call, dict(vars(package_self_test),
+                                          app=self.app, checks=self.checks))
+        finally:
+            self.assertIs(self.core.device_session, self.original)
+            self.original.assert_not_called()
+
+    def test_actual_setup_selects_typed_image_and_restores_provider(self):
+        from c64u_browser.picker_model import PickerSelection, PickerError
+        self.exercise()
+        selection = self.tab.cards['a']['selection']
+        self.assertIsInstance(selection, PickerSelection)
+        self.assertTrue(selection.device_id)
+        self.assertTrue(selection.session_id)
+        self.assertEqual(selection.path, '/USB2/PACKAGE.D64')
+        self.assertEqual(self.checks, [{'id': 'ui.disk_mount_selection', 'status': 'pass'}])
+        # The captured reference is unusable after leaving the simulated scope.
+        with self.assertRaises(PickerError):
+            self.tab.select_image(selection)
+
+    def test_invalid_and_stale_selections_restore_provider(self):
+        from dataclasses import replace
+        from c64u_browser.drives_selection import remote_selection
+        from c64u_browser.api import BrowserError
+        from c64u_browser.picker_model import PickerError
+        for change in (lambda s: s.path, lambda s: replace(s, scope='core-host'),
+                       lambda s: replace(s, storage_root='/USB0'),
+                       lambda s: replace(s, session_id='stale'),
+                       lambda s: replace(s, device_id='other')):
+            with self.subTest(change=change):
+                self.setUp()
+                with patch('c64u_browser.drives_selection.remote_selection',
+                           side_effect=lambda path, session: change(remote_selection(path, session))):
+                    with self.assertRaises((BrowserError, PickerError)):
+                        self.exercise()
+                self.path.set_text.assert_not_called()
+                self.assertEqual(self.checks, [])
+
+    def test_restores_provider_when_construction_or_ui_raises(self):
+        for target in ('construction', 'ui'):
+            with self.subTest(target=target):
+                self.setUp()
+                failing = (patch('c64u_browser.drives_selection.remote_selection',
+                                 side_effect=RuntimeError('fixture')) if target == 'construction'
+                           else patch.object(self.path, 'set_text', side_effect=RuntimeError('fixture')))
+                with failing, self.assertRaisesRegex(RuntimeError, 'fixture'):
+                    self.exercise()
+                self.assertFalse(self.tab.setting_path)
+                self.assertEqual(self.checks, [])
+
+    def test_restores_provider_when_complete_verdict_fails(self):
+        for control in (self.path, self.tab.message):
+            with self.subTest(control=control):
+                with patch.object(control.get_text, 'return_value', 'incorrect'):
+                    with patch.object(control.set_text, 'side_effect', None):
+                        with self.assertRaises(package_self_test.PackageSelfTestFailure):
+                            self.exercise()
+                self.assertEqual(self.checks, [])
 
 
 if __name__ == '__main__':

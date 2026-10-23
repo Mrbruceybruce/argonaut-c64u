@@ -367,12 +367,22 @@ def run(package_metadata, report_path):
             _require(app.controls.get_sensitive(),
                      'ui.disk_parent_restore',
                      'Closing the disk directory did not restore the main window.', checks)
-            app.drives_tab.select_image('/USB2/PACKAGE.D64')
-            _require(app.drives_tab.cards['a']['path'].get_text() ==
-                     '/USB2/PACKAGE.D64' and
-                     'selected for Drive A' in app.drives_tab.message.get_text(),
-                     'ui.disk_mount_selection',
-                     'A C64U disk image could not be prepared for Drive A.', checks)
+            from .drives_selection import remote_selection
+            from .scheduler import DeviceSession
+            saved_device_session = app.core.device_session
+            simulated_session = DeviceSession('package-self-test', 'offline-selection')
+            try:
+                # Selection updates UI only; never connect, mount, or execute.
+                app.core.device_session = lambda: simulated_session
+                app.drives_tab.select_image(remote_selection(
+                    '/USB2/PACKAGE.D64', simulated_session))
+                _require(app.drives_tab.cards['a']['path'].get_text() ==
+                         '/USB2/PACKAGE.D64' and
+                         'selected for Drive A' in app.drives_tab.message.get_text(),
+                         'ui.disk_mount_selection',
+                         'A C64U disk image could not be prepared for Drive A.', checks)
+            finally:
+                app.core.device_session = saved_device_session
             d71_data = bytearray(349696)
             d71_data[header_offset:header_offset + 4] = bytes((18, 1, 0x41, 0x80))
             d71_data[header_offset + 0x90:header_offset + 0xa0] = (
@@ -443,7 +453,7 @@ def run(package_metadata, report_path):
                          'Development credentials are not session-only.', checks)
                 from .app_preferences import show_preferences
                 preferences_dialog = show_preferences(app)
-                _require(preferences_dialog.pages.get_n_pages() == 3 and
+                _require(preferences_dialog.pages.get_n_pages() == 4 and
                          not preferences_dialog.connections.model.get_editable() and
                          preferences_dialog.connections.fields[
                              'case_edition'].get_editable(),
