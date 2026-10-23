@@ -87,7 +87,8 @@ def show_preferences(app, page=0):
     def destroy():
         managed=app.managed_library_view
         managed.detach_settings()
-        pages.remove_page(pages.page_num(managed.settings_box))
+        library_scroll.set_child(None)
+        pages.remove_page(pages.page_num(library_scroll))
         app.preferences_dialog=None
         dialog.destroy()
         GLib.idle_add(restore_parent_focus)
@@ -250,7 +251,11 @@ def show_preferences(app, page=0):
     pages.append_page(about_page(),Gtk.Label(label='About'))
     managed=app.managed_library_view
     managed.attach_settings(dialog)
-    pages.append_page(managed.settings_box,Gtk.Label(label='Game Library'))
+    # Every page must scroll: Gtk.Notebook includes hidden pages in its minimum size.
+    library_scroll=Gtk.ScrolledWindow(vexpand=True,
+        hscrollbar_policy=Gtk.PolicyType.NEVER)
+    library_scroll.set_child(managed.settings_box)
+    pages.append_page(library_scroll,Gtk.Label(label='Game Library'))
     dialog.connections=connections
     def request_close():
         if app.busy:return
