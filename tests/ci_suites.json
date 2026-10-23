@@ -71,6 +71,12 @@
           "tests": 27,
           "timeout_seconds": 120,
           "audit": "Synthetic subprocesses and mocked Docker only; verifies launch rejection, malformed isolation evidence, UID/capability/interface/route and child gates, timeout/real TERM and INT delivery through shell/supervisor/child chains, tracked snapshots, partial diagnostics, delayed creation uncertainty and cleanup failures."
+        },
+        {
+          "selector": "test_mainloop_diagnostics.MainloopDiagnosticsTests",
+          "tests": 15,
+          "timeout_seconds": 120,
+          "audit": "Fake clock, callbacks, device/media boundaries and private temporary reports; bounded local worker cleanup; no device, sockets, DNS or application launch."
         }
       ]
     },

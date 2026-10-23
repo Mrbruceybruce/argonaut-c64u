@@ -2,6 +2,7 @@
 # Copyright (C) 2026 Bruce Marcus
 """GTK4 client; presentation work uses its worker and Core schedules its jobs."""
 from . import development
+from .mainloop_diagnostics import observed, start_diagnostics
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from pathlib import Path
@@ -192,6 +193,7 @@ class Browser(Gtk.Application):
         # widgets stable while Core becomes the sole owner of connection state.
         self.preferences = self.core.preferences
         self.preferences_error = self.core.preferences_error
+        self.mainloop_diagnostics = None
         self.operation_log = None
         self.operation_log_error = None
         if test_lab_enabled(self.preferences):
@@ -222,6 +224,8 @@ class Browser(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
+        self.mainloop_diagnostics = start_diagnostics(
+            self.preferences, GLib.timeout_add, GLib.source_remove)
         self.appearance = AppearanceFollower(Gdk.Display.get_default())
         # GTK's macOS/Quartz backend only enables the app-menu "Quit" item and
         # the Cmd+Q accelerator if an "app.quit" action actually exists; without
@@ -235,6 +239,9 @@ class Browser(Gtk.Application):
 
 
     def do_shutdown(self):
+        if self.mainloop_diagnostics is not None:
+            self.mainloop_diagnostics.close()
+            self.mainloop_diagnostics = None
         self.cleanup_closed = True
         for review in tuple(getattr(self, '_file_reviews', ())):review.retire()
         if self.upload_cleanup is not None:self.upload_cleanup.close()
@@ -252,6 +259,13 @@ class Browser(Gtk.Application):
         else:
             self.pool.shutdown(wait=False)
             self.quit()
+
+    @observed('navigation')
+    def on_switch_page(self, _, page, index):
+        if index == 1:
+            return self.settings_tab.load_if_needed()
+        if index == 2:
+            return self.drives_tab.load_if_needed()
 
     def do_activate(self):
         # A second launcher activation must present the existing app, not create
@@ -323,7 +337,7 @@ class Browser(Gtk.Application):
             from .test_lab_tab import TestLabTab
             self.test_lab_tab = TestLabTab(self)
             self.tabs.append_page(self.test_lab_tab.box, Gtk.Label(label='Test Lab'))
-        self.tabs.connect('switch-page', lambda _, page, index: self.settings_tab.load_if_needed() if index == 1 else self.drives_tab.load_if_needed() if index == 2 else None)
+        self.tabs.connect('switch-page', self.on_switch_page)
         self.status_region = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.status_region.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
         outer.append(self.status_region)
