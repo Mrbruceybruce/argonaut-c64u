@@ -1,0 +1,66 @@
+name: P4-4 pinned Ubuntu dpkg inspection
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      IMAGE: ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
+      EXPECTED_ID: sha256:6277ab668b2ad3c3ab851d370faa1690d324b30db29d342527f61fed28f20f36
+    steps:
+      # No checkout, package download, build, installation or qualification.
+      - name: Read pinned base configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir evidence
+          exec > >(tee evidence/inspection.log) 2>&1
+          finish() {
+            code=$?
+            trap - EXIT
+            printf 'inspection_exit_code=%s\n' "$code" | tee evidence/outcome.txt
+            printf 'Base configuration inspection only. Runtime-derived image was not recreated; P4-4 remains unqualified.\n' >> evidence/outcome.txt
+            cat evidence/outcome.txt >> "$GITHUB_STEP_SUMMARY"
+            exit "$code"
+          }
+          trap finish EXIT
+          printf 'failed_run=39704056382\ncandidate=728359a6ba01b0a4be3b16cfdaa99bb5375dc668\nbase=%s\n' "$IMAGE" | tee evidence/provenance.txt
+          printf 'original_install_image=sha256:6feebbe2ba02c6c1e53136d92994c2008baecfc5299d7bd90fcecf83d5ce015f\n' >> evidence/provenance.txt
+          docker pull --platform linux/amd64 "$IMAGE"
+          docker image inspect "$IMAGE" > evidence/image.json
+          test "$(docker image inspect --format '{{.Id}}' "$IMAGE")" = "$EXPECTED_ID"
+          docker run --rm --pull=never --platform linux/amd64 \
+            --read-only --network none --cap-drop ALL \
+            --security-opt no-new-privileges --user 65534:65534 \
+            --cpus 1 --memory 128m --pids-limit 32 \
+            --env LC_ALL=C --entrypoint /bin/sh "$IMAGE" -eu -c '
+              dpkg --version
+              printf "\nConfiguration inventory (including ignored filenames):\n"
+              ls -la /etc/dpkg/dpkg.cfg /etc/dpkg/dpkg.cfg.d
+              for f in /etc/dpkg/dpkg.cfg.d/* /etc/dpkg/dpkg.cfg; do
+                [ -e "$f" ] || continue
+                printf "\nFILE %s\n" "$f"
+                test -f "$f"
+                test -r "$f"
+                sha256sum "$f"
+                nl -ba "$f"
+                printf "PATH RULES IN FILE ORDER: %s\n" "$f"
+                awk "/^[[:space:]]*path-(exclude|include)/ { print FNR \":\" \$0 }" "$f"
+              done
+              printf "\nInspection complete; raw rules require review. No install or hypothesis verdict performed.\n"
+            ' | tee evidence/dpkg-config.txt
+      - name: Retain diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: p44-dpkg-inspection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
