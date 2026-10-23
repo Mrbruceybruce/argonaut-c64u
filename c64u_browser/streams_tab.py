@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from gi.repository import Gtk,Gdk,GLib,Gio
+from .mainloop_diagnostics import observed
 from .streaming import StreamSession,AudioOutput,rgb_frame
 
 
@@ -78,6 +79,7 @@ class StreamsTab:
         self.audio.set_sensitive(not running)
         self.update_replay_status()
 
+    @observed('replay-toggle')
     def set_replay_enabled(self,enabled):
         """Apply the opt-in preference without interrupting normal preview."""
         if not enabled and self.replay:
@@ -109,6 +111,7 @@ class StreamsTab:
             bool(enabled and self.replay and self.replay.retained_seconds>0
                  and not self.replay_chooser and not self.replay_exporting))
 
+    @observed('stream-start')
     def start(self,*_):
         if not self.client or (self.session and self.session.thread.is_alive()):return
         self.app.preferences.app_options['preview_audio']=self.audio.get_active();self.app.save_app_preferences()
@@ -122,6 +125,7 @@ class StreamsTab:
         self.status.set_text('Starting preview…');self.update_buttons()
         if self.timer is None:self.timer=GLib.timeout_add(33,self.tick)
 
+    @observed('stream-stop')
     def stop(self,*_):
         if self.recorder:self.recorder.stop()
         if self.replay:self.replay.close();self.replay=None
@@ -132,6 +136,7 @@ class StreamsTab:
         self.picture.set_paintable(None);self.capture_button.set_sensitive(False)
         self.update_replay_status()
 
+    @observed('stream-tick')
     def tick(self):
         session=self.session
         if not session:return False
@@ -229,6 +234,7 @@ class StreamsTab:
         chooser.connect('response',response);chooser.show()
         return chooser
 
+    @observed('record')
     def record(self,*_):
         if self.recorder:
             self.recorder.stop();return
@@ -296,6 +302,7 @@ class StreamsTab:
         chooser.connect('response',response);chooser.show()
         return chooser
 
+    @observed('stream-close')
     def close(self):
         if self.record_chooser:self.record_chooser.destroy();self.record_chooser=None
         if self.capture_chooser:self.capture_chooser.destroy();self.capture_chooser=None
