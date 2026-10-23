@@ -14,6 +14,11 @@ from c64u_browser.mainloop_diagnostics import (
 )
 
 
+SECURE_DIRECTORIES = (hasattr(os, 'O_NOFOLLOW') and hasattr(os, 'O_DIRECTORY')
+                      and os.open in os.supports_dir_fd
+                      and os.mkdir in os.supports_dir_fd and hasattr(os, 'fchmod'))
+
+
 class MainloopDiagnosticsTests(unittest.TestCase):
     def setUp(self):
         self.now = 0.0
@@ -131,15 +136,16 @@ class MainloopDiagnosticsTests(unittest.TestCase):
                 environ={'ARGONAUT_MAINLOOP_DIAGNOSTICS': '1'}))
         remove.assert_called_once_with(3)
 
+    @unittest.skipUnless(SECURE_DIRECTORIES, 'Requires secure directory operations')
     def test_file_retention_size_permissions_and_overwrite(self):
         with tempfile.TemporaryDirectory() as folder:
-            prefs = Path(folder) / 'config.json'
+            prefs = Path(folder).resolve() / 'config.json'
             self.now = 5
             self.monitor.check()
             report = self.reports[0]
             report['threads']['items'] *= 1000
             write_report(prefs, report)
-            path = Path(folder) / 'diagnostics/mainloop-stall.json'
+            path = Path(folder).resolve() / 'diagnostics/mainloop-stall.json'
             self.assertLessEqual(path.stat().st_size, MAX_BYTES)
             self.assertTrue(json.loads(path.read_text())['threads']['threads_truncated'])
             report['threads']['items'] = []
@@ -150,10 +156,10 @@ class MainloopDiagnosticsTests(unittest.TestCase):
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
                 self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
 
-    @unittest.skipUnless(hasattr(os, 'O_NOFOLLOW'), 'Requires no-follow support')
+    @unittest.skipUnless(SECURE_DIRECTORIES, 'Requires secure directory operations')
     def test_report_does_not_follow_file_symlink(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            root = Path(folder).resolve()
             (root / 'diagnostics').mkdir()
             target = root / 'private'
             target.write_text('preserve')
@@ -161,6 +167,87 @@ class MainloopDiagnosticsTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 write_report(root / 'config.json', {'threads': {'items': []}})
             self.assertEqual(target.read_text(), 'preserve')
+
+    @unittest.skipUnless(SECURE_DIRECTORIES, 'Requires secure directory operations')
+    def test_directory_symlinks_leave_targets_untouched(self):
+        for component in ('diagnostics', 'parent'):
+            with self.subTest(component=component), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder).resolve()
+                target = root / 'target'
+                target.mkdir(mode=0o755)
+                existing = target / 'mainloop-stall.json'
+                existing.write_text('preserve')
+                existing.chmod(0o644)
+                before = (target.stat().st_mode, existing.stat().st_mode)
+                (root / component).symlink_to(target, target_is_directory=True)
+                prefs = root / 'config.json' if component == 'diagnostics' else root / 'parent/config.json'
+                with self.assertRaises(OSError):
+                    write_report(prefs, {'threads': {'items': []}})
+                self.assertEqual(existing.read_text(), 'preserve')
+                self.assertEqual((target.stat().st_mode, existing.stat().st_mode), before)
+                self.assertEqual(list(target.iterdir()), [existing])
+
+    @unittest.skipUnless(SECURE_DIRECTORIES, 'Requires secure directory operations')
+    def test_directory_non_directory_and_dangling_symlink_fail_closed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            directory = root / 'diagnostics'
+            directory.write_text('preserve')
+            before = directory.stat().st_mode
+            with self.assertRaises(OSError):
+                write_report(root / 'config.json', {'threads': {'items': []}})
+            self.assertEqual(directory.read_text(), 'preserve')
+            self.assertEqual(directory.stat().st_mode, before)
+            directory.unlink()
+            directory.symlink_to(root / 'missing', target_is_directory=True)
+            with self.assertRaises(OSError):
+                write_report(root / 'config.json', {'threads': {'items': []}})
+            self.assertFalse((root / 'missing').exists())
+
+    @unittest.skipUnless(SECURE_DIRECTORIES, 'Requires secure directory operations')
+    def test_safe_nested_directory_creation_and_permission_repair(self):
+        with tempfile.TemporaryDirectory() as folder:
+            prefs = Path(folder).resolve() / 'nested/settings/config.json'
+            report = {'threads': {'items': []}}
+            write_report(prefs, report)
+            directory = prefs.parent / 'diagnostics'
+            path = directory / 'mainloop-stall.json'
+            directory.chmod(0o755)
+            path.chmod(0o644)
+            write_report(prefs, report)
+            self.assertEqual(json.loads(path.read_text()), report)
+            self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    @unittest.skipUnless(SECURE_DIRECTORIES, 'Requires secure directory operations')
+    def test_directory_replaced_before_open_does_not_redirect_write(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            directory = root / 'diagnostics'
+            directory.mkdir()
+            target = root / 'target'
+            target.mkdir(mode=0o755)
+            original_open = os.open
+            def replace_then_open(path, flags, *args, **kwargs):
+                if path == 'diagnostics':
+                    directory.rmdir()
+                    directory.symlink_to(target, target_is_directory=True)
+                return original_open(path, flags, *args, **kwargs)
+            with patch('os.open', side_effect=replace_then_open) as mocked_open:
+                with patch.object(os, 'supports_dir_fd', os.supports_dir_fd | {mocked_open}):
+                    with self.assertRaises(OSError):
+                        write_report(root / 'config.json', {'threads': {'items': []}})
+            self.assertEqual(target.stat().st_mode & 0o777, 0o755)
+            self.assertEqual(list(target.iterdir()), [])
+
+    def test_unsupported_secure_operations_are_contained_once(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.monitor.sink = lambda report: write_report(Path(folder).resolve() / 'config.json', report)
+            self.now = 5
+            with patch.object(os, 'supports_dir_fd', set()):
+                self.assertTrue(self.monitor.check())
+                self.assertFalse(self.monitor.check())
+            self.assertEqual(list(Path(folder).resolve().iterdir()), [])
 
     def test_disabled_callbacks_passthrough(self):
         owner = SimpleNamespace(mainloop_diagnostics=None)

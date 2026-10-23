@@ -165,6 +165,34 @@ class Watchdog:
             worker.join(timeout=0.2)
 
 
+@contextmanager
+def _report_directory(preferences_path):
+    """Pin every path component before using it; never resolve symlinks."""
+    if (not hasattr(os, 'O_NOFOLLOW') or not hasattr(os, 'O_DIRECTORY')
+            or os.open not in os.supports_dir_fd
+            or os.mkdir not in os.supports_dir_fd or not hasattr(os, 'fchmod')):
+        raise OSError('Secure diagnostic directory operations unavailable')
+    directory = Path(preferences_path).parent / 'diagnostics'
+    if '..' in directory.parts:
+        raise OSError('Parent traversal in diagnostic directory')
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.open(directory.anchor or '.', flags)
+    try:
+        parts = directory.parts[1:] if directory.anchor else directory.parts
+        for part in parts:
+            try:
+                os.mkdir(part, mode=0o700, dir_fd=fd)
+            except FileExistsError:
+                pass
+            child = os.open(part, flags, dir_fd=fd)
+            os.close(fd)
+            fd = child
+        os.fchmod(fd, 0o700)
+        yield fd
+    finally:
+        os.close(fd)
+
+
 def write_report(preferences_path, report):
     """One private, capped file, overwritten on the next diagnosed launch."""
     payload = json.dumps(report, separators=(',', ':')).encode('utf-8')
@@ -174,21 +202,18 @@ def write_report(preferences_path, report):
         payload = json.dumps(report, separators=(',', ':')).encode('utf-8')
     if len(payload) > MAX_BYTES:
         return
-    directory = Path(preferences_path).parent / 'diagnostics'
-    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    directory.chmod(0o700)
-    flags = os.O_WRONLY | os.O_CREAT | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0)
-    fd = os.open(directory / 'mainloop-stall.json', flags, 0o600)
-    try:
-        if not stat.S_ISREG(os.fstat(fd).st_mode):
-            return
-        if hasattr(os, 'fchmod'):
+    with _report_directory(preferences_path) as directory_fd:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | getattr(os, 'O_NONBLOCK', 0)
+        fd = os.open('mainloop-stall.json', flags, 0o600, dir_fd=directory_fd)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                return
             os.fchmod(fd, 0o600)
-        os.ftruncate(fd, 0)
-        with os.fdopen(fd, 'wb', closefd=False) as stream:
-            stream.write(payload)
-    finally:
-        os.close(fd)
+            os.ftruncate(fd, 0)
+            with os.fdopen(fd, 'wb', closefd=False) as stream:
+                stream.write(payload)
+        finally:
+            os.close(fd)
 
 
 def start_diagnostics(preferences, add_timeout, remove_source, *, environ=None):

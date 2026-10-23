@@ -74,7 +74,7 @@
         },
         {
           "selector": "test_mainloop_diagnostics.MainloopDiagnosticsTests",
-          "tests": 15,
+          "tests": 20,
           "timeout_seconds": 120,
           "audit": "Fake clock, callbacks, device/media boundaries and private temporary reports; bounded local worker cleanup; no device, sockets, DNS or application launch."
         }
