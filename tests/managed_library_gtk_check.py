@@ -405,8 +405,10 @@ class ManagedSettingsGtk(unittest.TestCase):
         app.managed_library_view.settings_button.emit('clicked');fixture.pump()
         dialog=app.preferences_dialog
         self.assertEqual(GAME_LIBRARY_PAGE,dialog.pages.get_current_page())
-        self.assertIs(app.managed_library_view.settings_box,dialog.pages.get_nth_page(GAME_LIBRARY_PAGE))
-        self.assertEqual('Game Library',dialog.pages.get_tab_label_text(app.managed_library_view.settings_box))
+        library_page=dialog.pages.get_nth_page(GAME_LIBRARY_PAGE)
+        self.assertIsInstance(library_page,Gtk.ScrolledWindow)
+        self.assertTrue(app.managed_library_view.settings_box.is_ancestor(library_page))
+        self.assertEqual('Game Library',dialog.pages.get_tab_label_text(library_page))
         general=dialog.pages.get_nth_page(0)
         self.assertFalse(any(isinstance(w,Gtk.Entry) and w.get_placeholder_text()=='/USB0/ARGONAUT_LIBRARY'
                              for w in fixture.walk(general)))
@@ -425,7 +427,7 @@ class ManagedSettingsGtk(unittest.TestCase):
         self.assertIsNone(app.managed_library_view.settings_box.get_parent())
         self.assertIsNone(app.managed_library_view.settings_dialog)
         reopened=app.managed_library_view.open_settings();fixture.pump()
-        self.assertIs(app.managed_library_view.settings_box,reopened.pages.get_nth_page(GAME_LIBRARY_PAGE))
+        self.assertTrue(app.managed_library_view.settings_box.is_ancestor(reopened.pages.get_nth_page(GAME_LIBRARY_PAGE)))
         reopened.response(Gtk.ResponseType.CLOSE);fixture.pump()
 
 

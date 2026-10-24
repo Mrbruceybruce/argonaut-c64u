@@ -139,9 +139,9 @@ class GeometryAndKeyboard(unittest.TestCase):
         self.settings.set_property('gtk-font-name',self.font)
         self.settings.set_property('gtk-application-prefer-dark-theme',self.dark)
 
-    def frame(self):
+    def frame(self, page=None):
         from gtk_layout_fixture import allocated_frame
-        for _ in range(3):allocated_frame(self.dialog,self.d.page)
+        for _ in range(3):allocated_frame(self.dialog,self.d.page if page is None else page)
 
     def bounds(self, widget):
         ok,rect=widget.compute_bounds(self.d.page)
@@ -196,7 +196,7 @@ class GeometryAndKeyboard(unittest.TestCase):
     def test_narrow_controls_reachable_by_vertical_scroll(self):
         self.dialog.set_default_size(520,480);self.frame()
         self.assertEqual(520,self.dialog.get_width())
-        # Existing non-scrolling Game Library page sets the shared dialog's height floor.
+        # Hidden notebook pages must not force the shared dialog above the viewport.
         self.assertLessEqual(self.dialog.get_height(),500)
         self.assert_horizontal_fit(self.visible_controls())
         adjustment=self.d.page.get_vadjustment()
@@ -211,6 +211,27 @@ class GeometryAndKeyboard(unittest.TestCase):
         action=self.dialog.get_widget_for_response(Gtk.ResponseType.CLOSE)
         self.assertTrue(action.get_mapped());self.assertTrue(action.grab_focus())
         adjustment.set_value(0);self.frame();self.report('narrow-520x480-normal')
+
+        from c64u_browser.app_preferences import GAME_LIBRARY_PAGE
+        managed=self.app.managed_library_view
+        # Model a larger library status/font without relying on GTK-version metrics.
+        managed.message.set_size_request(-1,600)
+        self.dialog.set_default_size(520,480);self.frame()
+        self.assertLessEqual(self.dialog.get_height(),500)
+        self.dialog.pages.set_current_page(GAME_LIBRARY_PAGE)
+        scroll=self.dialog.pages.get_nth_page(GAME_LIBRARY_PAGE);self.frame(scroll)
+        adjustment=scroll.get_vadjustment()
+        self.assertGreater(adjustment.get_upper(),adjustment.get_page_size())
+        for widget in (managed.refresh_button,managed.create_button):
+            self.assertTrue(widget.get_mapped())
+            self.assertTrue(widget.grab_focus())
+            ok,rect=widget.compute_bounds(scroll);self.assertTrue(ok)
+            adjustment.set_value(adjustment.get_value()+rect.get_y());self.frame(scroll)
+            ok,rect=widget.compute_bounds(scroll);self.assertTrue(ok)
+            self.assertGreaterEqual(rect.get_y(),-1)
+            self.assertLessEqual(rect.get_y()+rect.get_height(),scroll.get_height()+1)
+        self.dialog.pages.set_current_page(1);self.frame()
+        self.assertLessEqual(self.dialog.get_height(),500)
 
     def test_enlarged_long_content_light_dark(self):
         d=self.d
@@ -229,7 +250,7 @@ class GeometryAndKeyboard(unittest.TestCase):
         d.add_candidate(Candidate('192.0.2.88',info={'info':{'hostname':'H'*200}}))
         for dark in (False,True):
             self.settings.set_property('gtk-application-prefer-dark-theme',dark);self.frame()
-            # Native notebook tabs and the existing Library page impose shared minima at 18pt.
+            # Native notebook tabs impose a shared width minimum at 18pt.
             self.assertLessEqual(self.dialog.get_width(),700)
             self.assertLessEqual(self.dialog.get_height(),760)
             self.assertLessEqual(d.page.measure(Gtk.Orientation.HORIZONTAL,-1)[0],520)
