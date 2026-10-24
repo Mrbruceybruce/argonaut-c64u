@@ -50,7 +50,7 @@
         },
         {
           "selector": "test_streaming.StreamTests",
-          "tests": 4,
+          "tests": 5,
           "timeout_seconds": 120,
           "audit": "Synthetic frame/audio bytes; Receiver and REST transports mocked."
         },
@@ -234,10 +234,10 @@
       ],
       "selectors": [
         {
-          "selector": "test_replay_buffer.ReplayBufferTests",
+          "selector": "test_recording.RecordingTests",
           "tests": 4,
           "timeout_seconds": 180,
-          "audit": "Real GStreamer WebM encode/export with synthetic video/audio and temporary files."
+          "audit": "Real GStreamer WebM recording, EOS finalization and decoding with synthetic video/audio and temporary files."
         }
       ]
     },

@@ -849,29 +849,33 @@ class PreferencesUI(unittest.TestCase):
         self.assertIsNone(self.app.preferences_dialog)
         self.assertEqual(Preferences(self.app.preferences.path).load().app_options['preview_scale'],175)
 
-    def test_instant_replay_is_an_explicit_saved_opt_in(self):
+    def test_replay_controls_are_absent_and_general_settings_still_save(self):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Preferences
         dialog=show_preferences(self.app);self.pump()
         general=dialog.pages.get_nth_page(0)
-        replay=next(w for w in self.walk(general)
-                    if isinstance(w,self.Gtk.CheckButton) and
-                    w.get_label()=='Keep a 30-second instant replay while previewing')
-        self.assertFalse(replay.get_active())
-        self.assertIn('off',self.app.streams_tab.replay_status.get_text())
-        replay.set_active(True);self.pump()
-        self.assertTrue(Preferences(self.app.preferences.path).load().app_options[
-            'replay_enabled'])
-        self.assertIn('enabled',self.app.streams_tab.replay_status.get_text())
+        for container in (general,self.app.streams_tab.box):
+            labels=[w.get_label() or '' for w in self.walk(container)
+                    if isinstance(w,(self.Gtk.Label,self.Gtk.Button,self.Gtk.CheckButton))]
+            self.assertFalse(any('replay' in label.lower() for label in labels))
+        audio=next(w for w in self.walk(general)
+                   if isinstance(w,self.Gtk.CheckButton) and
+                   w.get_label()=='Play preview audio by default')
+        audio.set_active(False);self.pump()
+        loaded=Preferences(self.app.preferences.path).load()
+        self.assertFalse(loaded.app_options['preview_audio'])
+        self.assertNotIn('replay_enabled',loaded.app_options)
         dialog.response(self.Gtk.ResponseType.CLOSE)
 
-    def test_preview_feeds_replay_and_normal_recording_together(self):
+    def test_preview_feeds_audio_and_recording_without_replay(self):
         import threading
         from unittest.mock import Mock
+        from c64u_browser.streaming import rgb_frame
         tab=self.app.streams_tab
-        self.app.preferences.app_options['replay_enabled']=True
+        # Even an in-memory legacy value must not activate retired behavior.
+        self.app.preferences.app_options.update(replay_enabled=True,replay_seconds=30)
         receiver=Mock()
-        packed=bytes(384*240//2);samples=[bytes(768)]
+        packed=bytes([0x21])*(384*240//2);samples=[bytes(768)]
         receiver.take.return_value=((240,packed),samples)
         receiver.frames=1;receiver.last_audio=time.monotonic()
         receiver.last_video=time.monotonic();receiver.started=time.monotonic()
@@ -879,16 +883,124 @@ class PreferencesUI(unittest.TestCase):
         session.thread.is_alive.return_value=True
         tab.session=session
         recorder=Mock(finishing=False);tab.recorder=recorder
-        replay=Mock(height=240,seconds=30,audio=True,retained_seconds=1.0)
-        with patch('c64u_browser.replay_buffer.ReplayBuffer',return_value=replay):
+        output=Mock();tab.output=output
+        try:
             self.assertTrue(tab.tick())
-        recorder.feed.assert_called_once()
-        replay.feed.assert_called_once()
-        self.assertEqual(recorder.feed.call_args.args[1],samples)
-        self.assertEqual(replay.feed.call_args.args[1],samples)
-        self.assertEqual(recorder.feed.call_args.args[0][0],240)
-        self.assertEqual(replay.feed.call_args.args[0],recorder.feed.call_args.args[0])
-        tab.recorder=None;tab.replay=None;tab.session=None
+            recorder.feed.assert_called_once_with((240,rgb_frame(packed)),samples)
+            output.push.assert_called_once_with(samples)
+            self.assertEqual(tab.picture.get_paintable().get_height(),240)
+            self.assertTrue(tab.capture_button.get_sensitive())
+            self.assertFalse(hasattr(tab,'replay'))
+            receiver.take.return_value=(None,samples)
+            self.assertTrue(tab.tick())
+            self.assertEqual(recorder.feed.call_args.args,(None,samples))
+            tab.stop()
+            recorder.stop.assert_called_once_with()
+            session.stop.assert_called_once_with()
+            output.close.assert_called_once_with()
+            self.assertIsNone(tab.picture.get_paintable())
+        finally:
+            tab.recorder=None;tab.session=None;tab.output=None
+
+    def test_stream_close_disposes_choosers_and_stops_owned_media(self):
+        import threading
+        from unittest.mock import Mock
+        tab=self.app.streams_tab
+        session=Mock(stopping=threading.Event())
+        session.thread.is_alive.return_value=True
+        recorder=Mock(finishing=False);output=Mock()
+        record_chooser=Mock();capture_chooser=Mock()
+        tab.session=session;tab.recorder=recorder;tab.output=output
+        tab.record_chooser=record_chooser;tab.capture_chooser=capture_chooser
+        tab.timer=self.GLib.timeout_add(60000,lambda:True)
+        try:
+            tab.close()
+            record_chooser.destroy.assert_called_once_with()
+            capture_chooser.destroy.assert_called_once_with()
+            recorder.stop.assert_called_once_with()
+            session.stop.assert_called_once_with()
+            output.close.assert_called_once_with()
+            self.assertIsNone(tab.timer)
+            self.assertIsNone(tab.record_chooser)
+            self.assertIsNone(tab.capture_chooser)
+            recorder.done=True;recorder.error='';recorder.path='synthetic.webm'
+            self.assertFalse(tab.record_tick())
+            self.assertIsNone(tab.recorder)
+            self.assertIn('Recording saved',tab.record_status.get_text())
+        finally:
+            tab.session=None;tab.recorder=None;tab.output=None
+
+    def test_stream_completion_and_audio_failure_preserve_cleanup(self):
+        import threading
+        from unittest.mock import Mock
+        tab=self.app.streams_tab
+        receiver=Mock(frames=0);receiver.take.return_value=(None,[bytes(768)])
+        session=Mock(receiver=receiver,stopping=threading.Event(),message='stopped')
+        session.thread.is_alive.return_value=True
+        tab.session=session;tab.recorder=Mock(finishing=False);tab.output=Mock()
+        recorder=tab.recorder;output=tab.output
+        try:
+            output.push.side_effect=RuntimeError('synthetic audio failure')
+            self.assertTrue(tab.tick())
+            self.assertIn('synthetic audio failure',session.stop_reason)
+            output.close.assert_called_once_with()
+            session.stop.assert_called_once_with()
+            recorder.stop.assert_called_once_with()
+            session.thread.is_alive.return_value=False
+            self.assertFalse(tab.tick())
+            self.assertIsNone(tab.session)
+            self.assertIsNone(tab.timer)
+            self.assertIsNone(tab.output)
+            self.assertFalse(tab.record_button.get_sensitive())
+        finally:
+            tab.session=None;tab.recorder=None;tab.output=None
+
+    def test_screenshot_keeps_captured_frame_while_preview_changes(self):
+        from unittest.mock import Mock
+        from gi.repository import Gdk
+        tab=self.app.streams_tab
+        frame=Gdk.MemoryTexture.new(384,240,Gdk.MemoryFormat.R8G8B8,
+                                   self.GLib.Bytes.new(bytes(384*240*3)),384*3)
+        tab.picture.set_paintable(frame)
+        destination=Path(self.temp.name)/'capture.png'
+        chooser=Mock();chooser.get_file.return_value=self.Gio.File.new_for_path(str(destination))
+        with patch.object(self.Gtk.FileChooserNative,'new',return_value=chooser):
+            tab.capture()
+        response=chooser.connect.call_args.args[1]
+        tab.picture.set_paintable(None)
+        response(chooser,self.Gtk.ResponseType.ACCEPT)
+        saved=Gdk.Texture.new_from_filename(str(destination))
+        self.assertEqual((saved.get_width(),saved.get_height()),(384,240))
+        self.assertIsNone(tab.capture_chooser)
+        self.assertEqual(self.app.preferences.screenshot_folder,self.temp.name)
+
+    def test_recording_chooser_preserves_session_guard_and_audio(self):
+        import threading
+        from unittest.mock import Mock
+        from gi.repository import Gdk
+        tab=self.app.streams_tab
+        frame=Gdk.MemoryTexture.new(384,240,Gdk.MemoryFormat.R8G8B8,
+                                   self.GLib.Bytes.new(bytes(384*240*3)),384*3)
+        for stale in (True,False):
+            session=Mock(stopping=threading.Event(),with_audio=True)
+            session.thread.is_alive.return_value=True
+            tab.session=session;tab.picture.set_paintable(frame)
+            chooser=Mock()
+            destination=str(Path(self.temp.name)/'recording.webm')
+            chooser.get_file.return_value=self.Gio.File.new_for_path(destination)
+            with patch.object(self.Gtk.FileChooserNative,'new',return_value=chooser):
+                tab.record()
+            response=chooser.connect.call_args.args[1]
+            if stale:tab.session=None
+            with patch('c64u_browser.recording.Recorder') as factory, \
+                    patch.object(self.GLib,'timeout_add'):
+                response(chooser,self.Gtk.ResponseType.ACCEPT)
+                if stale:factory.assert_not_called()
+                else:
+                    factory.assert_called_once_with(destination,240,True)
+                    self.assertEqual(tab.record_button.get_label(),'Stop recording')
+                    self.assertEqual(self.app.preferences.recording_folder,self.temp.name)
+            tab.recorder=None;tab.session=None;tab.picture.set_paintable(None)
 
     def test_unchanged_missing_legacy_folder_does_not_trap_preferences(self):
         from c64u_browser.app_preferences import show_preferences

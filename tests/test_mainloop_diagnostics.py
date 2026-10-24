@@ -260,7 +260,7 @@ class MainloopDiagnosticsTests(unittest.TestCase):
         from c64u_browser.gui import Browser
         from c64u_browser.streams_tab import StreamsTab
         app = SimpleNamespace(mainloop_diagnostics=self.monitor,
-                              preferences=SimpleNamespace(app_options={'replay_enabled': False}),
+                              preferences=SimpleNamespace(app_options={}),
                               settings_tab=Mock(), drives_tab=Mock())
         tab = StreamsTab.__new__(StreamsTab)
         app.streams_tab = tab
@@ -271,8 +271,6 @@ class MainloopDiagnosticsTests(unittest.TestCase):
                                       thread=Mock(), message='private-content')
         tab.session.thread.is_alive.return_value = True
         tab.recorder = None
-        tab.replay = None
-        tab.replay_exporting = False
         tab.output = Mock()
         tab.picture = Mock()
         tab.record_button = Mock()

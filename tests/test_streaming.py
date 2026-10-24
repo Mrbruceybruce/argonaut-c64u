@@ -63,3 +63,24 @@ class StreamTests(unittest.TestCase):
   c=Mock();c.start_stream.side_effect=RuntimeError('start failed');c.stop_stream.side_effect=RuntimeError('offline')
   with patch('c64u_browser.streaming.Receiver',return_value=Mock(address='192.168.68.80')):s=StreamSession(c);s.thread.join(2)
   self.assertIn('Remote stop was not confirmed',s.message)
+ def test_normal_stop_releases_receiver_and_each_started_stream(self):
+  import time
+  for audio in (False,True):
+   with self.subTest(audio=audio):
+    started=threading.Event();c=Mock()
+    names=['video','audio'] if audio else ['video']
+    def start(name,*args):
+     if name==names[-1]:started.set()
+    c.start_stream.side_effect=start
+    receiver=Mock(address='127.0.0.1',error='',last_video=time.monotonic())
+    with patch('c64u_browser.streaming.Receiver',return_value=receiver):
+     session=StreamSession(c,audio)
+     try:
+      self.assertTrue(started.wait(1))
+      session.stop();session.thread.join(2)
+      self.assertFalse(session.thread.is_alive())
+      receiver.close.assert_called_once_with()
+      self.assertEqual([call.args[0] for call in c.stop_stream.call_args_list],list(reversed(names)))
+      self.assertEqual(session.message,'Preview stopped.')
+     finally:
+      session.stop();session.thread.join(2)

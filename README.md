@@ -94,7 +94,7 @@ sectors remain protected during editing.
 
 ![Argonaut 1.8 Drives tab showing Drive A controls and Mount and Run](docs/images/linux-drives-1.8.png)
 
-**Streams — live C64U screen preview, audio, recording, and instant replay.**
+**Streams — live C64U screen preview, audio, screenshots, and recording.**
 
 ![Argonaut 1.8 Streams tab displaying a live C64U game screen](docs/images/linux-streams-1.8.png)
 

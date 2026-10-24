@@ -51,16 +51,28 @@ class AppPreferencesTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate({'show_hidden_local': value})
 
-    def test_replay_is_opt_in_with_a_bounded_default_duration(self):
-        self.assertFalse(validate({})['replay_enabled'])
-        self.assertEqual(validate({})['replay_seconds'],30)
-        self.assertTrue(validate({'replay_enabled':True})['replay_enabled'])
-        for value in (1,'true',None):
-            with self.assertRaises(ValueError):
-                validate({'replay_enabled':value})
-        for value in (4,301,True,'30'):
-            with self.assertRaises(ValueError):
-                validate({'replay_seconds':value})
+    def test_legacy_replay_options_are_ignored_without_losing_settings(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'prefs.json';p=Preferences(path)
+            p.profiles=[Profile.new('Legacy','test')];p.selected_id=p.profiles[0].id
+            p.app_options.update(preview_scale=175,preview_audio=False)
+            p.recording_folder=folder;p.screenshot_folder=folder;p.save()
+            original=json.loads(path.read_text())
+            for enabled,seconds in ((True,30),(False,300),('obsolete',None)):
+                data=json.loads(json.dumps(original))
+                data['app_options'].update(replay_enabled=enabled,replay_seconds=seconds)
+                path.write_text(json.dumps(data));before=path.read_bytes()
+                loaded=Preferences(path).load()
+                self.assertEqual(path.read_bytes(),before)  # load does not rewrite
+                self.assertNotIn('replay_enabled',loaded.app_options)
+                self.assertNotIn('replay_seconds',loaded.app_options)
+                self.assertEqual(loaded.app_options,p.app_options)
+                self.assertEqual(loaded.selected_id,p.selected_id)
+                self.assertEqual(loaded.recording_folder,folder)
+                self.assertEqual(loaded.screenshot_folder,folder)
+                loaded.save()
+                self.assertEqual(json.loads(path.read_text()),original)
 
     def test_missing_remote_folder_falls_back_to_drive(self):
         client=Mock();client.list_directory.side_effect=[('/',[Entry('USB2','dir',0)]),BrowserError('Gone'),('/USB2',[])]

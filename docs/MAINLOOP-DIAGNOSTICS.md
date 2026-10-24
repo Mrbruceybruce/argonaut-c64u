@@ -17,10 +17,11 @@ build identity. Unavailable or invalid identities are recorded as `unknown`.
 
 The GTK heartbeat runs every second. A separate daemon watchdog checks once a
 second and attempts one report after a heartbeat is at least five seconds old.
-Navigation and stream start/tick/stop/close, recording and replay-toggle callbacks
+Navigation and stream start/tick/stop/close, recording callbacks
 publish their phase. The stream/audio/replay/recording/export flags are snapshots
 at callback entry, not live queries from the watchdog. They indicate object
-presence, not pipeline health. Nested callbacks restore both the outer phase and its state snapshot on return.
+presence, not pipeline health. Retired replay/export flags remain false for report
+compatibility; historical replay phase and module labels remain allowlisted. Nested callbacks restore both the outer phase and its state snapshot on return.
 
 The report is `diagnostics/mainloop-stall.json` next to the active preferences
 file. It is created only after a stall, capped at 64 KiB, and overwritten by the

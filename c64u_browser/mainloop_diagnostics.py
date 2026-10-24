@@ -47,8 +47,9 @@ def observed(phase):
             tab = getattr(app, 'streams_tab', None)
             state = {key: getattr(tab, attr, None) is not None for key, attr in
                      (('stream', 'session'), ('audio', 'output'),
-                      ('replay', 'replay'), ('recording', 'recorder'))}
-            state['replay_exporting'] = getattr(tab, 'replay_exporting', False) is True
+                      ('recording', 'recorder'))}
+            # Preserve report compatibility; Instant Replay is retired.
+            state.update(replay=False, replay_exporting=False)
             with monitor.phase(phase, state):
                 return function(owner, *args, **kwargs)
         return call

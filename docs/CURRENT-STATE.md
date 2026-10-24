@@ -9,6 +9,120 @@ Earlier milestone, workspace and next-step statements retain their checkpoint
 scope; they are not fresh workspace observations or live planning instructions.
 Design approval, implementation, acceptance and publication remain distinct.
 
+## Issue #19 / RM-006 — Instant Replay removal, uncommitted
+
+Inspection baseline: `development` at `be6b8f500d94559ee1bf5e1343814e550bb15f2d`.
+This is the separately authorized replay-removal slice, not the rest of RM-006.
+Acceptance for this slice is **complete; Git publication remains pending**.
+Independent code review passed with **no P0–P2 findings**; **95 regression tests
+passed**. Operator-confirmed physical acceptance on the beige C64U passed for
+streaming/tab navigation, clean shutdown, audio on/off, PNG capture, playable WebM
+recording, stop/restart and disconnect/reconnect.
+Issue #23 / RM-015 remains **OPEN / intermittent / instrumented**. Removing replay
+neither identifies the hang's root cause nor establishes a fix.
+
+### Bounded plan and dependency findings
+
+The pre-edit inspection covered this document, ARGONAUT-ROADMAP, the relevant
+archived B1/F scope, UI-12/UI-55, SERVER-FIRST, MAINLOOP-DIAGNOSTICS,
+NEXT-PASS's historical replay/media records, RELEASING, and Issues #19/#23.
+`StreamsTab` was the only production consumer of `ReplayBuffer`; package self-test
+and replay tests were its other importers. Replay owned its splitmux pipeline,
+fragment directory, export snapshot, lock/condition and remux pipeline. Export
+used Browser.run's shared worker pool, which remains for other jobs. Its GTK
+feed/close calls could enter media locks/native state changes, but that observation
+is not evidence of the reported hang's cause.
+
+The bounded plan communicated before editing was to remove replay UI, preference
+activation, feed/export/cleanup paths and the dedicated module; replace replay-only
+tests with retained-media regressions; and reconcile current guidance/self-tests/CI.
+No media-worker rewrite, stream lifecycle redesign, scaling/keyboard expansion,
+device configuration change, package build or publication is included.
+
+`Receiver`/`StreamSession` own UDP and remote start/stop cleanup. `AudioOutput` owns
+preview playback. `Recorder` independently owns WebM encoding and asynchronous EOS
+finalization. Their implementations remain unchanged, as do screenshot capture,
+ordinary recording chooser session guards, Browser close and Core operations.
+Test Lab saved-report replay is unrelated and remains. GStreamer, VP8/Vorbis,
+WebM and audio packages are still required; only current splitmux runtime checks
+are retired. Existing replay files and abandoned temporary directories are not
+searched for or deleted.
+
+Legacy `replay_enabled`/`replay_seconds` keys are ignored on load and omitted on
+ordinary preference save, using existing unknown-key behavior. Loading alone does
+not rewrite the file. Profiles, selected connection, media folders and all other
+settings remain intact. Hang diagnostics retain their report fields and historical
+allowlisted labels; retired replay/export state is always false.
+
+### Safety and acceptance gates
+
+1. Complete dependency inspection before removal; preserve shared media paths.
+2. Pass focused preference, stream, diagnostics, lifecycle and packaging regressions;
+   verify actual synthetic WebM encode/finalize/decode and isolated GTK behavior.
+3. Independent code review passed with no P0–P2 findings. Git publication remains
+   pending; no staging, commit, push, PR, issue update or package publication is
+   part of this documentation reconciliation.
+4. Separately scoped physical acceptance on the beige C64U passed for streaming/tab
+   navigation, clean shutdown, audio on/off, PNG capture, playable WebM recording,
+   stop/restart and disconnect/reconnect. These results complete this slice's
+   acceptance. Repeated navigation for hang investigation and an independent
+   post-removal hang retest remain Issue #23 gates; root-cause evidence and its
+   deterministic regression are pending.
+5. Historical release notes, checklist generator and dev2 `tools/linux/contract.json`
+   remain unchanged. That pinned contract still describes a replay-containing
+   artifact and cannot qualify this source revision; any new package qualification
+   needs its own reviewed contract. No cross-platform or release acceptance is claimed.
+
+### Offline validation — 24 October 2026
+
+- Baseline before edits: 40 focused tests passed.
+- Final affected suite: **95 tests passed, zero failures/errors/skips** (18.446 s).
+  Modules: `test_streaming`, `test_app_preferences`, `test_mainloop_diagnostics`,
+  `test_recording`, `test_app_lifecycle`, `test_debian_packaging`,
+  `test_package_credential_channel`, `test_ci_runner`.
+- **Seven real GTK checks passed**, zero failures/errors/skips, under Xvfb/private
+  session bus and temporary HOME/XDG settings: replay-control absence and normal
+  preference save; simultaneous preview/audio/recording (including audio-only tick);
+  chooser/media/timer cleanup and recording completion; audio-error/session-end
+  cleanup; retained scaling; actual PNG capture of a retained frame; recording
+  chooser session guard and audio selection.
+- Four new media tests replace four obsolete replay-only tests. Actual GStreamer
+  NTSC audio/video and PAL video-only recordings finalize and decode to EOS;
+  initialization failure preserves the destination and cleans its owned temporary;
+  mode-change refusal still permits finalization. One added stream regression
+  verifies normal worker exit and reverse-order remote stop for audio/video and
+  video-only sessions using a fake receiver/transport.
+- Shared self-test against this **source checkout** passed **44 checks**. This is
+  not installed-package acceptance. Debian staging regressions passed separately;
+  no archive was built or installed.
+- CI source inventory audit passed: 167 modules, 40 selected classes, 478 selected
+  methods. This is inventory consistency, not execution of all CI selections or
+  GitHub-hosted qualification. Current media preflight now requires the decoders
+  exercised by the replacement tests and no splitmux factories.
+- Tracked/untracked syntax and whitespace checks passed. Streaming/recording/Browser
+  implementation and pinned historical packaging contract remain byte-identical
+  to baseline. During this offline validation, no staging, commit, push, issue
+  change or device operation occurred.
+
+The focused runs used a temporary wrapper rejecting Python Internet-socket
+connections; GTK used fake media/device objects and temporary preferences. Native
+GStreamer tests use synthetic frames/PCM and local files. The first GTK attempt
+was blocked by sandbox local-socket permissions; its permitted private-display
+rerun passed. Desktop portal/GVFS warnings occurred in that isolated environment,
+so these offline runs do not establish warning-free desktop or physical-hardware
+acceptance. The separate physical acceptance is recorded above.
+The initial new audio/video decoder fixture lacked separate playback queues and
+timed out; adding queues fixed the fixture without changing recording code.
+
+Reproduction: run the eight modules above with `PYTHONPATH=tests python3 -m unittest`.
+The seven GTK methods are the six replay-removal/media checks in `PreferencesUI`
+plus `test_scale_bounds_session_only_and_scroll_without_resize`, with
+`ARGONAUT_UI_TESTS=1` on a disposable display and isolated preferences. Use
+`python3 tests/run_ci_tests.py --audit` to check CI inventory. Independent review
+and physical acceptance are complete for this slice; Git publication remains
+pending. Issue #23 remains open with root-cause/verification gates outstanding;
+no hang root cause or fix is claimed.
+
 ## Current Game Library State — PA-5.13 Published
 
 This section records the current published managed Game Library state and the

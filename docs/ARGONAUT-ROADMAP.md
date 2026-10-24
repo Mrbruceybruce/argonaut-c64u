@@ -101,6 +101,19 @@ GitHub Project **Argonaut Development** owns live status.
   do not establish offline preparation or emulator integration. Do not reuse FTP
   staging unchanged for local filesystems or extend current game import formats implicitly.
 
+### RM-006 replay-removal implementation checkpoint
+
+The bounded Instant Replay removal is implemented locally and remains uncommitted;
+see [inspection, preservation boundary and safety gates](CURRENT-STATE.md#issue-19--rm-006--instant-replay-removal-uncommitted).
+Acceptance for this slice is **complete; Git publication remains pending**.
+Independent code review passed with **no P0–P2 findings**; **95 regression tests
+passed**. Operator-confirmed physical acceptance on the beige C64U passed for
+streaming/tab navigation, clean shutdown, audio on/off, PNG capture, playable WebM
+recording, stop/restart and disconnect/reconnect. RM-015 / Issue #23 stays open,
+with causality unproven and independent hang retesting still required; no hang
+root cause or fix is claimed.
+This checkpoint does not complete RM-006 or change Project scheduling/status.
+
 ## Dependencies and safety gates
 
 Technical prerequisites remain binding regardless of Project ordering:

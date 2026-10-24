@@ -104,7 +104,7 @@ The initial selection covers SID/settings/jobs/version, mocked media and streami
 parser and mocked hardware checks; tracked VICE D64/D71/D81 read/edit regressions;
 import planning/transaction/policy/execution; and loopback FTP reads/uploads/
 replacements. `test_media.MediaTests` is mocked REST, while
-`test_replay_buffer.ReplayBufferTests` really encodes and exports WebM. Native GTK
+`test_recording.RecordingTests` really encodes and finalizes WebM. Native GTK
 covers Device Details and compatibility presentation. `PreferencesUI` is used as
 a fixture by selected GTK tests; its own test suite remains deferred. Runner
 contract tests use synthetic children to check failures, skips, zero tests,
@@ -186,7 +186,7 @@ run's `network.json` and environment evidence after manual publication. Ubuntu's
 [AppArmor policy](https://documentation.ubuntu.com/security/security-features/privilege-restriction/apparmor/)
 can restrict unprivileged namespaces.
 
-Media preflight checks GI/GstPbutils and the actual VP8/Vorbis, WebM and splitmux
+Media preflight checks GI/GstPbutils and the actual VP8/Vorbis, WebM encode/decode
 factories. GTK preflight requires a working display, private session bus and XTest
 library. Missing dependencies fail instead of skipping. Success requires every
 selected class to finish with its expected nonzero test count, zero skips/errors/

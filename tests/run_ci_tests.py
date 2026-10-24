@@ -580,8 +580,8 @@ def preflight(kind):
         Gst.init(None)
         print(Gst.version_string(), flush=True)
         for name in ('appsrc', 'queue', 'videoconvert', 'vp8enc', 'audioconvert',
-                     'audioresample', 'vorbisenc', 'webmmux', 'splitmuxsink',
-                     'filesrc', 'matroskademux', 'splitmuxsrc', 'filesink'):
+                     'audioresample', 'vorbisenc', 'webmmux',
+                     'filesrc', 'matroskademux', 'filesink', 'vp8dec', 'vorbisdec', 'fakesink'):
             if Gst.ElementFactory.find(name) is None:
                 raise RuntimeError('Missing GStreamer element: ' + name)
         GstPbutils.Discoverer.new(5 * Gst.SECOND)

@@ -139,7 +139,6 @@ def run(package_metadata, report_path):
         from .platform_support import local_roots, portable_root, publish_new
         from .profiles import Preferences
         from .recording import pipeline_description as recording_pipeline
-        from .replay_buffer import pipeline_description as replay_pipeline
         from .version import ASSETS, build_info
 
         _check_credential_channel(package_metadata, checks)
@@ -161,25 +160,17 @@ def run(package_metadata, report_path):
 
         Gst.init(None)
         plugin_names = ('appsrc', 'audioconvert', 'audioresample', 'autoaudiosink',
-                        'webmmux', 'vp8enc', 'vorbisenc', 'videoconvert',
-                        'splitmuxsink', 'splitmuxsrc')
+                        'webmmux', 'vp8enc', 'vorbisenc', 'videoconvert')
         missing = [name for name in plugin_names if not Gst.ElementFactory.find(name)]
         _require(not missing, 'runtime.gstreamer',
                  'Required media plugins are unavailable.', checks)
         recording = Gst.parse_launch(recording_pipeline(240, True))
-        replay = Gst.parse_launch(replay_pipeline(240, True))
         _require(recording.get_by_name('video') is not None and
                  recording.get_by_name('audio') is not None and
                  recording.get_by_name('file') is not None,
                  'runtime.recording_pipeline',
                  'The recording pipeline could not be constructed.', checks)
-        _require(replay.get_by_name('video') is not None and
-                 replay.get_by_name('audio') is not None and
-                 replay.get_by_name('sink') is not None and
-                 Gst.ElementFactory.find('splitmuxsrc') is not None,
-                 'runtime.replay_pipeline',
-                 'The replay pipeline or export reader is unavailable.', checks)
-        recording.set_state(Gst.State.NULL);replay.set_state(Gst.State.NULL)
+        recording.set_state(Gst.State.NULL)
         _require(Gtk.init_check(), 'runtime.gtk', 'GTK could not initialize.', checks)
 
         with tempfile.TemporaryDirectory() as directory:
@@ -461,10 +452,9 @@ def run(package_metadata, report_path):
                          'Development Settings layout is incorrect.', checks)
                 _require(app.streams_tab.text_return.get_active() and
                          isinstance(app.streams_tab.zoom, Gtk.Label) and
-                         not app.preferences.app_options['replay_enabled'] and
-                         app.streams_tab.replay_button.get_label() ==
-                         'Save recent 30 seconds…' and
-                         not app.streams_tab.replay_button.get_sensitive(),
+                         app.streams_tab.record_button.get_label() ==
+                         'Start recording…' and
+                         not hasattr(app.streams_tab, 'replay_button'),
                          'development.streams_ui',
                          'Development Streams controls are incorrect.', checks)
                 app.streams_tab.text_input.set_text('print "hello"')

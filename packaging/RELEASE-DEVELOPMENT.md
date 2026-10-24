@@ -21,6 +21,10 @@ operation-status/cancellation improvements. Streaming remains OPEN / intermitten
 instrumented; packaging does not qualify or fix it. The shared historical
 `1.8-replay.3` workflow is not the current 1.10 build procedure.
 
+Instant Replay is removed from the current source: its controls and rolling history
+are retired. Preview, audio, screenshots and ordinary WebM recording remain.
+Legacy replay preferences are ignored; this does not establish a streaming hang fix.
+
 No public 1.10 tag or release is implied. Cross-platform release qualification and
 public-release review of Commodore branding remain pending. Its SVG and separate
 attribution/license text are included alongside the other application assets.
