@@ -65,6 +65,34 @@ GitHub Project **Argonaut Development** owns live status.
 
 ## RM-027 dependency-validation implementation candidate
 
+### Gate A publication and Gate B read-only acceptance — 25 October 2026 UTC
+
+Gate A is published on verified primary/live GitHub `development` at
+`89c8eea956dc66d52124da5969fc14ede9a5a27b`: **33/33 isolated offline methods**
+passed (11 real GTK, 20 Core, 2 LED), with zero failures/errors/skips and independent
+integration review without actionable findings.
+[Hosted Test Lab run 40154324070](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40154324070)
+passed all eight jobs; the new Gate A module remains deferred from hosted suites,
+so its offline result is separate evidence.
+
+[Gate B READ-ONLY acceptance](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6393217684)
+records **5/5 validated GETs** on operator-identified Founder `25BE71`, REST product
+`C64 Ultimate`, firmware `1.1.0`, API `0.1`. Both LED categories' seven-field
+metadata matched qualified source. See [current evidence and limitations](CURRENT-STATE.md#gate-a-publication-and-gate-b-read-only-acceptance--25-october-2026-utc)
+and [dependency evidence](CONFIGURATION-DEPENDENCIES.md#gate-ab-evidence-checkpoint--25-october-2026-utc).
+The isolated Gate B executor remains uncommitted/unpublished.
+
+Live Issue #25 remains **Open / P0 / In Progress**. RGB header-to-REST mapping is
+unverified; firmware `1.1.0s2` remains unqualified. **Gate C remains unauthorized
+and unaccepted**, and the original lockup remains unexplained and unproven resolved.
+Read-only metadata acceptance does not qualify writes, prolonged stability, other
+hardware, device-side atomicity, broader UI/package/cross-platform or release
+acceptance. RM-026, RM-028 and RM-029 dependencies remain in force.
+The checkpoints below preserve their historical scope, including the former
+Gate A publication-pending and Gate B outstanding statements. This documentation
+reconciliation awaits the user's manual publication gates; it changes no tracking
+state and grants no hardware or issue-closure authorization.
+
 ### Gate A integration checkpoint — 25 October 2026 UTC / 24 October America/Chicago
 
 The dependency validator is published on `development` at verified local/live

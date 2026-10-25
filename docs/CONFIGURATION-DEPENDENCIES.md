@@ -1,5 +1,44 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## Gate A/B evidence checkpoint — 25 October 2026 UTC
+
+Gate A infrastructure is published at `89c8eea956dc66d52124da5969fc14ede9a5a27b`.
+Its **33/33 isolated offline methods** passed; all eight jobs in
+[hosted run 40154324070](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40154324070)
+passed separately. The real-GTK Gate A module remains deferred from hosted suites.
+See [current publication and acceptance evidence](CURRENT-STATE.md#gate-a-publication-and-gate-b-read-only-acceptance--25-october-2026-utc).
+
+[Accepted Gate B read-only evidence](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6393217684)
+records **5/5 validated GETs** on operator-identified Founder `25BE71`, product
+`C64 Ultimate`, firmware `1.1.0`, API `0.1`. Both Keyboard Lighting and LED Strip
+Settings expose exactly seven expected fields. Enum arrays and defaults match
+the full pinned source vocabularies in order; enum objects contain exactly
+`current/values/default`. Intensity objects contain exactly
+`current/min/max/format/default`, bounds 0–31 and format `%d`, with defaults
+6 keyboard / 25 strip. Captured modes/intensities are Fixed Color / 6 for keyboard
+and Rainbow / 25 for strip. Exact distinctions remain: standalone Sparkle is
+strip-only; keyboard `Single Color` versus strip `SingleColor`; keyboard Circular
+versus strip Serpentine. No metadata/source/published-rule discrepancy was found
+within this capture. The linked acceptance record retains full values and the
+sanitized local journal's path/hash.
+
+The [pinned REST serializer](https://github.com/GideonZ/1541ultimate/blob/7b628eb166872965ea59d66f90ffd9bcf7d71d8a/software/api/route_configs.cc)
+emits neither enabled/disabled nor hardware-presence flags. The captured keyboard
+Outward pattern is dormant under Fixed Color; the strip Royal Blue fixed color
+is dormant under Rainbow. These retained values are consistent with the unchanged
+menu dependency matrix below, not permission to edit inactive fields.
+
+The two RGB headers beneath the main board and keyboard are operator-reported;
+physical-header-to-REST-category mapping remains unverified. This acceptance
+establishes bounded identity/metadata reads only, not every physical mode, safe
+writes, prolonged stability or other hardware qualification. **Gate C remains
+unauthorized and unaccepted; the original lockup remains unexplained and unproven
+resolved.** Firmware `1.1.0s2` remains unqualified. Issue #25 remains Open / P0 /
+In Progress; capability, redesign and enhancement dependencies remain unchanged.
+The earlier publication and original implementation checkpoints below retain
+their historical scope, including inert-widget fixture limitations. This evidence
+update changes no dependency rule and does not publish the isolated Gate B executor.
+
 ## Publication checkpoint — 24 October 2026
 
 The reviewed slice is integrated and published on `development` at

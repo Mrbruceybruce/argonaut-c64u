@@ -11,6 +11,60 @@ Design approval, implementation, acceptance and publication remain distinct.
 
 ## Issue #25 / RM-007 — offline configuration dependency candidate
 
+### Gate A publication and Gate B read-only acceptance — 25 October 2026 UTC
+
+Primary and live GitHub `development` are verified at
+`89c8eea956dc66d52124da5969fc14ede9a5a27b`. Gate A is published at that commit
+([publication record](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6392786752)).
+Its isolated offline execution passed **33/33 methods** (11 real GTK, 20 Core,
+2 existing LED), with zero failures/errors/skips, verified network isolation and
+independent integration review without actionable findings.
+[Hosted Test Lab run 40154324070](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40154324070)
+passed all eight jobs at this commit. The new real-GTK Gate A module remains
+explicitly deferred from hosted suites; its 33-method offline result is separate
+from hosted CI evidence. [Gate A's detailed record](ISSUE25-GATE-A.md) and the
+integration checkpoint below retain their historical pre-publication scope.
+
+[Gate B READ-ONLY acceptance](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6393217684)
+is recorded for the operator-identified Founder's Edition: REST product
+`C64 Ultimate`, ID `25BE71`, firmware `1.1.0`, API `0.1`. The completed bounded
+operator run validated **5/5 sequential GETs**, all HTTP 200 with empty API errors:
+version, identity, category listing and both exact LED categories. Keyboard
+Lighting captured Fixed Color / intensity 6; LED Strip Settings captured Rainbow /
+intensity 25. Both categories' seven fields, enum vocabularies, defaults and
+integer metadata match the qualified source; see [dependency evidence](CONFIGURATION-DEPENDENCIES.md#gate-ab-evidence-checkpoint--25-october-2026-utc).
+
+The retained sanitized journal is local evidence, not a published attachment:
+`/tmp/argonaut-gate-b-20261025-schema-local-01.jsonl`, SHA-256
+`6d336c460366b78276d9d95c301c8648df557f7518f18e22d4e064193c6260b1`.
+Its final snapshot has `complete=true`, `stop=null`; cumulative journal rows are
+not additional requests. This reconciliation inspected retained results and live
+publication/tracking evidence; it did not rerun tests or contact hardware.
+The isolated Gate B executor candidate remains uncommitted/unpublished; acceptance
+of the operator run does not publish that candidate.
+
+Two RGB headers beneath the main board and keyboard are operator-reported context;
+**physical-header-to-REST-category mapping remains unverified**. Advertised choices
+are not menu-enable or hardware-presence flags. Retained inactive values are
+consistent with the dependency rules, not authorization to edit inactive fields.
+The successful bounded reads do not establish prolonged stability, physical menu
+rendering, safe writes or transition safety. The original intermittent lockup
+remains unexplained and unproven resolved. **Gate C remains unauthorized and
+unaccepted**; firmware `1.1.0s2`, other hardware, device-side atomicity, native
+Restore chooser/real remote transport, exhaustive keyboard traversal/exact focus
+preservation, package/cross-platform/release qualification remain outstanding.
+RM-026 capabilities, RM-028 redesign and RM-029 enhancements retain their gates.
+
+Live Argonaut Development verification: Issue #25 **Open / P0 / In Progress**.
+Before this documentation edit, tracked files and index were clean and all seven
+existing untracked artifacts were present. Only CURRENT-STATE, ARGONAUT-ROADMAP
+and CONFIGURATION-DEPENDENCIES are reconciled here. Their publication requires
+independent documentation review followed by the user's manual staging,
+staged-diff review, commit, push and live publication-verification gates.
+Earlier checkpoints below remain historical; their Gate A publication-pending
+and Gate B outstanding statements do not describe this later checkpoint.
+No GitHub change, hardware operation or issue closure is authorized here.
+
 ### Gate A integration checkpoint — 25 October 2026 UTC / 24 October America/Chicago
 
 Primary `development` and live GitHub `development` were verified at
