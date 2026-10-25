@@ -11,6 +11,80 @@ Design approval, implementation, acceptance and publication remain distinct.
 
 ## Issue #25 / RM-007 — offline configuration dependency candidate
 
+### Gate C1 functional disposition — 25 October 2026 UTC
+
+The user reviewed and approved documenting **bounded C1 functional success,
+with protocol completion not achieved**. This disposition concerns Issue #25 /
+RM-027 under parent RM-007; it does not close the issue or accept the entire Gate C.
+Primary and live GitHub `development` were verified at
+`873fa34ecacaba56dc04db7694a2483e3e2c922e`; Issue #25 remains **Open / P0 /
+In Progress**. Before this edit, primary tracked files/index were clean and the
+seven existing untracked artifacts remained. The isolated C1 executor is still
+detached at that commit, uncommitted and unpublished, with its prior work preserved.
+
+Attempt `c1-9868611d584b495698fbdec68051d806` retained seven validated GETs,
+then one POST at position 8 with exact body
+`{"Keyboard Lighting":{"Strip Intensity":16}}` and validated `{"errors":[]}`
+response. Its baseline identified C64 Ultimate `25BE71`, firmware `1.1.0`, API
+`0.1`; keyboard mode/color/intensity were Fixed Color / Red / 6, and LED Strip
+Settings mode was Off. The strip Off baseline superseded the earlier Gate B
+Rainbow baseline for this attempt only; C1 sent no strip-setting write.
+
+The operator reported brighter LEDs and a responsive keyboard. A subsequent,
+separately authorized authenticated GET to `/v1/configs/Keyboard%20Lighting/*`
+returned HTTP 200, `errors: []`, and intensity **16**. Mode Fixed Color, color
+Red, pattern Outward, tint Pure, Auto SID Enabled and SID UltiSID1-A were retained,
+with expected enum choices/defaults and integer intensity metadata (0–31, default
+6, format `%d`). Together these support functional success of the bounded
+keyboard intensity change **6→16**, supplemented by operator observations.
+
+The attempt stopped with **premature terminal reply** before requests 9–14.
+Neither scheduled readback round nor its associated post-write observation
+checkpoint completed. The later GET did not freshly verify identity or LED Strip
+Settings and cannot substitute for the two timed rounds. **The original
+14-request protocol did not pass.** Preserve its terminal record unchanged:
+`protocol_complete=false`, `physical_acceptance=false`, `evidence_complete=false`,
+and `write_outcome="write outcome uncertain"`. This supplemental disposition does
+not rewrite those original facts, resume the attempt or renew its consumed claim.
+
+Evidence inspected during reconciliation:
+
+- Local immutable event directory:
+  `/home/bruce/.local/state/argonaut-gate-c1/c1-9868611d584b495698fbdec68051d806/`.
+  All 33 event files have a consistent SHA-256 chain; no final manifest exists.
+  Reconciliation-time SHA-256 of `032-SUPERVISOR_STOP.json`:
+  `b090a41b0d75fb6f44a78f8009e056bdcb6d8028ceb264db688b171363bbc9ab`.
+  This is a terminal-file hash, not a complete-bundle manifest or authenticity proof.
+- Conversation `6ade0045-cd2c-83ea-8fae-a7f052972eb0` (Finish Issue 25): operator
+  observations in message `f82e317b-670a-48b5-a5e9-e4b3c456c5e0`; subsequent
+  authenticated GET transcript in message `89e3c414-217f-4d10-b1a1-e15f00a3edee`.
+  The latter is an operator-supplied transcript, not an executor journal event.
+- The isolated `issue25-c1-strip-off-evidence/` records source-bound offline
+  results of 217/217 normal and 217/217 optimized tests, zero failures/errors/skips,
+  and independent review PASS without actionable findings in that revision.
+  Those retained results were inspected, not rerun; they do not resolve the later
+  physical attempt's premature termination.
+
+Preserve the event directory, permanent authorization claim, reviewed source
+manifest, offline reports and independent review in place. A separately identified
+sanitized transcript copy and archival hash inventory remain retention work; do
+not manufacture the missing original final manifest. Local evidence is not a
+published attachment. The source conversation references above retain provenance.
+
+The executor termination remains unresolved. The original intermittent device
+lockup remains unexplained and unproven resolved. No Rainbow transition,
+prolonged stability, physical-header mapping, other hardware/firmware (including
+`1.1.0s2`), device-side atomicity, broader UI/package/cross-platform or release
+qualification is established. RM-026, RM-028 and RM-029 dependencies remain.
+
+This documentation and the approved issue evidence comment record the bounded
+disposition only. Independent documentation review found no actionable findings. Repository
+publication still requires the user's manual staging, staged-diff review, commit,
+push and live verification. No hardware contact, recovery, integration of executor code, Git
+staging/commit/push, Project-field change or issue closure is part of this step.
+The Gate A/B checkpoints below retain their historical scope; their statements
+that Gate C was unauthorized/unaccepted do not describe this later C1 disposition.
+
 ### Gate A publication and Gate B read-only acceptance — 25 October 2026 UTC
 
 Primary and live GitHub `development` are verified at

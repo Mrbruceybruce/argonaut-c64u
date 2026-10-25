@@ -65,6 +65,29 @@ GitHub Project **Argonaut Development** owns live status.
 
 ## RM-027 dependency-validation implementation candidate
 
+### Gate C1 functional disposition — 25 October 2026 UTC
+
+The user approved recording **bounded keyboard-intensity functional success
+(6→16, Fixed Color / Red), with the original C1 protocol incomplete**. Seven
+validated GETs and one validated POST response were retained; the operator
+reported brighter LEDs and a responsive keyboard. A separately authorized
+authenticated keyboard-category GET returned HTTP 200, empty errors and intensity
+16 with the other expected values/metadata retained.
+
+The executor stopped with `premature terminal reply` before requests 9–14;
+neither scheduled readback/observation round completed. The supplemental GET did
+not reverify identity or LED Strip Settings. It does not make the original
+14-request protocol pass or change its false completion/acceptance flags.
+See [full disposition and evidence retention needs](CURRENT-STATE.md#gate-c1-functional-disposition--25-october-2026-utc).
+
+Primary/live `development` were verified at `873fa34ecacaba56dc04db7694a2483e3e2c922e`.
+Issue #25 remains **Open / P0 / In Progress**. Executor termination, the original
+lockup, safe mode-transition qualification and hardware mapping remain unresolved;
+firmware `1.1.0s2` remains unqualified. RM-026, RM-028 and RM-029 retain their gates.
+The isolated executor remains uncommitted/unpublished. Independent documentation review
+found no actionable findings; manual Git publication remains pending; no new hardware action or issue
+closure is authorized. Earlier Gate A/B statements retain their historical scope.
+
 ### Gate A publication and Gate B read-only acceptance — 25 October 2026 UTC
 
 Gate A is published on verified primary/live GitHub `development` at

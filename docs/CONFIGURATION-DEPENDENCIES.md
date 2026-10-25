@@ -1,5 +1,27 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## Gate C1 functional disposition — 25 October 2026 UTC
+
+The approved [C1 disposition](CURRENT-STATE.md#gate-c1-functional-disposition--25-october-2026-utc)
+records bounded keyboard intensity **6→16** success in Fixed Color / Red, supported
+by the validated POST response, operator observations and a subsequent separately
+authorized authenticated keyboard-category GET (HTTP 200, empty errors, intensity
+16 and otherwise expected values/metadata). The attempt baseline had LED Strip
+Settings mode Off; C1 sent no strip write or mode transition.
+
+The original attempt stopped before requests 9–14; its two scheduled readback and
+observation rounds did not complete. The later GET did not reverify identity or
+the strip category. **The original 14-request protocol did not pass**, and its
+terminal completion/acceptance/evidence flags remain false. The complete evidence
+record and pending retention needs are linked above.
+
+This changes no dependency rule or firmware qualification. It does not establish
+safe mode transitions, prolonged stability, header mapping, device-side atomicity
+or lockup resolution. The executor termination remains unresolved; Issue #25
+remains **Open / P0 / In Progress**, with dependent work still gated. The isolated
+executor is unpublished; independent documentation review found no actionable findings, and manual
+publication remains pending. Earlier Gate A/B statements describe their historical checkpoints.
+
 ## Gate A/B evidence checkpoint — 25 October 2026 UTC
 
 Gate A infrastructure is published at `89c8eea956dc66d52124da5969fc14ede9a5a27b`.
