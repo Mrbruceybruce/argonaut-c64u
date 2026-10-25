@@ -1,5 +1,44 @@
 # Issue #25 — LED mode-write containment review gate
 
+## Recorded ownership and linked tooling follow-up — 25 October 2026
+
+[The accepted ownership record](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6402085824)
+identifies **Bruce / Argonaut maintainer** as residual-risk owner for the intermittent
+lockup and indirect/firmware-driven LED transitions, including Auto SID, and their
+investigation/qualification coordination. GitHub assignees are unchanged.
+[Issue #48](https://github.com/Mrbruceybruce/argonaut-c64u/issues/48) is the linked C1
+executor follow-up for premature termination, truthful terminal outcomes, scheduled
+readback/observation accounting, deterministic offline regressions, independent
+review and durable evidence retention. Tracking exists; correction and retention
+work are not complete or authorized by this reconciliation.
+
+**QUALIFIED ACCEPT** covers the bounded investigation and explicit mode-write
+containment, not a demonstrated lockup fix or general write/transition safety.
+The original triggering payload/root cause and lockup remain unresolved. Indirect
+transitions, including Auto SID, remain outside the containment guarantee.
+**#25 remains Open / P0 — Critical / In Progress** and retains this defining safety
+scope; completion of #48 cannot establish its resolution or authorize its closure.
+#24 capability coordination and RM-026, RM-028 and RM-029 gates remain unchanged.
+
+C1 intensity **6→16** retains bounded functional success only. Requests 9–14 and
+both scheduled readback/observation rounds remain incomplete; supplemental GET
+evidence cannot replace them. Preserve the original 33-event journal and consumed
+authorization claim, with `protocol_complete=false`, `physical_acceptance=false`,
+`evidence_complete=false` and `write_outcome="write outcome uncertain"` unchanged.
+No original final manifest exists; #48 must distinguish later archival metadata
+from original evidence and must not manufacture that manifest or resume the attempt.
+Hardware/header mapping, other variants, firmware 1.1.0s2, prolonged stability,
+device-side atomicity and broader release qualification remain unproven.
+
+The prior four-document reconciliation is published at
+`2dc8bdc09740ca1a0a2e69ff92ec2fa44be4f4c9`; primary/live `development` equality was
+verified before this edit. Historical proposed-owner, missing-follow-up and pending-
+publication statements below are preserved and superseded by this checkpoint.
+This new documentation-only update requires independent review and the user's
+manual staging, staged-diff review, commit, push and live-verification gates.
+Any closure decision requires separate explicit maintainer review and authorization.
+No Git publication, GitHub change, hardware contact or C1 implementation occurs here.
+
 ## Qualified-acceptance disposition — 25 October 2026
 
 The user approved documentation and tracking reconciliation toward **QUALIFIED

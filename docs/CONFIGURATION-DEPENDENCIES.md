@@ -1,5 +1,25 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## Ownership and follow-up reconciliation — 25 October 2026
+
+[Recorded maintainer acceptance](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6402085824)
+establishes **Bruce / Argonaut maintainer** as residual-risk owner, without changing
+GitHub assignees. [C1 tooling #48](https://github.com/Mrbruceybruce/argonaut-c64u/issues/48)
+tracks premature termination, truthful outcomes, scheduled readback/observation
+accounting and evidence retention, with offline regressions and independent review.
+The original lockup and indirect/firmware-driven transitions, including Auto SID,
+remain unresolved under **#25, Open / P0 — Critical / In Progress**.
+**QUALIFIED ACCEPT** remains explicit mode-write containment acceptance, not a fix,
+general write safety or completed physical qualification. #24 coordination and
+RM-026/028/029 gates remain. No dependency rule or firmware qualification changes.
+
+The prior reconciliation is published at
+`2dc8bdc09740ca1a0a2e69ff92ec2fa44be4f4c9`. Earlier proposed-owner, missing-follow-up
+and publication-pending wording below is historical and superseded by this record.
+See [current ownership, C1 evidence limits and decision gates](ISSUE25-MODE-CONTAINMENT.md#recorded-ownership-and-linked-tooling-follow-up--25-october-2026).
+This new documentation update awaits independent review and manual publication;
+#25 closure requires separate explicit maintainer review and authorization.
+
 ## Published containment and qualified-acceptance boundary — 25 October 2026
 
 Explicit mode-write containment is published on `development` at

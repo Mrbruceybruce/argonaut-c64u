@@ -65,6 +65,32 @@ GitHub Project **Argonaut Development** owns live status.
 
 ## RM-027 dependency-validation implementation candidate
 
+### Recorded residual-risk ownership and C1 follow-up — 25 October 2026
+
+The [maintainer ownership record](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6402085824)
+confirms **Bruce / Argonaut maintainer** accepts residual intermittent-lockup and
+indirect/firmware-driven LED-transition risk ownership, including Auto SID, and
+coordination of investigation and qualification. This is recorded responsibility,
+not a GitHub assignee change. [C1 tooling issue #48](https://github.com/Mrbruceybruce/argonaut-c64u/issues/48)
+now tracks premature termination, truthful outcomes, scheduled readback/observation
+accounting, deterministic offline regressions, independent review and durable
+evidence retention. Its creation does not authorize implementation or hardware work.
+
+**QUALIFIED ACCEPT** remains bounded acceptance of explicit mode-write containment,
+not a lockup fix, general write safety, completed physical qualification or closure.
+The original lockup/root cause and indirect transitions remain unresolved under
+**#25, Open / P0 — Critical / In Progress**; no safety scope transfers to #48.
+#24 capability coordination and RM-026, RM-028 and RM-029 gates remain unchanged.
+See the [current evidence boundaries](ISSUE25-MODE-CONTAINMENT.md#recorded-ownership-and-linked-tooling-follow-up--25-october-2026).
+
+The preceding four-document reconciliation is published on `development` at
+`2dc8bdc09740ca1a0a2e69ff92ec2fa44be4f4c9`, verified against primary and live GitHub
+HEADs before this edit. Earlier proposed-owner, missing-follow-up and publication-
+pending statements below retain their historical checkpoint scope and are superseded
+by this record. This new documentation-only reconciliation awaits independent review
+and the user's manual publication gates. Any #25 closure still requires separate
+explicit maintainer review and authorization preserving the unresolved safety scope.
+
 ### Publication and qualified-acceptance reconciliation — 25 October 2026
 
 The reviewed explicit LED mode-write containment is integrated and published on
