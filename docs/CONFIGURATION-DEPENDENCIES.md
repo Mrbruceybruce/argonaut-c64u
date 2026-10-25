@@ -1,5 +1,22 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## Publication checkpoint — 24 October 2026
+
+The reviewed slice is integrated and published on `development` at
+`c3a4984a1a4754830cf2b02aa202e3d75b0b37a7`.
+[Hosted Test Lab run 40150212361](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40150212361)
+passed all eight configured jobs, including GTK regression. The offline fixtures
+and their limitations described below are unchanged. This hosted result does not
+establish physical C64U, package, cross-platform or release acceptance, qualify
+firmware `1.1.0s2`, or prove the device lockup resolved. Issue #25 is verified as
+P0 / In Progress / Open in Argonaut Development; the Project status update is complete.
+Physical acceptance and root-cause investigation remain pending.
+Earlier candidate/integration-authorization statements below describe the
+pre-publication checkpoint; they are not the current publication state or new
+hardware authorization. See CURRENT-STATE for integration tests and review.
+
+## Original implementation checkpoint
+
 Offline implementation candidate, 24 October 2026, based on published
 `development` commit `c6db7da2be7bc4f65d2bdad41491712e35b9718a`.
 This is reusable Core infrastructure for the Ultimate Menu renovation

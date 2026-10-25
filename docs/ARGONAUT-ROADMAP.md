@@ -65,6 +65,15 @@ GitHub Project **Argonaut Development** owns live status.
 
 ## RM-027 dependency-validation implementation candidate
 
+Publication checkpoint — 24 October 2026: the reviewed bounded slice is published
+on `development` at `c3a4984a1a4754830cf2b02aa202e3d75b0b37a7`.
+[Hosted Test Lab run 40150212361](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40150212361)
+passed all eight jobs. Issue #25 is verified as P0 / In Progress / Open
+in Argonaut Development; the approved Project status update is complete. Physical acceptance and
+lockup root-cause investigation remain pending. This supersedes
+publication-pending wording in the candidate checkpoint below, without completing
+RM-027 or its broader parent/dependent work.
+
 The offline Issue #25 slice provides shared Core dependency admission for RM-007's
 ongoing Ultimate Menu renovation. It validates whole proposed batches against
 fresh controlling settings, with LED menu rules pinned to official 1.1.0 source.

@@ -11,6 +11,39 @@ Design approval, implementation, acceptance and publication remain distinct.
 
 ## Issue #25 / RM-007 — offline configuration dependency candidate
 
+### Publication and hosted CI checkpoint — 24 October 2026
+
+The reviewed dependency-validation slice was integrated into the primary checkout
+and published to GitHub `development` as
+`c3a4984a1a4754830cf2b02aa202e3d75b0b37a7` (parent
+`c6db7da2be7bc4f65d2bdad41491712e35b9718a`). Local and live GitHub HEADs
+were verified equal. The committed patch matches the approved 13-file integration:
+877 insertions and 49 deletions, including all 51 preserved workflow lines and
+three reviewed checkpoint corrections. The seven original untracked artifacts
+retain their recorded hashes; preservation archives and isolated candidates remain
+retained. This checkpoint does not authorize cleanup of those workspaces.
+
+Primary integration validation passed 118 affected tests (15.247 seconds) and
+30 optimized dependency tests (0.393 seconds), with zero failures/errors/skips.
+Independent integration review found no actionable P0–P2 findings.
+[Hosted Test Lab run 40150212361](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40150212361)
+completed successfully at the published commit: all eight jobs passed, including
+GTK regression, normal/optimized unit and regression jobs, media regression,
+offline checks and Markdown validation. This establishes the configured hosted
+workflow result for this commit; it does not upgrade historical failed runs or
+establish physical C64U, package, cross-platform or release acceptance.
+
+Issue #25 is verified as P0 / In Progress / Open in Argonaut Development.
+The approved Project status update is complete. Publication
+is complete for this bounded slice. Physical acceptance and the device-lockup
+root-cause investigation remain pending; no lockup fix or device-side atomicity
+is claimed. Firmware `1.1.0s2` remains unqualified. Issue #24 capability work,
+Issue #20 menu renovation and dependent LED enhancements retain their separate
+gates. The earlier candidate and operating-workflow snapshots below retain their
+historical scope; the primary implementation is now committed and published.
+
+### Original implementation checkpoint
+
 A separate isolated checkout, `issue25-dependency-validation`, implements
 Core-owned full-batch dependency validation shared with Ultimate Menu, Restore,
 Undo and native-file previews. It starts at published `c6db7da2be7bc4f65d2bdad41491712e35b9718a`;
