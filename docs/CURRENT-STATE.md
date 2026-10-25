@@ -11,6 +11,65 @@ Design approval, implementation, acceptance and publication remain distinct.
 
 ## Issue #25 / RM-007 — offline configuration dependency candidate
 
+### Gate A integration checkpoint — 25 October 2026 UTC / 24 October America/Chicago
+
+Primary `development` and live GitHub `development` were verified at
+`6ff217c9aaaec834875e51e8cbe55d37585b998d`. The Core dependency validator is
+already published: its implementation commit is
+`c3a4984a1a4754830cf2b02aa202e3d75b0b37a7`, followed by the documentation
+reconciliation at `6ff217c9aaaec834875e51e8cbe55d37585b998d`.
+
+The separately reviewed five-file GTK Gate A infrastructure is now integrated
+into the primary checkout, but remains **unstaged, uncommitted and unpublished**:
+`tests/run_gate_a.py`, `tests/ultimate_menu_fixture.py`,
+`tests/test_ultimate_menu_gate_a.py`, `tests/ci_suites.json`, and
+`docs/ISSUE25-GATE-A.md`. Its exact patch is 512 additions / 1 deletion, and all
+five SHA-256 hashes match the reviewed candidate. It changes no production
+behavior. The inventory records the new GTK module as deferred from hosted suites;
+the explicit local Gate A run does not establish hosted qualification.
+
+Primary integration validation passed **33/33 methods**: 11 real GTK, 20 Core
+and 2 existing LED dependency tests, with **zero failures, errors or skips**.
+Network namespace isolation was verified, with synthetic REST, temporary
+preferences/history, private Xvfb/D-Bus and socket/DNS guards. Independent final
+candidate execution also passed 33/33. Independent integration review found no
+actionable blocker within the bounded offline scope; that integration review
+checked the retained execution evidence and did not rerun tests.
+
+Retained local evidence is under
+`/tmp/argonaut-gate-a-primary-integration-20261025/`: `summary.json`,
+`integration.patch`, `preservation.json`, and `independent-integration-review.txt`.
+The final isolated candidate evidence is in `/tmp/argonaut-gate-a-review-final/`.
+These are local evidence paths, not published repository artifacts. This
+reconciliation inspected the existing results; it did not rerun Gate A.
+
+The seven pre-existing untracked artifacts, all 529 ignored files, the empty
+index and all six worktree registrations (including the existing prunable p44
+entry) were verified preserved. The five integrated files remain byte-identical;
+only CURRENT-STATE and ARGONAUT-ROADMAP are changed by this reconciliation.
+[Gate A's detailed evidence](ISSUE25-GATE-A.md) retains its approved
+pre-integration checkpoint verbatim: its statements that integration is pending,
+the primary is clean and live Project/remote verification is unavailable are
+historical. This checkpoint supplies the subsequent integration state.
+[The dependency contract](CONFIGURATION-DEPENDENCIES.md) likewise retains its
+original fixture/qualification scope; its inert-widget limitations do not
+describe the separate real-GTK Gate A fixture.
+
+Live read-only tracking verification found Issue #25 **Open / P0 / In Progress**.
+Gate A passes only its listed offline coverage. The intermittent device lockup
+has not been reproduced, explained or proven resolved. Physical Gates B/C remain
+unauthorized and unexecuted. Native Restore chooser and real remote transport,
+exhaustive keyboard traversal/exact focus preservation, firmware `1.1.0s2`,
+hardware capability coverage, device-side atomicity, and hosted/package,
+cross-platform and release qualification remain outstanding. The earlier hosted
+run below qualifies only its published commit, not this new Gate A candidate.
+RM-026 capabilities, RM-028 redesign and RM-029 enhancements retain their gates.
+
+Next publication gates remain user-controlled: documentation review, manual
+staging, staged-diff review, commit, push and publication verification. This
+reconciliation performs no staging, commit, push, GitHub update, hardware
+operation or issue closure and grants no authorization for those later gates.
+
 ### Publication and hosted CI checkpoint — 24 October 2026
 
 The reviewed dependency-validation slice was integrated into the primary checkout

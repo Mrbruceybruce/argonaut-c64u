@@ -444,7 +444,8 @@
     "test_upload_cleanup": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_usb_backup": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_usb_backup_preferences": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
-    "test_wired_status": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment."
+    "test_wired_status": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
+    "test_ultimate_menu_gate_a": "Issue #25 explicit offline Gate A runner tests/run_gate_a.py; separately reviewed namespace/GTK fixture, not yet a hosted CI selection."
   },
   "deferred_classes": {
     "test_uc1_compatibility.Protocol": "Outside approved class selection; requires separate audit and assignment.",

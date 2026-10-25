@@ -65,6 +65,38 @@ GitHub Project **Argonaut Development** owns live status.
 
 ## RM-027 dependency-validation implementation candidate
 
+### Gate A integration checkpoint — 25 October 2026 UTC / 24 October America/Chicago
+
+The dependency validator is published on `development` at verified local/live
+HEAD `6ff217c9aaaec834875e51e8cbe55d37585b998d` (implementation at `c3a4984`,
+followed by publication-status documentation). The separate five-file GTK Gate A
+infrastructure is integrated in the primary checkout but remains **unstaged,
+uncommitted and unpublished**. Its 512 additions / 1 deletion and five hashes
+match the independently reviewed candidate; no production behavior changed.
+
+Primary isolated offline validation passed **33/33 methods** (11 real GTK,
+20 Core, 2 existing LED), with zero failures/errors/skips and verified network
+isolation. Independent final candidate execution also passed 33/33; independent
+integration review found no actionable blocker within that offline scope.
+See [current integration state and retained evidence](CURRENT-STATE.md#gate-a-integration-checkpoint--25-october-2026-utc--24-october-americachicago)
+and [bounded Gate A coverage](ISSUE25-GATE-A.md). The latter remains the unchanged
+pre-integration evidence record; CURRENT-STATE records its later integration.
+The new GTK module is deferred from hosted suites; prior hosted CI success does
+not qualify this candidate.
+
+Issue #25 remains Open / P0 / In Progress on fresh read-only verification.
+The intermittent lockup remains unexplained and unproven resolved. Physical
+Gates B/C, native Restore chooser/real remote transport, exhaustive keyboard and
+exact focus preservation, firmware `1.1.0s2`, broader hardware capabilities,
+device-side atomicity and hosted/package/cross-platform/release qualification
+remain outstanding. RM-026, RM-028 and RM-029 retain their separate dependencies.
+Publication of Gate A still requires documentation review and the user's manual
+staging, staged-diff review, commit, push and publication-verification gates.
+This documentation-only reconciliation changes no issue/Project state and
+authorizes no hardware operations or issue closure.
+
+### Earlier dependency-validator publication checkpoint
+
 Publication checkpoint — 24 October 2026: the reviewed bounded slice is published
 on `development` at `c3a4984a1a4754830cf2b02aa202e3d75b0b37a7`.
 [Hosted Test Lab run 40150212361](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40150212361)
