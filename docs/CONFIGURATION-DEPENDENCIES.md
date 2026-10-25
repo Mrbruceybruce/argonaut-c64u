@@ -1,5 +1,36 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## Published containment and qualified-acceptance boundary — 25 October 2026
+
+Explicit mode-write containment is published on `development` at
+`40da3846e88c6efe5395928394a6850c17e92f1c`. Local/live HEAD equality and the nine-file
+reviewed manifest were verified. The candidate checkpoint below is historical.
+The approved reconciliation records **QUALIFIED ACCEPT** of the bounded investigation
+and refusal policy, with #25 retained **Open / P0 / In Progress**.
+See [criteria disposition and residual risks](ISSUE25-MODE-CONTAINMENT.md#qualified-acceptance-disposition--25-october-2026).
+
+Core refuses all explicit mode writes, including same-value and mixed batches,
+before configuration reads, history mutation or POST. Admitted parameter-only
+batches retain fresh firmware/metadata, active-field, staleness and session checks;
+history is recorded before the single admitted configuration POST. Refusal does
+not establish control over indirect or firmware-driven transitions, including
+Auto SID behavior. The intermittent lockup is unexplained and unproven resolved.
+
+Retained integration tests passed 120/120 normal, 120/120 optimized and 35/35 GTK,
+with engineering/integration review PASS; these tests were inspected, not rerun.
+[Hosted CI at 40da384](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40223973630)
+succeeded for its configured suites. Gate A/B remain bounded offline/read-only
+evidence. C1's validated intensity 6→16 POST and separate authenticated GET support
+bounded functional success, not completion of its original 14-request protocol.
+Requests 9–14 and both timed rounds remain incomplete; original flags stay false.
+
+Hardware/header mapping, other variants and firmware 1.1.0s2 remain unqualified;
+#24 coordination and RM-026/028/029 gates remain. Bruce / Argonaut maintainer is
+only the proposed residual-risk owner, subject to explicit acceptance. Executor
+termination/evidence retention need approved follow-up tracking while #25 remains
+the defining lockup issue. This documentation edit awaits manual publication and
+a separate final closure decision; it authorizes no hardware operation.
+
 ## LED mode-write containment candidate — 25 October 2026
 
 This isolated, uncommitted candidate is based on published development

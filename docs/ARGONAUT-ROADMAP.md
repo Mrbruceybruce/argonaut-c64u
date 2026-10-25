@@ -65,6 +65,56 @@ GitHub Project **Argonaut Development** owns live status.
 
 ## RM-027 dependency-validation implementation candidate
 
+### Publication and qualified-acceptance reconciliation — 25 October 2026
+
+The reviewed explicit LED mode-write containment is integrated and published on
+`development` at `40da3846e88c6efe5395928394a6850c17e92f1c` (parent `2cd5a60549e08cf734f192e0cfc38882f583c3db`).
+Primary and live GitHub HEADs were verified equal before this documentation edit;
+tracked files/index were clean, with seven preserved legacy untracked artifacts.
+All nine published files match the reviewed integration manifest. The sixteen
+other snapshotted checkouts retain their recorded file contents and unpublished work.
+
+**QUALIFIED ACCEPT** is the bounded investigation/refusal-policy disposition being
+reconciled with the user's approval. It accepts explicit mode-write containment,
+not resolution of the intermittent device lockup, general write safety, completed
+physical qualification or issue closure. The original triggering payload and root
+cause remain unknown. The historical candidate checkpoints below are preserved;
+their unintegrated/unpublished wording does not describe the published containment.
+This four-document reconciliation itself remains unstaged, uncommitted and unpublished.
+
+Retained primary integration evidence passes **120/120 normal**, **120/120 optimized**
+and **35/35 GTK Gate A** (11 GTK, 22 Core, 2 LED), zero failures/errors/skips.
+Engineering and integration independent reviews report PASS. These results were
+inspected, not rerun for this documentation-only change.
+[Hosted Test Lab run 40223973630](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40223973630)
+completed successfully at `40da384`; it qualifies the configured hosted suites,
+not the separately executed real-GTK Gate A module or physical/package/release acceptance.
+See the [acceptance criteria and residual-risk record](ISSUE25-MODE-CONTAINMENT.md#qualified-acceptance-disposition--25-october-2026).
+
+Gate A remains bounded offline UI/Core evidence; Gate B accepted five read-only
+requests on operator-identified Founder hardware with firmware 1.1.0.
+C1 supports bounded intensity **6→16** functional success through the validated
+POST, operator observations and a separate authenticated GET. Requests 9–14 and
+both timed readback/observation rounds remain incomplete; the original 14-request
+protocol did not pass. Original terminal flags and evidence are unchanged.
+
+Explicit mode refusal does not control indirect/firmware-driven transitions,
+including behavior associated with Auto SID. Intermittent lockup, transition safety,
+physical-header-to-category mapping, Beige/Starlight/other variant qualification,
+firmware `1.1.0s2`, device-side atomicity and broader release acceptance remain open.
+Proposed residual-risk owner: **Bruce / Argonaut maintainer, subject to explicit
+maintainer acceptance**; no ownership assignment is made by this reconciliation.
+
+Issue #25 remains **Open / P0 — Critical / In Progress** and the defining LED safety
+issue. Its existing Project fields already match the approved disposition; no field
+change is needed. Capability coordination remains with #24; RM-026, RM-028 and
+RM-029 retain their gates. C1 executor premature termination and evidence retention
+need separately approved follow-up tracking; no dedicated issue was identified in
+the repository issue inventory. No new issue, reassignment, closure, hardware
+operation or Git publication is authorized by this checkpoint. Next gates are
+independent documentation review, the user's manual publication sequence, and a
+separate final acceptance/closure decision with explicit residual-risk ownership.
+
 ### LED mode-write containment candidate — 25 October 2026
 
 A new isolated candidate based on published `development` at

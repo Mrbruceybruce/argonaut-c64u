@@ -1,5 +1,99 @@
 # Issue #25 — LED mode-write containment review gate
 
+## Qualified-acceptance disposition — 25 October 2026
+
+The user approved documentation and tracking reconciliation toward **QUALIFIED
+ACCEPT** of the bounded investigation and explicit LED mode-write refusal policy.
+This does not close #25 or claim the intermittent device-lockup defect is fixed.
+The original implementation/review record below is preserved as a historical
+checkpoint; its publication-pending statements no longer describe the containment.
+
+The nine-file implementation is published at
+`40da3846e88c6efe5395928394a6850c17e92f1c` on `development`, parent
+`2cd5a60549e08cf734f192e0cfc38882f583c3db`. Primary/live HEAD equality, intended
+GitHub fetch/push remotes, empty index and clean tracked files were verified before
+this edit. All nine files match the reviewed manifest. Seven legacy untracked
+artifacts and sixteen other snapshotted checkout contents are preserved.
+This four-document reconciliation remains unstaged, uncommitted and unpublished.
+
+### Acceptance criteria disposition
+
+| Issue #25 criterion | Bounded assessment |
+| --- | --- |
+| Existing diagnostics and configuration behavior reviewed | Met within retained evidence; original triggering payload/root cause remain unknown. |
+| Relevant request construction and ordering documented | Met: shared Core admission; mode-write batches refused whole before configuration reads/history/POST; admitted parameter batches record history before one configuration POST. |
+| Hardware-specific dependencies identified where possible | Qualified: pinned official firmware 1.1.0 rules and Founder metadata; physical header mapping and other variants unverified. |
+| Reviewed refusal policy | Met for every explicit mode write, including same-value writes, previews and mixed batches; indirect transitions are outside this guarantee. |
+| Deterministic regression tests | Met for identified admission/dependency failure mechanisms; tests do not reproduce the unexplained physical lockup. |
+| Independent engineering review | PASS for containment and its integration; retained reports remain source-bound. |
+| Separate authorization for physical reproduction | Required; this reconciliation performs no hardware contact and grants no new authorization. |
+| Remaining uncertainty documented | Explicit below; residual-risk ownership and final closure require a separate maintainer decision. |
+
+Retained primary results: **120/120 normal**, **120/120 optimized**, **35/35 GTK**
+(11 GTK, 22 Core, 2 LED), zero failures/errors/skips. Engineering and integration
+reviews PASS. Local evidence is retained in `issue25-mode-integration-evidence/`
+under the project workspace: `normal-primary.json`, `optimized-primary.json`,
+`gtk-primary/summary.json`, `manifest.json`, `integration-report.txt` and
+`independent-integration-review.txt`; it is not a published attachment. Results
+were inspected, not rerun for this documentation-only change.
+[Hosted Test Lab run 40223973630](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/40223973630)
+is completed/success at `40da384`. The real-GTK Gate A module remains separate
+from hosted suite qualification; no package/cross-platform/release acceptance follows.
+
+### Physical evidence and unresolved risks
+
+Gate A is bounded offline UI/Core coverage. Gate B accepted five validated
+read-only requests on operator-identified Founder `25BE71`, firmware 1.1.0,
+API 0.1; neither establishes general write or transition safety.
+[C1 disposition](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6401134651)
+supports keyboard intensity **6→16** functional success: seven validated GETs,
+then the position-8 POST, operator observations and a separate authorized,
+authenticated keyboard-category GET. That GET did not reverify identity/strip
+settings or substitute for either timed readback/observation round.
+
+The original 14-request protocol remains incomplete: premature terminal reply
+prevented requests 9–14. Preserve `protocol_complete=false`,
+`physical_acceptance=false`, `evidence_complete=false` and
+`write_outcome="write outcome uncertain"`. Preserve the 33-event journal, permanent
+consumed claim, reviewed source manifest and reports; no original final manifest
+exists. Sanitized supplemental transcript retention and archival hash inventory
+remain work, not completed evidence or permission to resume the attempt.
+
+The original intermittent lockup remains unexplained and unproven resolved.
+Explicit mode-write refusal does not control indirect/firmware-driven transitions,
+including Auto SID behavior. Parameter-only edits retain safeguards but do not
+establish universal hardware safety. Physical-header-to-REST-category mapping,
+Beige/Starlight/other hardware variants, firmware 1.1.0s2, prolonged stability,
+device-side atomicity and broader UI/package/cross-platform/release qualification
+remain unproven.
+
+### Tracking and decision gates
+
+#25 remains the defining LED safety issue, **Open / P0 — Critical / In Progress**.
+The live Project fields already match this approved scope; do not move it to Done
+or lower its priority. #24 remains capability coordination (P1 / Backlog); #26
+remains P2 / Backlog. RM-026, RM-028 and RM-029 retain their dependencies.
+
+The repository issue inventory and existing #25 comments identify no dedicated
+C1 executor premature-termination/evidence-retention follow-up issue. Record this
+as a separate proposed follow-up, linked back to #25, requiring explicit creation
+approval. Its scope should preserve the original failed protocol, diagnose early
+termination and define durable evidence retention without inventing a missing
+manifest or renewing hardware authorization. No new issue is created here.
+
+Unresolved lockup and indirect/Auto SID transitions remain tracked by open #25;
+coordinate hardware qualification with #24. #1 concerns a separate Undo/SuperCPU
+freeze observation and is not a substitute for #25 or evidence of shared cause.
+Proposed residual-risk owner: **Bruce / Argonaut maintainer, subject to explicit
+acceptance**. #25 has no assignee; no assignment or ownership transfer is made.
+Before any later closure, explicitly accept ownership and settle durable linked
+follow-up tracking without dropping the defining LED safety scope.
+
+Next: independent review and documentation checks, then the user's manual staging,
+staged-diff review, commit, push and live publication verification gates. Final
+closure requires separate authorization. This step authorizes no Git publication,
+hardware contact, recovery, new issue, reassignment or issue-state change.
+
 ## Scope and implementation
 
 Approved isolated implementation based on published development
