@@ -77,6 +77,18 @@
           "tests": 20,
           "timeout_seconds": 120,
           "audit": "Fake clock, callbacks, device/media boundaries and private temporary reports; bounded local worker cleanup; no device, sockets, DNS or application launch."
+        },
+        {
+          "selector": "test_configuration_dependencies.CoreDependencies",
+          "tests": 20,
+          "timeout_seconds": 120,
+          "audit": "Issue #25: fake Core transports, blocked Python sockets, temporary history; pure policy and inert GTK controller widgets. No application launch or hardware."
+        },
+        {
+          "selector": "test_configuration_dependencies.UIDependencies",
+          "tests": 10,
+          "timeout_seconds": 120,
+          "audit": "Issue #25: fake Core transports, blocked Python sockets, temporary history; pure policy and inert GTK controller widgets. No application launch or hardware."
         }
       ]
     },

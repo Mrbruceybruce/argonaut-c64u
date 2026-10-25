@@ -259,8 +259,11 @@ class UltimateClient:
                     'api', 'Invalid or unsupported REST response.') from exc
 
     def apply_configuration(self, values):
-        if not isinstance(values, dict) or not values:
-            raise BrowserError('No configuration changes were staged.')
+        from .configuration_policy import execute
+        return execute(self, values, self._apply_configuration_validated)
+
+    def _apply_configuration_validated(self, values):
+        # Internal transport sink; Core owns admission.
         return self._request_json('POST', '/v1/configs', values)
 
     def save_configuration(self):

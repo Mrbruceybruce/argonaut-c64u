@@ -58,8 +58,10 @@ class BackupActions:
   scroll=Gtk.ScrolledWindow(vexpand=True,hexpand=True);scroll.set_child(box);dialog.get_content_area().append(scroll)
   def response(_,code):
    dialog.destroy()
-   if code!=Gtk.ResponseType.OK or tab.client is not client or tab.app.busy or tab.pending or tab.drafts:return
-   tab.all_settings=settings;tab.requires_refresh=False
+   if code!=Gtk.ResponseType.OK or tab.client is not client or tab.app.busy or tab.pending or tab.drafts or tab.requires_refresh:return
+   selected={(category,setting.name):value for check,(category,setting,value) in zip(checks,changes) if check.get_active()}
+   if not selected or tab.admit_changes(selected,settings) is None:return
+   tab.all_settings=settings
    for check,(category,setting,value) in sorted(zip(checks,changes),key=lambda pair:not controls_dependencies(pair[1][0],pair[1][1].name)):
     if check.get_active():tab.stage(category,setting,display(value))
    tab.render();tab.update_edit_buttons()

@@ -9,6 +9,84 @@ Earlier milestone, workspace and next-step statements retain their checkpoint
 scope; they are not fresh workspace observations or live planning instructions.
 Design approval, implementation, acceptance and publication remain distinct.
 
+## Issue #25 / RM-007 — offline configuration dependency candidate
+
+A separate isolated checkout, `issue25-dependency-validation`, implements
+Core-owned full-batch dependency validation shared with Ultimate Menu, Restore,
+Undo and native-file previews. It starts at published `c6db7da2be7bc4f65d2bdad41491712e35b9718a`;
+the earlier blanket-refusal candidate remains untouched.
+See [contract, official 1.1.0 source qualification, and limitations](CONFIGURATION-DEPENDENCIES.md).
+
+All known valid modes remain usable within the qualified metadata/product/firmware
+scope. Invalid mixed batches and stale controlling settings are refused before
+REST/history writes. Unknown firmware, including unqualified `1.1.0s2`, is not
+assumed equivalent. This is menu-contract enforcement, not a hardware lockup fix.
+
+Live Project inspection on 24 October 2026: #25 P0/Backlog, #24 P1/Backlog,
+#20 P2/Backlog. No tracking changes were made. Implementation remains uncommitted
+in both the isolated and primary checkouts; publication and physical acceptance
+require separate approval.
+
+Offline validation: **118 affected tests passed**, zero failures/errors/skips
+(15.091 seconds), including 30 new dependency tests; those 30 also passed under
+optimized Python. CI source inventory audit passed: 168 modules, 42 selected
+classes and 508 selected methods. Syntax and all-file whitespace checks passed.
+These are local offline results, not full hosted CI, GTK rendering, hardware,
+package or release acceptance. Independent engineering review passed with no actionable P0–P2 findings; the
+reviewer independently reran all 118 tests successfully (15.061 seconds).
+User-approved integration preserves the primary workflow additions verbatim.
+
+## Operating workflow and checkout verification
+
+### Verified local snapshot — 24 October 2026, before this documentation edit
+
+- Primary integration/publication checkout:
+  `/home/bruce/Documents/ChatGPT/Local Projects/argonaut-repository`.
+  Branch `development`, HEAD and local `origin/development` both
+  `c6db7da2be7bc4f65d2bdad41491712e35b9718a`; index and tracked files clean.
+  `origin` fetch/push URL: `https://github.com/Mrbruceybruce/argonaut-c64u.git`.
+  This is local verification, not a fresh check of GitHub's branch tip.
+- The older `/home/bruce/Documents/ChatGPT/Local Projects/argonaut-development`
+  is a detached worktree at `40a2c98d8c6995528bf89daab35ef6156faad23a`.
+- Seven existing untracked artifacts are present and must be preserved:
+  `c64/d71-crossside-test.prg`, `c64/d71-edited.d71`,
+  `c64/d81-crossbam-test.prg`, `c64/d81-edited.d81`, `c64/rel-removed.d64`,
+  `tests/fixtures/RELFILE.rel`, and `tests/fixtures/new-disk.d64`.
+
+These observations supersede older workspace observations for this checkpoint
+only; reverify them at the next task. Historical acceptance/publication records
+below retain their original scope.
+
+### Standing workflow — changes require user approval
+
+- GitHub `development` is the authoritative published source. Live tracking
+  remains with **Argonaut Development**, as defined above and in the roadmap.
+  Use the primary checkout above for integration and publication. ChatGPT Work
+  issue checkouts are isolated implementation/review environments; their changes
+  are not automatically integrated or published.
+- At each new chat, read this document and [ARGONAUT-ROADMAP](ARGONAUT-ROADMAP.md),
+  relevant linked documents (including [DEVELOPMENT](DEVELOPMENT.md),
+  [RELEASING](RELEASING.md) and applicable architecture/acceptance contracts),
+  and the relevant issues. Before suggesting commands or editing, verify the
+  actual checkout path, worktree registration, branch, HEAD, remotes, index and
+  working-tree status, including untracked files. Do not infer them from the
+  chat's working directory, a directory name or an earlier checkpoint.
+- Integrate reviewed changes into the primary checkout only after explicit safe
+  checks of source/target identity, exact diff, review/validation evidence,
+  branch ancestry/divergence and preservation of existing local files, followed
+  by user approval of the integration. Stop on an unexpected state, conflict,
+  failed check or uncertain file ownership; resolve it with the user first.
+- Preserve existing tracked edits and untracked files. Never clean, reset or
+  discard them without explicit approval; exclude unrelated artifacts from
+  staging. The seven-file list above is a snapshot, not a permanent allowlist.
+- Publication is manual: review the final diff and whitespace, explicitly stage
+  only approved files, inspect the staged diff, commit, push, then verify the
+  published branch/commit and final local status. Execute commands sequentially,
+  inspect each result before proceeding, and stop at approval/validation gates
+  or any failure. Implementation/review approval alone does not authorize
+  integration or publication; package/release gates remain in RELEASING.
+- Do not change this operating workflow without user approval.
+
 ## Issue #19 / RM-006 — Instant Replay removal, uncommitted
 
 Inspection baseline: `development` at `be6b8f500d94559ee1bf5e1343814e550bb15f2d`.

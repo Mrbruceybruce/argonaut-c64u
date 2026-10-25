@@ -63,6 +63,18 @@ scope was approved **COMPLETE** during migration. Managed CRT launch, Founder
 qualification and general import/recovery remain separate RM-011/RM-030 work.
 GitHub Project **Argonaut Development** owns live status.
 
+## RM-027 dependency-validation implementation candidate
+
+The offline Issue #25 slice provides shared Core dependency admission for RM-007's
+ongoing Ultimate Menu renovation. It validates whole proposed batches against
+fresh controlling settings, with LED menu rules pinned to official 1.1.0 source.
+See [contract and qualification boundaries](CONFIGURATION-DEPENDENCIES.md) and
+[implementation evidence](CURRENT-STATE.md#issue-25--rm-007--offline-configuration-dependency-candidate).
+This is neither the former blanket LED refusal nor a proven lockup correction.
+RM-026 capability investigation, RM-028 structural redesign, RM-029 enhancements,
+physical acceptance and publication remain separate gates. Live priority/status
+remain with the Project; no issue or Project field was changed for this candidate.
+
 ## Strategic outcomes and boundaries
 
 - **A–C:** preserve Network Foundation and bounded stabilization/Files acceptance.

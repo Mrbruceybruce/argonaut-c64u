@@ -8,7 +8,8 @@ from .configuration import Configuration, display
 from .api import BrowserError
 from .backup_dialog import BackupActions
 from .flash_dialog import FlashFiles
-from .config_history import history_path, save_before_apply, read_previous
+from .config_history import history_path, read_previous
+from .configuration_policy import ConfigurationRefused, validate
 from .dependencies import enabled, controls_dependencies, inactive_reason, NETWORK_CATEGORIES, STATIC_FIELDS
 from .settings_sections import section_entries, section_for, visible_entries, subsection_for, display_name
 from .settings_safety import warnings_for
@@ -142,7 +143,7 @@ class SettingsTab:
             if isinstance(result,Exception):
                 if not writing:
                     self.clear(self.rows);self.heading.set_text('Could not read settings. Use Reload from C64U to retry.')
-                self.app.status.set_text(('Operation could not be verified; device values may have changed. Edits are retained. ' if writing else '')+str(result))
+                self.app.status.set_text(('Operation could not be verified; device values may have changed. Edits are retained. ' if writing and not isinstance(result,ConfigurationRefused) else '')+str(result))
             else:done(result)
         self.app.run(caught,finish)
 
@@ -206,9 +207,18 @@ class SettingsTab:
         dialog.connect('response',response);dialog.present()
         return dialog
 
+    def admit_changes(self, snapshot, settings=None):
+        payload={}
+        for (category,name),value in snapshot.items():payload.setdefault(category,{})[name]=value
+        try:return validate(payload,self.all_settings if settings is None else settings)
+        except ConfigurationRefused as exc:
+            self.app.status.set_text(str(exc))
+            return None
+
     def apply(self):
         if not self.pending or self.errors or self.requires_refresh or not self.client or self.app.busy:return
         snapshot=dict(self.pending)
+        if self.admit_changes(snapshot) is None:return
         originals={(c,s.name):s for c,rows in self.all_settings.items() for s in rows}
         lines=['Apply these changes to the running C64U? Nothing will be saved to flash.']
         warnings=warnings_for(snapshot)
@@ -222,22 +232,14 @@ class SettingsTab:
     def apply_reviewed(self, snapshot):
         if snapshot != self.pending or self.errors or self.requires_refresh or not self.client or self.app.busy:return
         client=self.client
-        payload={}
-        for (category,name),value in snapshot.items(): payload.setdefault(category,{})[name]=value
+        payload=self.admit_changes(snapshot)
+        if payload is None:return
         expected={(c,s.name):s.current for c,rows in self.all_settings.items() for s in rows}
+        session=client.configuration_session
         profile=self.app.active_profile
         def task():
-            model=Configuration(client)
-            fresh=model.all_settings(list(payload))
-            actual={(c,s.name):s.current for c,rows in fresh.items() for s in rows}
-            if any(actual.get(key)!=expected.get(key) for key in snapshot):
-                raise BrowserError('Device settings changed since review. Discard edits and reload before applying.')
-            for category,rows in fresh.items():
-                for setting in rows:
-                    if setting.name in payload[category]:setting.parse(display(payload[category][setting.name]))
             path=history_path(self.app.preferences,profile,client)
-            save_before_apply(path,fresh,payload,client.host)
-            client.apply_configuration(payload)
+            client.apply_configuration(payload,expected=expected,history_path=path,session=session)
             return Configuration(client).all_settings(list(payload))
         def done(result):
             self.all_settings.update(result)

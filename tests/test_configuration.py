@@ -82,7 +82,7 @@ class ConfigurationTests(unittest.TestCase):
 
  def test_write_methods_use_documented_routes(self):
   client=UltimateClient('test')
-  with patch.object(client,'_request_json') as request:
+  with patch.object(client,'_get_json',return_value={'SID Sockets Configuration':{'SID Socket 1':{'current':'Disabled','values':['Disabled','Enabled']}}}), patch.object(client,'_request_json') as request:
    client.apply_configuration({'SID Sockets Configuration': {'SID Socket 1':'Enabled'}})
    request.assert_called_with('POST','/v1/configs',{'SID Sockets Configuration': {'SID Socket 1':'Enabled'}})
    client.save_configuration()

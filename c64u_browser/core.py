@@ -153,7 +153,22 @@ class CoreDeviceOperations:
     def mount_disk(self, *args, **kwargs): return self._client().mount_disk(*args, **kwargs)
     def create_d64(self, *args, **kwargs): return self._client().create_d64(*args, **kwargs)
     def set_drive_type(self, *args, **kwargs): return self._client().set_drive_type(*args, **kwargs)
-    def apply_configuration(self, *args, **kwargs): return self._client().apply_configuration(*args, **kwargs)
+    @property
+    def configuration_session(self):
+        return self._core.device_session()
+
+    def apply_configuration(self, values, *, expected=None, history_path=None, session=None):
+        from .configuration_policy import execute, ConfigurationRefused
+        with self._core._session_admission():
+            client = self._client()
+            captured = self._core.device_session()
+            def check_session():
+                if (self._client() is not client or captured != self._core.device_session()
+                        or session is not None and session != captured):
+                    raise ConfigurationRefused('Connection changed; reload before applying.')
+            return execute(client, values, client._apply_configuration_validated,
+                           expected=expected, history_path=history_path,
+                           check_session=check_session)
     def save_configuration(self, *args, **kwargs): return self._client().save_configuration(*args, **kwargs)
     def run_prg(self, *args, **kwargs): return self._client().run_prg(*args, **kwargs)
     def write_memory(self, *args, **kwargs): return self._client().write_memory(*args, **kwargs)
