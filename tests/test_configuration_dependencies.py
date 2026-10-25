@@ -92,7 +92,7 @@ class CoreDependencies(Offline,unittest.TestCase):
                         else:self.refused(payload)
                 for name,value in (('LedStrip Auto SID Mode','Enabled'),('LedStrip SID Select','UltiSID1-B')):
                     self.ops.apply_configuration({category:{name:value}})
-                self.ops.apply_configuration({category:{'LedStrip Mode':mode}})
+                self.refused({category:{'LedStrip Mode':mode}})
 
     def test_final_state_all_orders_reject_whole_mixed_batch(self):
         for category in CATEGORIES:
@@ -102,12 +102,12 @@ class CoreDependencies(Offline,unittest.TestCase):
                         self.refused(dict(categories),history_path=self.history)
         self.assertFalse(self.history.exists())
 
-    def test_valid_enabling_transition_controller_sent_first(self):
+    def test_enabling_transition_also_refused_in_every_field_order(self):
         for category in CATEGORIES:
             for fields in permutations((('Fixed Color','Red'),('LedStrip Mode','Fixed Color'))):
                 self.client.metadata[category]=metadata(category,'Rainbow')
-                self.ops.apply_configuration({category:dict(fields)})
-                self.assertEqual(list(self.client.writes[-1][category]),['LedStrip Mode','Fixed Color'])
+                self.refused({category:dict(fields)},history_path=self.history)
+        self.assertFalse(self.history.exists())
 
     def test_stale_unedited_controller_rejected_before_history(self):
         expected={(c,s.name):s.current for c,rows in self.settings().items() for s in rows}
@@ -125,7 +125,7 @@ class CoreDependencies(Offline,unittest.TestCase):
                      {'firmware_version':'1.1.0','product':'Unknown'},
                      {'firmware_version':'1.2.0','product':'C64 Ultimate'}):
             self.client.info=info
-            self.refused({CATEGORIES[0]:{'LedStrip Mode':'Off'},'Other':{'Value':'new'}})
+            self.refused({CATEGORIES[0]:{'Strip Intensity':15},'Other':{'Value':'new'}})
             self.ops.apply_configuration({'Other':{'Value':'new'}})
 
     def test_unknown_missing_and_malformed_capabilities(self):
@@ -159,10 +159,13 @@ class CoreDependencies(Offline,unittest.TestCase):
 
     def test_raw_client_public_apply_has_same_boundary(self):
         with self.assertRaises(ConfigurationRefused):
-            self.client.apply_configuration({CATEGORIES[1]:{'LedStrip Mode':'Rainbow','Fixed Color':'Red'}})
+            self.client.apply_configuration({CATEGORIES[1]:{'LedStrip Mode':'Rainbow'}})
         self.assertEqual(self.client.writes,[])
-        self.client.apply_configuration({CATEGORIES[1]:{'LedStrip Mode':'Rainbow'}})
-        self.assertEqual(len(self.client.writes),1)
+        for category in CATEGORIES:
+            for value in ('Rainbow', 'Fixed Color'):
+                with self.assertRaises(ConfigurationRefused):
+                    self.client.apply_configuration({category:{'LedStrip Mode':value}})
+        self.assertEqual(self.client.writes,[])
 
     def test_existing_history_preserved_on_invalid_mixed_batch(self):
         self.history.parent.mkdir();self.history.write_bytes(b'prior')
@@ -196,19 +199,45 @@ class CoreDependencies(Offline,unittest.TestCase):
                 self.ops.apply_configuration({'Other':{'Value':'new'}},history_path=self.history)
             self.assertEqual(dispatch.call_count,1)
 
-    def test_every_mode_transition_keeps_dormant_stored_values(self):
+    def test_all_85_mode_pairs_refused_including_same_value(self):
+        pairs = 0
         for category in CATEGORIES:
             modes=MODES + (('Sparkle',) if category==CATEGORIES[0] else ())
             for old in modes:
                 for new in modes:
-                    self.client.metadata[category]=metadata(category,old)
-                    self.ops.apply_configuration({category:{'LedStrip Mode':new}})
-                    self.assertEqual(self.client.writes[-1],{category:{'LedStrip Mode':new}})
-                    self.assertEqual(self.client.metadata[category]['Fixed Color']['current'],'Blue')
+                    with self.subTest(category=category, old=old, new=new):
+                        self.client.metadata[category]=metadata(category,old)
+                        before=copy.deepcopy(self.client.metadata)
+                        self.refused({category:{'LedStrip Mode':new}},history_path=self.history)
+                        self.assertEqual(self.client.metadata,before)
+                        self.assertFalse(self.history.exists())
+                        pairs += 1
+        self.assertEqual(pairs,85)
+
+    def test_mode_refusal_without_metadata_and_case_bypasses(self):
+        # Presentation must not add identity errors for unrelated metadata.
+        self.assertTrue(enabled('Other/Legacy', 'Value', {}, {}))
+        for category in CATEGORIES:
+            for transform in (str, str.lower, str.upper, str.swapcase):
+                payload={transform(category):{transform('LedStrip Mode'):'Fixed Color'}}
+                with self.assertRaisesRegex(ConfigurationRefused,'blocked by Argonaut'):
+                    validate(payload,{})
+                with patch.object(self.client,'read_configuration',side_effect=AssertionError('no read needed')):
+                    self.refused(payload,history_path=self.history)
+        self.assertFalse(self.history.exists())
+
+    def test_mode_mixed_with_valid_parameters_preserves_existing_history(self):
+        self.history.parent.mkdir(); self.history.write_bytes(b'prior')
+        for category in CATEGORIES:
+            for mode in ('Fixed Color','Rainbow','Off'):
+                for fields in permutations((('LedStrip Mode',mode),('Strip Intensity',15))):
+                    for categories in permutations(((category,dict(fields)),('Other',{'Value':'new'}))):
+                        self.refused(dict(categories),history_path=self.history)
+                        self.assertEqual(self.history.read_bytes(),b'prior')
 
     def test_invalid_second_led_category_prevents_first_category_write(self):
-        for order in permutations(((CATEGORIES[0],{'LedStrip Mode':'Rainbow'}),
-                                   (CATEGORIES[1],{'LedStrip Mode':'Rainbow','Fixed Color':'Red'}))):
+        for order in permutations(((CATEGORIES[0],{'Strip Intensity':15}),
+                                   (CATEGORIES[1],{'LedStrip Mode':'Rainbow'}))):
             self.refused(dict(order),history_path=self.history)
         self.assertFalse(self.history.exists())
 
@@ -238,10 +267,10 @@ class CoreDependencies(Offline,unittest.TestCase):
         category=CATEGORIES[0]
         with patch.object(client,'read_configuration',side_effect=self.client.read_configuration), patch.object(client,'read_about',side_effect=self.client.read_about), patch.object(client,'_request_json') as request:
             with self.assertRaises(ConfigurationRefused):
-                client.apply_configuration({'Other':{'Value':'new'},category:{'LedStrip Mode':'Rainbow','Fixed Color':'Red'}})
+                client.apply_configuration({'Other':{'Value':'new'},category:{'LedStrip Mode':'Rainbow'}})
             request.assert_not_called()
-            client.apply_configuration({category:{'Color tint':'Bright','LedStrip Mode':'Rainbow'}})
-            request.assert_called_once_with('POST','/v1/configs',{category:{'LedStrip Mode':'Rainbow','Color tint':'Bright'}})
+            client.apply_configuration({category:{'Color tint':'Bright'}})
+            request.assert_called_once_with('POST','/v1/configs',{category:{'Color tint':'Bright'}})
 
     def test_headless_core_does_not_import_gtk(self):
         import subprocess,sys
@@ -281,23 +310,24 @@ class UIDependencies(Offline,unittest.TestCase):
         self.tab.pending={(c,n):v for c,items in values.items() for n,v in items.items()}
         self.tab.drafts={k:str(v) for k,v in self.tab.pending.items()}
     def test_apply_refuses_invalid_full_batch_and_retains_edits(self):
-        self.stage({'Other':{'Value':'new'},CATEGORIES[1]:{'LedStrip Mode':'Rainbow','Fixed Color':'Red'}})
+        self.stage({'Other':{'Value':'new'},CATEGORIES[1]:{'LedStrip Mode':'Rainbow'}})
         pending=dict(self.tab.pending);drafts=dict(self.tab.drafts)
         self.assertIsNone(self.tab.apply());self.tab.apply_reviewed(pending)
         self.assertEqual(self.tab.pending,pending);self.assertEqual(self.tab.drafts,drafts)
         self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
-    def test_both_categories_stage_discards_newly_inactive_edits(self):
+    def test_both_categories_mode_stage_refused_preserves_parameter_draft(self):
         for category in CATEGORIES:
             rows={s.name:s for s in self.tab.all_settings[category]}
             self.tab.stage(category,rows['Fixed Color'],'Red')
             self.assertIn((category,'Fixed Color'),self.tab.pending)
             self.tab.stage(category,rows['LedStrip Mode'],'Rainbow')
-            self.assertNotIn((category,'Fixed Color'),self.tab.pending)
-            self.assertNotIn((category,'Fixed Color'),self.tab.drafts)
+            self.assertIn((category,'Fixed Color'),self.tab.pending)
+            self.assertIn((category,'Fixed Color'),self.tab.drafts)
+            self.assertNotIn((category,'LedStrip Mode'),self.tab.pending)
             self.assertEqual(self.client.writes,[])
 
     def test_ui_bypass_still_rejected_by_core(self):
-        payload={CATEGORIES[0]:{'LedStrip Mode':'Sparkle','Color tint':'Bright'}}
+        payload={CATEGORIES[0]:{'LedStrip Mode':'Fixed Color'}}
         self.stage(payload)
         with patch.object(self.tab,'admit_changes',return_value=payload):self.tab.apply_reviewed(dict(self.tab.pending))
         self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
@@ -310,7 +340,7 @@ class UIDependencies(Offline,unittest.TestCase):
         self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
     def test_restore_and_undo_preview_reject_invalid_selected_set(self):
         for title in ('Restore preview','Undo last apply preview','Native configuration preview'):
-            data={'settings':{CATEGORIES[1]:{'LedStrip Mode':'Rainbow','Fixed Color':'Red'},'Other':{'Value':'new'}}}
+            data={'settings':{CATEGORIES[1]:{'LedStrip Mode':'Rainbow'},'Other':{'Value':'new'}}}
             dialog,checks=self.tab.backups.preview(data,self.tab.all_settings,title=title)
             for check in checks:check.set_active(True)
             dialog.response(1)
@@ -318,15 +348,15 @@ class UIDependencies(Offline,unittest.TestCase):
             self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
     def test_valid_restore_stages_whole_batch_and_applies(self):
         category=CATEGORIES[0]
-        self.client.metadata[category]=metadata(category,'Rainbow');self.tab.all_settings=self.settings()
-        dialog,checks=self.tab.backups.preview({'settings':{category:{'Fixed Color':'Red','LedStrip Mode':'Fixed Color'}}},self.tab.all_settings)
+        self.client.metadata[category]=metadata(category,'Fixed Color');self.tab.all_settings=self.settings()
+        dialog,checks=self.tab.backups.preview({'settings':{category:{'Fixed Color':'Red','Strip Intensity':15}}},self.tab.all_settings)
         for check in checks:check.set_active(True)
         dialog.response(1);self.assertEqual(len(self.tab.pending),2)
         self.tab.apply().response(1)
-        self.assertEqual(self.client.writes,[{category:{'LedStrip Mode':'Fixed Color','Fixed Color':'Red'}}])
+        self.assertEqual(self.client.writes,[{category:{'Fixed Color':'Red','Strip Intensity':15}}])
         self.assertFalse(self.tab.pending)
     def test_actual_undo_history_uses_dependency_validation(self):
-        write_backup(self.history,{'format':'argonaut-settings','version':1,'settings':{CATEGORIES[0]:{'LedStrip Mode':'Rainbow','Fixed Color':'Red'}}})
+        write_backup(self.history,{'format':'argonaut-settings','version':1,'settings':{CATEGORIES[0]:{'LedStrip Mode':'Rainbow'}}})
         before=self.history.read_bytes();captured=[];original=self.tab.backups.preview
         def preview(*args,**kwargs):
             result=original(*args,**kwargs);captured.append(result);return result
@@ -345,7 +375,7 @@ class UIDependencies(Offline,unittest.TestCase):
         captured=[];original=self.tab.backups.preview
         def preview(*args,**kwargs):
             result=original(*args,**kwargs);captured.append(result);return result
-        with patch('c64u_browser.flash_dialog.read_remote',return_value=b'[Keyboard Lighting]\nLedStrip Mode=Rainbow\nFixed Color=Red\n'), patch.object(self.tab.backups,'preview',side_effect=preview):
+        with patch('c64u_browser.flash_dialog.read_remote',return_value=b'[Keyboard Lighting]\nLedStrip Mode=Rainbow\n'), patch.object(self.tab.backups,'preview',side_effect=preview):
             native.preview()
         dialog,checks=captured[0]
         for check in checks:check.set_active(True)
@@ -358,6 +388,6 @@ class UIDependencies(Offline,unittest.TestCase):
         checks[0].set_active(True);self.tab.require_fresh_settings();dialog.response(1)
         self.assertTrue(self.tab.requires_refresh);self.assertFalse(self.tab.pending)
     def test_cancel_confirmation_writes_nothing(self):
-        self.stage({CATEGORIES[0]:{'LedStrip Mode':'Off'}})
+        self.stage({CATEGORIES[0]:{'Strip Intensity':15}})
         self.tab.apply().response(0)
         self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')

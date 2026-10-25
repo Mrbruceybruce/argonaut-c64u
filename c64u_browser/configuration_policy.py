@@ -96,7 +96,23 @@ def controls_dependencies(category, name):
                for (c, _), rule in DEPENDENCIES.items())
 
 
+def mode_write_blocked(category, name):
+    """Argonaut containment policy, independent of firmware/menu metadata."""
+    return (type(category) is str and type(name) is str
+            and category.casefold() in {c.casefold() for c in LED_CATEGORIES}
+            and name.casefold() == MODE.casefold())
+
+
+def refuse_mode_writes(values):
+    for category, items in values.items():
+        for name in items:
+            if mode_write_blocked(category, name):
+                raise ConfigurationRefused(inactive_reason(category, name))
+
+
 def enabled(category, name, settings, pending):
+    if mode_write_blocked(category, name):
+        return False
     rows = {s.name: s for s in settings.get(category, ())}
     if category in MODES:
         mode = pending.get((category, MODE), getattr(rows.get(MODE), 'current', None))
@@ -111,6 +127,9 @@ def enabled(category, name, settings, pending):
 
 
 def inactive_reason(category, name):
+    if mode_write_blocked(category, name):
+        return ('LED mode writes are blocked by Argonaut pending safety qualification, '
+                'including writes of the current mode. Active parameter edits remain available.')
     if category in NETWORK_CATEGORIES and name in STATIC_FIELDS:
         return 'Read-only while DHCP is enabled. Disable DHCP to edit these saved static settings.'
     return 'Inactive in the proposed LED mode, or this capability is unknown.'
@@ -124,6 +143,7 @@ def validate(values, settings):
     """
     from .configuration import display
     values = detach(values)
+    refuse_mode_writes(values)
     categories = {identity(c): c for c in settings}
     if len(categories) != len(settings):
         raise ConfigurationRefused('Ambiguous configuration category metadata.')
@@ -191,6 +211,7 @@ def execute(client, values, dispatch, *, expected=None, history_path=None, check
     payload = detach(values)
     expected = dict(expected) if expected is not None else None
     check_session()
+    refuse_mode_writes(payload)
     # Canonicalize known stores before the read; unknown stores retain identity.
     known = {c.casefold(): c for c in (*LED_CATEGORIES, *NETWORK_CATEGORIES)}
     payload = {known.get(c.casefold(), c): items for c, items in payload.items()}

@@ -65,6 +65,30 @@ GitHub Project **Argonaut Development** owns live status.
 
 ## RM-027 dependency-validation implementation candidate
 
+### LED mode-write containment candidate — 25 October 2026
+
+A new isolated candidate based on published `development` at
+`2cd5a60549e08cf734f192e0cfc38882f583c3db` implements the user-approved Argonaut
+restriction: refuse every explicit `LedStrip Mode` write in Keyboard Lighting
+and LED Strip Settings, including same-value writes and whole mixed batches.
+Active parameter-only edits retain existing dependency, firmware, metadata,
+staleness and session safeguards. See the [updated contract](CONFIGURATION-DEPENDENCIES.md#led-mode-write-containment-candidate--25-october-2026)
+and [offline tests/review record](ISSUE25-MODE-CONTAINMENT.md).
+
+This candidate is uncommitted, unpublished and not integrated into primary.
+Primary/live HEAD match the baseline; tracked primary files/index are clean,
+seven pre-existing untracked artifacts and the historical stash remain preserved.
+Prior isolated candidates remain untouched. Live tracking is **Open / P0 /
+In Progress** for #25; #24 is P1 / Backlog and #26 is P2 / Backlog.
+No tracking change is made. Integration requires a separate authorization decision.
+
+Containment is not a firmware requirement, demonstrated lockup fix or physical
+acceptance. The original lockup and C1 executor termination remain unresolved;
+safe mode transitions, hardware mapping, firmware 1.1.0s2 and broader release
+qualification remain unproven. RM-026, RM-028 and RM-029 retain their gates.
+The historical checkpoints below are not fresh authorization or current candidate
+publication claims.
+
 ### Gate C1 functional disposition — 25 October 2026 UTC
 
 The user approved recording **bounded keyboard-intensity functional success

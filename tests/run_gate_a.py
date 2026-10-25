@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import run_ci_tests as runner
 
 SELECTORS = [('test_ultimate_menu_gate_a.RealGtkMenu', 11),
-             ('test_configuration_dependencies.CoreDependencies', 20),
+             ('test_configuration_dependencies.CoreDependencies', 22),
              ('test_dependencies.LEDTests', 2)]
 
 

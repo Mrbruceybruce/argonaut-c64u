@@ -1,5 +1,35 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## LED mode-write containment candidate — 25 October 2026
+
+This isolated, uncommitted candidate is based on published development
+`2cd5a60549e08cf734f192e0cfc38882f583c3db`. The approved Argonaut policy refuses
+**every explicit `LedStrip Mode` write** in **Keyboard Lighting** and
+**LED Strip Settings**, including same-value writes, Off, Default, and all
+otherwise advertised transitions. This is an Argonaut containment restriction,
+not a firmware requirement or demonstrated lockup fix. It supersedes the earlier
+controller-only transition admission described by the historical checkpoints.
+
+Core's shared policy rejects the complete requested batch before configuration
+reads, POST dispatch or history mutation; case variants cannot bypass it.
+The detached intent and session gate remain in force. `validate` independently
+refuses the same intent for Apply review and selected Restore, Undo and native
+configuration previews. A selection containing a mode write is refused whole;
+no valid companion edits are silently applied. Preview differences omit unchanged
+stored values, which are not requested writes; direct explicit same-value writes
+are refused. The mode row remains visible and read-only with the containment reason.
+
+Parameter-only edits remain admitted exactly under the existing fresh firmware,
+metadata, active-field, review-staleness and session checks. Dormant stored values
+remain untouched. DHCP and unrelated configuration retain their existing behavior.
+There is no new bypass, retry, rollback, hardware operation or firmware qualification.
+
+Offline evidence and independent review are recorded in
+[the containment review record](ISSUE25-MODE-CONTAINMENT.md).
+Integration, physical acceptance, publication and issue closure remain separate.
+Issue #25 remains **Open / P0 / In Progress**; the original lockup and C1 executor
+termination remain unresolved. Earlier evidence below retains its historical scope.
+
 ## Gate C1 functional disposition — 25 October 2026 UTC
 
 The approved [C1 disposition](CURRENT-STATE.md#gate-c1-functional-disposition--25-october-2026-utc)
@@ -147,8 +177,10 @@ existing UI callers. Future property sheets can use the same policy.
 2. Read fresh settings for every touched category. For LED edits, read fresh
    firmware/product identity. Validate all selected values and capabilities.
 3. Overlay every proposed controller before checking dependent edits. Retained
-   dormant values are not edits and do not prohibit valid controller-only changes.
-   Same-value explicit edits to inactive fields still fail admission.
+   dormant values are not edits. Controller-only LED changes are refused; other
+   qualified controllers retain their dependency behavior.
+   Same-value explicit edits to inactive fields still fail admission. Explicit LED
+   mode edits are now refused before this step by the containment policy above.
 4. For reviewed Apply, compare changed values and controlling settings against
    the review snapshot, including a mode the user did not edit. A stale controller
    refuses even if the requested dependent is active in both old and new modes.
@@ -166,7 +198,7 @@ admission, not a public client capability. Core does not expose raw transports.
 
 The UI uses the same final-state validator before review and before staging a
 Restore/Undo/native-file selection. Invalid selections preserve existing state.
-A preview cannot clear an existing reload gate. Ordinary interactive controller
+A preview cannot clear an existing reload gate. LED mode rows are read-only. Other interactive controller
 changes retain the established behavior of discarding newly inactive local
 field edits; selection previews validate the complete set before any staging.
 Core rechecks independently, so bypassing UI admission cannot permit a bad write.
@@ -210,10 +242,10 @@ absent. The affected regression run also includes `test_configuration`,
 `test_core`, `test_api`, `test_c64_ai_launch`, `test_scheduler`, `test_recovery`,
 and `test_ci_runner`, with the same socket guard installed around the full run.
 
-CI registers the two new classes (20 Core tests, 10 UI tests); the source audit
+CI registers the two classes (22 Core tests, 10 UI tests); the source audit
 checks inventory, not execution of all CI selections. Tests cover all category
 modes and transitions, active/inactive field rules, both field/category orders,
-valid mixed transitions, stale unedited controllers, malformed/unknown metadata,
+whole mixed-batch mode refusal, stale unedited controllers, malformed/unknown metadata,
 case bypass, direct Core and public raw API, zero REST/history writes on refusal,
 history on admitted dispatch, Restore/actual Undo/native previews, and existing
 DHCP dependency semantics. See CURRENT-STATE for final test/review results.
