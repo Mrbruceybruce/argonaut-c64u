@@ -1,10 +1,11 @@
 # Current development state
 
-## Issue #49 temporary LED Apply containment — offline candidate, 26 October 2026
+## Issue #49 temporary LED Apply containment — published, 26 October 2026
 
-This isolated, uncommitted candidate is based on published `development`
-`d0925f2130daa213bf118f24dc064e9c35736ae9`. Under the maintainer's explicit
-implementation authorization, shared Core admission now refuses every explicit
+The independently reviewed 11-file containment is integrated into the primary
+repository and published on `development` at
+`28d123b04a56d8eb172b1be4995cc8c5cbc06245` (parent
+`d0925f2130daa213bf118f24dc064e9c35736ae9`). Shared Core admission refuses every explicit
 Apply write targeting `Keyboard Lighting` or `LED Strip Settings`, including
 same-value and unknown fields, case variants and whole mixed batches, before
 remote configuration/identity reads, history mutation or POST. All LED values
@@ -12,16 +13,20 @@ remain readable and visible; their editors are read-only. The narrower published
 mode-write restriction and existing LED implementation/dependency rules are retained.
 Unrelated writes retain metadata, dependency, staleness and session admission.
 
-This candidate supersedes earlier parameter-write availability statements **only
-for this isolated implementation**. It is not integrated or published. See
-[the scope, evidence and acceptance gate](ISSUE49-LED-APPLY-CONTAINMENT.md).
-The primary checkout and prior candidates are preserved. No physical C64U
-operations, staging, committing, pushing, issue closure or Project updates occur.
+This published containment supersedes earlier parameter-write availability
+statements. Implementation and integration independent reviews passed; retained
+primary regression results are **122/122 normal**, **122/122 optimized** and
+**37/37 GTK**, with zero failures/errors/skips. These results were inspected,
+not rerun for this documentation reconciliation. See
+[the scope, evidence and acceptance limits](ISSUE49-LED-APPLY-CONTAINMENT.md).
+Primary and live GitHub HEADs matched before this edit; tracked files/index were
+clean and all seven legacy untracked artifacts were preserved.
 
 The original intermittent lockup and its root cause remain unresolved. Firmware
-runtime Auto SID transitions, other clients, device menus and firmware reset/load
-are outside this Apply boundary. #49 remains open; #48 remains C1 tooling only.
-RM-026/028/029 and all hardware, integration and publication gates remain in force.
+runtime Auto SID transitions, other clients, physical device menus and firmware
+reset/load remain outside containment and unqualified by these results.
+#49 remains **Open / P0 — Critical / In Progress**; #48 remains C1 tooling only.
+C1 physical acceptance remains incomplete; RM-026/028/029 gates are unchanged.
 
 
 GitHub Project **Argonaut Development** is authoritative for live priority,
