@@ -1,5 +1,62 @@
 # Issue #25 — LED mode-write containment review gate
 
+## Qualified closure and accepted safety handoff — 26 October 2026
+
+The [authorized #25 closure](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6402539547)
+and [accepted #49 handoff](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6402541994)
+record **#25 Closed / Done** with **QUALIFIED ACCEPT** of the bounded investigation
+and explicit LED mode-write containment. **#49 Open / P0 — Critical / In Progress**
+now owns the defining safety investigation: the original intermittent LED lockup,
+unknown triggering payload/prior state/request sequence/root cause, and indirect
+or firmware-driven transitions including Auto SID. The lockup is unexplained and
+unproven resolved; #49's acceptance criteria remain outstanding. **Bruce / Argonaut
+maintainer retains accepted residual-risk ownership** and investigation/qualification
+coordination, without a GitHub assignee change.
+
+Containment refuses every explicit `LedStrip Mode` write in both LED categories,
+including same-value writes and whole mixed batches, before configuration reads,
+history mutation or POST. Parameter-only edits retain existing dependency,
+firmware, metadata, staleness and session safeguards. Indirect/Auto SID transitions
+are outside this guarantee; closure establishes neither general write safety nor
+completed physical qualification. No dependency rule or firmware qualification changes.
+
+[#48](https://github.com/Mrbruceybruce/argonaut-c64u/issues/48) remains open for C1
+executor correctness, premature termination, truthful outcomes, scheduled readback/
+observation accounting, offline regressions, independent review and durable evidence
+retention only; it does not own device-lockup safety. C1 retains bounded intensity
+**6→16** functional success, but its original 14-request protocol did not pass:
+requests 9–14 and both scheduled readback/observation rounds remain incomplete.
+The 33-event journal, consumed authorization, `protocol_complete=false`,
+`physical_acceptance=false`, `evidence_complete=false` and
+`write_outcome="write outcome uncertain"` remain unchanged. Supplemental readback
+cannot complete that protocol; no original final manifest exists. Do not manufacture
+one or resume the consumed attempt.
+
+RM-027 retains its G2 / LED safety identity under RM-007, with #25 as the qualified
+closure history and #49 as the accepted successor safety tracker. Coordinate with
+#24 / RM-026; RM-028 redesign and RM-029 enhancements retain their capability and
+applicable safety gates. Closing #25 does not release those dependencies.
+Physical-header mapping, other hardware variants, firmware `1.1.0s2`, prolonged
+stability, device-side atomicity and broader UI/package/cross-platform/release
+qualification remain unproven.
+
+Primary and live GitHub `development` were verified at
+`d467726f148f73df805329ef817f3445f80d19c6` before this edit. This publishes the prior
+ownership/#48 reconciliation, not this new four-document update. Containment remains
+published at `40da3846e88c6efe5395928394a6850c17e92f1c`. Retained integration evidence
+records 120/120 normal, 120/120 optimized and 35/35 GTK passing with independent
+engineering/integration review PASS; these are historical results, not new test runs.
+Gate B remains bounded acceptance of five read-only requests on the qualified
+firmware 1.1.0 device.
+
+This checkpoint supersedes older statements below that #25 is open, closure awaits
+a decision, ownership is only proposed, or C1 follow-up tracking is missing. Earlier
+publication-pending and candidate statements retain their dated historical scope;
+original evidence and acceptance limits remain intact. This documentation-only
+reconciliation requires independent review and the user's manual publication gates.
+GitHub dependency/reference reconciliation remains separately pending: no issue or
+Project changes, implementation, hardware contact or new physical test are authorized.
+
 ## Recorded ownership and linked tooling follow-up — 25 October 2026
 
 [The accepted ownership record](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6402085824)

@@ -52,7 +52,7 @@ technical dependencies below do not prescribe Project scheduling.
 | <a id="rm-024"></a>RM-024 | C3 / storage policy review | Parent RM-003; preserve C1 policy | No generic Flash/Temp mutation; new export/recovery needs separate review; restore unapproved. [History](ARGONAUT-ROADMAP-HISTORY.md#c-files--storage-ux) |
 | <a id="rm-025"></a>RM-025 | C4 / Files polish | Parent RM-003; C0–C3 and RM-019 contracts | Accessibility, labels, menus/focus and recovery visibility; bounded acceptance only. [History](ARGONAUT-ROADMAP-HISTORY.md#c-files--storage-ux) |
 | <a id="rm-026"></a>RM-026 ([#24](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24)) | G1 / capabilities | Parent RM-007; before dependent filtering | Firmware detection → configuration → visibility/dependencies → REST evidence. [History](ARGONAUT-ROADMAP-HISTORY.md#1-firmwarehardware-capability-investigation--first-engineering-phase) |
-| <a id="rm-027"></a>RM-027 ([#25](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25)) | G2 / LED safety | Parent RM-007; prerequisite to dependent LED changes | Investigate payload/order and valid transitions; no casual lockup reproduction. [History](ARGONAUT-ROADMAP-HISTORY.md#2-led-safety-investigation--p0-device-safety-gate) |
+| <a id="rm-027"></a>RM-027 ([#25](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25) qualified closure; [#49](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49) successor safety scope) | G2 / LED safety | Parent RM-007; prerequisite to dependent LED changes | Investigate payload/order and valid transitions; no casual lockup reproduction. [History](ARGONAUT-ROADMAP-HISTORY.md#2-led-safety-investigation--p0-device-safety-gate) |
 | <a id="rm-028"></a>RM-028 ([#26](https://github.com/Mrbruceybruce/argonaut-c64u/issues/26)) | G3 / property-sheet redesign | Parent RM-007; RM-026 and applicable RM-027 findings | Hierarchical navigation, persistent properties, Advanced/F2 parity; remove Favorites. [History](ARGONAUT-ROADMAP-HISTORY.md#3-treeproperty-sheet-redesign--settled-direction) |
 | <a id="rm-029"></a>RM-029 | G4 / LED enhancements | Parent RM-007; RM-026 and RM-027 | Profiles, random generation and color controls after capability and safety qualification. [History](ARGONAUT-ROADMAP-HISTORY.md#4-led-enhancements--later-within-redesign) |
 | <a id="rm-030"></a>RM-030 ([#27](https://github.com/Mrbruceybruce/argonaut-c64u/issues/27)) | Managed Import / general workflow and recovery | Parent RM-011; staged phase gates | 3A/3B foundations; 3B-2C workflow, 3B-3 recovery and general 3C are not closed by pinned PA results. [History](ARGONAUT-ROADMAP-HISTORY.md#managed-import-phase-3b-2b3e2f--exclusive-writer-correction-pending-inspection) |
@@ -62,6 +62,70 @@ Historical migration decision: RM-031's original pinned publisher/managed-displa
 scope was approved **COMPLETE** during migration. Managed CRT launch, Founder
 qualification and general import/recovery remain separate RM-011/RM-030 work.
 GitHub Project **Argonaut Development** owns live status.
+
+## Qualified closure and accepted safety handoff — 26 October 2026
+
+The [authorized #25 closure](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6402539547)
+and [accepted #49 handoff](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6402541994)
+record **#25 Closed / Done** with **QUALIFIED ACCEPT** of the bounded investigation
+and explicit LED mode-write containment. **#49 Open / P0 — Critical / In Progress**
+now owns the defining safety investigation: the original intermittent LED lockup,
+unknown triggering payload/prior state/request sequence/root cause, and indirect
+or firmware-driven transitions including Auto SID. The lockup is unexplained and
+unproven resolved; #49's acceptance criteria remain outstanding. **Bruce / Argonaut
+maintainer retains accepted residual-risk ownership** and investigation/qualification
+coordination, without a GitHub assignee change.
+
+Containment refuses every explicit `LedStrip Mode` write in both LED categories,
+including same-value writes and whole mixed batches, before configuration reads,
+history mutation or POST. Parameter-only edits retain existing dependency,
+firmware, metadata, staleness and session safeguards. Indirect/Auto SID transitions
+are outside this guarantee; closure establishes neither general write safety nor
+completed physical qualification. No dependency rule or firmware qualification changes.
+
+[#48](https://github.com/Mrbruceybruce/argonaut-c64u/issues/48) remains open for C1
+executor correctness, premature termination, truthful outcomes, scheduled readback/
+observation accounting, offline regressions, independent review and durable evidence
+retention only; it does not own device-lockup safety. C1 retains bounded intensity
+**6→16** functional success, but its original 14-request protocol did not pass:
+requests 9–14 and both scheduled readback/observation rounds remain incomplete.
+The 33-event journal, consumed authorization, `protocol_complete=false`,
+`physical_acceptance=false`, `evidence_complete=false` and
+`write_outcome="write outcome uncertain"` remain unchanged. Supplemental readback
+cannot complete that protocol; no original final manifest exists. Do not manufacture
+one or resume the consumed attempt.
+
+RM-027 retains its G2 / LED safety identity under RM-007, with #25 as the qualified
+closure history and #49 as the accepted successor safety tracker. Coordinate with
+#24 / RM-026; RM-028 redesign and RM-029 enhancements retain their capability and
+applicable safety gates. Closing #25 does not release those dependencies.
+Physical-header mapping, other hardware variants, firmware `1.1.0s2`, prolonged
+stability, device-side atomicity and broader UI/package/cross-platform/release
+qualification remain unproven.
+
+Primary and live GitHub `development` were verified at
+`d467726f148f73df805329ef817f3445f80d19c6` before this edit. This publishes the prior
+ownership/#48 reconciliation, not this new four-document update. Containment remains
+published at `40da3846e88c6efe5395928394a6850c17e92f1c`. Retained integration evidence
+records 120/120 normal, 120/120 optimized and 35/35 GTK passing with independent
+engineering/integration review PASS; these are historical results, not new test runs.
+Gate B remains bounded acceptance of five read-only requests on the qualified
+firmware 1.1.0 device.
+
+This checkpoint supersedes older statements below that #25 is open, closure awaits
+a decision, ownership is only proposed, or C1 follow-up tracking is missing. Earlier
+publication-pending and candidate statements retain their dated historical scope;
+original evidence and acceptance limits remain intact. This documentation-only
+reconciliation requires independent review and the user's manual publication gates.
+GitHub dependency/reference reconciliation remains separately pending: no issue or
+Project changes, implementation, hardware contact or new physical test are authorized.
+
+Native GitHub dependencies still list #26 as blocked by #24 and closed #25;
+#49 has no native blocking links. #26's text and #48's body retain older #25
+references, while #49's creation-time proposed-handoff text is superseded by the
+accepted handoff above. These tracking discrepancies do not clear safety gates;
+reconciling them needs separate authorization. RM-029 remains under #20 / RM-007
+and this roadmap; no dedicated issue was identified.
 
 ## RM-027 dependency-validation implementation candidate
 
@@ -321,6 +385,11 @@ This checkpoint does not complete RM-006 or change Project scheduling/status.
 ## Dependencies and safety gates
 
 Technical prerequisites remain binding regardless of Project ordering:
+
+- RM-027's qualified #25 closure does not satisfy the unresolved safety scope now
+  retained by #49. RM-026 / #24 capability qualification remains required;
+  RM-028 / #26 must incorporate applicable capability and safety findings, and
+  RM-029 LED enhancements remain gated on capability and safety qualification.
 
 - Core owns credentials, device rules, scheduling, identity, permissions and execution.
   UI changes must preserve managed ownership and accepted Network Foundation behavior.
