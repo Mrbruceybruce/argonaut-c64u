@@ -105,11 +105,13 @@ qualification remain unproven.
 
 ### Stage 2 closeout reconciliation — 26 October 2026 (America/Chicago)
 
-Primary and live GitHub `development` were verified at
-`f955e96ace7db4f0caa2026422a2f4dec0418e4b` before this edit, with the intended
-GitHub fetch/push remotes, clean tracked files/index and seven preserved untracked
-artifacts. This is the published qualified-closure/safety-handoff checkpoint;
-the present Stage 2 documentation update remains unstaged, uncommitted and unpublished.
+The independently reviewed Stage 2 documentation reconciliation is committed and
+published to GitHub `development` at
+`c300bf4292b5bd3e4e7037650d89b3b811d29389` (parent
+`f955e96ace7db4f0caa2026422a2f4dec0418e4b`). Primary and live GitHub HEADs were
+verified equal before this publication-status correction, with the intended GitHub
+fetch/push remotes, clean tracked files/index and seven preserved untracked artifacts.
+GitHub dependencies and Project tracking are synchronized as recorded below.
 Containment remains published at `40da3846e88c6efe5395928394a6850c17e92f1c`.
 Historical integration results remain 120/120 normal, 120/120 optimized and
 35/35 GTK, with independent engineering/integration review PASS; no tests were
@@ -151,12 +153,15 @@ a decision, ownership is only proposed, C1 follow-up tracking is missing, or Git
 reconciliation is pending. Earlier publication-pending and candidate statements
 retain their dated historical scope. #25's qualified closure, #49's unresolved
 lockup and indirect/Auto SID safety scope, #48's tooling-only boundary, incomplete
-C1 physical acceptance and all dependency rules remain unchanged. This update
-requires independent read-only review and the user's manual publication gates;
-closeout is not fully synchronized while publication remains outstanding.
+C1 physical acceptance and all dependency rules remain unchanged. Stage 2's
+independent read-only review and manual publication gates are complete; its former
+publication-pending statements are superseded by the verified commit above.
+This narrow publication-status correction is a separate documentation change and
+requires independent read-only review and the user's manual publication gates.
 No Git writes/publication, GitHub changes, hardware contact or new physical test
-are part of Stage 2. The next gate is the user's separately controlled manual
-publication review; #49 remains the P0 safety investigation.
+are authorized by this correction. The next gate applies only to this correction:
+the user's separately controlled manual publication review. #49 remains the P0
+safety investigation.
 
 Historical pre-reconciliation snapshot (superseded by Stage 2 above): native
 GitHub dependencies listed #26 as blocked by #24 and closed #25; #49 had no native
