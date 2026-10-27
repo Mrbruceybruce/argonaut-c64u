@@ -110,8 +110,22 @@ def refuse_mode_writes(values):
                 raise ConfigurationRefused(inactive_reason(category, name))
 
 
+def led_apply_blocked(category):
+    """Temporary #49 Apply containment; not a firmware capability rule."""
+    return (type(category) is str
+            and category.casefold() in {c.casefold() for c in LED_CATEGORIES})
+
+
+def refuse_led_apply(values):
+    # Refuse the complete request, including unknown and same-value fields.
+    # Keep the narrower published mode rule independently enforced above.
+    for category in values:
+        if led_apply_blocked(category):
+            raise ConfigurationRefused(inactive_reason(category, ''))
+
+
 def enabled(category, name, settings, pending):
-    if mode_write_blocked(category, name):
+    if led_apply_blocked(category):
         return False
     rows = {s.name: s for s in settings.get(category, ())}
     if category in MODES:
@@ -127,9 +141,9 @@ def enabled(category, name, settings, pending):
 
 
 def inactive_reason(category, name):
-    if mode_write_blocked(category, name):
-        return ('LED mode writes are blocked by Argonaut pending safety qualification, '
-                'including writes of the current mode. Active parameter edits remain available.')
+    if led_apply_blocked(category):
+        return ('LED Apply writes are temporarily blocked by Argonaut pending Issue #49 '
+                'safety qualification. LED values remain readable; all fields are read-only.')
     if category in NETWORK_CATEGORIES and name in STATIC_FIELDS:
         return 'Read-only while DHCP is enabled. Disable DHCP to edit these saved static settings.'
     return 'Inactive in the proposed LED mode, or this capability is unknown.'
@@ -144,6 +158,7 @@ def validate(values, settings):
     from .configuration import display
     values = detach(values)
     refuse_mode_writes(values)
+    refuse_led_apply(values)
     categories = {identity(c): c for c in settings}
     if len(categories) != len(settings):
         raise ConfigurationRefused('Ambiguous configuration category metadata.')
@@ -212,6 +227,7 @@ def execute(client, values, dispatch, *, expected=None, history_path=None, check
     expected = dict(expected) if expected is not None else None
     check_session()
     refuse_mode_writes(payload)
+    refuse_led_apply(payload)
     # Canonicalize known stores before the read; unknown stores retain identity.
     known = {c.casefold(): c for c in (*LED_CATEGORIES, *NETWORK_CATEGORIES)}
     payload = {known.get(c.casefold(), c): items for c, items in payload.items()}

@@ -14,39 +14,27 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
                     self.tab.revert()
                     self.client.metadata[category] = metadata(category, mode)
                     self.tab.reload()
-                    for name, active in zip(FIELDS, FLAGS[mode]):
+                    for name in metadata(category):
                         expander = self.expander(category, name)
                         self.assertTrue(expander.get_visible())
                         expander.set_expanded(True)
                         allocated_frame(self.window, expander)
-                        editors = [w for w in descendants(expander.get_child()) if isinstance(w, (Gtk.ComboBoxText, Gtk.Entry))]
-                        self.assertEqual(bool(editors), bool(active), name)
-                        if active:
-                            self.assertTrue(editors[0].is_sensitive())
-                        else:
-                            self.assertTrue(any(isinstance(w, Gtk.Label) and 'Inactive' in w.get_text() for w in descendants(expander)))
-                    for name in ('LedStrip Auto SID Mode', 'LedStrip SID Select'):
-                        self.assertTrue(self.editor(category, name).is_sensitive())
+                        self.assertFalse(any(isinstance(w, (Gtk.ComboBoxText, Gtk.Entry)) for w in descendants(expander)))
+                        self.assertTrue(any(isinstance(w, Gtk.Label) and 'blocked by Argonaut' in w.get_text() for w in descendants(expander)))
         self.no_writes()
 
-    def test_mode_is_read_only_and_parameter_draft_preserved(self):
+    def test_led_fields_read_only_and_unrelated_draft_preserved(self):
+        self.show_section('Additional Settings'); self.choose('Other', 'Value', 'new')
+        before = dict(self.tab.pending)
         for category in CATEGORIES:
-            self.tab.revert()
-            self.choose(category, 'Fixed Color', 'Red')
-            before = dict(self.tab.pending)
-            expander = self.expander(category, 'LedStrip Mode')
-            expander.set_expanded(True); allocated_frame(self.window, expander)
-            self.assertFalse(any(isinstance(w, (Gtk.ComboBoxText, Gtk.Entry))
-                                 for w in descendants(expander)))
-            self.assertTrue(any(isinstance(w, Gtk.Label) and 'blocked by Argonaut' in w.get_text()
-                                for w in descendants(expander)))
-            row = next(s for s in self.tab.all_settings[category] if s.name == 'LedStrip Mode')
-            self.tab.stage(category, row, 'Rainbow')
-            self.assertEqual(self.tab.pending, before)
+            for row in self.tab.all_settings[category]:
+                self.tab.stage(category, row, '15' if row.name == 'Strip Intensity' else 'Rainbow')
+                self.assertEqual(self.tab.pending, before)
         self.no_writes()
 
     def test_collapsed_combo_cannot_edit_and_expanded_can_focus(self):
-        expander = self.expander(CATEGORIES[0], 'Fixed Color')
+        self.show_section('Wired Network Setup')
+        expander = self.expander('Ethernet Settings', 'Use DHCP')
         combo = next(w for w in descendants(expander.get_child()) if isinstance(w, Gtk.ComboBoxText))
         self.assertFalse(combo.is_sensitive())
         self.assertFalse(combo.grab_focus())
@@ -57,7 +45,7 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
         self.no_writes()
 
     def test_invalid_mixed_preview_refuses_all_and_retains_history(self):
-        payload = {CATEGORIES[0]: {'LedStrip Mode': 'Rainbow'}, 'Other': {'Value': 'new'}}
+        payload = {CATEGORIES[0]: {'LedStrip Auto SID Mode': 'Enabled'}, 'Other': {'Value': 'new'}}
         for title in ('Restore preview', 'Undo last apply preview', 'Native configuration preview'):
             dialog, checks = self.tab.backups.preview({'settings': payload}, self.tab.all_settings, title=title)
             allocated_frame(dialog)
@@ -67,18 +55,18 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
             self.assertFalse(self.tab.pending); self.assertFalse(self.tab.drafts)
             self.no_writes()
 
-    def test_stale_controller_after_real_review_refuses(self):
-        self.choose(CATEGORIES[0], 'Color tint', 'Bright')
+    def test_stale_value_after_real_review_refuses(self):
+        self.show_section('Additional Settings'); self.choose('Other', 'Value', 'new')
         pending = dict(self.tab.pending)
         dialog = self.reviewed()
-        self.client.metadata[CATEGORIES[0]]['LedStrip Mode']['current'] = 'Rainbow'
+        self.client.metadata['Other']['Value']['current'] = 'external'
         dialog.response(Gtk.ResponseType.OK)
         self.assertEqual(self.tab.pending, pending)
         self.assertIn('not sent', self.app.status.get_text())
         self.no_writes()
 
     def test_stale_queued_session_refuses(self):
-        self.choose(CATEGORIES[0], 'Color tint', 'Bright')
+        self.show_section('Additional Settings'); self.choose('Other', 'Value', 'new')
         queued = []
         self.app.run = lambda task, done: queued.append((task, done))
         self.reviewed().response(Gtk.ResponseType.OK)
@@ -90,10 +78,14 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
         self.assertIn('not sent', self.app.status.get_text())
         self.no_writes()
 
-    def test_unknown_firmware_refuses_and_reload_gate_disables_editing(self):
+    def test_led_ui_bypass_refuses_and_reload_gate_disables_editing(self):
         self.client.info['firmware_version'] = '1.1.0s2'
-        self.choose(CATEGORIES[0], 'Strip Intensity', '15')
-        self.reviewed().response(Gtk.ResponseType.OK)
+        key = (CATEGORIES[0], 'Strip Intensity')
+        self.tab.pending[key] = 15; self.tab.drafts[key] = '15'
+        payload = {CATEGORIES[0]: {'Strip Intensity': 15}}
+        with patch.object(self.tab, 'admit_changes', return_value=payload), patch.object(self.client, 'read_configuration', side_effect=AssertionError('read')) as read, patch.object(self.client, 'read_about', side_effect=AssertionError('info')) as info:
+            self.tab.apply_reviewed(dict(self.tab.pending))
+        read.assert_not_called(); info.assert_not_called()
         self.assertIn('not sent', self.app.status.get_text()); self.no_writes()
         self.tab.require_fresh_settings()
         self.assertFalse(self.tab.rows.is_sensitive())
@@ -101,13 +93,12 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
         self.assertFalse(self.tab.flash_button.is_sensitive())
         self.assertIsNone(self.tab.apply()); self.no_writes()
 
-    def test_valid_parameter_edit_records_history(self):
-        category = CATEGORIES[0]
-        self.choose(category, 'Fixed Color', 'Red')
+    def test_valid_unrelated_edit_records_history(self):
+        self.show_section('Additional Settings'); self.choose('Other', 'Value', 'new')
         self.no_writes()
         self.reviewed().response(Gtk.ResponseType.OK)
-        self.assertEqual(self.client.writes, [{category: {'Fixed Color': 'Red'}}])
-        self.assertEqual(read_backup(self.history)['settings'], {category: {'Fixed Color': 'Blue'}})
+        self.assertEqual(self.client.writes, [{'Other': {'Value': 'new'}}])
+        self.assertEqual(read_backup(self.history)['settings'], {'Other': {'Value': 'old'}})
         self.assertFalse(self.tab.pending)
         self.assertIn('Applied and verified', self.app.status.get_text())
 
@@ -126,10 +117,10 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
         self.assertEqual(len(self.client.writes), 3)
 
     def test_cancel_review_and_actual_undo_preview_write_nothing(self):
-        self.choose(CATEGORIES[0], 'Strip Intensity', '15')
+        self.show_section('Additional Settings'); self.choose('Other', 'Value', 'new')
         self.reviewed().response(Gtk.ResponseType.CANCEL); self.no_writes()
         self.tab.revert()
-        write_backup(self.history, {'format': 'argonaut-settings', 'version': 1, 'settings': {CATEGORIES[0]: {'LedStrip Mode': 'Rainbow'}}})
+        write_backup(self.history, {'format': 'argonaut-settings', 'version': 1, 'settings': {CATEGORIES[0]: {'LedStrip SID Select': 'UltiSID1-B'}}})
         before = self.history.read_bytes()
         self.tab.undo_apply()
         dialog = next(w for w in Gtk.Window.get_toplevels() if isinstance(w, Gtk.Dialog))
@@ -149,7 +140,7 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
         native.folder = lambda: '/Flash/configs'
         native.listing = SimpleNamespace(get_selected_row=lambda: SimpleNamespace(name='synthetic.cfg'))
         native.run = lambda task, done: done(task())
-        with patch('c64u_browser.flash_dialog.read_remote', return_value=b'[Keyboard Lighting]\nLedStrip Mode=Rainbow\n') as read:
+        with patch('c64u_browser.flash_dialog.read_remote', return_value=b'[Keyboard Lighting]\nStrip Intensity=15\n') as read:
             native.preview()
         self.assertEqual(read.call_count, 1)
         dialog = next(w for w in Gtk.Window.get_toplevels() if isinstance(w, Gtk.Dialog) and w is not native.dialog)

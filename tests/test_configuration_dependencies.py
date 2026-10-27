@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 from c64u_browser.api import UltimateClient
 from c64u_browser.configuration import Configuration
-from c64u_browser.configuration_policy import ConfigurationRefused, validate, enabled
+from c64u_browser.configuration_policy import ConfigurationRefused, validate, enabled, DEPENDENCIES
 from c64u_browser.core import ArgonautCore
 from c64u_browser.config_history import history_path
 from c64u_browser.backups import read_backup, write_backup
@@ -81,18 +81,21 @@ class Offline:
 class CoreDependencies(Offline,unittest.TestCase):
     def test_all_category_modes_fields_and_ui_agreement(self):
         for category in CATEGORIES:
-            modes=MODES + (('Sparkle',) if category==CATEGORIES[0] else ())
-            for mode in modes:
-                self.client.metadata[category]=metadata(category,mode)
-                for name,value,allowed in zip(FIELDS,VALUES,FLAGS[mode]):
-                    with self.subTest(category=category,mode=mode,field=name):
-                        payload={category:{name:value}}
-                        self.assertEqual(enabled(category,name,self.settings(),{}),bool(allowed))
-                        if allowed:self.ops.apply_configuration(payload)
-                        else:self.refused(payload)
-                for name,value in (('LedStrip Auto SID Mode','Enabled'),('LedStrip SID Select','UltiSID1-B')):
-                    self.ops.apply_configuration({category:{name:value}})
-                self.refused({category:{'LedStrip Mode':mode}})
+            for mode in MODES + (('Sparkle',) if category == CATEGORIES[0] else ()):
+                self.client.metadata[category] = metadata(category, mode)
+                settings = self.settings()
+                # Retained firmware dependency rules are not rewritten by containment.
+                self.assertEqual(tuple(mode in DEPENDENCIES[(category, name)].allowed for name in FIELDS), tuple(bool(flag) for flag in FLAGS[mode]))
+                for name, meta in self.client.metadata[category].items():
+                    for value in (meta['current'], (15 if name == 'Strip Intensity' else meta['values'][-1])):
+                        with self.subTest(category=category, mode=mode, field=name, value=value):
+                            self.assertFalse(enabled(category, name, settings, {}))
+                            before = copy.deepcopy(self.client.metadata)
+                            with patch.object(self.client, 'read_configuration', side_effect=AssertionError('read')) as read, patch.object(self.client, 'read_about', side_effect=AssertionError('info')) as info:
+                                self.refused({category: {name: value}}, history_path=self.history)
+                            read.assert_not_called(); info.assert_not_called()
+                            self.assertEqual(self.client.metadata, before)
+                            self.assertFalse(self.history.exists())
 
     def test_final_state_all_orders_reject_whole_mixed_batch(self):
         for category in CATEGORIES:
@@ -118,7 +121,7 @@ class CoreDependencies(Offline,unittest.TestCase):
     def test_fresh_controller_without_ui_snapshot_is_authoritative(self):
         self.client.metadata[CATEGORIES[1]]['LedStrip Mode']['current']='Rainbow'
         self.refused({CATEGORIES[1]:{'Fixed Color':'Red'}})
-        self.ops.apply_configuration({CATEGORIES[1]:{'Color tint':'Bright'}})
+        self.refused({CATEGORIES[1]:{'Color tint':'Bright'}})
 
     def test_unknown_firmware_and_product_do_not_block_non_led(self):
         for info in ({}, {'firmware_version':'1.1.0s2','product':'C64 Ultimate'},
@@ -173,14 +176,14 @@ class CoreDependencies(Offline,unittest.TestCase):
         self.assertEqual(self.history.read_bytes(),b'prior')
 
     def test_detached_intent_survives_caller_mutation_during_read(self):
-        values={CATEGORIES[0]:{'Color tint':'Bright'}}
+        values={'Other':{'Value':'new'}}
         read=self.client.read_configuration
         def mutate(category=None):
-            values[CATEGORIES[0]]['Fixed Color']='Red'
+            values[CATEGORIES[0]]={'Strip Intensity':15}
+            values['Other']['Value']='injected'
             return read(category)
-        self.client.metadata[CATEGORIES[0]]['LedStrip Mode']['current']='Rainbow'
         with patch.object(self.client,'read_configuration',side_effect=mutate):self.ops.apply_configuration(values)
-        self.assertEqual(self.client.writes,[{CATEGORIES[0]:{'Color tint':'Bright'}}])
+        self.assertEqual(self.client.writes,[{'Other':{'Value':'new'}}])
 
     def test_failed_reads_and_stale_session_have_zero_writes(self):
         with patch.object(self.client,'read_configuration',side_effect=TimeoutError):
@@ -222,8 +225,9 @@ class CoreDependencies(Offline,unittest.TestCase):
                 payload={transform(category):{transform('LedStrip Mode'):'Fixed Color'}}
                 with self.assertRaisesRegex(ConfigurationRefused,'blocked by Argonaut'):
                     validate(payload,{})
-                with patch.object(self.client,'read_configuration',side_effect=AssertionError('no read needed')):
+                with patch.object(self.client,'read_configuration',side_effect=AssertionError('no read needed')) as read:
                     self.refused(payload,history_path=self.history)
+                read.assert_not_called()
         self.assertFalse(self.history.exists())
 
     def test_mode_mixed_with_valid_parameters_preserves_existing_history(self):
@@ -269,12 +273,51 @@ class CoreDependencies(Offline,unittest.TestCase):
             with self.assertRaises(ConfigurationRefused):
                 client.apply_configuration({'Other':{'Value':'new'},category:{'LedStrip Mode':'Rainbow'}})
             request.assert_not_called()
-            client.apply_configuration({category:{'Color tint':'Bright'}})
-            request.assert_called_once_with('POST','/v1/configs',{category:{'Color tint':'Bright'}})
+            client.apply_configuration({'Other':{'Value':'new'}})
+            request.assert_called_once_with('POST','/v1/configs',{'Other':{'Value':'new'}})
+
+    def test_all_led_fields_case_variants_unknown_fields_and_mixed_batches(self):
+        self.history.parent.mkdir(); self.history.write_bytes(b'prior')
+        for category in CATEGORIES:
+            fields = [(name, meta['current']) for name, meta in metadata(category).items()]
+            fields += [('Future field', 'unknown')]
+            for name, value in fields:
+                for transform in (str, str.lower, str.upper, str.swapcase):
+                    for order in permutations(((transform(category), {transform(name): value}), ('Other', {'Value': 'new'}))):
+                        payload = dict(order)
+                        with self.subTest(category=category, name=name, payload=payload):
+                            with patch.object(self.client, 'read_configuration', side_effect=AssertionError('read')) as read, patch.object(self.client, 'read_about', side_effect=AssertionError('info')) as info:
+                                self.refused(payload, history_path=self.history)
+                                with self.assertRaises(ConfigurationRefused):self.client.apply_configuration(payload)
+                            read.assert_not_called(); info.assert_not_called()
+                            with self.assertRaises(ConfigurationRefused):validate(payload, {})
+                            self.assertEqual(self.history.read_bytes(), b'prior')
+                            self.assertEqual(self.client.writes, [])
+        for category in CATEGORIES:
+            for fields in permutations((('Strip Intensity', 10), ('LedStrip Auto SID Mode', 'Enabled'))):
+                with patch.object(self.client, 'read_configuration', side_effect=AssertionError('read')) as read, patch.object(self.client, 'read_about', side_effect=AssertionError('info')) as info:
+                    self.refused({category:dict(fields), 'Other':{'Value':'new'}}, history_path=self.history)
+                read.assert_not_called(); info.assert_not_called()
+                self.assertEqual(self.history.read_bytes(), b'prior')
+        client = UltimateClient('192.0.2.20')
+        with patch.object(client, '_request_json', side_effect=AssertionError('transport')) as request:
+            for category in CATEGORIES:
+                for name, meta in metadata(category).items():
+                    with self.assertRaises(ConfigurationRefused):client.apply_configuration({category:{name:meta['current']}})
+            request.assert_not_called()
+
+    def test_led_values_still_readable_and_unrelated_mode_names_writable(self):
+        settings = self.settings()
+        for category in CATEGORIES:
+            self.assertEqual({s.name for s in settings[category]}, set(metadata(category)))
+            self.assertEqual(next(s.current for s in settings[category] if s.name == 'Strip Intensity'), '10')
+        self.client.metadata['Other']['LedStrip Mode'] = {'current':'old'}
+        self.ops.apply_configuration({'Other': {'LedStrip Mode':'new'}})
+        self.assertEqual(self.client.writes, [{'Other': {'LedStrip Mode':'new'}}])
 
     def test_headless_core_does_not_import_gtk(self):
         import subprocess,sys
-        result=subprocess.run([sys.executable,'-c',"import sys; from c64u_browser.core import ArgonautCore; from c64u_browser.configuration_policy import validate; assert 'gi' not in sys.modules"],capture_output=True,text=True)
+        result=subprocess.run([sys.executable,'-c',"import sys; from c64u_browser.core import ArgonautCore; from c64u_browser.configuration_policy import validate; sys.exit(1 if 'gi' in sys.modules else 0)"],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
 
 
@@ -310,53 +353,51 @@ class UIDependencies(Offline,unittest.TestCase):
         self.tab.pending={(c,n):v for c,items in values.items() for n,v in items.items()}
         self.tab.drafts={k:str(v) for k,v in self.tab.pending.items()}
     def test_apply_refuses_invalid_full_batch_and_retains_edits(self):
-        self.stage({'Other':{'Value':'new'},CATEGORIES[1]:{'LedStrip Mode':'Rainbow'}})
+        self.stage({'Other':{'Value':'new'},CATEGORIES[1]:{'Strip Intensity':15}})
         pending=dict(self.tab.pending);drafts=dict(self.tab.drafts)
         self.assertIsNone(self.tab.apply());self.tab.apply_reviewed(pending)
         self.assertEqual(self.tab.pending,pending);self.assertEqual(self.tab.drafts,drafts)
         self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
-    def test_both_categories_mode_stage_refused_preserves_parameter_draft(self):
+    def test_both_categories_all_fields_stage_refused_preserves_unrelated_draft(self):
+        self.stage({'Other': {'Value': 'new'}})
+        before = (dict(self.tab.pending), dict(self.tab.drafts))
         for category in CATEGORIES:
-            rows={s.name:s for s in self.tab.all_settings[category]}
-            self.tab.stage(category,rows['Fixed Color'],'Red')
-            self.assertIn((category,'Fixed Color'),self.tab.pending)
-            self.tab.stage(category,rows['LedStrip Mode'],'Rainbow')
-            self.assertIn((category,'Fixed Color'),self.tab.pending)
-            self.assertIn((category,'Fixed Color'),self.tab.drafts)
-            self.assertNotIn((category,'LedStrip Mode'),self.tab.pending)
-            self.assertEqual(self.client.writes,[])
+            for row in self.tab.all_settings[category]:
+                self.tab.stage(category, row, '15' if row.name == 'Strip Intensity' else 'Rainbow')
+                self.assertEqual((self.tab.pending, self.tab.drafts), before)
+                self.assertEqual(self.client.writes, [])
 
     def test_ui_bypass_still_rejected_by_core(self):
-        payload={CATEGORIES[0]:{'LedStrip Mode':'Fixed Color'}}
+        payload={CATEGORIES[0]:{'Strip Intensity':10}}
         self.stage(payload)
         with patch.object(self.tab,'admit_changes',return_value=payload):self.tab.apply_reviewed(dict(self.tab.pending))
         self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
         self.assertIn('not sent',self.tab.app.status.set_text.call_args.args[0])
-    def test_controller_changes_after_review_preserve_history(self):
-        self.stage({CATEGORIES[0]:{'Color tint':'Bright'}})
+    def test_value_changes_after_review_preserve_history(self):
+        self.stage({'Other':{'Value':'new'}})
         dialog=self.tab.apply()
-        self.client.metadata[CATEGORIES[0]]['LedStrip Mode']['current']='Rainbow'
+        self.client.metadata['Other']['Value']['current']='external'
         dialog.response(1)
         self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
+
     def test_restore_and_undo_preview_reject_invalid_selected_set(self):
         for title in ('Restore preview','Undo last apply preview','Native configuration preview'):
-            data={'settings':{CATEGORIES[1]:{'LedStrip Mode':'Rainbow'},'Other':{'Value':'new'}}}
+            data={'settings':{CATEGORIES[1]:{'LedStrip Auto SID Mode':'Enabled'},'Other':{'Value':'new'}}}
             dialog,checks=self.tab.backups.preview(data,self.tab.all_settings,title=title)
             for check in checks:check.set_active(True)
             dialog.response(1)
             self.assertFalse(self.tab.pending);self.assertFalse(self.tab.drafts)
             self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
-    def test_valid_restore_stages_whole_batch_and_applies(self):
-        category=CATEGORIES[0]
-        self.client.metadata[category]=metadata(category,'Fixed Color');self.tab.all_settings=self.settings()
-        dialog,checks=self.tab.backups.preview({'settings':{category:{'Fixed Color':'Red','Strip Intensity':15}}},self.tab.all_settings)
+    def test_valid_restore_stages_unrelated_batch_and_applies(self):
+        dialog,checks=self.tab.backups.preview({'settings':{'Other':{'Value':'new'}}},self.tab.all_settings)
         for check in checks:check.set_active(True)
-        dialog.response(1);self.assertEqual(len(self.tab.pending),2)
+        dialog.response(1);self.assertEqual(len(self.tab.pending),1)
         self.tab.apply().response(1)
-        self.assertEqual(self.client.writes,[{category:{'Fixed Color':'Red','Strip Intensity':15}}])
+        self.assertEqual(self.client.writes,[{'Other':{'Value':'new'}}])
         self.assertFalse(self.tab.pending)
+
     def test_actual_undo_history_uses_dependency_validation(self):
-        write_backup(self.history,{'format':'argonaut-settings','version':1,'settings':{CATEGORIES[0]:{'LedStrip Mode':'Rainbow'}}})
+        write_backup(self.history,{'format':'argonaut-settings','version':1,'settings':{CATEGORIES[0]:{'LedStrip SID Select':'UltiSID1-B'}}})
         before=self.history.read_bytes();captured=[];original=self.tab.backups.preview
         def preview(*args,**kwargs):
             result=original(*args,**kwargs);captured.append(result);return result
@@ -375,7 +416,7 @@ class UIDependencies(Offline,unittest.TestCase):
         captured=[];original=self.tab.backups.preview
         def preview(*args,**kwargs):
             result=original(*args,**kwargs);captured.append(result);return result
-        with patch('c64u_browser.flash_dialog.read_remote',return_value=b'[Keyboard Lighting]\nLedStrip Mode=Rainbow\n'), patch.object(self.tab.backups,'preview',side_effect=preview):
+        with patch('c64u_browser.flash_dialog.read_remote',return_value=b'[Keyboard Lighting]\nStrip Intensity=15\n'), patch.object(self.tab.backups,'preview',side_effect=preview):
             native.preview()
         dialog,checks=captured[0]
         for check in checks:check.set_active(True)
@@ -388,6 +429,6 @@ class UIDependencies(Offline,unittest.TestCase):
         checks[0].set_active(True);self.tab.require_fresh_settings();dialog.response(1)
         self.assertTrue(self.tab.requires_refresh);self.assertFalse(self.tab.pending)
     def test_cancel_confirmation_writes_nothing(self):
-        self.stage({CATEGORIES[0]:{'Strip Intensity':15}})
+        self.stage({'Other':{'Value':'new'}})
         self.tab.apply().response(0)
         self.assertEqual(self.client.writes,[]);self.assertEqual(self.history.read_bytes(),b'prior')
