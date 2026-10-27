@@ -49,22 +49,60 @@ Physical-header mapping, other hardware variants, firmware `1.1.0s2`, prolonged
 stability, device-side atomicity and broader UI/package/cross-platform/release
 qualification remain unproven.
 
+### Stage 2 closeout reconciliation — 26 October 2026 (America/Chicago)
+
 Primary and live GitHub `development` were verified at
-`d467726f148f73df805329ef817f3445f80d19c6` before this edit. This publishes the prior
-ownership/#48 reconciliation, not this new four-document update. Containment remains
-published at `40da3846e88c6efe5395928394a6850c17e92f1c`. Retained integration evidence
-records 120/120 normal, 120/120 optimized and 35/35 GTK passing with independent
-engineering/integration review PASS; these are historical results, not new test runs.
-Gate B remains bounded acceptance of five read-only requests on the qualified
-firmware 1.1.0 device.
+`f955e96ace7db4f0caa2026422a2f4dec0418e4b` before this edit, with the intended
+GitHub fetch/push remotes, clean tracked files/index and seven preserved untracked
+artifacts. This is the published qualified-closure/safety-handoff checkpoint;
+the present Stage 2 documentation update remains unstaged, uncommitted and unpublished.
+Containment remains published at `40da3846e88c6efe5395928394a6850c17e92f1c`.
+Historical integration results remain 120/120 normal, 120/120 optimized and
+35/35 GTK, with independent engineering/integration review PASS; no tests were
+rerun for this documentation-only reconciliation.
+
+GitHub dependency/reference reconciliation is complete and was verified read-only:
+[#26](https://github.com/Mrbruceybruce/argonaut-c64u/issues/26) references #49 for
+applicable RM-027 safety findings; its native blockers are exactly **#24 Open,
+#25 Closed and #49 Open**, with the reciprocal **#49 blocks #26** link present.
+#49's accepted-handoff notice supersedes its preserved creation-time description;
+#48's provenance identifies #49 as the safety successor. In
+[Argonaut Development](https://github.com/users/Mrbruceybruce/projects/1), #48 is
+registered **Backlog / P1 — High / Test Lab / AI**. This completes tracking only,
+not #48 tooling work, #49 safety acceptance or RM-026/028/029 dependency gates.
+
+**Stage 1: Gate B journal not recovered.** Its documented original path is
+`/tmp/argonaut-gate-b-20261025-schema-local-01.jsonl`; expected SHA-256:
+`6d336c460366b78276d9d95c301c8648df557f7518f18e22d4e064193c6260b1`.
+The completed Stage 1 search reported no exact-hash copy or plausible renamed
+journal. It excluded Git internals, dependency/cache directories, content over
+10 MB and inaccessible system-private temporary directories; this is not proof
+that no copy exists elsewhere. Stage 2 confirmed the documented path is absent;
+it did not repeat the recovery search or recreate evidence.
+
+[Historical Gate B acceptance](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25#issuecomment-6393217684)
+remains documented: five sequential validated GETs, all HTTP 200 with empty API
+errors, device `25BE71`, firmware `1.1.0`, final `complete=true`, `stop=null`.
+That record describes cumulative snapshots, not additional requests. Without the
+original journal, its bytes, hash, row structure and captured responses cannot be
+independently reverified. The `c64u_browser/led_capture_baseline.json` fixtures in
+the preserved `issue25-get-capture` and `issue25-get-test` checkouts explicitly
+identify themselves as transcriptions of that comment, not recovered originals.
+**Historical bounded acceptance retained; original journal unavailable for
+reinspection.** Earlier references to a retained journal describe historical
+availability, not current possession or fresh verification.
 
 This checkpoint supersedes older statements below that #25 is open, closure awaits
-a decision, ownership is only proposed, or C1 follow-up tracking is missing. Earlier
-publication-pending and candidate statements retain their dated historical scope;
-original evidence and acceptance limits remain intact. This documentation-only
-reconciliation requires independent review and the user's manual publication gates.
-GitHub dependency/reference reconciliation remains separately pending: no issue or
-Project changes, implementation, hardware contact or new physical test are authorized.
+a decision, ownership is only proposed, C1 follow-up tracking is missing, or GitHub
+reconciliation is pending. Earlier publication-pending and candidate statements
+retain their dated historical scope. #25's qualified closure, #49's unresolved
+lockup and indirect/Auto SID safety scope, #48's tooling-only boundary, incomplete
+C1 physical acceptance and all dependency rules remain unchanged. This update
+requires independent read-only review and the user's manual publication gates;
+closeout is not fully synchronized while publication remains outstanding.
+No Git writes/publication, GitHub changes, hardware contact or new physical test
+are part of Stage 2. The next gate is the user's separately controlled manual
+publication review; #49 remains the P0 safety investigation.
 
 ## Issue #25 / RM-007 — offline configuration dependency candidate
 
