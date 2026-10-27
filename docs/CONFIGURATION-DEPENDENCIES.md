@@ -93,12 +93,14 @@ lockup and indirect/Auto SID safety scope, #48's tooling-only boundary, incomple
 C1 physical acceptance and all dependency rules remain unchanged. Stage 2's
 independent read-only review and manual publication gates are complete; its former
 publication-pending statements are superseded by the verified commit above.
-This narrow publication-status correction is a separate documentation change and
-requires independent read-only review and the user's manual publication gates.
-No Git writes/publication, GitHub changes, hardware contact or new physical test
-are authorized by this correction. The next gate applies only to this correction:
-the user's separately controlled manual publication review. #49 remains the P0
-safety investigation.
+Stage 2 publication at `c300bf4292b5bd3e4e7037650d89b3b811d29389` and the
+publication-status correction at `60a8907d9ae54c7e3038128fb62466fbb2db7d24`
+were both verified on GitHub `development`. At that checkpoint, GitHub dependency
+and Project reconciliation was complete, with no outstanding primary `development`
+publication or administrative reconciliation. The original Gate B journal remained
+unavailable, #49's lockup and indirect/Auto SID safety remained unresolved, and C1
+physical acceptance remained incomplete. All evidence limitations and safety,
+dependency, review and manual publication gates remain unchanged.
 
 ## Ownership and follow-up reconciliation — 25 October 2026
 
