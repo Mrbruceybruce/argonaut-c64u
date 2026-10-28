@@ -1,12 +1,15 @@
 # Current development state
 
-## Issue #49 offline characterization — integrated and validated, 27 October 2026
+## Issue #49 offline characterization — published, 27 October 2026
 
-The seven-file offline characterization is integrated into primary `development`
-at unchanged HEAD `cfcc88fcfb9f383497f53ce7657d5f8162652ada` and has completed
-bounded integrated validation. Changes remain **unstaged, uncommitted and
-unpublished**. This entry supersedes validation-pending and next-authorization
-language in the preserved integration and isolated-candidate checkpoints below.
+The reviewed seven-file offline characterization is committed and published on
+`development` at `5609be0b8094aa0214ffce25143587884425d06e` (parent
+`cfcc88fcfb9f383497f53ce7657d5f8162652ada`). Primary and live GitHub HEADs were
+verified equal before this publication-status reconciliation, with the intended
+GitHub fetch/push remotes, clean tracked files and empty staging. All seven
+committed file hashes match the reviewed publication inventory. This entry
+supersedes integration-, validation- and publication-pending language in the
+preserved historical checkpoints below; their evidence and limits remain intact.
 
 Retained primary results are **135/135 normal and 135/135 optimized**, each with
 13 characterization methods plus 122 regressions, zero failures/errors/skips.
@@ -16,32 +19,34 @@ across modes and the original candidate. Independent integration review reports
 inspected, not rerun for this documentation reconciliation. They do not establish
 compiled-firmware behavior, installed-image equivalence, FPGA routing, physical
 C64U safety, lockup reproduction or resolution, or broader release qualification.
+No physical C64U acceptance is established by this characterization or publication.
 
 Evidence is retained under project workspace
 `/home/bruce/.codex/.chatgpt-projects/g-p-6ab45977554c8191ac3a40c7db115846/`:
 `issue49-offline-primary-validation-evidence/validation-report.txt` and
 `issue49-offline-primary-validation-evidence/independent-integration-review.txt`.
-That validation verified all 23 checkouts and 14,592 unaffected file hashes,
-including the original candidate, legacy artifacts and migration stash. Its exact
-seven-file hashes precede this documentation-only reconciliation; refreshed hashes
-and the independent documentation review belong in separate
-`issue49-offline-doc-reconciliation-evidence/`. The four model/test/allowlist files
-remain unchanged. Original candidate and historical evidence remain preserved.
+The reviewed seven-file publication inventory and prior documentation review are
+in `issue49-offline-doc-reconciliation-evidence/`. Fresh pre-edit preservation
+checks verified all 23 checkouts and 14,592 unaffected file hashes, including the
+original candidate, seven legacy artifacts and migration stash. Evidence for this
+publication-status reconciliation is retained separately in
+`issue49-offline-publication-status-evidence/`. The four model/test/allowlist files
+remain unchanged; original candidate and historical evidence remain preserved.
 
-Fresh pre-edit verification found primary and live GitHub `development` at the
-same baseline, empty staging, and #49 Open / P0 — Critical / In Progress /
-Ultimate Menu in Argonaut Development (Project 1). The original intermittent LED
-lockup and root cause remain unresolved. Category-wide LED Apply refusal remains
-intact; #48 remains tooling only, C1 physical acceptance remains incomplete, and
+Live #49 remains Open / P0 — Critical / In Progress / Ultimate Menu in
+Argonaut Development (Project 1). The original intermittent LED lockup and root
+cause remain unresolved. Category-wide LED Apply refusal remains intact; #48
+remains tooling only, C1 physical acceptance remains incomplete, and
 RM-026/028/029 gates remain outstanding. No hardware operation, runtime containment
 change or GitHub mutation is part of this reconciliation.
 
-Next gates, in order: independently review this documentation reconciliation;
-refresh the complete changed-file inventory, hashes, branch, local/live HEADs,
-remotes and empty staging; then review the proposed manual staging/commit/push
-procedure. The user retains Git publication control, with separate staged-diff,
-commit and live-publication verification gates. No publication or issue closure
-is established by this checkpoint.
+This three-document publication-status correction itself remains **unstaged,
+uncommitted and unpublished**. Its independent documentation review and fresh
+branch/local/live HEAD, remotes, complete inventory, hash and empty-index checks
+precede any separately authorized manual publication. The user retains staging,
+commit and push control, with separate staged-diff, commit and live-publication
+verification gates. Publication of the characterization does not close #49 or
+establish hosted CI, hardware, package or release acceptance.
 
 ## Issue #49 offline characterization — integrated, validation pending, 27 October 2026
 
