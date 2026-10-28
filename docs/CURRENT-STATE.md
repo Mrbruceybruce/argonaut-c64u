@@ -40,13 +40,14 @@ remains tooling only, C1 physical acceptance remains incomplete, and
 RM-026/028/029 gates remain outstanding. No hardware operation, runtime containment
 change or GitHub mutation is part of this reconciliation.
 
-This three-document publication-status correction itself remains **unstaged,
-uncommitted and unpublished**. Its independent documentation review and fresh
-branch/local/live HEAD, remotes, complete inventory, hash and empty-index checks
-precede any separately authorized manual publication. The user retains staging,
-commit and push control, with separate staged-diff, commit and live-publication
-verification gates. Publication of the characterization does not close #49 or
-establish hosted CI, hardware, package or release acceptance.
+The three-document publication-status reconciliation was committed and published
+on GitHub `development` at `1bdaf63dbdd9b00d88c07afbd8fd2795b210bb10`.
+Primary and live GitHub `development` HEADs were verified equal at that commit
+on 28 October 2026 before this narrowly scoped wording correction. The user
+retains staging, commit and push control for subsequent changes, with separate
+staged-diff, commit and live-publication verification gates. Publication of the
+characterization does not close #49 or establish hosted CI, hardware, package
+or release acceptance.
 
 ## Issue #49 offline characterization — integrated, validation pending, 27 October 2026
 
