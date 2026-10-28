@@ -1,5 +1,87 @@
 # Argonaut roadmap
 
+## Issue #49 offline characterization — integrated and validated, 27 October 2026
+
+The seven-file offline characterization is integrated into primary `development`
+at unchanged HEAD `cfcc88fcfb9f383497f53ce7657d5f8162652ada` and has completed
+bounded integrated validation. Changes remain **unstaged, uncommitted and
+unpublished**. This entry supersedes validation-pending and next-authorization
+language in the preserved integration and isolated-candidate checkpoints below.
+
+Retained primary results are **135/135 normal and 135/135 optimized**, each with
+13 characterization methods plus 122 regressions, zero failures/errors/skips.
+Verified network isolation preceded test imports. All seven exported traces match
+across modes and the original candidate. Independent integration review reports
+**QUALIFIED PASS** for this bounded source-derived model. These results were
+inspected, not rerun for this documentation reconciliation. They do not establish
+compiled-firmware behavior, installed-image equivalence, FPGA routing, physical
+C64U safety, lockup reproduction or resolution, or broader release qualification.
+
+Evidence is retained under project workspace
+`/home/bruce/.codex/.chatgpt-projects/g-p-6ab45977554c8191ac3a40c7db115846/`:
+`issue49-offline-primary-validation-evidence/validation-report.txt` and
+`issue49-offline-primary-validation-evidence/independent-integration-review.txt`.
+That validation verified all 23 checkouts and 14,592 unaffected file hashes,
+including the original candidate, legacy artifacts and migration stash. Its exact
+seven-file hashes precede this documentation-only reconciliation; refreshed hashes
+and the independent documentation review belong in separate
+`issue49-offline-doc-reconciliation-evidence/`. The four model/test/allowlist files
+remain unchanged. Original candidate and historical evidence remain preserved.
+
+Fresh pre-edit verification found primary and live GitHub `development` at the
+same baseline, empty staging, and #49 Open / P0 — Critical / In Progress /
+Ultimate Menu in Argonaut Development (Project 1). The original intermittent LED
+lockup and root cause remain unresolved. Category-wide LED Apply refusal remains
+intact; #48 remains tooling only, C1 physical acceptance remains incomplete, and
+RM-026/028/029 gates remain outstanding. No hardware operation, runtime containment
+change or GitHub mutation is part of this reconciliation.
+
+Next gates, in order: independently review this documentation reconciliation;
+refresh the complete changed-file inventory, hashes, branch, local/live HEADs,
+remotes and empty staging; then review the proposed manual staging/commit/push
+procedure. The user retains Git publication control, with separate staged-diff,
+commit and live-publication verification gates. No publication or issue closure
+is established by this checkpoint.
+
+## Issue #49 offline characterization — integrated, validation pending, 27 October 2026
+
+The independently reviewed seven-file offline candidate has been integrated into
+primary `development` at unchanged HEAD `cfcc88fcfb9f383497f53ce7657d5f8162652ada`.
+All seven files first matched the reviewed SHA-256 inventory exactly; this later
+status reconciliation changes only the three documentation files in that inventory.
+The original isolated candidate and its sibling evidence remain preserved.
+Changes are **unstaged, uncommitted and unpublished**. Live GitHub `development`
+matched the baseline at the integration gate; #49 remains Open / P0 — Critical /
+In Progress / Ultimate Menu in Argonaut Development.
+
+The isolated-candidate checkpoint below is preserved history; its integration-
+pending wording is superseded by this entry. Retained **135/135 normal and
+135/135 optimized** results and the implementation **QUALIFIED PASS** belong to
+the isolated candidate. No tests were run during integration. Fresh integrated
+validation and the subsequent independent integration review remain pending.
+Next authorization gate: bounded normal/optimized characterization and containment
+regressions, source inventory, and independent integration review, with verified
+network isolation before test imports and new evidence retained separately.
+Manual staging, commit, push and publication verification remain later gates.
+
+See [scope, evidence locations and limitations](ISSUE49-OFFLINE-CHARACTERIZATION.md).
+This model does not establish firmware safety or resolve the intermittent lockup.
+Category-wide LED Apply refusal, #48's tooling-only scope, incomplete C1 physical
+acceptance and RM-026/028/029 gates remain unchanged. No hardware operation or
+GitHub tracking change occurred.
+
+## Issue #49 offline characterization — isolated candidate, 27 October 2026
+
+A bounded source-derived Python LED model and deterministic trace tests are in
+an isolated candidate based on `cfcc88f`. They characterize strip Off sleep/resume,
+keyboard mapping preemption, and selected callback/transition boundaries.
+See [scope, evidence and deferred coverage](ISSUE49-OFFLINE-CHARACTERIZATION.md).
+This is not firmware execution or physical acceptance. Published LED Apply
+containment remains unchanged; the original lockup remains unresolved. The
+candidate is uncommitted, unpublished and not integrated into primary. #49 and
+RM-026/028/029 acceptance gates remain unchanged.
+
+
 ## Issue #49 temporary LED Apply containment — published, 26 October 2026
 
 The independently reviewed 11-file containment is integrated into the primary

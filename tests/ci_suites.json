@@ -89,6 +89,12 @@
           "tests": 10,
           "timeout_seconds": 120,
           "audit": "Issue #25: fake Core transports, blocked Python sockets, temporary history; pure policy and inert GTK controller widgets. No application launch or hardware."
+        },
+        {
+          "selector": "test_led_characterization.LEDCharacterization",
+          "tests": 13,
+          "timeout_seconds": 120,
+          "audit": "Issue #49 source-derived finite LED model, synthetic register traces only; no firmware execution, application imports, transport, hardware or network."
         }
       ]
     },
