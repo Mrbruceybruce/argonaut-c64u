@@ -1,5 +1,22 @@
 # Argonaut roadmap
 
+## Issue #24 identity evidence — documentation-only candidate, 28 October 2026
+
+The [pinned identity evidence and regression design](ISSUE24-IDENTITY-EVIDENCE.md)
+records official source revisions S1 (`1.1.0`) and S2 (`3.12`), source product
+names, REST identity limits, and the distinct UC-1 inspection and operational
+admission contracts. It identifies observed allowlist gaps without adopting a
+runtime policy or diagnosing the community report. The regression matrix is
+design only; no tests or hardware qualification were performed for this slice.
+
+Baseline is `9140f3146c9c012fce391aca439e684e8932b767`, verified equal to live
+GitHub before editing. This documentation candidate is unstaged, uncommitted
+and unpublished; independent review evidence is retained separately. #24 remains
+Open / P1 / Backlog and broader capability/dependency mapping remains outstanding.
+#26 retains #24 Open, #49 Open and #25 Closed as native dependencies. Category-wide
+LED Apply containment, unresolved #49 safety, #48 tooling-only scope, incomplete
+C1 physical acceptance and RM-026/028/029 gates are unchanged.
+
 ## Issue #49 offline characterization — published, 27 October 2026
 
 The reviewed seven-file offline characterization is committed and published on

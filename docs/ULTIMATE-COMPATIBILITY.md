@@ -42,6 +42,15 @@ Not yet established.
 A community report must not silently become a physically verified compatibility
 claim.
 
+## Issue #24 source evidence and admission boundaries
+
+See the [pinned identity evidence matrix and regression design](ISSUE24-IDENTITY-EVIDENCE.md)
+for S1/S2 source mappings, including `Ultimate 64-II` and `C64 Ultimate (MK1)`,
+and the distinction between UC-1 recognition and operational `test_connection()`.
+Source names, model configuration and inspection success do not establish
+hardware capabilities or expand physical/operation qualification. The matrix
+is documentation and test design only; existing admission policy is unchanged.
+
 ## Known hardware
 
 | Hardware | Firmware | REST `product` | REST API | Argonaut status | Evidence |
