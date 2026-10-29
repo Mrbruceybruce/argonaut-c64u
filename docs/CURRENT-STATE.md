@@ -1,6 +1,6 @@
 # Current development state
 
-## Issue #24 identity evidence — documentation-only candidate, 28 October 2026
+## Issue #24 identity evidence — published, 28 October 2026
 
 The [pinned identity evidence and regression design](ISSUE24-IDENTITY-EVIDENCE.md)
 records official source revisions S1 (`1.1.0`) and S2 (`3.12`), source product
@@ -9,9 +9,13 @@ admission contracts. It identifies observed allowlist gaps without adopting a
 runtime policy or diagnosing the community report. The regression matrix is
 design only; no tests or hardware qualification were performed for this slice.
 
-Baseline is `9140f3146c9c012fce391aca439e684e8932b767`, verified equal to live
-GitHub before editing. This documentation candidate is unstaged, uncommitted
-and unpublished; independent review evidence is retained separately. #24 remains
+The identity-evidence documentation is published on `development` at
+`7126a27528794b0030bc98b5c9277fad1ebfb651`. Primary and live GitHub HEADs were
+verified equal at that commit before this publication-status correction.
+Historical pre-edit baseline: `9140f3146c9c012fce391aca439e684e8932b767`, verified
+equal to live GitHub before the original edit. Independent review evidence is
+retained separately. This publication-status correction remains unstaged,
+uncommitted and unpublished pending the user's manual Git gates. #24 remains
 Open / P1 / Backlog and broader capability/dependency mapping remains outstanding.
 #26 retains #24 Open, #49 Open and #25 Closed as native dependencies. Category-wide
 LED Apply containment, unresolved #49 safety, #48 tooling-only scope, incomplete
