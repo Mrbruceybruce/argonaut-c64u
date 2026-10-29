@@ -1,5 +1,32 @@
 # Current development state
 
+## Issue #49 incident-evidence reconciliation — 29 October 2026
+
+The [reconciled evidence and unknowns](CONFIGURATION-DEPENDENCIES.md#issue-49-incident-evidence-reconciliation--29-october-2026)
+distinguish probable Founders Edition involvement (operator recollection), a
+current screenshot, historical GUI dependency gaps, source-derived payloads,
+and logs/prior-value backups from an actual incident capture. The original
+request, prior state, sequence and whether Review & Apply or Save to Flash
+immediately preceded the lockup remain unknown.
+
+Live [#49](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49) and Argonaut
+Development were verified read-only: **Open / P0 — Critical / In Progress /
+Ultimate Menu**. **2/8 criteria are complete: 1 (bounded evidence/plan documentation)
+and 4 (reviewed current refusal policy); 2, 3, 5, 6, 7 and 8 remain outstanding.**
+This supersedes earlier blanket statements that all criteria remain outstanding.
+Chris's [upstream #1030 response](https://github.com/GideonZ/1541ultimate/issues/1030#issuecomment-6500815020)
+requests a standalone reproducer with expected/actual behavior and says the
+referenced code is closed source. It does not establish RTL provenance, FPGA
+effects or original-lockup causation.
+
+Category-wide LED Apply containment remains in force. Physical C64U acceptance
+and the original intermittent lockup/root cause remain unresolved; C1 remains
+incomplete, #48 remains tooling only, and RM-026/028/029 gates are unchanged.
+This documentation-only reconciliation starts from primary and live GitHub
+development at bc54dc43501664e4d5fc742a9b8d9b745b285f48, with clean tracked
+files/index and seven existing untracked artifacts. Its changes await the user's
+manual publication gates; it authorizes no reproducer execution or hardware contact.
+
 ## Issue #24 identity evidence — published, 28 October 2026
 
 The [pinned identity evidence and regression design](ISSUE24-IDENTITY-EVIDENCE.md)
@@ -14,8 +41,10 @@ The identity-evidence documentation is published on `development` at
 verified equal at that commit before this publication-status correction.
 Historical pre-edit baseline: `9140f3146c9c012fce391aca439e684e8932b767`, verified
 equal to live GitHub before the original edit. Independent review evidence is
-retained separately. This publication-status correction remains unstaged,
-uncommitted and unpublished pending the user's manual Git gates. #24 remains
+retained separately. The publication-status correction was committed and published
+on `development` at `bc54dc43501664e4d5fc742a9b8d9b745b285f48`, verified equal
+to primary and live GitHub HEADs on 29 October 2026. This supersedes its former
+unstaged/uncommitted/unpublished wording. #24 remains
 Open / P1 / Backlog and broader capability/dependency mapping remains outstanding.
 #26 retains #24 Open, #49 Open and #25 Closed as native dependencies. Category-wide
 LED Apply containment, unresolved #49 safety, #48 tooling-only scope, incomplete

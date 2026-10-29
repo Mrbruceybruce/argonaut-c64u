@@ -1,5 +1,114 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## Issue #49 incident-evidence reconciliation — 29 October 2026
+
+This record reconciles the operator's **LED Reproduction Plan** conversation
+(6ae3bd36-47f0-83e8-861a-0fc099a68986), its supplied screenshot, retained local
+logs/backups, repository source and live GitHub tracking. It does not identify
+an incident request or establish a lockup mechanism. Earlier dated checkpoints
+remain historical evidence, subject to the current qualifications below.
+
+### Device and GUI evidence
+
+- **Probable Founders Edition:** the operator recalls testing LED colors and
+  patterns on that edition. This is recollection, not captured incident identity.
+- **Current screenshot:** the supplied image displays `C64 Founders`,
+  `192.168.68.69:80`, firmware `1.1.0`, API `0.1`; strip Mode is Rainbow and the
+  retained Color is Royal Blue. It establishes what the screenshot displays,
+  not the historical device, firmware, incident state or request. A displayed
+  dormant color under Rainbow does not by itself establish an invalid write.
+- **Historical GUI dependency gaps:** before Core validation at `c3a4984`,
+  `dependencies.py` restricted selected fields only in `LED Strip Settings`;
+  `Keyboard Lighting` did not receive those rules. Historical
+  `settings_tab.py::apply_reviewed` built a batch from pending fields and checked
+  fresh values/metadata, without the later Core dependency admission. Thus a
+  GUI gap is evidenced, but the operator's recollection of no restrictions does
+  not identify the exact incident build. The gap does not prove that conflicting
+  settings were sent, accepted by firmware, or caused the lockup.
+
+### Request construction is not an incident capture
+
+At baseline `bc54dc4`, `settings_tab.py::admit_changes` groups staged fields by
+category; `api.py::_apply_configuration_validated` constructs `POST /v1/configs`,
+with JSON serialization and `Content-Type: application/json` in
+`_request_json_impl`. For a hypothetical strip color-only edit to Red, the body is:
+
+```json
+{"LED Strip Settings": {"Fixed Color": "Red"}}
+```
+
+For the keyboard store it is:
+
+```json
+{"Keyboard Lighting": {"Fixed Color": "Red"}}
+```
+
+These are **source-derived payloads, not captured incident requests**. The REST
+field is `Fixed Color`, not `Solid Color`; the configured host/HTTP port determine
+the destination. Founders Edition does not imply a different endpoint. Rainbow
+is not automatically included in a color-only batch: `"LedStrip Mode": "Rainbow"`
+appears only if that mode field is also staged. Current category-wide LED Apply
+containment refuses either example before remote reads, history mutation or POST.
+
+The source distinguishes Review & Apply (running configuration POST) from Save
+to Flash (`PUT /v1/configs:save_to_flash`, persistence of running configuration).
+The operator recalls Save to Flash activating the change. Preserve that observation
+without inferring an incident sequence: **the original request, staged batch,
+prior state, ordering, and whether Review & Apply or Save to Flash immediately
+preceded the lockup are unknown**. Neither the GUI gap nor source construction
+reconstructs the original wire request or firmware response.
+
+### Retained logs and prior-value backups
+
+The following files were inspected read-only; they remain local evidence, not
+new hardware observations. A host address alone is not historical device identity.
+
+| Evidence | Verified content | Limit |
+| --- | --- | --- |
+| `~/.config/argonaut/diagnostics/operations.jsonl.1`, POST entries between lines 1474–1882 | 25 `POST /v1/configs` events on 4 October 2026, 03:02:06–03:34:01 UTC; all have `outcome=ok` | Timing/route/outcome only: no request payload, LED category, device identity or response body. None is identified as the lockup request. |
+| `~/.config/argonaut/config-history/7e8b172faa68104e911365553ea69470449af76b4b37b0b32cc3918353f6328c.json` | 4 October, 03:34:01.349941 UTC; host `192.168.68.69`; `LED Strip Settings` → `Strip Intensity: 6` | Prior-value backup, not the requested replacement value. Its timestamp closely precedes the final POST but establishes neither incident correlation nor device identity. |
+| `~/.config/argonaut-development/config-history/2dd566536cb21bc811185bdfd34e8991c2b78f62cab15231ca9b73de78fc45d9.json` | 6 October, 02:13:43.555941 UTC; host `192.168.68.69`; `LED Strip Settings` → `LedStrip Mode: Rainbow Sparkle` | Prior-mode backup, not proof that Rainbow Sparkle was sent or caused a lockup. |
+
+`config_history.py::save_before_apply` saves the current values of selected
+fields before dispatch. Backups therefore do not prove the replacement request
+or its success. The retained logs exist; saying there are no logs would be
+incorrect. They lack the payload and incident correlation needed for diagnosis.
+
+### Upstream response and remaining gates
+
+[GideonZ/1541ultimate#1030](https://github.com/GideonZ/1541ultimate/issues/1030)
+remains open. In his [response](https://github.com/GideonZ/1541ultimate/issues/1030#issuecomment-6500815020),
+Chris (`chrisgleissner`) reports not seeing the issue in his Android testing and
+requests a self-contained reproducer with explicit expected and actual behavior.
+He also says the referenced code is closed source and unavailable in public
+repositories. This qualifies public-source investigation of the referenced
+FPGA/controller implementation; it does not mean all firmware source is closed,
+verify the exact RTL provenance, explain FPGA effects, or disprove the incident.
+A standalone reproducer remains requested, not established or authorized here.
+Source-derived scheduling/model findings remain distinct from demonstrated
+physical behavior and original-lockup causation.
+
+Live [#49 acceptance reconciliation](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6486999413)
+marks **2/8 complete**: criterion 1, bounded evidence/unknowns/plan documentation;
+and criterion 4, independently reviewed current category-wide refusal policy.
+Criteria **2, 3, 5, 6, 7 and 8 remain outstanding**: indirect/Auto SID assessment,
+hardware/firmware/header qualification with #24, failure-mechanism regression
+coverage, applicable physical qualification, evidence for intermittent-lockup
+resolution, and final reconciliation before closure. This supersedes earlier
+blanket statements that all criteria remain outstanding; no new box is checked.
+
+Retain [category-wide LED Apply containment](ISSUE49-LED-APPLY-CONTAINMENT.md).
+The [offline characterization](ISSUE49-OFFLINE-CHARACTERIZATION.md) records
+historical 135/135 normal and 135/135 optimized results and a bounded model
+QUALIFIED PASS; those tests were not rerun for this documentation slice. Physical
+C64U acceptance and the original intermittent lockup/root cause remain unresolved.
+C1 requests 9–14 and both scheduled observation/readback rounds remain incomplete;
+#48 retains tooling-only scope. #49 remains Open / P0 — Critical / In Progress /
+Ultimate Menu in Argonaut Development, with Bruce's residual-risk ownership and
+RM-026/028/029 gates unchanged. Any further investigation/reproducer or physical
+procedure needs its own bounded scope and authorization; this slice is documentation
+only, with no code, hardware or GitHub tracking changes.
+
 ## Issue #49 temporary LED Apply containment — published, 26 October 2026
 
 The independently reviewed 11-file containment is integrated into the primary
