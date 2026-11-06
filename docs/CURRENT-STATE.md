@@ -25,8 +25,10 @@ were published on `development` at `88809b271862471a606c2e96a66445114b41c4de`;
 primary and live GitHub HEADs were verified equal for this reconciliation.
 This supersedes earlier #49 Open / In Progress and publication-pending statements
 as current status; dated checkpoints, evidence and their limitations remain
-historical records. This closure reconciliation itself remains uncommitted and
-unpublished, pending the owner's manual publication steps.
+historical records. The closure reconciliation and its separate Class A waiver
+were published on `development` at
+`72aa9486e4f8955a946c3abd6b4299bfed0bb65e`; primary and live GitHub HEADs
+were verified equal at that commit after publication.
 
 ### Closure-reconciliation Class A waiver — approved 5 November 2026
 
@@ -59,10 +61,12 @@ Criteria 2, 3, 5, 6, 7 and 8 remain unmet, not waived. Category-wide LED Apply
 containment, unresolved trigger/root cause and indirect/Auto SID risks, Bruce's
 residual-risk ownership, incomplete C1 physical acceptance, #48 tooling-only scope
 and RM-026/028/029 gates remain unchanged. This disposition adds no implementation
-or acceptance scope. The final four-file diff, including this record, requires
-Markdown, whitespace and hash verification at the pre-staging gate. Staging,
-commit, push and publication verification remain the owner's manual steps;
-this reconciliation remains uncommitted and unpublished.
+or acceptance scope. The final four-file diff, including this record, passed
+Markdown validation (50 documents, zero errors), whitespace and hash verification.
+The owner staged, committed and pushed it; publication was verified at `72aa948`
+as recorded above. Its final diff SHA-256 was
+`c1311ce952a36e381ee3a864d8a348d34e37aec66f181c01259dc26c9131f9a0`.
+This waiver applies only to that published four-file reconciliation.
 
 ## Issue #49 November 2 result and Ultimate Menu requirements — 5 November 2026
 

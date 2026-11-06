@@ -25,8 +25,10 @@ were published on `development` at `88809b271862471a606c2e96a66445114b41c4de`;
 primary and live GitHub HEADs were verified equal for this reconciliation.
 This supersedes earlier #49 Open / In Progress and publication-pending statements
 as current status; dated checkpoints, evidence and their limitations remain
-historical records. This closure reconciliation itself remains uncommitted and
-unpublished, pending the owner's manual publication steps.
+historical records. The closure reconciliation and its separate Class A waiver
+were published on `development` at
+`72aa9486e4f8955a946c3abd6b4299bfed0bb65e`; primary and live GitHub HEADs
+were verified equal at that commit after publication.
 
 ## Issue #49 single-attempt non-reproduction — 2 November 2026
 
