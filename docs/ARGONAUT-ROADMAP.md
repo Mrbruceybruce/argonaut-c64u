@@ -1,5 +1,33 @@
 # Argonaut roadmap
 
+## Issue #49 closure and #24 handoff — 5 November 2026
+
+[Issue #49's final disposition](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6675876895)
+is **Closed / Not planned / Done / P0 — Critical**, with remaining responsibilities
+handed off to [#24](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6675856802)
+(**Open / Backlog / P1 — High**); both retain the Ultimate Menu Project area.
+#49 remains historical safety evidence. Administrative closure records bounded
+non-reproduction, not a fix: the original trigger, prior state, sequence and root
+cause remain unknown, including unresolved indirect/Auto SID transition risks.
+Criteria 1 and 4 retain only their bounded completion; **2, 3, 5, 6, 7 and 8 remain
+unmet, not waived**. Their relevant investigation, regression, review and physical
+qualification obligations continue under #24.
+
+Category-wide LED Apply containment, Bruce's residual-risk ownership, incomplete
+C1 physical acceptance, #48 tooling/evidence-only scope and RM-026/028/029 gates
+remain unchanged. #24 remains investigation-only; implementation, containment
+removal and physical qualification require separate authorization and acceptance.
+#26 retains native dependency links to #24, #25 and #49; only #24 is open.
+Closed historical links do not release the applicable safety obligations under #24.
+
+The November 2 findings, approved Ultimate Menu requirements and review policy
+were published on `development` at `88809b271862471a606c2e96a66445114b41c4de`;
+primary and live GitHub HEADs were verified equal for this reconciliation.
+This supersedes earlier #49 Open / In Progress and publication-pending statements
+as current status; dated checkpoints, evidence and their limitations remain
+historical records. This closure reconciliation itself remains uncommitted and
+unpublished, pending the owner's manual publication steps.
+
 ## Issue #49 November 2 result and Ultimate Menu requirements — 5 November 2026
 
 The [retained November 2 experiment and RAID1 archive](CONFIGURATION-DEPENDENCIES.md#issue-49-single-attempt-non-reproduction--2-november-2026)
@@ -18,7 +46,7 @@ unsaved, with running values retained. These are future requirements, not curren
 implementation or permission to bypass containment. Removal requires deterministic
 regressions, independent review and applicable authorized physical acceptance.
 
-Read-only GitHub verification: **#49 Open / P0 — Critical / In Progress** and
+Historical pre-closure GitHub verification: **#49 Open / P0 — Critical / In Progress** and
 **#24 Open / P1 — High / Backlog**, both Ultimate Menu in Argonaut Development.
 #49 criteria 1 and 4 retain their bounded completion; **2, 3, 5, 6, 7 and 8 remain
 unmet**. Category-wide LED Apply containment, unresolved original trigger/root
@@ -31,8 +59,9 @@ seven preserved untracked artifacts. The owner-approved Class A independent-revi
 waiver, exact approved inventory/diff, justification and validation are recorded in
 [CURRENT-STATE](CURRENT-STATE.md#issue-49-november-2-result-and-ultimate-menu-requirements--5-november-2026).
 The waiver applies only to this documentation slice and preserves all safety
-acceptance gates. Manual staging, commit, push and publication verification remain
-pending.
+acceptance gates. The final slice was subsequently published at
+`88809b271862471a606c2e96a66445114b41c4de`, as recorded above; its waiver
+does not cover later reconciliation edits.
 
 ## Issue #49 incident-evidence reconciliation — 29 October 2026
 
@@ -255,7 +284,7 @@ technical dependencies below do not prescribe Project scheduling.
 | <a id="rm-024"></a>RM-024 | C3 / storage policy review | Parent RM-003; preserve C1 policy | No generic Flash/Temp mutation; new export/recovery needs separate review; restore unapproved. [History](ARGONAUT-ROADMAP-HISTORY.md#c-files--storage-ux) |
 | <a id="rm-025"></a>RM-025 | C4 / Files polish | Parent RM-003; C0–C3 and RM-019 contracts | Accessibility, labels, menus/focus and recovery visibility; bounded acceptance only. [History](ARGONAUT-ROADMAP-HISTORY.md#c-files--storage-ux) |
 | <a id="rm-026"></a>RM-026 ([#24](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24)) | G1 / capabilities | Parent RM-007; before dependent filtering | Firmware detection → configuration → visibility/dependencies → REST evidence. [History](ARGONAUT-ROADMAP-HISTORY.md#1-firmwarehardware-capability-investigation--first-engineering-phase) |
-| <a id="rm-027"></a>RM-027 ([#25](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25) qualified closure; [#49](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49) successor safety scope) | G2 / LED safety | Parent RM-007; prerequisite to dependent LED changes | Investigate payload/order and valid transitions; no casual lockup reproduction. [History](ARGONAUT-ROADMAP-HISTORY.md#2-led-safety-investigation--p0-device-safety-gate) |
+| <a id="rm-027"></a>RM-027 ([#25](https://github.com/Mrbruceybruce/argonaut-c64u/issues/25) qualified closure; [#49](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49) closed historical evidence; continuing obligations under #24) | G2 / LED safety | Parent RM-007; prerequisite to dependent LED changes | Investigate payload/order and valid transitions; no casual lockup reproduction. [History](ARGONAUT-ROADMAP-HISTORY.md#2-led-safety-investigation--p0-device-safety-gate) |
 | <a id="rm-028"></a>RM-028 ([#26](https://github.com/Mrbruceybruce/argonaut-c64u/issues/26)) | G3 / property-sheet redesign | Parent RM-007; RM-026 and applicable RM-027 findings | Hierarchical navigation, persistent properties, Advanced/F2 parity; remove Favorites. [History](ARGONAUT-ROADMAP-HISTORY.md#3-treeproperty-sheet-redesign--settled-direction) |
 | <a id="rm-029"></a>RM-029 | G4 / LED enhancements | Parent RM-007; RM-026 and RM-027 | Profiles, random generation and color controls after capability and safety qualification. [History](ARGONAUT-ROADMAP-HISTORY.md#4-led-enhancements--later-within-redesign) |
 | <a id="rm-030"></a>RM-030 ([#27](https://github.com/Mrbruceybruce/argonaut-c64u/issues/27)) | Managed Import / general workflow and recovery | Parent RM-011; staged phase gates | 3A/3B foundations; 3B-2C workflow, 3B-3 recovery and general 3C are not closed by pinned PA results. [History](ARGONAUT-ROADMAP-HISTORY.md#managed-import-phase-3b-2b3e2f--exclusive-writer-correction-pending-inspection) |
@@ -636,7 +665,9 @@ This checkpoint does not complete RM-006 or change Project scheduling/status.
 Technical prerequisites remain binding regardless of Project ordering:
 
 - RM-027's qualified #25 closure does not satisfy the unresolved safety scope now
-  retained by #49. RM-026 / #24 capability qualification remains required;
+  preserved in closed #49 and handed off to #24. #26 retains #24 Open, #25
+  Closed and #49 Closed dependency links; closure releases no safety obligation.
+  RM-026 / #24 capability qualification remains required;
   RM-028 / #26 must incorporate applicable capability and safety findings, and
   RM-029 LED enhancements remain gated on capability and safety qualification.
 

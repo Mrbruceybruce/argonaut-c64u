@@ -1595,8 +1595,12 @@ fixed by this documentation update.
 Approved requirements from **Argonaut Development Items**
 (conversation `6aed2311-c0ac-83ea-b38d-c4c76dd48a5a`), memorialized with the
 maintainer's documentation-only authorization. This is future design direction
-for RM-007/RM-028/RM-029, coordinated with #24 capability qualification and #49
-safety. It does not change the current staged Review & Apply implementation or
+for RM-007/RM-028/RM-029, coordinated with #24 capability qualification and
+continuing safety obligations. #49 is Closed / Not planned historical evidence;
+its [final disposition](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6675876895)
+and [#24 handoff](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6675856802)
+preserve six unmet criteria (2, 3, 5, 6, 7 and 8), unresolved indirect/Auto SID
+risks and Bruce's residual-risk ownership. It does not change the current staged Review & Apply implementation or
 category-wide LED Apply refusal.
 
 ### Native-menu evidence and edition differences
@@ -1648,6 +1652,7 @@ acceptance for the relevant variants and firmware. Tests must cover immediate
 apply, navigation within/leaving the section, repeated unsaved prompts, retained
 values and failed/uncertain saves, alongside Core refusal and session safeguards.
 Any later containment removal needs a separately approved bounded change after
-those gates; neither this approval nor menu parity closes #49 or establishes
-intermittent-lockup resolution. C1 remains incomplete; #48 remains tooling only;
+those gates; #49's administrative closure and this menu-parity approval establish
+no intermittent-lockup resolution or safety acceptance. Remaining obligations
+continue under #24. C1 remains incomplete; #48 remains tooling only;
 RM-026/028/029 dependencies remain in force.

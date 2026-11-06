@@ -1,5 +1,69 @@
 # Current development state
 
+## Issue #49 closure and #24 handoff — 5 November 2026
+
+[Issue #49's final disposition](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6675876895)
+is **Closed / Not planned / Done / P0 — Critical**, with remaining responsibilities
+handed off to [#24](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6675856802)
+(**Open / Backlog / P1 — High**); both retain the Ultimate Menu Project area.
+#49 remains historical safety evidence. Administrative closure records bounded
+non-reproduction, not a fix: the original trigger, prior state, sequence and root
+cause remain unknown, including unresolved indirect/Auto SID transition risks.
+Criteria 1 and 4 retain only their bounded completion; **2, 3, 5, 6, 7 and 8 remain
+unmet, not waived**. Their relevant investigation, regression, review and physical
+qualification obligations continue under #24.
+
+Category-wide LED Apply containment, Bruce's residual-risk ownership, incomplete
+C1 physical acceptance, #48 tooling/evidence-only scope and RM-026/028/029 gates
+remain unchanged. #24 remains investigation-only; implementation, containment
+removal and physical qualification require separate authorization and acceptance.
+#26 retains native dependency links to #24, #25 and #49; only #24 is open.
+Closed historical links do not release the applicable safety obligations under #24.
+
+The November 2 findings, approved Ultimate Menu requirements and review policy
+were published on `development` at `88809b271862471a606c2e96a66445114b41c4de`;
+primary and live GitHub HEADs were verified equal for this reconciliation.
+This supersedes earlier #49 Open / In Progress and publication-pending statements
+as current status; dated checkpoints, evidence and their limitations remain
+historical records. This closure reconciliation itself remains uncommitted and
+unpublished, pending the owner's manual publication steps.
+
+### Closure-reconciliation Class A waiver — approved 5 November 2026
+
+Bruce approved the new Class A independent-review waiver after the four-file
+closure-reconciliation assessment in **Argonaut Development Items**
+(conversation `6aed2311-c0ac-83ea-b38d-c4c76dd48a5a`, owner reply “approved”).
+The continuation explicitly authorizes recording that disposition and publication
+preflight only. This is separate from the earlier five-file waiver published at
+`88809b271862471a606c2e96a66445114b41c4de`.
+
+The approved inventory is `docs/CURRENT-STATE.md`, `docs/ARGONAUT-ROADMAP.md`,
+`docs/CONFIGURATION-DEPENDENCIES.md` and `docs/UI.md`: **107 insertions,
+14 deletions** against that commit, before this disposition record. The exact
+approved `git diff --binary` SHA-256 is
+`b6d4451ea404c151606d3c5638af767c0dd7e903ff8cf1e9769f1e7f0f38d223`.
+
+Class A justification: this bounded administrative slice reconciles #49's
+existing closure, the #24 handoff and prior publication status. It changes no
+application behavior, external interface, safety policy, hardware,
+configuration-write or persistent-data behavior. The complete inventory and
+approved diff match retained evidence; Markdown validation passed for 50 documents
+with zero errors, whitespace checks passed, and all seven preserved untracked
+artifacts match retained hashes. There are no unexplained changes or validation
+discrepancies. Conditions 1–7 are satisfied; the explicit owner approval supplies
+condition 8 under [the review policy](DEVELOPMENT.md#class-a-waiver-conditions).
+Independent review is waived for this documentation slice only; no independent
+review pass is claimed.
+
+Criteria 2, 3, 5, 6, 7 and 8 remain unmet, not waived. Category-wide LED Apply
+containment, unresolved trigger/root cause and indirect/Auto SID risks, Bruce's
+residual-risk ownership, incomplete C1 physical acceptance, #48 tooling-only scope
+and RM-026/028/029 gates remain unchanged. This disposition adds no implementation
+or acceptance scope. The final four-file diff, including this record, requires
+Markdown, whitespace and hash verification at the pre-staging gate. Staging,
+commit, push and publication verification remain the owner's manual steps;
+this reconciliation remains uncommitted and unpublished.
+
 ## Issue #49 November 2 result and Ultimate Menu requirements — 5 November 2026
 
 The [retained November 2 experiment and RAID1 archive](CONFIGURATION-DEPENDENCIES.md#issue-49-single-attempt-non-reproduction--2-november-2026)
@@ -18,7 +82,7 @@ unsaved, with running values retained. These are future requirements, not curren
 implementation or permission to bypass containment. Removal requires deterministic
 regressions, independent review and applicable authorized physical acceptance.
 
-Read-only GitHub verification: **#49 Open / P0 — Critical / In Progress** and
+Historical pre-closure GitHub verification: **#49 Open / P0 — Critical / In Progress** and
 **#24 Open / P1 — High / Backlog**, both Ultimate Menu in Argonaut Development.
 #49 criteria 1 and 4 retain their bounded completion; **2, 3, 5, 6, 7 and 8 remain
 unmet**. Category-wide LED Apply containment, unresolved original trigger/root
@@ -53,9 +117,9 @@ the explicit owner approval supplies condition 8. Independent review is waived
 for this documentation slice only, not performed or represented as a review pass.
 
 This disposition record and its roadmap pointer only reconcile the approved
-waiver; they add no implementation or acceptance scope. Revalidate the final diff
-at the manual pre-staging gate. Staging, commit, push and live publication
-verification remain pending; the owner retains each manual publication step.
+waiver; they add no implementation or acceptance scope. The final slice was subsequently published at
+`88809b271862471a606c2e96a66445114b41c4de`, as recorded above. The waiver
+remains specific to that prior slice and does not cover later reconciliation edits.
 
 ## Issue #49 incident-evidence reconciliation — 29 October 2026
 

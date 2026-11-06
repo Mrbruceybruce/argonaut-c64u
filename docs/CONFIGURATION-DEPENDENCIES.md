@@ -1,5 +1,33 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## Issue #49 closure and #24 handoff — 5 November 2026
+
+[Issue #49's final disposition](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6675876895)
+is **Closed / Not planned / Done / P0 — Critical**, with remaining responsibilities
+handed off to [#24](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6675856802)
+(**Open / Backlog / P1 — High**); both retain the Ultimate Menu Project area.
+#49 remains historical safety evidence. Administrative closure records bounded
+non-reproduction, not a fix: the original trigger, prior state, sequence and root
+cause remain unknown, including unresolved indirect/Auto SID transition risks.
+Criteria 1 and 4 retain only their bounded completion; **2, 3, 5, 6, 7 and 8 remain
+unmet, not waived**. Their relevant investigation, regression, review and physical
+qualification obligations continue under #24.
+
+Category-wide LED Apply containment, Bruce's residual-risk ownership, incomplete
+C1 physical acceptance, #48 tooling/evidence-only scope and RM-026/028/029 gates
+remain unchanged. #24 remains investigation-only; implementation, containment
+removal and physical qualification require separate authorization and acceptance.
+#26 retains native dependency links to #24, #25 and #49; only #24 is open.
+Closed historical links do not release the applicable safety obligations under #24.
+
+The November 2 findings, approved Ultimate Menu requirements and review policy
+were published on `development` at `88809b271862471a606c2e96a66445114b41c4de`;
+primary and live GitHub HEADs were verified equal for this reconciliation.
+This supersedes earlier #49 Open / In Progress and publication-pending statements
+as current status; dated checkpoints, evidence and their limitations remain
+historical records. This closure reconciliation itself remains uncommitted and
+unpublished, pending the owner's manual publication steps.
+
 ## Issue #49 single-attempt non-reproduction — 2 November 2026
 
 Reconciled 5 November from the retained archive and the
@@ -53,7 +81,8 @@ separate; the archive record reports all its sizes/hashes matched.
   `f7d8c3f7fd80a49348dd4f04a254886fa2cd76de22c004366deffb934d48cd93`.
 
 This archive manifest replaces neither the original experiment inventory nor
-C1's missing original final manifest. #49 remains Open / P0 / In Progress;
+C1's missing original final manifest. At the pre-closure checkpoint, #49 was
+Open / P0 / In Progress (current disposition and #24 handoff are recorded above);
 criteria 1 and 4 alone retain bounded completion, with 2, 3, 5, 6, 7 and 8 unmet.
 Category-wide LED Apply containment, incomplete C1 acceptance, #48 tooling-only
 scope and RM-026/028/029 gates remain unchanged. The
