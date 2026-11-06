@@ -1,5 +1,62 @@
 # Current development state
 
+## Issue #49 November 2 result and Ultimate Menu requirements — 5 November 2026
+
+The [retained November 2 experiment and RAID1 archive](CONFIGURATION-DEPENDENCIES.md#issue-49-single-attempt-non-reproduction--2-november-2026)
+record a **qualified single-attempt non-reproduction**, not resolution of the
+intermittent lockup or general LED-write safety. One strip Fixed Color POST
+changed Royal Blue to Red while Rainbow remained selected; the recorded
+observation ended 60 seconds after POST completion. Overall device/keyboard
+responsiveness was not independently established. The archive contains 42 copied
+files plus review/provenance records; all 44 `SHA256SUMS` entries and the separately
+retained phone video were reverified on 5 November. Originals remain preserved.
+
+The [approved Ultimate Menu LED requirements](UI.md#ultimate-menu-led-native-menu-parity--approved-5-november-2026)
+record Founders/beige native-menu differences, immediate application of admitted
+changes, and a Save to Flash prompt when leaving the LED section, repeated while
+unsaved, with running values retained. These are future requirements, not current
+implementation or permission to bypass containment. Removal requires deterministic
+regressions, independent review and applicable authorized physical acceptance.
+
+Read-only GitHub verification: **#49 Open / P0 — Critical / In Progress** and
+**#24 Open / P1 — High / Backlog**, both Ultimate Menu in Argonaut Development.
+#49 criteria 1 and 4 retain their bounded completion; **2, 3, 5, 6, 7 and 8 remain
+unmet**. Category-wide LED Apply containment, unresolved original trigger/root
+cause, incomplete C1 physical acceptance, #48 tooling-only scope, Bruce's
+residual-risk ownership and RM-026/028/029 gates remain unchanged.
+
+This documentation slice starts from primary and live GitHub `development` at
+`a3a2ed3e6248ed57f61cd87bbfbbece5283ba185`, with clean tracked files/index and
+seven preserved untracked artifacts. Bruce explicitly approved the Class A
+independent-review waiver for this five-file documentation update in **Argonaut
+Development Items** (conversation `6aed2311-c0ac-83ea-b38d-c4c76dd48a5a`):
+“I approve the Class A independent-review waiver for the current five-file
+Argonaut documentation update, using the stated justification.”
+
+The approved inventory is `docs/ARGONAUT-ROADMAP.md`,
+`docs/CONFIGURATION-DEPENDENCIES.md`, `docs/CURRENT-STATE.md`,
+`docs/DEVELOPMENT.md` and `docs/UI.md`: **255 insertions, 8 deletions** against
+`a3a2ed3e6248ed57f61cd87bbfbbece5283ba185`, before this disposition record.
+The pre-record `git diff --binary` SHA-256 is
+`b0fa0fa7f9dfb12991f49c8e1910b8939357635e48c74c667d6d3e207ef1c086`.
+
+Class A justification: this bounded slice records retained experiment evidence,
+previously approved future menu requirements, prior publication status and the
+approved review policy. It changes no application behavior, external interface,
+hardware/configuration-write or persistent-data behavior, or safety policy.
+The complete inventory was verified; Markdown validation passed for 50 documents
+with zero errors and whitespace checks passed, without unexplained discrepancies.
+All seven untracked artifacts match retained hashes. Unresolved safety acceptance,
+category-wide LED Apply containment, incomplete C1, #48 tooling-only scope and
+RM-026/028/029 gates remain unchanged. Conditions 1–7 were assessed satisfied;
+the explicit owner approval supplies condition 8. Independent review is waived
+for this documentation slice only, not performed or represented as a review pass.
+
+This disposition record and its roadmap pointer only reconcile the approved
+waiver; they add no implementation or acceptance scope. Revalidate the final diff
+at the manual pre-staging gate. Staging, commit, push and live publication
+verification remain pending; the owner retains each manual publication step.
+
 ## Issue #49 incident-evidence reconciliation — 29 October 2026
 
 The [reconciled evidence and unknowns](CONFIGURATION-DEPENDENCIES.md#issue-49-incident-evidence-reconciliation--29-october-2026)
@@ -22,10 +79,12 @@ effects or original-lockup causation.
 Category-wide LED Apply containment remains in force. Physical C64U acceptance
 and the original intermittent lockup/root cause remain unresolved; C1 remains
 incomplete, #48 remains tooling only, and RM-026/028/029 gates are unchanged.
-This documentation-only reconciliation starts from primary and live GitHub
-development at bc54dc43501664e4d5fc742a9b8d9b745b285f48, with clean tracked
-files/index and seven existing untracked artifacts. Its changes await the user's
-manual publication gates; it authorizes no reproducer execution or hardware contact.
+The 29 October reconciliation was committed and published on `development` at
+`a3a2ed3e6248ed57f61cd87bbfbbece5283ba185`; primary and live GitHub HEADs were
+verified equal on 5 November 2026. This supersedes its former publication-pending
+wording. Its historical pre-edit baseline was
+`bc54dc43501664e4d5fc742a9b8d9b745b285f48`, with clean tracked files/index and
+seven existing untracked artifacts. Publication authorizes no hardware operation.
 
 ## Issue #24 identity evidence — published, 28 October 2026
 

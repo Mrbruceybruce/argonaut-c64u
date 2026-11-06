@@ -45,6 +45,66 @@ launcher and service unit. Test Lab can create its private pairing, start or
 restart the service, and generate the matching C64 program without `petcat`.
 Ollama and firewall configuration remain separate, visible prerequisites.
 
+## Risk-based independent review
+
+Review requirements follow the risk of the complete change, not its file type
+or size. Classify the full changed-file inventory and record the purpose,
+classification, validation evidence and review disposition before publication.
+
+- **Class A — administrative, waivable:** narrowly scoped administrative or
+  documentation work may qualify for an owner-approved independent-review waiver
+  only when all eight conditions below are satisfied.
+- **Class B — low-risk, conditional:** use proportionate review based on the
+  documented scope, impact and applicable validation. Low risk alone is not a
+  waiver; record the review conditions and disposition. If Class A conditions
+  are not met, its waiver route is unavailable. Mandatory-review triggers below
+  take precedence.
+- **Class C — functional or safety-critical, mandatory:** independent review is
+  required, together with deterministic regression coverage and applicable
+  physical C64U acceptance. A review waiver cannot replace those gates.
+
+### Class A waiver conditions
+
+All eight conditions are required:
+
+1. The change has a narrowly scoped, documented purpose.
+2. It changes no application behavior, external interface or safety policy.
+3. It changes no hardware, configuration-write or persistent-data behavior.
+4. The complete changed-file inventory has been verified.
+5. Applicable automated validation passes.
+6. There are no unexplained changes, failures or discrepancies in the change or
+   its validation evidence.
+7. Unresolved safety-critical acceptance requirements remain unchanged.
+8. The owner explicitly approves the waiver and its justification is recorded.
+
+Previously approved behavior requirements may be documented under Class A only
+when accurately recorded as requirements, without implementing them or changing
+acceptance criteria or safety policy. Documentation of an unresolved issue does
+not resolve it, qualify hardware or waive its outstanding acceptance gates.
+
+### Mandatory review and waiver boundaries
+
+Independent review is mandatory for functional or safety-critical changes,
+acceptance-criteria changes, unexplained failures, and changes spanning multiple
+subsystems. Assess related work together; do not artificially split a change to
+obtain a lower classification or avoid review. Multiple documentation files
+alone do not establish a multi-subsystem implementation change; assess their
+actual scope and effect.
+
+Class A eligibility is an assessment, not a granted waiver. Record any owner
+waiver against the exact reviewed inventory and diff, with its purpose,
+justification, validation results and preserved acceptance limitations. Approval
+to edit documentation, an earlier approval of behavior requirements, or silence
+is not waiver approval. If the scope or evidence changes, reassess eligibility
+and obtain a new disposition before relying on the waiver.
+
+This policy does not relax unresolved safety-critical requirements, category-wide
+LED Apply containment, deterministic regression obligations for implementation,
+or applicable physical acceptance. Implementation completion, acceptance,
+publication and issue closure remain distinct. Staging, committing, pushing and
+publication verification remain the owner's manual steps unless separately and
+explicitly authorized.
+
 ## Bounded offline CI (P4-2)
 
 ### Hosted qualification exception — October 2026

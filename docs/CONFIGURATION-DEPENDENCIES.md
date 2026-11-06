@@ -1,5 +1,66 @@
 # Configuration dependency validation — Issue #25 / RM-007 foundation
 
+## Issue #49 single-attempt non-reproduction — 2 November 2026
+
+Reconciled 5 November from the retained archive and the
+[Issue #49 experiment/archive record](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6674694752).
+Attempt `single-post-20261102-02` occurred on November 1 CST / November 2 UTC.
+It is a **qualified single-attempt non-reproduction within available observations**.
+It neither establishes nor rules out causation for the original intermittent
+lockup; its triggering payload, prior state, sequence and root cause remain unknown.
+
+- Identity records report firmware `1.1.0`, API `0.1`, core `1.49`, FPGA `122`,
+  unique ID `25BE71`; these do not establish hardware-edition/header mapping.
+- Four preflight GETs, exactly one `POST /v1/configs`, and two readback GETs all
+  returned HTTP 200 with empty API errors. POST body:
+  `{"LED Strip Settings":{"Fixed Color":"Red"}}`.
+- POST completed at `2026-11-02 02:36:29.156697 UTC`; strip readback at
+  `02:36:33.408044 UTC` confirmed Fixed Color Royal Blue → Red, with Rainbow
+  unchanged. Keyboard settings were unchanged. Both Auto SID fields were Enabled;
+  that does not demonstrate an automatic transition was exercised.
+- Observation-end record: `02:37:29.156841 UTC`, 60 seconds after completion.
+  No Save to Flash request appears in this seven-request sequence.
+- Request records are credential-redacted representations, not byte-exact wire
+  captures. The baseline is a documented path-rebound derivative; the attempt
+  has its own preflight records.
+
+Prior sampled recording review reported continued changing illumination and no
+sustained freeze apparent in sampled frames. It was not repeated for this
+reconciliation. OBS duration is 22:08.45; phone duration is 3:51.61. Phone/workstation
+alignment assumed clock agreement without independent synchronization. The C64
+display is outside the phone view; overall device/local-input responsiveness and
+later keypress effects were not independently established. Separate passive notes
+are absent. OBS contains masked password prompts/stars, an unreviewed audio track
+(audio-disabled compliance unverified), and 13 reported rendering-lag frames.
+Sampling cannot exclude brief anomalies. These limits prevent physical acceptance
+or an intermittent-lockup resolution claim.
+
+### RAID1 archive and provenance
+
+Local archive (not a public attachment):
+`/Raid1_Drive/Argonaut/Evidence/Issue49/Baseline/single-post-20261102-02/`.
+The archive record reports **42 copied files**, including request evidence,
+authorization/finalization and terminal companions, OBS and the hash-bound
+standalone client. All originals were preserved. `ARCHIVE-INVENTORY.json` and
+`QUALIFIED-REVIEW.txt` accompany them; `SHA256SUMS` covers 44 entries, all freshly
+verified on 5 November 2026. The original 32-entry request inventory remains
+separate; the archive record reports all its sizes/hashes matched.
+
+- `SHA256SUMS` SHA-256:
+  `e99b8c36d5387358c8c122be65d745ea0d3a90742ca5674feccf42240ca49bc1`.
+- Original phone video remains at `/Raid1_Drive/Argonaut/IMG_0711.mov`, referenced
+  by `EXTERNAL-SHA256SUMS` and freshly verified in place:
+  `f7d8c3f7fd80a49348dd4f04a254886fa2cd76de22c004366deffb934d48cd93`.
+
+This archive manifest replaces neither the original experiment inventory nor
+C1's missing original final manifest. #49 remains Open / P0 / In Progress;
+criteria 1 and 4 alone retain bounded completion, with 2, 3, 5, 6, 7 and 8 unmet.
+Category-wide LED Apply containment, incomplete C1 acceptance, #48 tooling-only
+scope and RM-026/028/029 gates remain unchanged. The
+[approved native-menu requirements](UI.md#ultimate-menu-led-native-menu-parity--approved-5-november-2026)
+are design direction, not safety qualification. This edit performs no hardware
+operation, upstream #1030 post or GitHub tracking change.
+
 ## Issue #49 incident-evidence reconciliation — 29 October 2026
 
 This record reconciles the operator's **LED Reproduction Plan** conversation

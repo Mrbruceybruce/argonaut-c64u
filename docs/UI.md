@@ -1589,3 +1589,65 @@ all platforms, themes, fonts, scaling or display configurations. The historical
 Xvfb geometry and GTK warning records above remain valid; other desktop/font/
 scaling combinations still need qualification, and the warnings are not claimed
 fixed by this documentation update.
+
+## Ultimate Menu LED native-menu parity — approved, 5 November 2026
+
+Approved requirements from **Argonaut Development Items**
+(conversation `6aed2311-c0ac-83ea-b38d-c4c76dd48a5a`), memorialized with the
+maintainer's documentation-only authorization. This is future design direction
+for RM-007/RM-028/RM-029, coordinated with #24 capability qualification and #49
+safety. It does not change the current staged Review & Apply implementation or
+category-wide LED Apply refusal.
+
+### Native-menu evidence and edition differences
+
+Retained screenshots are local references under
+`/home/bruce/Pictures/c64u-screenshots/founder_led/` (nine images) and
+`/home/bruce/Pictures/c64u-screenshots/beige_led/` (four images).
+Founders screenshots show **Case Lights** and **Keyboard Lights**, alongside
+Power LED outputs; the beige screenshot shows Power LED outputs and
+**LED Strip (if installed)**, without the Founders Keyboard Lights section.
+The operator confirms the beige unit has no installed LED strip. Presence of
+that conditional menu or REST fields must not be treated as proof of installed
+hardware. Preserve each edition's native grouping and applicable controls;
+do not copy Founders controls wholesale to beige. These screenshots and operator
+observations do not establish a complete capability matrix, physical-header
+mapping or a reliable automatic edition-detection rule. #24 must resolve those
+qualifications; unknown capabilities must fail safely.
+
+### Approved interaction requirements
+
+- Apply an admitted LED edit immediately to running configuration, matching the
+  native menu. Save to Flash is persistence, not the action that first activates
+  the edit. Core retains ownership of admission, validation and device operations.
+- Allow navigation among controls within the LED section without a Save to Flash
+  prompt on every move. When leaving the LED section with unsaved applied changes,
+  display a popup asking whether to **Save to Flash**.
+- Declining Save to Flash retains the applied running values and the unsaved
+  state; it must not silently revert, reset or discard them. Returning to the
+  section and leaving again while still unsaved prompts again, even without a
+  new edit. A failed or uncertain save must not be represented as successful.
+- Retain stored values when a mode makes a control inactive; inactivity alone
+  must not clear or rewrite a dormant value. Represent native availability and
+  dependencies using qualified capability evidence.
+
+This section defines LED behavior; it does not authorize a global conversion of
+unrelated configuration workflows. Preserve identity/session/staleness safeguards,
+truthful operation outcomes and the distinction between running state and flash
+persistence. Detailed navigation boundaries and failure handling require a scoped
+implementation design and review.
+
+### Implementation and containment-removal gates
+
+Native-menu resemblance and the
+[November 2 non-reproduction](CONFIGURATION-DEPENDENCIES.md#issue-49-single-attempt-non-reproduction--2-november-2026)
+are insufficient to remove containment. Keep current category-wide refusal until
+the applicable capability/safety rules and implementation have deterministic
+regression coverage, independent review and explicitly authorized physical C64U
+acceptance for the relevant variants and firmware. Tests must cover immediate
+apply, navigation within/leaving the section, repeated unsaved prompts, retained
+values and failed/uncertain saves, alongside Core refusal and session safeguards.
+Any later containment removal needs a separately approved bounded change after
+those gates; neither this approval nor menu parity closes #49 or establishes
+intermittent-lockup resolution. C1 remains incomplete; #48 remains tooling only;
+RM-026/028/029 dependencies remain in force.
