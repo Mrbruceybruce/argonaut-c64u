@@ -95,6 +95,18 @@
           "tests": 13,
           "timeout_seconds": 120,
           "audit": "Issue #49 source-derived finite LED model, synthetic register traces only; no firmware execution, application imports, transport, hardware or network."
+        },
+        {
+          "selector": "test_led_presentation.LEDPresentationTests",
+          "tests": 9,
+          "timeout_seconds": 120,
+          "audit": "Pure synthetic LED snapshots; explicit same-value/unknown-field/mixed LED intents refused before transport, which is patched to fail. No hardware or persistent preferences."
+        },
+        {
+          "selector": "test_led_presentation.LEDPresentationUITests",
+          "tests": 2,
+          "timeout_seconds": 120,
+          "audit": "Pure synthetic LED snapshots and inert GTK presentation; no transport, hardware or persistent preferences."
         }
       ]
     },

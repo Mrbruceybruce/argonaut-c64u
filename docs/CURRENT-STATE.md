@@ -1,5 +1,34 @@
 # Current development state
 
+## Issue #24 read-only LED presentation — implementation review gate, 7 November 2026
+
+The owner separately authorized the single read-only presentation slice from
+**Begin Investigation** (conversation `6aefb12d-c4d4-83ea-846d-3ee9a98a74c8`).
+The pure snapshot mapper and Settings integration are implemented locally;
+no operational admission or staging/Apply/save workflow changed. The runtime
+view has no qualified controller evidence and therefore retains raw category
+headings with **Native layout unknown**. Synthetic qualified evidence exercises
+the Founders and BASIC Beige native layouts without inferring them from edition,
+model, installed lighting or REST advertisement.
+
+[Scope, qualification and regression evidence](UI.md#issue-24-read-only-led-presentation--7-november-2026)
+record this Class C functional slice. Eleven new tests and the existing affected
+regressions pass: 45 focused tests in normal and optimized Python; 106 tests in
+the broader offline run. CI inventory audit and a synthetic native GTK smoke
+check pass. Independent implementation review corrected two metadata-status gaps;
+final seven-file inventory/documentation review passed with no remaining findings. Physical C64U acceptance was
+not performed or authorized. This is not resolution of the intermittent lockup,
+completion of #24, or permission to remove containment.
+
+Primary `development` and live GitHub were verified equal at
+`13a1a8b1922bd176889030dc894e7456626c03cf` before editing. This slice remains
+**unstaged, uncommitted and unpublished**. The seven prior untracked artifacts
+retain their baseline SHA-256 hashes. #24 remains Open / Backlog / P1 — High /
+Ultimate Menu; no GitHub tracking changes were made. #49's six unmet criteria,
+indirect/Auto SID risks, incomplete C1 acceptance, #48 tooling-only scope and
+RM-026/028/029 gates remain unchanged. The next step is the owner review gate;
+publication and any physical qualification require separate authorization.
+
 ## Issue #49 closure and #24 handoff — 5 November 2026
 
 [Issue #49's final disposition](https://github.com/Mrbruceybruce/argonaut-c64u/issues/49#issuecomment-6675876895)

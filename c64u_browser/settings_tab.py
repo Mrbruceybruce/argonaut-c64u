@@ -13,6 +13,7 @@ from .configuration_policy import ConfigurationRefused, validate
 from .dependencies import enabled, controls_dependencies, inactive_reason, NETWORK_CATEGORIES, STATIC_FIELDS
 from .settings_sections import section_entries, section_for, visible_entries, subsection_for, display_name
 from .settings_safety import warnings_for
+from .led_presentation import is_led, present_led, READ_ONLY
 
 class SettingsTab:
     def __init__(self, app):
@@ -45,7 +46,7 @@ class SettingsTab:
         self.favorite_filter=Gtk.CheckButton(label='Favorites')
         self.favorite_filter.connect('toggled',lambda *_: self.render())
         filters.append(self.favorite_filter)
-        self.box.append(Gtk.Label(label='Changes are staged until you apply them. Save to Flash keeps the running configuration after power off. Changing LED Mode or enabling DHCP discards edits to fields that become inactive.',wrap=True,xalign=0))
+        self.box.append(Gtk.Label(label='Changes are staged until you apply them. Save to Flash keeps the running configuration after power off. LED values are read-only. Enabling DHCP discards edits to fields that become inactive.',wrap=True,xalign=0))
         self.pending_summary=Gtk.Label(xalign=0,wrap=True)
         self.box.append(self.pending_summary)
         panes=Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL,vexpand=True);panes.set_position(270);self.box.append(panes)
@@ -280,7 +281,14 @@ class SettingsTab:
         if only_favorites and not matches:
             self.rows.append(Gtk.Label(label='No matching favorites. Clear the search or turn off Favorites and use ☆ beside a setting to add it.',wrap=True,xalign=0))
         last_subsection=None
+        led_shown=False
         for category, setting in matches:
+            if is_led(category, setting.name):
+                if not led_shown:
+                    self.show_led_results(matches, include_missing=not query and not only_favorites)
+                    led_shown=True
+                    last_subsection=None
+                continue
             section=section_for(category,setting.name) if query or only_favorites else self.category
             subsection=(section,subsection_for(section,category,setting.name))
             if subsection != last_subsection:
@@ -350,6 +358,38 @@ class SettingsTab:
             self.rows.append(line)
         self.app.status.set_text(f'{len(self.pending)} change(s) staged locally.' if self.pending else 'Showing the last loaded settings. Reload from C64U to refresh.')
         self.update_edit_buttons()
+
+    def show_led_results(self, matches, include_missing=False):
+        # No reliable controller evidence exists in the loaded REST snapshot.
+        # Do not infer it from product/model/edition or issue another request.
+        view=present_led(self.all_settings)
+        visible={(category, item.name) for category, item in matches if is_led(category, item.name)}
+        self.rows.append(Gtk.Label(label=view.layout, xalign=0, wrap=True))
+        self.rows.append(Gtk.Label(label=READ_ONLY, xalign=0, wrap=True))
+        for group in view.groups:
+            rows=[row for row in group.rows if (row.category,row.name) in visible
+                  or (include_missing and row.setting is None)]
+            if not rows:continue
+            self.rows.append(Gtk.Label(label=group.heading,xalign=0,wrap=True,css_classes=['heading']))
+            for row in rows:
+                line=Gtk.Box(spacing=6)
+                key=(row.category,row.name)
+                if row.setting is not None:
+                    favorite=Gtk.Button(label='★' if key in self.favorites else '☆')
+                    favorite.set_tooltip_text('Remove from Favorites' if key in self.favorites else 'Add to Favorites')
+                    favorite.connect('clicked',lambda _, key=key:self.toggle_favorite(key))
+                    line.append(favorite)
+                text=f'{row.label} — {row.value}\n{row.availability}\n{row.category} / {row.name}'
+                if key in self.drafts or key in self.pending:
+                    draft=self.drafts.get(key,display(self.pending.get(key)))
+                    text+=f'\nRetained local draft: {draft} (not applied)'
+                if row.setting is not None and row.setting.details:
+                    text+='\n'+row.setting.details
+                line.append(Gtk.Label(label=text,xalign=0,wrap=True,selectable=True,hexpand=True))
+                self.rows.append(line)
+        provenance=Gtk.Expander(label='Evidence provenance',expanded=False)
+        provenance.set_child(Gtk.Label(label='\n'.join(view.provenance),xalign=0,wrap=True,selectable=True))
+        self.rows.append(provenance)
 
     def toggle_favorite(self, key):
         if self.app.busy:return

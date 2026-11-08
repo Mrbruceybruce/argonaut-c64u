@@ -1656,3 +1656,101 @@ those gates; #49's administrative closure and this menu-parity approval establis
 no intermittent-lockup resolution or safety acceptance. Remaining obligations
 continue under #24. C1 remains incomplete; #48 remains tooling only;
 RM-026/028/029 dependencies remain in force.
+
+## Issue #24 read-only LED presentation — 7 November 2026
+
+The owner authorized only the bounded presentation contract independently reviewed
+in **Begin Investigation** (conversation `6aefb12d-c4d4-83ea-846d-3ee9a98a74c8`).
+This is a **Class C functional change**, with mandatory independent review and
+regression evidence. It implements inspection over already loaded Settings;
+it grants no session, operation, credential persistence, FTP access or new request.
+
+### Mapping and evidence boundary
+
+`c64u_browser/led_presentation.py` is a pure snapshot mapper. Its optional evidence
+records carry source, device/build scope, observation date where available,
+current/stale and conflict state. Firmware qualification must explicitly identify
+pinned source revision `7b628eb166872965ea59d66f90ffd9bcf7d71d8a`; the source's
+`1.1.0` version declaration alone does not qualify an installed image or `1.1.0s2`.
+Matching current controller evidence must separately establish detected True or
+False. Missing, stale, conflicting, mismatched or unknown evidence stays unknown.
+No reliable REST controller detector is established. The integrated Settings view
+passes no qualification evidence and uses the neutral raw-category layout.
+
+| Qualified controller branch | Native headings, in order |
+| --- | --- |
+| Detected | Power LED (if installed); Case Lights; Keyboard Lights |
+| Not detected | Power LED; LED Strip (if installed) |
+| Unknown | Original REST category headings; Native layout unknown |
+
+These branches preserve the observed Founders and BASIC Beige layouts only when
+applicable evidence qualifies them. They do not identify shipping editions,
+installed lighting, wiring or retrofits. An absent installed strip does not hide
+the optional strip section. A non-native advertised keyboard store is inspectable
+under REST details. Unknown/Starlight hardware is never extrapolated from a model.
+
+Power Output 1 and Output 2 retain `U64 Specific Settings / LED Select Top` and
+`LED Select Bot`. The six lighting rows are Mode, Music Detect, Pattern,
+Brightness, Color and Tint, preserving respectively `LedStrip Mode`,
+`LedStrip Auto SID Mode`, `LedStrip Pattern`, `Strip Intensity`, `Fixed Color`
+and `Color tint` in `LED Strip Settings` or `Keyboard Lighting`. Display aliases
+never become request identities. `LedStrip SID Select` and unfamiliar advertised
+fields remain in separate REST details, with original names and values.
+
+Native active/inactive status follows the pinned mode table in
+[configuration dependencies](CONFIGURATION-DEPENDENCIES.md#official-source-qualification)
+only with qualified layout/firmware and consistent metadata. Unknown modes,
+missing or conflicting metadata remain **Native availability unknown**. Inactive
+values are retained; missing fields are marked Not reported, without source
+defaults. Exact observed choices, values and metadata remain inspectable;
+keyboard/strip vocabulary differences are not normalized. Configured mode is
+not claimed as the current physical effect: Auto SID may change runtime behavior.
+Installed-lighting observations are attributed separately, never inferred from
+native visibility or REST exposure and never used as operational permission.
+
+The existing settings presentation renders selectable, copyable values and
+provenance with **Read-only — safety qualification pending**, including power
+outputs. Search and Favorites use the same read-only path. Local drafts, if
+already present, remain separately labeled and are never silently applied or
+cleared by rendering. Existing session/reload gates remain intact. The whole-batch
+Core refusal for both LED stores remains unchanged, including unknown fields,
+same-value intent and mixed batches. Power outputs retain their original category;
+this view does not expand Core containment. No LED write callbacks, Apply changes,
+immediate application or navigation-triggered Save to Flash were introduced.
+The separately approved future interaction requirements above remain deferred.
+
+### Verification and review gate
+
+- New deterministic tests: nine mapper/refusal tests and two inert-widget UI tests
+  in `tests/test_led_presentation.py`, registered in `tests/ci_suites.json`.
+- Focused mapper and configuration-dependency suites: **45 passed**, normal and
+  optimized Python, with socket connect/connect_ex/sendto/create_connection
+  blocked before importing the test modules. Existing Core tests cover whole-batch
+  refusal before reads/writes and preserved history; new tests exercise refusal
+  after both qualified and unknown presentation, including REST-only fields.
+- Broader affected run: **106 passed** across LED presentation, configuration
+  dependencies, configuration, dependencies, backups, settings safety, native
+  files, Core and CI runner tests, under the same socket guard.
+- CI source inventory audit passed (171 modules, 45 selected classes, 536 selected
+  tests). This is an inventory result, not a claim that all selected tests ran.
+- Synthetic native GTK smoke: selectable values and provenance, no LED entry,
+  combo, slider or spin widgets. The sandboxed virtual-display attempt segfaulted;
+  the permitted virtual display worked. A smoke-harness assertion initially
+  counted collapsed provenance as a visible row; correcting traversal gave a
+  pass without product changes. This is not physical or visual-layout acceptance.
+- An initial focused run from the project mirror failed the existing subprocess
+  import check due to its working directory. Running from the primary repository
+  passed in both Python modes. No application change addressed that harness error.
+- Independent implementation reviewer identified malformed power metadata and
+  unknown color vocabulary incorrectly receiving qualified native status. Both
+  were corrected and regression-tested. The reviewer independently reran all
+  45 focused tests successfully and found no remaining implementation findings.
+  Final independent review of the complete seven-file inventory and documentation
+  passed with no remaining actionable findings. The reviewer independently
+  verified empty staging and clean whitespace checks; broader-run and GTK results
+  above are implementer verification, not independently repeated results.
+
+The slice is uncommitted/unpublished at the review gate. No physical C64U contact,
+package/release qualification, issue closure or containment-removal acceptance is
+claimed. Preserve #49's six unmet criteria and the unresolved original trigger,
+root cause and indirect/Auto SID risks. Publication remains a separate owner gate.
