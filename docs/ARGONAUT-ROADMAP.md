@@ -1,5 +1,52 @@
 # Argonaut roadmap
 
+## Issue #24 — Publication reconciliation and bounded owner disposition
+
+Record status: the owner subsequently confirmed the approved wording below and
+separately authorized this three-document reconciliation, validation and independent
+diff review. The approved text is retained verbatim apart from Markdown heading markers
+and line wrapping; its preparation-stage statements about pending confirmation or
+application are historical. These local documentation changes are unstaged, uncommitted
+and unpublished. GitHub tracking and hardware operations remain unauthorized.
+
+Review classification: mandatory independent review applies to this
+acceptance-disposition documentation. No Class A review waiver is used. Validation and
+independent review of the complete three-file diff must be recorded before any
+separately authorized publication.
+
+The read-only LED presentation implementation is published on development at
+8391be3ea9cb2528dcc3f0b4c5185a73ea1694f9. Primary and live GitHub HEADs were verified
+equal during preparation of this reconciliation.
+
+The earlier implementation-review checkpoint remains historical evidence. Its
+unpublished and physical-not-performed statements describe that checkpoint; this
+proposed appended record updates publication status and records the subsequent owner
+disposition.
+
+Bruce accepts the 22/22 observed displayed-value matches—14/14 Founders Edition and 8/8
+BASIC Beige—under the bounded owner risk-acceptance record proposed for UI.md.
+Additional running-build, device and firmware provenance evidence and repeat
+presentation testing are waived for this milestone. Screenshot streaming and
+network-service restart are accepted as documented retrospective procedural exceptions.
+
+No further physical testing is required for this bounded presentation observation
+milestone under the owner's accepted disposition. This does not waive physical
+acceptance requirements for other Issue #24 development or release activities.
+
+This is owner risk acceptance, not independent verification of provenance or complete
+procedural compliance. Historical reboot attempts and continuation after errors remain
+recorded without asserting retroactive authorization. All evidence limitations and
+exclusions in the waiver remain applicable; untested coverage is not relabeled as
+passed.
+
+Issue #24 remains Open / Backlog / P1 — High / Ultimate Menu. LED Apply containment,
+unresolved lockup and indirect/Auto SID risks, Issue #49 obligations, and broader
+development, physical-acceptance and release requirements remain unchanged.
+
+This reconciliation remains proposed only. Wording approval does not authorize
+documentation edits or publication. Documentation reconciliation, independent diff
+review and the manual publication workflow require separate authorization.
+
 ## Issue #24 read-only LED presentation — implementation review gate, 7 November 2026
 
 The owner separately authorized the single read-only presentation slice from

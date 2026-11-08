@@ -1754,3 +1754,93 @@ The slice is uncommitted/unpublished at the review gate. No physical C64U contac
 package/release qualification, issue closure or containment-removal acceptance is
 claimed. Preserve #49's six unmet criteria and the unresolved original trigger,
 root cause and indirect/Auto SID risks. Publication remains a separate owner gate.
+
+## Issue #24 — Bounded owner risk acceptance: read-only LED presentation observations
+
+Record status: the owner subsequently confirmed the approved wording below and
+separately authorized this three-document reconciliation, validation and independent
+diff review. The approved text is retained verbatim apart from Markdown heading markers
+and line wrapping; its preparation-stage statements about pending confirmation or
+application are historical. These local documentation changes are unstaged, uncommitted
+and unpublished. GitHub tracking and hardware operations remain unauthorized.
+
+Review classification: mandatory independent review applies to this
+acceptance-disposition documentation. No Class A review waiver is used. Validation and
+independent review of the complete three-file diff must be recorded before any
+separately authorized publication.
+
+### Disposition
+
+Bruce has approved this owner risk-acceptance disposition. The final wording below
+incorporates his required clarification and awaits confirmation. It has not been applied
+or published.
+
+Bruce accepts the 22/22 observed displayed-value matches—14/14 Founders Edition and 8/8
+BASIC Beige—as sufficient for this bounded presentation observation milestone. Device
+associations retain their historical conversation-context limitations.
+
+Bruce waives additional running-build, device and firmware provenance evidence and
+repeat presentation testing for this milestone, accepting the residual uncertainty.
+
+No further physical testing is required for this bounded presentation observation
+milestone under the owner's accepted disposition. This does not waive physical
+acceptance requirements for other Issue #24 development or release activities.
+
+This records an owner-accepted presentation observation milestone. It does not convert
+the observations into independently verified physical acceptance or establish that the
+original procedure and evidence requirements were fulfilled.
+
+### Evidence and rationale
+
+The retained evidence record in “Begin Investigation” (conversation
+6aefb12d-c4d4-83ea-846d-3ee9a98a74c8) reports independent review finding 22/22 visual
+value matches. That reported visual review remains distinct from the owner’s acceptance
+disposition.
+
+Bruce considers the observations sufficient and the capture/recovery process necessary,
+without an effect on the observed outcome. This is the owner’s assessment and risk
+judgment; absence of an effect has not been independently established.
+
+### Procedural exceptions
+
+Bruce accepts screenshot streaming and network-service restart as documented
+retrospective exceptions for this observation session. The original restrictions remain
+in the historical record. This acceptance does not establish original procedure
+compliance or retroactive prior authorization.
+
+Reported reboot attempts and continuation after errors remain recorded with unresolved
+sequence and authorization. This record neither asserts that they were authorized nor
+adds them to the specifically accepted procedural exceptions.
+
+### Retained limitations
+
+Running Argonaut build identity, exact installed-firmware equivalence, capture timing,
+and attachment/device associations remain incompletely verified. Repository publication
+does not prove which build ran during capture.
+
+The owner’s acceptance disposition is not independent verification of
+running-build/device provenance or procedure compliance. Behavioral observations remain
+attributed operator reports where applicable; static captures cannot prove absence of
+hidden writes.
+
+Favorites and qualified-controller rendering branches remain physically untested. Other
+modes, transitions, immediate Apply, flash persistence and write safety remain untested
+or excluded. Advertised Beige keyboard values do not add native-menu matches. These
+coverage limitations remain recorded without requiring further physical testing for this
+bounded observation milestone.
+
+### Scope and unchanged obligations
+
+This is a specific owner-directed risk acceptance for these presentation observations,
+not a Class A independent-review waiver or a general review-policy amendment. Existing
+implementation regression and independent-review results remain historical evidence; no
+repeat test result is claimed.
+
+Category-wide LED Apply containment remains mandatory. This waiver does not resolve the
+intermittent lockup or indirect/Auto SID risks; satisfy Issue #49 criteria 2, 3, 5, 6, 7
+or 8; complete C1, broader Issue #24, or RM-026/028/029 acceptance; expand Issue #48
+beyond tooling/evidence; or establish release acceptance.
+
+Issue #24 remains Open / Backlog / P1 — High / Ultimate Menu. No implementation,
+containment removal, hardware operation, documentation edit, Git action, tracking
+mutation, publication or issue closure is authorized by this wording approval.
