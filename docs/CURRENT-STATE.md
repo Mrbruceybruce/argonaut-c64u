@@ -2,17 +2,23 @@
 
 ## Issue #24 — Publication reconciliation and bounded owner disposition
 
-Record status: the owner subsequently confirmed the approved wording below and
-separately authorized this three-document reconciliation, validation and independent
-diff review. The approved text is retained verbatim apart from Markdown heading markers
-and line wrapping; its preparation-stage statements about pending confirmation or
-application are historical. These local documentation changes are unstaged, uncommitted
-and unpublished. GitHub tracking and hardware operations remain unauthorized.
+Record status — verified 8 November 2026: the owner-approved acceptance disposition
+and publication reconciliation are published on `development` at
+`033bab95467bac6e012963bb898e8e8d94b17e3b`. Primary and live GitHub HEADs were
+verified equal at that commit before this publication-status correction, with clean
+tracked files and empty staging. The
+[Issue #24 acceptance record](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6717635688)
+confirms the bounded disposition below. Earlier preparation-stage statements about
+pending confirmation, application or publication are superseded as current status;
+historical implementation checkpoints and evidence limitations remain unchanged.
 
-Review classification: mandatory independent review applies to this
-acceptance-disposition documentation. No Class A review waiver is used. Validation and
-independent review of the complete three-file diff must be recorded before any
-separately authorized publication.
+The published acceptance record reports independent review of the wording and resulting
+documentation diff before publication; it does not claim repeated screenshot comparisons
+or hardware testing. No Class A review waiver applies. The owner separately authorized
+this three-document publication-status correction, validation and independent diff
+review. This new correction remains unstaged, uncommitted and unpublished pending the
+manual publication gate; its validation and independent review must be recorded before
+publication. GitHub tracking changes and hardware operations remain unauthorized.
 
 The read-only LED presentation implementation is published on development at
 8391be3ea9cb2528dcc3f0b4c5185a73ea1694f9. Primary and live GitHub HEADs were verified
@@ -20,11 +26,11 @@ equal during preparation of this reconciliation.
 
 The earlier implementation-review checkpoint remains historical evidence. Its
 unpublished and physical-not-performed statements describe that checkpoint; this
-proposed appended record updates publication status and records the subsequent owner
+published record updates publication status and records the subsequent owner
 disposition.
 
 Bruce accepts the 22/22 observed displayed-value matches—14/14 Founders Edition and 8/8
-BASIC Beige—under the bounded owner risk-acceptance record proposed for UI.md.
+BASIC Beige—under the bounded owner risk-acceptance record in UI.md.
 Additional running-build, device and firmware provenance evidence and repeat
 presentation testing are waived for this milestone. Screenshot streaming and
 network-service restart are accepted as documented retrospective procedural exceptions.
@@ -43,9 +49,9 @@ Issue #24 remains Open / Backlog / P1 — High / Ultimate Menu. LED Apply contai
 unresolved lockup and indirect/Auto SID risks, Issue #49 obligations, and broader
 development, physical-acceptance and release requirements remain unchanged.
 
-This reconciliation remains proposed only. Wording approval does not authorize
-documentation edits or publication. Documentation reconciliation, independent diff
-review and the manual publication workflow require separate authorization.
+The published disposition does not authorize further implementation, containment
+removal, hardware operations or issue closure. Issue #49 criteria 2, 3, 5, 6, 7 and 8
+remain unmet, not waived, under #24; no broader acceptance criterion is marked complete.
 
 ## Issue #24 read-only LED presentation — implementation review gate, 7 November 2026
 
