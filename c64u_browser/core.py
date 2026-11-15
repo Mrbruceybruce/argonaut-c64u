@@ -1012,6 +1012,30 @@ class ArgonautCore:
                 client.drive_action(drive, 'reset')
                 return client.read_drives()
 
+    def execute_drive_command(self, session, drive, action, *, mode=None):
+        """Worker-only Drive command bound to its confirmation's session.
+
+        Admission and the device lane cover both dispatch and one readback.
+        Failures propagate without retrying an operation with uncertain outcome.
+        """
+        if (drive not in ('a', 'b') or action not in ('on', 'off', 'remove', 'type')
+                or (action == 'type' and mode not in ('1541', '1571', '1581'))
+                or (action != 'type' and mode is not None)):
+            raise CoreError('argument', 'Unsupported drive command.')
+        with self._session_admission():
+            def validate():
+                if session != self.device_session() or not session.session_id:
+                    raise CoreError('session', 'Connection changed. Command was not sent.')
+            validate()
+            client = self._require_client()
+            with self.scheduler.inline(JobBinding.device(session), reject_busy=True):
+                validate()
+                if action == 'type':
+                    client.set_drive_type(drive, mode)
+                else:
+                    client.drive_action(drive, action)
+                return client.read_drives()
+
     def execute_drive_image(self, selection, drive, mode='readonly', *, run=False):
         """Existing desktop worker only; bind the complete action to one session.
 

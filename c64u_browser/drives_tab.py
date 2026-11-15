@@ -90,31 +90,33 @@ class DrivesTab:
             if info.get('type') in ('1541','1571','1581'):
                 card['type'].set_selected(('1541','1571','1581').index(info['type']))
 
-    def confirm(self, drive, title, detail, operation, success='Command completed; drive status refreshed.', *, selection=None, reset_session=None):
+    def confirm(self, drive, title, detail, operation, success='Command completed; drive status refreshed.', *, selection=None, reset_session=None, command_session=None):
         if not self.client or not self.loaded or self.app.busy:return
         client=self.client
         if selection is not None:
             try:validate_selection(selection,self.app.core.device_session())
             except Exception as exc:self.message.set_text(str(exc));return
-        reset_answered=False
+        guarded_session=reset_session if reset_session is not None else command_session
+        answered=False
         dialog=Gtk.Dialog(title=title,transient_for=self.app.window,modal=True)
         dialog.add_button('Cancel',Gtk.ResponseType.CANCEL);dialog.add_button(title,Gtk.ResponseType.OK)
         dialog.get_content_area().append(Gtk.Label(label=f'Drive {drive.upper()} on {client.host}\n\n{detail}',wrap=True,xalign=0))
         def response(_,code):
-            nonlocal reset_answered
+            nonlocal answered
             dialog.destroy()
-            if reset_session is not None:
-                if reset_answered:return
-                reset_answered=True
-                if code==Gtk.ResponseType.OK and reset_session!=self.app.core.device_session():
-                    self.message.set_text('Connection changed. Reset was not sent. Open a new confirmation.')
+            if guarded_session is not None:
+                if answered:return
+                answered=True
+                if code==Gtk.ResponseType.OK and guarded_session!=self.app.core.device_session():
+                    label='Reset' if reset_session is not None else 'Command'
+                    self.message.set_text(f'Connection changed. {label} was not sent. Open a new confirmation.')
                     return
             if code!=Gtk.ResponseType.OK or self.client is not client:return
             if selection is not None:
                 try:validate_selection(selection,self.app.core.device_session())
                 except Exception as exc:self.message.set_text(str(exc));return
             def task():
-                if selection is not None or reset_session is not None:return operation(client)
+                if selection is not None or guarded_session is not None:return operation(client)
                 operation(client)
                 return client.read_drives()
             self.request(task,success,action=True)
@@ -133,7 +135,9 @@ class DrivesTab:
             session=self.app.core.device_session()
             return self.confirm(drive,title,detail,
                 lambda _:self.app.core.execute_drive_reset(session,drive),reset_session=session)
-        return self.confirm(drive,title,detail,lambda client:client.drive_action(drive,action))
+        session=self.app.core.device_session()
+        return self.confirm(drive,title,detail,
+            lambda _:self.app.core.execute_drive_command(session,drive,action),command_session=session)
 
     def path_changed(self, drive):
         if self.setting_path:return
@@ -187,7 +191,9 @@ class DrivesTab:
 
     def change_type(self, drive):
         mode=('1541','1571','1581')[self.cards[drive]['type'].get_selected()]
-        return self.confirm(drive,'Change drive type',f'Switch to {mode}? This also loads its configured ROM, replacing any temporary ROM.',lambda client:client.set_drive_type(drive,mode))
+        session=self.app.core.device_session()
+        return self.confirm(drive,'Change drive type',f'Switch to {mode}? This also loads its configured ROM, replacing any temporary ROM.',
+            lambda _:self.app.core.execute_drive_command(session,drive,'type',mode=mode),command_session=session)
 
     def mount_run(self):
         try:

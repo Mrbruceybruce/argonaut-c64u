@@ -1,5 +1,34 @@
 # Argonaut roadmap
 
+## Issue #24 — Drive A/B confirmation safety integrated, unpublished, 15 November 2026
+
+The reviewed four-file correction is integrated in primary `development` above
+published HEAD `5312370990e10d437bddb2e301098334da2cb5c6`; local and live GitHub
+HEADs were verified equal for this documentation reconciliation. The correction
+and this reconciliation remain **unstaged, uncommitted and unpublished**.
+Drive A/B on/off/eject and type (1541/1571/1581) confirmations capture their
+originating session and exact intent, consume one response, and use Core session
+revalidation under admission and the device lane before dispatch/readback.
+A valid operation sends one command and one readback; uncertain outcomes do not
+retry. Reset and mount behavior remain preserved.
+
+Retained integration results: **260/260 unit**, **356/356 broader regression** and
+**93/93 focused** tests pass in both normal and optimized Python; **17/17 offline
+checks** pass. Independent Class C integrated-diff review passed with no actionable
+findings. The extended adjacent suite remains **114/115 in both modes**, with the
+independently reproduced pre-existing machine submission-error wording assertion.
+These are inspected retained results, not application tests rerun for this
+reconciliation. See [scope, evidence and limits](ISSUE24-IDENTITY-EVIDENCE.md#drive-ab-command-confirmation-safety--integrated-unpublished).
+
+Physical acceptance of these Drive A/B commands remains pending; the earlier
+bounded Beige Drive A Reset observation does not qualify them. Manual publication
+is a separate owner gate. Flash-file stale-session guards, broader disconnected
+presentation, category-wide LED Apply containment, unresolved intermittent lockup
+and indirect/Auto SID risks remain outstanding. Transferred #49 criteria 2, 3, 5,
+6, 7 and 8 remain unmet and unwaived; C1, #26 dependencies and RM-026/028/029 gates
+remain unchanged. Live #24 remains Open / Backlog / P1 — High / Ultimate Menu.
+No GitHub tracking change or broader acceptance/closure is included.
+
 ## Issue #24 — operator-reported Beige Drive A Reset, 15 November 2026
 
 The operator reports successful cancellation with Argonaut responsive, followed by
@@ -10,9 +39,10 @@ verified post-reset status or broader device qualification. See the
 Earlier stopped/no-physical-Reset statements below describe prior checkpoints.
 Issue #24 remains Open / Backlog / P1 — High / Ultimate Menu; remaining Drive/Flash
 safeguards, LED containment and lockup, indirect/Auto SID risks, transferred #49
-obligations and #26 dependencies remain outstanding. This documentation update is
-integrated locally, but remains unstaged, uncommitted and unpublished; the proposed
-issue comment is not posted.
+obligations and #26 dependencies remain outstanding. This earlier acceptance record
+is published at `5312370990e10d437bddb2e301098334da2cb5c6`, confirmed by the
+[published acceptance comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6901618581).
+That publication does not include the later Drive A/B command correction above.
 
 ## Issue #24 — ordinary worker status correction, 15 November 2026
 

@@ -139,6 +139,12 @@
           "audit": "Audited Connections class only: mocked HTTP opener, synthetic discovery/parser inputs and temporary preferences; successful connection may query local route/neighbor state inside mandatory network-isolated runner. No device access; other module classes remain deferred."
         },
         {
+          "selector": "test_drive_command_confirmation.DriveCommandConfirmation",
+          "tests": 21,
+          "timeout_seconds": 120,
+          "audit": "Real Core with synthetic transports and inert GTK; sockets/DNS blocked. Twenty command contracts each cover both drives and on/off/eject/all three types, session changes, delayed workers, contention, exact intent, single response and uncertain failures; one additional preservation contract covers all three mount modes on both drives."
+        },
+        {
           "selector": "test_drive_reset_confirmation.DriveResetConfirmation",
           "tests": 15,
           "timeout_seconds": 120,

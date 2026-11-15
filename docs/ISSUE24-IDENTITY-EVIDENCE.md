@@ -189,10 +189,90 @@ unwaived; C1, #26 dependencies and broader RM-026/028/029 gates remain outstandi
 Preparation verified primary and live GitHub `development` at
 `0bbc4014170dd295fd7fdaefd9c96e93a2067c21`, clean tracked files, empty staging and
 seven legacy artifacts matching retained hashes. Live #24 remains Open / Backlog /
-P1 — High / Ultimate Menu. This record is integrated locally, but remains unstaged,
-uncommitted and unpublished; no issue comment or Project change has been made. No hardware contact, application
-launch or repeated hardware/regression test occurred during preparation. No broader
+P1 — High / Ultimate Menu. This acceptance record is published at
+`5312370990e10d437bddb2e301098334da2cb5c6`, as confirmed by the
+[published acceptance comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6901618581).
+That publication supersedes this record's former unpublished/comment-not-posted
+wording; no Project fields changed. No hardware contact, application launch or
+repeated hardware/regression test occurred during preparation. No broader
 acceptance criterion, safety requirement or publication gate is waived.
+
+### Drive A/B command confirmation safety — integrated, unpublished
+
+On 15 November 2026, the exact independently reviewed four-file candidate was
+integrated into primary `development` at published HEAD
+`5312370990e10d437bddb2e301098334da2cb5c6`. Local and live GitHub HEADs were
+reverified equal during documentation reconciliation. The implementation and
+this documentation remain **unstaged, uncommitted and unpublished**; the index
+is empty. The four implementation files are `c64u_browser/core.py`,
+`c64u_browser/drives_tab.py`, `tests/ci_suites.json` and the new, still untracked
+`tests/test_drive_command_confirmation.py`. The seven legacy untracked artifacts
+and other worktrees remain preserved.
+
+For both A and B, on/off/eject (`remove`) and type changes to 1541/1571/1581
+capture the originating `DeviceSession` and exact drive/action/type intent at
+confirmation opening. The guarded dialog consumes its response before cancellation,
+stale-session refusal, busy refusal or worker submission; repeated responses cannot
+submit another command. Core's `execute_drive_command` validates arguments and
+revalidates the session under fail-fast admission, captures one transport, then
+revalidates inside the physical-device lane before dispatch. Admission covers
+command and readback, excluding session replacement during that interval. A valid
+command is followed by one status readback. Command uncertainty skips readback;
+readback uncertainty repeats neither operation. No automatic retry or reconnect
+is added. The Reset Core body, mount handling and transport routes are unchanged;
+the shared dialog refactor preserves Reset's guarded-response behavior.
+
+The retained integration evidence directory is
+`/tmp/argonaut-issue24-drive-confirmations-integration-20261115`:
+`REPORT.txt`, `validation.json`, suite logs/reports, `integrated.patch` and
+`independent-integrated-review.txt`. The integrated patch is byte-identical to the
+reviewed candidate, SHA-256
+`83bd19d1362f6df32a36c566e51bdc3f12b808106ee09adb378494a43d1e29cc`.
+The prior candidate evidence remains in
+`/tmp/argonaut-issue24-drive-confirmations-evidence-20261115`.
+
+| Retained integration check | Result | Execution boundary |
+| --- | --- | --- |
+| Unit | 260/260 in each Python mode | Verified isolated network namespaces |
+| Broader Python regression | 356/356 in each mode | Verified isolated network namespaces |
+| Focused synthetic regression | 93/93 in each mode | Socket and DNS blocked |
+| Offline checks | 17/17 | Verified isolated network namespace |
+| Independent new-command + Reset checks | 36/36 in each mode | Synthetic, socket and DNS blocked |
+| Extended adjacent suite | 114/115 in each mode; one known baseline failure | Synthetic, socket and DNS blocked |
+
+Each mode means normal and optimized Python. Passing suites record zero failures,
+errors and skips. The 21 new command-suite tests include 20 contracts covering all
+12 A/B command/type intents and one mount-preservation contract covering six A/B
+access-mode combinations. Coverage includes cancellation, stale/disconnected/lost/
+reconnected/replaced sessions, delayed workers, contention, exact intent, duplicate
+responses and uncertain outcomes. **Independent Class C integrated-diff review:
+PASS, no actionable findings; no waiver applies.** Retained integration Markdown
+validation passed all 50 documents with zero errors; whitespace and CI source
+inventory checks passed. These application-test results are inspected prior
+evidence, not new executions for this documentation reconciliation.
+
+The extended failure is
+`MachineSafetyTests.test_worker_submission_failure_consumes_target_and_old_response`:
+it expects “was not sent” but receives “Could not complete Reset C64 submission.
+No automatic retry.” Prior independent evidence reproduces the same failure on
+unchanged baseline. `power_dialog.py`, `gui.py` and `test_machine_safety.py` remain
+baseline-identical. The extended suite is not fully passing and no repair is claimed.
+
+Physical acceptance of on/off/eject/type on A/B remains pending. It requires a
+separately reviewed and authorized procedure with identified build/device/firmware,
+idle drives and safe disposable media as applicable. The earlier operator-reported
+Beige Drive A Reset success does not qualify these commands. No application launch,
+hardware contact, Git publication or GitHub tracking write is part of this
+reconciliation. Manual publication and live verification remain separate gates;
+this is not release acceptance or completion/closure of #24.
+
+Flash-file stale-session gaps and broader disconnected-button presentation remain
+follow-ups. Category-wide LED Apply containment, unresolved intermittent lockup and
+indirect/Auto SID risks, Bruce's residual-risk ownership, unmet/unwaived #49 criteria
+2, 3, 5, 6, 7 and 8, incomplete C1, #48 tooling-only scope, #26 dependencies and
+RM-026/028/029 gates remain unchanged. Earlier on/off/eject/type follow-up wording
+above describes the Reset-only checkpoint; this section updates implementation
+status only, without extending physical acceptance.
 
 ## Publication and hosted GTK verification — 15 November 2026
 

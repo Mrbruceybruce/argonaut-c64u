@@ -1931,5 +1931,29 @@ authorized Reset were reported successful by the operator. See the
 for pre-reset screenshot observations, operator-confirmed build/prerequisites and
 unverified post-reset details. No exact post-reset UI/status or zero-dispatch-on-cancel
 claim is made. Broader Drive/Flash, LED/Auto SID and transferred #49 obligations
-remain open. This documentation reconciliation is integrated locally, but remains
-unstaged, uncommitted and unpublished.
+remain open. This earlier acceptance record is published at
+`5312370990e10d437bddb2e301098334da2cb5c6`, confirmed by the
+[published acceptance comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6901618581).
+It does not include or qualify the later command correction below.
+
+## Issue #24 — Drive A/B command confirmation safety
+
+The on/off/eject and type (1541/1571/1581) correction is integrated locally above
+`5312370990e10d437bddb2e301098334da2cb5c6`, but remains unstaged, uncommitted and
+unpublished. Both drive cards capture the originating session and exact command
+intent when opening confirmation. Cancellation, stale-session refusal, busy refusal
+and worker submission consume the guarded dialog response; another response cannot
+submit another command. UI stale checks are backed by Core session revalidation
+under admission and the physical-device lane before dispatch/readback. Valid
+confirmation sends one command and one readback; uncertain outcomes do not retry.
+Reset and mount behavior remain preserved.
+
+See [the integration evidence](ISSUE24-IDENTITY-EVIDENCE.md#drive-ab-command-confirmation-safety--integrated-unpublished)
+for the exact four-file scope, retained 260/260 unit, 356/356 broader and 93/93
+focused results in both Python modes, 17/17 offline checks and independent Class C
+integrated-diff PASS. The extended adjacent suite remains 114/115 in each mode due
+to the independently reproduced baseline machine-message assertion failure.
+Physical A/B command acceptance is pending; prior bounded Beige Reset success
+cannot qualify it. Flash-file stale-session safeguards, broader disconnected-button
+presentation, LED Apply containment, unresolved lockup/Auto SID risks and transferred
+#49 obligations remain unchanged. No broader UI or release acceptance is claimed.
