@@ -2,7 +2,8 @@
 
 ## Issue #24 — ordinary worker status correction, 15 November 2026
 
-The bounded local correction clears an ordinary worker's untouched “Working…”
+The correction is published on `development` at
+`48dc290a0ea6923e2b477553a4e6af474815c3e1`. It clears an ordinary worker's untouched “Working…”
 placeholder on completion. Explicit success/error messages and newer ordinary or
 managed-operation messages retain ownership, including reentrant completion
 callbacks. Reset commands, REST routes and session-safety protections are unchanged.
@@ -13,9 +14,13 @@ existing synthetic Reset contracts. Execution used separate network namespaces;
 no application launch or hardware contact occurred. Independent implementation
 review passed with no blocking findings; no review waiver applies (Class C).
 See [the UI status record](UI.md#issue-24--ordinary-worker-status-completion)
-for evidence, scope and remaining acceptance limits. This slice is **unstaged,
-uncommitted and unpublished**. Physical Reset acceptance remains stopped; a
-cleared status message does not establish physical drive idleness or safe media.
+for evidence, scope and remaining acceptance limits. Primary and live GitHub HEADs
+were verified equal at that commit, with clean tracked files, empty staging and
+seven unchanged legacy artifacts. [Argonaut Test Lab #228](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/43757934767)
+passed all eight hosted jobs at the same commit. These inspected CI results are
+separate from the retained local regressions above. Publication supersedes this
+slice's former unpublished wording. Physical Reset acceptance remains stopped;
+a cleared status message does not establish physical drive idleness or safe media.
 
 ## Issue #24 — acceptance and Drive Reset safety, 15 November 2026
 

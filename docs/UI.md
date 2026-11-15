@@ -1895,7 +1895,29 @@ before tests; their logs remain preserved. The latter checked host-mounted sysfs
 the successful rerun inspected namespace interfaces through `socket.if_nameindex()`.
 These setup failures are not test failures or hardware results.
 
-Implementation and synthetic qualification do not resume physical acceptance,
-qualify device/media safety, or close #24. The seven legacy untracked artifacts
-remain preserved. This correction is unstaged, uncommitted and unpublished;
-publication and renewed operator acceptance require separate authorization.
+The owner published the exact reviewed seven-file correction on `development` at
+[48dc290a0ea6923e2b477553a4e6af474815c3e1](https://github.com/Mrbruceybruce/argonaut-c64u/commit/48dc290a0ea6923e2b477553a4e6af474815c3e1).
+Primary and live GitHub HEADs were verified equal; tracked files and staging were
+clean, and all seven legacy untracked artifacts matched their retained hashes.
+The published diff (249 insertions, 3 deletions) matches the independently reviewed
+inventory and file hashes; its SHA-256 is
+`9f352e1ae7b7410ec955299dff4d75af2e8f12989493f0c73ba2d76ba2ca7e8c`.
+Publication supersedes this correction's former unpublished wording.
+
+[Argonaut Test Lab #228](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/43757934767)
+completed successfully at that exact commit. All eight jobs passed. Inspected
+hosted artifacts record unit tests 239/239 in each mode, Python regressions
+356/356 in each mode, GTK 27/27 and media 4/4, with zero failures, errors or test
+skips. Offline checks passed; Markdown records 36/36 validator tests and 50
+documents with zero errors, retaining the historical archive-link diagnostic.
+The GTK source-qualification step was skipped as expected on a push; it applies
+only to manual GTK-only dispatch. The GTK suite itself ran and passed. These are
+hosted synthetic results, distinct from the retained local 74/74 affected tests.
+No regression or hardware tests were repeated for this documentation reconciliation.
+
+Implementation, offline testing, hosted CI and publication do not resume physical
+acceptance, qualify device/media safety, or close #24. Physical Drive Reset
+acceptance remains stopped; renewed operator acceptance requires separate
+authorization. Live tracking remains Open / Backlog / P1 — High / Ultimate Menu.
+Category-wide LED Apply containment, unresolved lockup/indirect SID risks,
+transferred #49 obligations and #26 dependencies remain unchanged.
