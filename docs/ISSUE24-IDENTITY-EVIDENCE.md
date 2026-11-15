@@ -44,8 +44,9 @@ investigation; this documentation pass is not a build or firmware qualification.
 
 ## API admission and UI acceptance — 15 November 2026
 
-The nine-file API admission change is integrated in primary `development` at
-`b998af66b0a846e619a976a9ee57a04ba4816cef`, unstaged and uncommitted. Shared
+The API admission change is published on `development` in
+`ba8d1a56db7eb9ca231e91ec875ef58a229f5bd3`, together with About relocation and
+the Drive Reset correction. Shared
 `compatibility.validate_api_version` accepts exactly `0.1` for inspection and
 operational connection testing; malformed/missing/nonstring versions are refused
 as `malformed`, and other numeric major.minor versions as `unsupported_api`,
@@ -57,8 +58,8 @@ whitespace checks PASS. Full Markdown: 50 documents/zero errors; 36 validator te
 PASS. Offline suites used verified nonroot, zero-capability, loopback-only network
 namespaces and temporary preferences. No hardware was contacted by those suites.
 
-The separately reviewed three-file About relocation is also integrated, unstaged
-and uncommitted: General → Device details → Game Library → About. Focused tests
+The separately reviewed three-file About relocation is published in the same
+commit: General → Device details → Game Library → About. Focused tests
 passed 18/18 normal and optimized, including shortcut destinations and reconnect.
 Independent implementation and integrated-diff reviews PASS.
 
@@ -115,14 +116,14 @@ retry. Valid same-session confirmation still sends exactly one reset and readbac
 The response-to-worker delay is checked in Core, not just in GTK.
 
 The reviewed source is retained in `/tmp/argonaut-issue24-drive-reset-20261115`.
-Its seven-file correction is now integrated into primary `development`, unstaged
-and uncommitted, on the existing API/About changes. Source, tests and CI manifest
-match the reviewed bytes; only these three status documents receive an integration
-wording update. All unaffected primary files and seven older untracked artifacts
-are preserved. The Reset-only patch, status-only overlay and combined validation/
+Its seven-file correction was integrated with the API/About changes and published
+in `ba8d1a56db7eb9ca231e91ec875ef58a229f5bd3`. The retained integration review
+verified the implementation/test/CI bytes and three-document status overlay.
+The seven older untracked artifacts remain preserved. The Reset-only patch, status-only overlay and combined validation/
 independent integration review evidence are retained separately in
-`/tmp/argonaut-issue24-drive-reset-integration-20261115`. No staging, commit, push,
-installation, physical reset or GitHub tracking modification is part of this work.
+`/tmp/argonaut-issue24-drive-reset-integration-20261115`. Publication supersedes
+the earlier uncommitted status; it does not establish installation, physical Reset
+acceptance or issue closure.
 
 Candidate validation: **223/223 normal and 223/223 optimized unit tests PASS**,
 including 15 new Reset contracts; **35/35 normal and 35/35 optimized adjacent
@@ -147,10 +148,41 @@ under Ultimate Menu; initial eight-button sensitivity is not a safety boundary.
 Category-wide LED Apply containment remains unchanged. Original intermittent LED
 lockup and indirect/Auto SID risks remain unresolved; transferred #49 obligations
 and #26 dependencies remain in force. Any separately required physical qualification,
-manual publication and issue closure are distinct remaining gates. Integration
+release acceptance and issue closure remain separate gates. Integration
 validation/review does not establish physical Reset or all-tab safety acceptance.
 
+## Publication and hosted GTK verification — 15 November 2026
+
+Primary and live GitHub `development` were verified equal at
+`765032f420e63c040393be86f388f0c981df17f0`, the direct child of `ba8d1a5`, with
+clean tracked files, empty staging and the seven legacy artifacts unchanged.
+This one-line test-only correction updates the Settings tab-order expectation in
+`tests/test_uc1b_presentation.py`; lifecycle, close/reopen and geometry assertions
+remain unchanged. Its retained independent review reports PASS, no actionable
+findings, and local namespace-isolated GTK validation reports 27/27 PASS. Docker
+was unavailable locally; that record is distinct from the subsequent hosted run.
+
+[Run #225](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/43749999040)
+at `ba8d1a5` remains a failed historical result: 26/27 GTK tests passed, with only
+the stale Settings tab-order expectation failing. This was not the earlier
+578-pixel geometry failure.
+[Argonaut Test Lab #226](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/43751767750)
+at the full correction SHA above passed all eight jobs. Its GTK artifact records
+27/27 PASS, including the complete Settings close/reopen test and the narrow-window
+geometry test; zero failures, errors, skips or timeouts; successful Docker network
+isolation, GTK/private D-Bus preflight, runner cleanup and independent workflow
+cleanup. These inspected CI results do not qualify physical Drive Reset, all-tab
+safety, unresolved LED behavior or a release. No hardware tests were repeated for
+this documentation reconciliation. Issue #24 remains Open / Backlog / P1 — High /
+Ultimate Menu; no Project fields or acceptance criteria are changed.
+
 ## Two distinct Argonaut contracts
+
+Historical baseline comparison: this section and the original regression design
+below describe the pre-admission investigation. The published shared API `0.1`
+validator supersedes the old API-validation gap; product allowlist and capability
+limitations remain. Retain the original findings as historical evidence, not the
+current API admission policy.
 
 At the baseline, [compatibility.validate_protocol](../c64u_browser/compatibility.py)
 requires both identity envelopes to be dictionaries with `errors == []`.

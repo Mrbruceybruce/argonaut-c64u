@@ -2,12 +2,15 @@
 
 ## Issue #24 — acceptance and Drive Reset safety, 15 November 2026
 
-The nine-file API admission change and separate three-file About relocation are
-integrated, unstaged and uncommitted in primary `development` at
-`b998af66b0a846e619a976a9ee57a04ba4816cef`. API admission accepts exactly `0.1`,
+The API admission change, About relocation and Drive Reset session correction are
+published on `development` in `ba8d1a56db7eb9ca231e91ec875ef58a229f5bd3`.
+The separate GTK test correction is published in
+`765032f420e63c040393be86f388f0c981df17f0`; primary and live GitHub HEADs were
+verified equal on 15 November 2026, with clean tracked files, empty staging and
+seven preserved untracked artifacts. API admission accepts exactly `0.1`,
 rejects malformed/unsupported versions before operational admission, and retains
 identity, session, credential and category-wide LED Apply safeguards. Settings
-order is **General → Device details → Game Library → About**. Both changes passed
+order is **General → Device details → Game Library → About**. API admission and About relocation passed
 independent implementation and integration review. Prior validation: 208 normal
 and 208 optimized tests, 17 offline checks for API admission; 18 normal and 18
 optimized focused tests for About. Full Markdown validation passed.
@@ -21,10 +24,9 @@ launch does not erase failed attempts or prove their cause. The integrated-sourc
 build identity and final Settings order were visually accepted. Sensitive fields,
 non-atomic snapshots and untested physical operations limit these observations.
 
-The separately identifiable seven-file Drive Reset correction and documentation
-reconciliation are now **integrated, unstaged and uncommitted** in primary, layered
-on those exact twelve files. The reviewed isolated source and each slice's patch
-are retained separately. Reset captures the originating session
+The separately reviewed API, About and Drive Reset slices were published together
+in the 15-file implementation commit. Their isolated sources and patches remain
+separate review evidence. Reset captures the originating session
 at confirmation opening. UI rejects stale responses; Core rechecks under its
 session admission guard and device lane before dispatch/readback. Cancellation,
 refusal and uncertain outcomes consume the dialog response without retry. A valid
@@ -33,8 +35,14 @@ Ultimate Menu control is changed.
 
 See [the acceptance and safety evidence](ISSUE24-IDENTITY-EVIDENCE.md#drive-reset-confirmation-safety-candidate)
 for validation, review disposition and limits. Combined integration evidence is
-retained in `/tmp/argonaut-issue24-drive-reset-integration-20261115`; manual
-publication remains a gate. No physical Drive Reset was performed; this is deterministic
+retained in `/tmp/argonaut-issue24-drive-reset-integration-20261115`.
+[Argonaut Test Lab #226](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/43751767750)
+passed all eight hosted jobs at `765032f420e63c040393be86f388f0c981df17f0`.
+GTK passed 27/27, including Settings close/reopen and geometry, with zero
+failures/errors/skips/timeouts and successful isolation, preflight and cleanup.
+The preceding run #225 failed on the stale tab-order expectation; the correction
+changes only that expectation, preserving lifecycle and geometry assertions.
+No physical Drive Reset was performed; this is deterministic
 synthetic qualification, not hardware operation acceptance. Other stale action
 confirmations/Flash-file dialogs and broader disconnected-button presentation
 remain separate follow-ups. Original intermittent LED lockup, indirect/Auto SID
@@ -55,11 +63,13 @@ historical implementation checkpoints and evidence limitations remain unchanged.
 
 The published acceptance record reports independent review of the wording and resulting
 documentation diff before publication; it does not claim repeated screenshot comparisons
-or hardware testing. No Class A review waiver applies. The owner separately authorized
-this three-document publication-status correction, validation and independent diff
-review. This new correction remains unstaged, uncommitted and unpublished pending the
-manual publication gate; its validation and independent review must be recorded before
-publication. GitHub tracking changes and hardware operations remain unauthorized.
+or hardware testing. No Class A review waiver applies. The separately authorized three-document
+publication-status correction was
+published at `b998af66b0a846e619a976a9ee57a04ba4816cef`, following validation and
+independent review (PASS, no actionable findings), as recorded in the
+[8 November publication verification](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6727436949).
+Its former pending-publication wording is superseded; the bounded owner disposition
+and historical evidence limitations below remain unchanged.
 
 The read-only LED presentation implementation is published on development at
 8391be3ea9cb2528dcc3f0b4c5185a73ea1694f9. Primary and live GitHub HEADs were verified

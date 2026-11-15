@@ -669,7 +669,14 @@ evidence; neither is inferred.
 
 Source observations below are at the UI-01 baseline. They describe code structure,
 not new acceptance or a claim that the application was run. Recommendations are
-**Proposed**. Source files and tests remain unchanged.
+**Proposed**. Source files and tests remain unchanged at that historical checkpoint.
+
+Current Settings update — 15 November 2026: `ba8d1a56db7eb9ca231e91ec875ef58a229f5bd3`
+published General → Device details → Game Library → About, with
+`GAME_LIBRARY_PAGE=2` and `ABOUT_PAGE=3`. The navigation row below retains the
+UI-01 baseline. The later one-line GTK expectation correction and hosted 27/27
+result are recorded in [Issue #24 evidence](ISSUE24-IDENTITY-EVIDENCE.md#publication-and-hosted-gtk-verification--15-november-2026).
+This update does not change the earlier LED presentation waiver or its limitations.
 
 | Surface | Inspected source / symbol | Observation and centralized styling opportunity |
 | --- | --- | --- |
@@ -1769,11 +1776,13 @@ historical implementation checkpoints and evidence limitations remain unchanged.
 
 The published acceptance record reports independent review of the wording and resulting
 documentation diff before publication; it does not claim repeated screenshot comparisons
-or hardware testing. No Class A review waiver applies. The owner separately authorized
-this three-document publication-status correction, validation and independent diff
-review. This new correction remains unstaged, uncommitted and unpublished pending the
-manual publication gate; its validation and independent review must be recorded before
-publication. GitHub tracking changes and hardware operations remain unauthorized.
+or hardware testing. No Class A review waiver applies. The separately authorized three-document
+publication-status correction was
+published at `b998af66b0a846e619a976a9ee57a04ba4816cef`, following validation and
+independent review (PASS, no actionable findings), as recorded in the
+[8 November publication verification](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6727436949).
+Its former pending-publication wording is superseded; the bounded owner disposition
+and historical evidence limitations below remain unchanged.
 
 ### Disposition
 

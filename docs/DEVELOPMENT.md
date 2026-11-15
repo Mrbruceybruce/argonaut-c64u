@@ -107,7 +107,23 @@ explicitly authorized.
 
 ## Bounded offline CI (P4-2)
 
+### Hosted status — 15 November 2026
+
+[Argonaut Test Lab #226](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/43751767750)
+at `765032f420e63c040393be86f388f0c981df17f0` passed all eight jobs. GTK passed
+27/27, including Settings close/reopen and narrow-window geometry, with zero
+failures/errors/skips/timeouts; isolation, preflight and both cleanup checks passed.
+The correction changes only the stale Settings tab-order expectation after About
+was moved last. [Run #225](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/43749999040)
+remains failed historical evidence. Its tab-order failure was distinct from the
+October geometry failure below. The older exception and later references to an
+unresolved geometry regression describe their original checkpoints, not the
+current hosted result. Preserve their evidence and the 500-pixel assertion.
+Hosted success does not establish physical C64U or release acceptance.
+
 ### Hosted qualification exception — October 2026
+
+Historical checkpoint; current hosted status is recorded above.
 
 P4-2 infrastructure is implemented and administratively accepted
 with one unresolved GTK regression. Hosted GitHub Actions run

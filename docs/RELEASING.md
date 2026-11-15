@@ -183,5 +183,8 @@ if bounded stop/kill cannot verify smoke-container termination. Cleanup errors
 remain failures. Runtime preflight fails on missing GTK/media typelibs or factories;
 changing package dependencies or adding another platform needs separate scope
 approval. Ubuntu success does not establish Debian 13 or physical C64U
-qualification, close the existing GTK geometry regression, qualify streaming,
-or authorize a Stable release. P4-1 inventory reconciliation remains open.
+qualification, qualify streaming or authorize a Stable release. The GTK geometry
+exception described at this P4-4 checkpoint is historical; see the later
+[Test Lab #226 result](DEVELOPMENT.md#hosted-status--15-november-2026).
+That separate regression result does not expand package or physical acceptance.
+P4-1 inventory reconciliation remains open.
