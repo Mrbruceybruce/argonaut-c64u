@@ -262,7 +262,7 @@ class SettingsHardware(unittest.TestCase):
         app.preferences.selected_id = app.preferences.profiles[0].id
         dialog = show_preferences(app, page=1); fixture.pump()
         self.assertEqual(4, dialog.pages.get_n_pages())
-        self.assertEqual(['General', 'Device details', 'About', 'Game Library'],
+        self.assertEqual(['General', 'Device details', 'Game Library', 'About'],
             [dialog.pages.get_tab_label_text(dialog.pages.get_nth_page(i)) for i in range(4)])
         hardware = dialog.connections.hardware_expander
         self.assertFalse(hardware.get_expanded())
