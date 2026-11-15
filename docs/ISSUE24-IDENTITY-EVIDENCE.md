@@ -151,6 +151,49 @@ and #26 dependencies remain in force. Any separately required physical qualifica
 release acceptance and issue closure remain separate gates. Integration
 validation/review does not establish physical Reset or all-tab safety acceptance.
 
+### Beige Drive A Reset — operator-reported acceptance
+
+On 15 November 2026, the operator reported successful bounded physical acceptance
+for Drive A on Beige (`192.168.68.70`). Evidence is separated as follows:
+
+- **Retained pre-reset UI observations:** screenshots from Work task
+  `01a1e0c2-23b0-7fb2-9772-8c2d42d1c245` show firmware `1.1.0s2`, API `0.1`,
+  Drive A On / Device 8 / Type 1541 / No disk mounted, and a blank bottom status
+  after the drive read. These screenshots were re-inspected for this record;
+  they do not establish physical idleness or post-reset state.
+- **Operator-confirmed provenance and prerequisites:** the operator confirmed
+  About `1.10-dev / 0bbc4014170d-modified`, selected Drive A, and confirmed no
+  physical drive activity or valuable unsaved work. The running build identity
+  is operator-reported, not independently verified from an About capture.
+- **Operator-reported cancellation:** “cancelled and everything is working” in
+  conversation `6af0e31f-b0d8-83ea-919f-681a71f30feb` records successful cancellation
+  and continued responsiveness. No transport trace establishes zero Reset dispatch
+  on cancellation; prior synthetic cancellation contracts are separate evidence.
+- **Operator-reported physical Reset:** after separate authorization, one physical
+  Drive A Reset was performed, followed by “works normally”. The current owner
+  handoff identifies this as the result of that one authorized Reset. No exact
+  post-reset UI text, explicit drive-status readback or physical observation was
+  supplied. Reset dispatch count, logs and post-reset media state were not
+  independently verified. This is bounded operator-reported success, not a claim
+  of instrumented hardware qualification or exhaustive operation safety.
+
+This subsequent report supersedes the earlier stopped/no-physical-Reset wording
+only for this bounded Beige Drive A attempt. It does not qualify Drive B, Founders,
+other devices, fault/reconnect recovery, other Drive actions or all-tab safety.
+On/off/eject/type confirmations, Flash-file stale-session safeguards and broader
+disconnected-button presentation remain follow-ups. Category-wide LED Apply
+containment remains mandatory; intermittent LED lockup and indirect/Auto SID risks
+remain unresolved. Transferred #49 criteria 2, 3, 5, 6, 7 and 8 remain unmet and
+unwaived; C1, #26 dependencies and broader RM-026/028/029 gates remain outstanding.
+
+Preparation verified primary and live GitHub `development` at
+`0bbc4014170dd295fd7fdaefd9c96e93a2067c21`, clean tracked files, empty staging and
+seven legacy artifacts matching retained hashes. Live #24 remains Open / Backlog /
+P1 — High / Ultimate Menu. This record is integrated locally, but remains unstaged,
+uncommitted and unpublished; no issue comment or Project change has been made. No hardware contact, application
+launch or repeated hardware/regression test occurred during preparation. No broader
+acceptance criterion, safety requirement or publication gate is waived.
+
 ## Publication and hosted GTK verification — 15 November 2026
 
 Primary and live GitHub `development` were verified equal at

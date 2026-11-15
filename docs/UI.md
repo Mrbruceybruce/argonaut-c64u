@@ -1921,3 +1921,15 @@ acceptance remains stopped; renewed operator acceptance requires separate
 authorization. Live tracking remains Open / Backlog / P1 — High / Ultimate Menu.
 Category-wide LED Apply containment, unresolved lockup/indirect SID risks,
 transferred #49 obligations and #26 dependencies remain unchanged.
+
+## Issue #24 — subsequent operator-reported Drive A acceptance
+
+The earlier stopped physical-acceptance statements above describe their historical
+checkpoints. The subsequent 15 November Beige Drive A cancellation and one separately
+authorized Reset were reported successful by the operator. See the
+[acceptance evidence](ISSUE24-IDENTITY-EVIDENCE.md#beige-drive-a-reset--operator-reported-acceptance)
+for pre-reset screenshot observations, operator-confirmed build/prerequisites and
+unverified post-reset details. No exact post-reset UI/status or zero-dispatch-on-cancel
+claim is made. Broader Drive/Flash, LED/Auto SID and transferred #49 obligations
+remain open. This documentation reconciliation is integrated locally, but remains
+unstaged, uncommitted and unpublished.

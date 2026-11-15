@@ -1,5 +1,19 @@
 # Argonaut roadmap
 
+## Issue #24 — operator-reported Beige Drive A Reset, 15 November 2026
+
+The operator reports successful cancellation with Argonaut responsive, followed by
+one separately authorized physical Drive A Reset on Beige (`192.168.68.70`) and
+“works normally”. This is bounded operator-reported acceptance, not independently
+verified post-reset status or broader device qualification. See the
+[acceptance evidence and limits](ISSUE24-IDENTITY-EVIDENCE.md#beige-drive-a-reset--operator-reported-acceptance).
+Earlier stopped/no-physical-Reset statements below describe prior checkpoints.
+Issue #24 remains Open / Backlog / P1 — High / Ultimate Menu; remaining Drive/Flash
+safeguards, LED containment and lockup, indirect/Auto SID risks, transferred #49
+obligations and #26 dependencies remain outstanding. This documentation update is
+integrated locally, but remains unstaged, uncommitted and unpublished; the proposed
+issue comment is not posted.
+
 ## Issue #24 — ordinary worker status correction, 15 November 2026
 
 The correction is published on `development` at
