@@ -83,6 +83,7 @@ class OperationPresentation:
         self.job = self.token = None
         self.cancellable = self.attempted = False
         self._listeners = []
+        self._text_owner = None
 
     @property
     def view(self):
@@ -102,11 +103,21 @@ class OperationPresentation:
         # Existing ordinary status writers retain their lifetime convention:
         # the next ordinary message replaces the previous one after job release.
         if self.state in ('RUNNING', 'CANCELLATION_REQUESTED'):return
+        owner = object()
+        self._text_owner = owner
         self.state = 'IDLE';self.message = text;self._emit()
+        return owner
+
+    def replace_text(self, owner, text):
+        """Replace only the ordinary message still owned by this writer."""
+        if owner is None or owner is not self._text_owner:return False
+        self.set_text(text)
+        return True
 
     def get_text(self):return self.message
 
     def begin(self, job, token, cancellable=True):
+        self._text_owner = None
         self.job, self.token = job, token
         self.state = 'RUNNING';self.cancellable = cancellable;self.attempted = False
         self.message = operation_label(job.operation);self._listeners = []

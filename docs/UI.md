@@ -1859,3 +1859,43 @@ beyond tooling/evidence; or establish release acceptance.
 Issue #24 remains Open / Backlog / P1 — High / Ultimate Menu. No implementation,
 containment removal, hardware operation, documentation edit, Git action, tracking
 mutation, publication or issue closure is authorized by this wording approval.
+
+## Issue #24 — ordinary worker status completion
+
+The authorized status-only correction addresses a source path that left the
+bottom “Working…” message visible after a successful Drives read. The operator
+confirmed source build `1.10-dev / 3003964b2c6c-modified`, Beige firmware `1.1.0s2`,
+API `0.1`, and no mounted disks. Persistent “Working…” stopped physical acceptance.
+The read-only investigation reproduced a completed worker with its busy flag
+cleared while that placeholder remained. This explains a stale display path;
+it does not independently establish live application or physical drive idleness.
+
+Ordinary status writes now return an ownership marker. Worker completion clears
+only its still-owned placeholder; explicit callback success/error text survives.
+Worker exceptions replace only their still-owned message. Submission failure is
+reported before its completion callback, allowing that callback to publish a more
+specific result or start a subsequent operation without an older overwrite.
+Every later ordinary write and managed-operation start revokes prior ownership,
+including identical “Working…” text. Existing foreground presentation, cancellation,
+admission, Reset confirmation/session checks and transport behavior are unchanged.
+
+This is a Class C functional slice with independent implementation review PASS,
+no blocking findings and no waiver. The complete inventory is two implementation
+files, the new `tests/test_worker_status.py`, its CI allowlist entry, and current-state,
+roadmap and UI documentation. The 16 new deterministic cases use controlled Futures,
+mocked scheduling and inert UI objects. Unit suites passed 239/239 in normal and
+optimized Python. Affected status, foreground-admission, Drive Reset and drive-route
+regressions passed 74/74 in each mode. All execution used separate network namespaces;
+the affected run also blocked Python socket/DNS calls. No application was launched,
+physical commands sent, software installed, or GitHub tracking changed.
+
+Evidence is retained in `/tmp/argonaut-issue24-worker-status-20261115-g39ihgxh`.
+Initial sandbox namespace setup and custom interface-preflight attempts stopped
+before tests; their logs remain preserved. The latter checked host-mounted sysfs;
+the successful rerun inspected namespace interfaces through `socket.if_nameindex()`.
+These setup failures are not test failures or hardware results.
+
+Implementation and synthetic qualification do not resume physical acceptance,
+qualify device/media safety, or close #24. The seven legacy untracked artifacts
+remain preserved. This correction is unstaged, uncommitted and unpublished;
+publication and renewed operator acceptance require separate authorization.

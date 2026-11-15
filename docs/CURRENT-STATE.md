@@ -1,5 +1,22 @@
 # Current development state
 
+## Issue #24 — ordinary worker status correction, 15 November 2026
+
+The bounded local correction clears an ordinary worker's untouched “Working…”
+placeholder on completion. Explicit success/error messages and newer ordinary or
+managed-operation messages retain ownership, including reentrant completion
+callbacks. Reset commands, REST routes and session-safety protections are unchanged.
+
+Deterministic validation passed: 239/239 unit tests and 74/74 affected regressions
+in both normal and optimized Python, including 16 new status contracts and the
+existing synthetic Reset contracts. Execution used separate network namespaces;
+no application launch or hardware contact occurred. Independent implementation
+review passed with no blocking findings; no review waiver applies (Class C).
+See [the UI status record](UI.md#issue-24--ordinary-worker-status-completion)
+for evidence, scope and remaining acceptance limits. This slice is **unstaged,
+uncommitted and unpublished**. Physical Reset acceptance remains stopped; a
+cleared status message does not establish physical drive idleness or safe media.
+
 ## Issue #24 — acceptance and Drive Reset safety, 15 November 2026
 
 The API admission change, About relocation and Drive Reset session correction are

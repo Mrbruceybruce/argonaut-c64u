@@ -143,6 +143,12 @@
           "tests": 15,
           "timeout_seconds": 120,
           "audit": "Issue #24 Reset-only session binding: real Core with FakeClient, inert GTK dialog and temporary preferences. Socket connect/connect_ex/sendto/create_connection blocked. Covers stale callback and worker races, admission/lane refusal, one-shot response and uncertain outcome without retry; no physical commands or display."
+        },
+        {
+          "selector": "test_worker_status.WorkerStatus",
+          "tests": 16,
+          "timeout_seconds": 120,
+          "audit": "Issue #24 ordinary worker status: controlled Futures, mocked pool/header/idle scheduling and inert labels; imports GUI without constructing windows. Tests success, worker/callback/submission failure, rejected overlap, reentrant subsequent workers and foreground status ownership. No tasks, transports, device requests or application launch; mandatory network-isolated runner."
         }
       ]
     },

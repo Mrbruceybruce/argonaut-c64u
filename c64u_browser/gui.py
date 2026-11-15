@@ -542,7 +542,7 @@ class Browser(Gtk.Application):
         refresh_header(self)
         sensitivity = [(widget, widget.get_sensitive()) for widget in self.busy_controls]
         for widget, _ in sensitivity: widget.set_sensitive(False)
-        self.status.set_text('Working…')
+        working_status = self.status.set_text('Working…')
         try:
             future = self.pool.submit(task)
         except Exception as exc:
@@ -550,9 +550,9 @@ class Browser(Gtk.Application):
             for widget, sensitive in sensitivity: widget.set_sensitive(sensitive)
             refresh_header(self)
             error = BrowserError('Could not start the operation. Close and reopen Argonaut. '+str(exc))
+            self.status.replace_text(working_status, str(error))
             try: done(error)
             except Exception: pass
-            self.status.set_text(str(error))
             return False
         def finish():
             self.busy = False
@@ -562,8 +562,11 @@ class Browser(Gtk.Application):
                 if isinstance(exc, ConnectionFailure) and exc.kind in ('host', 'network', 'authentication') and self.recovery:
                     self.recovery.lost(str(exc))
                     if exc.kind=='authentication':self.recovery.paused=True
-                self.status.set_text(str(exc))
+                self.status.replace_text(working_status, str(exc))
             finally:
+                # A completion callback may publish a result or start another
+                # operation. Retire only this worker's untouched placeholder.
+                self.status.replace_text(working_status, '')
                 refresh_header(self)
                 managed=getattr(self,'managed_library_view',None)
                 if managed is not None:managed.try_restore()
