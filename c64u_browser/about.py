@@ -38,5 +38,5 @@ def about_page():
     return scroll
 
 def show_about(app):
-    from .app_preferences import show_preferences
-    return show_preferences(app, page=2)
+    from .app_preferences import show_preferences, ABOUT_PAGE
+    return show_preferences(app, page=ABOUT_PAGE)

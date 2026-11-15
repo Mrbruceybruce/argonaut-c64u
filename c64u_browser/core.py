@@ -997,6 +997,21 @@ class ArgonautCore:
         from .managed_d64_execution import execute
         return execute(self, plan_id)
 
+    def execute_drive_reset(self, session, drive):
+        """Worker-only Reset bound to the confirmation's originating session."""
+        if drive not in ('a', 'b'):
+            raise CoreError('argument', 'Unsupported drive.')
+        with self._session_admission():
+            def validate():
+                if session != self.device_session() or not session.session_id:
+                    raise CoreError('session', 'Connection changed. Reset was not sent.')
+            validate()
+            client = self._require_client()
+            with self.scheduler.inline(JobBinding.device(session), reject_busy=True):
+                validate()
+                client.drive_action(drive, 'reset')
+                return client.read_drives()
+
     def execute_drive_image(self, selection, drive, mode='readonly', *, run=False):
         """Existing desktop worker only; bind the complete action to one session.
 

@@ -84,6 +84,14 @@ class CompatibilityResult:
         ))
 
 
+def validate_api_version(version):
+    """Shared inspection/admission policy; version support grants no capabilities."""
+    if not isinstance(version, str) or not re.fullmatch(r'[0-9]+\.[0-9]+', version):
+        raise ConnectionFailure('malformed', 'Malformed Ultimate REST API version.')
+    if version != '0.1':
+        raise ConnectionFailure('unsupported_api', 'Unsupported Ultimate REST API version: ' + version)
+
+
 def validate_protocol(result):
     """Require both Ultimate v1 envelopes; product spelling is not a gate."""
     for route in ('version', 'info'):
@@ -99,11 +107,7 @@ def validate_protocol(result):
         if key in info and (not isinstance(info[key], str) or len(info[key]) > 256
                            or any(ord(c) < 32 for c in info[key])):
             raise ConnectionFailure('malformed', 'Malformed optional Ultimate identity field.')
-    if not isinstance(version, str) or not re.fullmatch(r'[0-9]+\.[0-9]+', version):
-        raise ConnectionFailure('malformed', 'Malformed Ultimate REST API version.')
-    # UC-1 qualifies the documented/observed API contract only, not future versions.
-    if version != '0.1':
-        raise ConnectionFailure('unsupported_api', 'Unsupported Ultimate REST API version: ' + version)
+    validate_api_version(version)
     return result
 
 

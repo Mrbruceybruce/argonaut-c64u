@@ -42,6 +42,114 @@ investigation; this documentation pass is not a build or firmware qualification.
 | Community report and inference | [#14](https://github.com/Mrbruceybruce/argonaut-c64u/issues/14) reported Elite II identity refusal without a supplied identity response in the prior investigation. Source spelling `Ultimate 64-II` could explain it. | Hypothesis only; the actual response and installed firmware are still needed for diagnosis. |
 | Unknown | Actual Elite II/Starlight identities, installed-image provenance and operation-specific capabilities remain unverified here. | No SID, networking, video, bus, user-port, drive or LED capability follows from a name. |
 
+## API admission and UI acceptance — 15 November 2026
+
+The nine-file API admission change is integrated in primary `development` at
+`b998af66b0a846e619a976a9ee57a04ba4816cef`, unstaged and uncommitted. Shared
+`compatibility.validate_api_version` accepts exactly `0.1` for inspection and
+operational connection testing; malformed/missing/nonstring versions are refused
+as `malformed`, and other numeric major.minor versions as `unsupported_api`,
+before MAC lookup or candidate session adoption. Existing product, identity,
+credential and LED containment boundaries remain. Protocol recognition does not
+qualify installed capabilities. Independent Class C and integration review PASS;
+208/208 normal and 208/208 optimized tests, 17/17 offline checks, inventory and
+whitespace checks PASS. Full Markdown: 50 documents/zero errors; 36 validator tests
+PASS. Offline suites used verified nonroot, zero-capability, loopback-only network
+namespaces and temporary preferences. No hardware was contacted by those suites.
+
+The separately reviewed three-file About relocation is also integrated, unstaged
+and uncommitted: General → Device details → Game Library → About. Focused tests
+passed 18/18 normal and optimized, including shortcut destinations and reconnect.
+Independent implementation and integrated-diff reviews PASS.
+
+### Physical and operator acceptance
+
+Founders (firmware `1.1.0`) and Beige (`1.1.0s2`) each reported API `0.1`. Retained
+GET-only baselines cover 22 categories including actual LED, SID and network
+settings. Recognition, disconnect/connect, and configuration comparisons passed;
+70 displayed fields matched per cycle, with two sensitive fields excluded. Both
+inspection dialogs and integrated-source About identity/final tab order received
+operator visual confirmation. Current settings were observations, not prescribed
+LED/SID prerequisites. No device configuration writes were authorized or performed
+by acceptance helpers; credentials were session-only and their processes ended.
+
+**Founders and Beige Export: PASS under operator-controlled conditions.** Founders
+connected Export success is operator-reported evidence distinct from its earlier
+stopped helper attempt. Beige succeeded through the primary source launcher in
+normal GNOME services with isolated preferences and no GTK automation. Its saved
+`argonaut-settings.json`, created `2026-11-15T18:33:39.175678+00:00`, is a valid
+version-1 backup with 22 categories/206 settings, matching the retained sanitized
+baseline and omitting prohibited credential fields. SHA-256:
+`10407e78a0be8b272fd9bc58012357c0c8aef082ba3805c30851bfb81bb9e369`.
+The original export contains private network values and is not a public attachment.
+
+Work-launched GTK chooser failures remain an environment-dependent limitation;
+precise cause is unconfirmed. An instrumented Beige retry recorded connected,
+loaded, idle state and a GTK-visible native chooser, while the operator saw no
+save dialog. A disconnected-button no-op does not explain that retry. Earlier
+synthetic exports succeeded, and the final operator-controlled launch succeeded.
+Neither result proves a portal, application or helper root cause. Failed attempts
+remain historical evidence; no application export-code correction was made.
+
+Local evidence is retained in `/tmp/argonaut-issue24-authenticated-20261115`,
+`/tmp/argonaut-issue24-ui-final-20261115`,
+`/tmp/argonaut-issue24-remaining-ui-20261115`,
+`/tmp/argonaut-issue24-export-retry-20261115`, and
+`/tmp/argonaut-issue24-operator-export-20261115`. These temporary artifacts must
+be retained for review; they are not committed/public evidence. Redacted baseline
+values cannot establish equality of private values. Snapshots are non-atomic;
+there is no flash-persistence, fault-recovery or exhaustive all-settings visual
+qualification. Successful Export does not establish all-tab operational safety.
+
+### Drive Reset confirmation safety candidate
+
+A deterministic probe found that the shared client facade survives reconnection:
+a stale Drive Reset dialog could dispatch against a renewed session. This
+pre-existing finding is separate from API/About admission and presentation changes.
+The bounded correction captures the originating `DeviceSession` when Reset is
+opened, rejects stale UI responses, and dispatches through Core with the same
+session revalidated under admission and device-lane exclusion. Reset/readback use
+one captured transport; reconnect cannot replace it mid-operation. A consumed,
+cancelled or refused dialog cannot retry. Uncertain reset/readback errors do not
+retry. Valid same-session confirmation still sends exactly one reset and readback.
+The response-to-worker delay is checked in Core, not just in GTK.
+
+The reviewed source is retained in `/tmp/argonaut-issue24-drive-reset-20261115`.
+Its seven-file correction is now integrated into primary `development`, unstaged
+and uncommitted, on the existing API/About changes. Source, tests and CI manifest
+match the reviewed bytes; only these three status documents receive an integration
+wording update. All unaffected primary files and seven older untracked artifacts
+are preserved. The Reset-only patch, status-only overlay and combined validation/
+independent integration review evidence are retained separately in
+`/tmp/argonaut-issue24-drive-reset-integration-20261115`. No staging, commit, push,
+installation, physical reset or GitHub tracking modification is part of this work.
+
+Candidate validation: **223/223 normal and 223/223 optimized unit tests PASS**,
+including 15 new Reset contracts; **35/35 normal and 35/35 optimized adjacent
+Drive/picker/machine tests PASS**; **17/17 offline checks PASS**. Unit/offline suites
+used verified loopback-only network namespaces; adjacent tests used fake transports
+and inert dialogs without a namespace. CI inventory and whitespace checks PASS.
+Full Markdown: **50 documents/zero errors**, with unchanged historical diagnostics.
+The validator used the existing pinned tooling and a Git-derived inventory file;
+no software was installed. **Independent Class C review: PASS, no actionable
+findings**, including independent 15/15 normal and 15/15 optimized Reset contracts
+with network/DNS blocked. Exact diff, hashes, review and validation evidence are
+retained in `/tmp/argonaut-issue24-drive-reset-evidence-20261115`.
+Fifteen deterministic Reset contracts cover valid,
+cancelled, disconnected, lost, reconnected, replaced and different-device sessions;
+worker delay; admission/device-lane contention; single dispatch and uncertain
+outcomes. All transports are synthetic and GTK dialogs inert. Rejected paths must
+perform zero device commands, configuration writes and readback.
+
+This corrects **Reset only**. On/off/eject/type confirmations and Flash-file guards
+are not qualified by it. The broader disconnected-button redesign remains deferred
+under Ultimate Menu; initial eight-button sensitivity is not a safety boundary.
+Category-wide LED Apply containment remains unchanged. Original intermittent LED
+lockup and indirect/Auto SID risks remain unresolved; transferred #49 obligations
+and #26 dependencies remain in force. Any separately required physical qualification,
+manual publication and issue closure are distinct remaining gates. Integration
+validation/review does not establish physical Reset or all-tab safety acceptance.
+
 ## Two distinct Argonaut contracts
 
 At the baseline, [compatibility.validate_protocol](../c64u_browser/compatibility.py)

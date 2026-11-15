@@ -1132,13 +1132,38 @@ class PreferencesUI(unittest.TestCase):
         self.assertEqual(loaded.profiles[0].case_edition,'Existing case')
         self.assertEqual(loaded.profiles[1].case_edition,'New box');self.assertEqual(loaded.profiles[1].serial_number,'SN2')
 
+    def test_about_last_and_settings_shortcuts_keep_destinations(self):
+        from c64u_browser.app_preferences import show_preferences
+        from c64u_browser.about import show_about
+        dialog=show_about(self.app)
+        self.pump()
+        pages=dialog.pages
+        def current_label():
+            return pages.get_tab_label_text(pages.get_nth_page(pages.get_current_page()))
+        self.assertEqual([pages.get_tab_label_text(pages.get_nth_page(i))
+                          for i in range(pages.get_n_pages())],
+                         ['General','Device details','Game Library','About'])
+        self.assertEqual(current_label(),'About')
+        self.assertIs(self.app.managed_library_view.open_settings(),dialog)
+        self.assertEqual(current_label(),'Game Library')
+        self.assertIs(show_about(self.app),dialog)
+        self.assertEqual(current_label(),'About')
+        self.app.open_connections()
+        self.assertEqual(current_label(),'Device details')
+        dialog.response(self.Gtk.ResponseType.CLOSE)
+        self.pump()
+        self.assertIsNone(self.app.preferences_dialog)
+        dialog=self.app.managed_library_view.open_settings()
+        self.assertEqual(dialog.pages.get_tab_label_text(
+            dialog.pages.get_nth_page(dialog.pages.get_current_page())),'Game Library')
+
     def test_close_prompt_keeps_profile_edits_while_general_is_already_saved(self):
         from c64u_browser.app_preferences import show_preferences
         from c64u_browser.profiles import Profile,Preferences
         profile=Profile.new('Test','test.local')
         self.app.preferences.profiles=[profile];self.app.preferences.selected_id=profile.id
         dialog=show_preferences(self.app)
-        self.assertEqual([dialog.pages.get_tab_label_text(dialog.pages.get_nth_page(i)) for i in range(4)],['General','Device details','About','Game Library'])
+        self.assertEqual([dialog.pages.get_tab_label_text(dialog.pages.get_nth_page(i)) for i in range(4)],['General','Device details','Game Library','About'])
         general=dialog.pages.get_nth_page(0)
         plus=next(w for w in self.walk(general) if isinstance(w,self.Gtk.Button) and w.get_label()=='+')
         plus.emit('clicked');dialog.connections.fields['case_edition'].set_text('Test box')

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Validated desktop preferences, separate from machine configuration."""
-GAME_LIBRARY_PAGE=3
+GAME_LIBRARY_PAGE=2
+ABOUT_PAGE=3
 
 DEFAULTS={'remember_window':True,'width':1200,'height':850,'preview_scale':150,
           'preview_audio':True,'remember_folders':True,'show_hidden_local':False,
@@ -243,8 +244,6 @@ def show_preferences(app, page=0):
     connections=ConnectionDialog(app,window=dialog)
     app.connection_dialog=connections
     pages.append_page(connections.page,Gtk.Label(label='Device details'))
-    from .about import about_page
-    pages.append_page(about_page(),Gtk.Label(label='About'))
     managed=app.managed_library_view
     managed.attach_settings(dialog)
     # Every page must scroll: Gtk.Notebook includes hidden pages in its minimum size.
@@ -252,6 +251,8 @@ def show_preferences(app, page=0):
         hscrollbar_policy=Gtk.PolicyType.NEVER)
     library_scroll.set_child(managed.settings_box)
     pages.append_page(library_scroll,Gtk.Label(label='Game Library'))
+    from .about import about_page
+    pages.append_page(about_page(),Gtk.Label(label='About'))
     dialog.connections=connections
     def request_close():
         if app.busy:return

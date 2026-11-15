@@ -107,6 +107,42 @@
           "tests": 2,
           "timeout_seconds": 120,
           "audit": "Pure synthetic LED snapshots and inert GTK presentation; no transport, hardware or persistent preferences."
+        },
+        {
+          "selector": "test_api_version_admission.APIVersionAdmissionTests",
+          "tests": 5,
+          "timeout_seconds": 120,
+          "audit": "Synthetic REST read_about responses exercise real operational and inspection validators; Python sockets blocked and MAC lookup mocked. No hardware or persistent preferences."
+        },
+        {
+          "selector": "test_api_version_admission.CoreAPIVersionAdmissionTests",
+          "tests": 7,
+          "timeout_seconds": 120,
+          "audit": "Real Core connection/reconnection and UltimateClient validation, synthetic REST, blocked Python sockets and FTP lease, mocked initial listing/MAC/credentials, temporary preferences only."
+        },
+        {
+          "selector": "test_core.CoreTests",
+          "tests": 11,
+          "timeout_seconds": 120,
+          "audit": "Audited headless Core: in-memory client and credential doubles, temporary preferences, synthetic discovery callbacks; subprocess only verifies headless module import. No device transport."
+        },
+        {
+          "selector": "test_uc1_compatibility.Protocol",
+          "tests": 24,
+          "timeout_seconds": 120,
+          "audit": "Audited protocol fixtures: Python sockets blocked, opener and MAC lookup mocked; synthetic HTTP responses only. GI import does not construct GTK windows."
+        },
+        {
+          "selector": "test_connections.Connections",
+          "tests": 12,
+          "timeout_seconds": 120,
+          "audit": "Audited Connections class only: mocked HTTP opener, synthetic discovery/parser inputs and temporary preferences; successful connection may query local route/neighbor state inside mandatory network-isolated runner. No device access; other module classes remain deferred."
+        },
+        {
+          "selector": "test_drive_reset_confirmation.DriveResetConfirmation",
+          "tests": 15,
+          "timeout_seconds": 120,
+          "audit": "Issue #24 Reset-only session binding: real Core with FakeClient, inert GTK dialog and temporary preferences. Socket connect/connect_ex/sendto/create_connection blocked. Covers stale callback and worker races, admission/lane refusal, one-shot response and uncertain outcome without retry; no physical commands or display."
         }
       ]
     },
@@ -348,8 +384,6 @@
     "test_compatibility_retirement": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_configuration": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_connection_layout": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
-    "test_connections": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
-    "test_core": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_creation_path_evidence": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_debian_packaging": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
     "test_deferred_upload_cleanup": "Outside approved P4-2 selection; requires import, transport and runtime audit before assignment.",
@@ -466,9 +500,11 @@
     "test_ultimate_menu_gate_a": "Issue #25 explicit offline Gate A runner tests/run_gate_a.py; separately reviewed namespace/GTK fixture, not yet a hosted CI selection."
   },
   "deferred_classes": {
-    "test_uc1_compatibility.Protocol": "Outside approved class selection; requires separate audit and assignment.",
     "test_uc1_compatibility.Isolation": "Outside approved class selection; requires separate audit and assignment.",
-    "test_uc1_compatibility.CallbackIsolation": "Outside approved class selection; requires separate audit and assignment."
+    "test_uc1_compatibility.CallbackIsolation": "Outside approved class selection; requires separate audit and assignment.",
+    "test_connections.SubnetSelectionTests": "Outside approved class selection; requires separate audit and assignment.",
+    "test_connections.IdentTests": "Outside approved class selection; requires separate audit and assignment.",
+    "test_core.FakeClient": "In-memory fixture with test_connection service method; not a unittest TestCase and not an executable test class."
   },
   "deferred_gtk_scripts": {
     "appearance_gtk_check.py": "Standalone script; requires entry-point, assertion and lifecycle review before CI assignment.",

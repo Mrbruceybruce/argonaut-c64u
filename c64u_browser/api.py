@@ -359,14 +359,15 @@ class UltimateClient:
             raise ConnectionFailure('malformed', 'Excessively nested REST response.') from exc
 
     def test_connection(self):
+        from .compatibility import validate_api_version
         result = self.info()
         info, version = result['info'], result['version']
+        validate_api_version(version.get('version'))
         product = info.get('product')
         # Generic JSON, HTTP 200 and even /v1/version are insufficient identity.
         if (not isinstance(product, str) or product.casefold() not in
                 {'c64 ultimate', 'commodore 64 ultimate', 'ultimate 64', 'ultimate 64 elite', 'ultimate 64 elite ii'}
-                or not isinstance(info.get('firmware_version'), str)
-                or not isinstance(version.get('version'), str)):
+                or not isinstance(info.get('firmware_version'), str)):
             raise ConnectionFailure('api', 'REST replied, but a supported Ultimate device could not be positively identified.')
         from .network_identity import peer_mac
         result['network_mac']=peer_mac(self.host)

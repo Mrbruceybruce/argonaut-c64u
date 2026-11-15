@@ -90,23 +90,31 @@ class DrivesTab:
             if info.get('type') in ('1541','1571','1581'):
                 card['type'].set_selected(('1541','1571','1581').index(info['type']))
 
-    def confirm(self, drive, title, detail, operation, success='Command completed; drive status refreshed.', *, selection=None):
+    def confirm(self, drive, title, detail, operation, success='Command completed; drive status refreshed.', *, selection=None, reset_session=None):
         if not self.client or not self.loaded or self.app.busy:return
         client=self.client
         if selection is not None:
             try:validate_selection(selection,self.app.core.device_session())
             except Exception as exc:self.message.set_text(str(exc));return
+        reset_answered=False
         dialog=Gtk.Dialog(title=title,transient_for=self.app.window,modal=True)
         dialog.add_button('Cancel',Gtk.ResponseType.CANCEL);dialog.add_button(title,Gtk.ResponseType.OK)
         dialog.get_content_area().append(Gtk.Label(label=f'Drive {drive.upper()} on {client.host}\n\n{detail}',wrap=True,xalign=0))
         def response(_,code):
+            nonlocal reset_answered
             dialog.destroy()
+            if reset_session is not None:
+                if reset_answered:return
+                reset_answered=True
+                if code==Gtk.ResponseType.OK and reset_session!=self.app.core.device_session():
+                    self.message.set_text('Connection changed. Reset was not sent. Open a new confirmation.')
+                    return
             if code!=Gtk.ResponseType.OK or self.client is not client:return
             if selection is not None:
                 try:validate_selection(selection,self.app.core.device_session())
                 except Exception as exc:self.message.set_text(str(exc));return
             def task():
-                if selection is not None:return operation(client)
+                if selection is not None or reset_session is not None:return operation(client)
                 operation(client)
                 return client.read_drives()
             self.request(task,success,action=True)
@@ -121,6 +129,10 @@ class DrivesTab:
             'remove':('Eject disk','Remove the mounted disk? Finish any disk activity first.'),
         }
         title,detail=descriptions[action]
+        if action=='reset':
+            session=self.app.core.device_session()
+            return self.confirm(drive,title,detail,
+                lambda _:self.app.core.execute_drive_reset(session,drive),reset_session=session)
         return self.confirm(drive,title,detail,lambda client:client.drive_action(drive,action))
 
     def path_changed(self, drive):

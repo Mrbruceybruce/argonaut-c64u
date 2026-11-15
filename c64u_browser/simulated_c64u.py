@@ -124,7 +124,7 @@ def _ftp_authentication_failure():
 
 def _rest_wrong_device_identity():
     opener = _RouteOpener({
-        '/v1/version': {'errors': [], 'version': 'v1'},
+        '/v1/version': {'errors': [], 'version': '0.1'},
         '/v1/info': {'errors': [], 'product': 'C64 Ultimate',
                      'firmware_version': '1.1.0', 'unique_id': 'other-device'},
     })
@@ -145,7 +145,7 @@ def _rest_wrong_device_identity():
 
 def _complete_read_only_hardware_suite():
     opener = _RouteOpener({
-        '/v1/version': {'errors': [], 'version': 'v1'},
+        '/v1/version': {'errors': [], 'version': '0.1'},
         '/v1/info': {'errors': [], 'product': 'C64 Ultimate',
                      'firmware_version': '1.1.0', 'unique_id': 'expected-device'},
         '/v1/drives': {'errors': [], 'drives': [

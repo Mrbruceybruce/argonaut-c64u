@@ -33,7 +33,7 @@ class HardwareChecksTests(unittest.TestCase):
         profile = Profile.new('Fixture', 'fixture.invalid', device_id='device-1')
         requests = []
         responses = {
-            '/v1/version': {'errors': [], 'version': 'v1'},
+            '/v1/version': {'errors': [], 'version': '0.1'},
             '/v1/info': {'errors': [], 'product': 'C64 Ultimate',
                          'firmware_version': '1.1', 'unique_id': 'device-1'},
             '/v1/drives': {'errors': [], 'drives': [{'a': {'enabled': True}}]},
@@ -65,7 +65,7 @@ class HardwareChecksTests(unittest.TestCase):
         profile = Profile.new('Fixture', 'fixture.invalid', device_id='expected')
         client.test_connection.return_value = {
             'info': {'firmware_version': '1.1', 'unique_id': 'different'},
-            'version': {'version': 'v1'}, 'network_mac': ''}
+            'version': {'version': '0.1'}, 'network_mac': ''}
         report = run_hardware_checks(client, profile)
         self.assertEqual([check['status'] for check in report['checks']],
                          ['fail', 'skip', 'skip', 'skip'])

@@ -1,5 +1,46 @@
 # Current development state
 
+## Issue #24 — acceptance and Drive Reset safety, 15 November 2026
+
+The nine-file API admission change and separate three-file About relocation are
+integrated, unstaged and uncommitted in primary `development` at
+`b998af66b0a846e619a976a9ee57a04ba4816cef`. API admission accepts exactly `0.1`,
+rejects malformed/unsupported versions before operational admission, and retains
+identity, session, credential and category-wide LED Apply safeguards. Settings
+order is **General → Device details → Game Library → About**. Both changes passed
+independent implementation and integration review. Prior validation: 208 normal
+and 208 optimized tests, 17 offline checks for API admission; 18 normal and 18
+optimized focused tests for About. Full Markdown validation passed.
+
+Founders and Beige read-only REST/connection/configuration checks passed. Both
+Export workflows have operator-controlled PASS outcomes; Beige's saved export
+was verified as 22 categories/206 settings matching the retained sanitized
+baseline. Work-launched GTK chooser failures remain an environment-dependent
+acceptance limitation with precise cause unconfirmed. The successful operator
+launch does not erase failed attempts or prove their cause. The integrated-source
+build identity and final Settings order were visually accepted. Sensitive fields,
+non-atomic snapshots and untested physical operations limit these observations.
+
+The separately identifiable seven-file Drive Reset correction and documentation
+reconciliation are now **integrated, unstaged and uncommitted** in primary, layered
+on those exact twelve files. The reviewed isolated source and each slice's patch
+are retained separately. Reset captures the originating session
+at confirmation opening. UI rejects stale responses; Core rechecks under its
+session admission guard and device lane before dispatch/readback. Cancellation,
+refusal and uncertain outcomes consume the dialog response without retry. A valid
+confirmation retains one Reset and status readback. No other Drive action or
+Ultimate Menu control is changed.
+
+See [the acceptance and safety evidence](ISSUE24-IDENTITY-EVIDENCE.md#drive-reset-confirmation-safety-candidate)
+for validation, review disposition and limits. Combined integration evidence is
+retained in `/tmp/argonaut-issue24-drive-reset-integration-20261115`; manual
+publication remains a gate. No physical Drive Reset was performed; this is deterministic
+synthetic qualification, not hardware operation acceptance. Other stale action
+confirmations/Flash-file dialogs and broader disconnected-button presentation
+remain separate follow-ups. Original intermittent LED lockup, indirect/Auto SID
+risks, transferred #49 obligations and #26 dependencies remain unresolved.
+No Issue #23 diagnostic work, installation or GitHub tracking change is included.
+
 ## Issue #24 — Publication reconciliation and bounded owner disposition
 
 Record status — verified 8 November 2026: the owner-approved acceptance disposition
