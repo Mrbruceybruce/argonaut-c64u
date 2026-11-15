@@ -197,7 +197,98 @@ wording; no Project fields changed. No hardware contact, application launch or
 repeated hardware/regression test occurred during preparation. No broader
 acceptance criterion, safety requirement or publication gate is waived.
 
+### Beige Drive A/B — bounded operator-reported acceptance
+
+Record prepared 15 November 2026 for owner approval. The implementation is
+published at `152e3885590e9fe62e19e68eb30e83f1f3025c4f`, confirmed by the
+[publication comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6902156008).
+Local and live `development` match that commit; tracked files and index are
+clean and seven preserved artifacts match retained hashes. The earlier
+integrated/unpublished section below is a historical checkpoint, superseded
+only for publication and the bounded acceptance recorded here.
+
+Evidence sources are the operator reports and retained screenshots from
+**Continue issue 24** (conversation `6af0e31f-b0d8-83ea-919f-681a71f30feb`),
+the existing Work task **Prepare Issue 24 acceptance plan**
+(`01a1e147-349c-7f90-ad59-3fddc09c5869`), and the owner's explicit continuation
+summary. The retrieved prior assistant replies contain reference placeholders;
+the case mapping below therefore relies on that explicit owner summary, not
+reconstructed unseen instructions or invented per-step timestamps.
+
+Re-inspected screenshots show About `1.10-dev / 152e3885590e-modified`,
+connection address `192.168.68.70:80`, firmware `1.1.0s2`, API `0.1`, and the
+baseline drive cards: A On / Device 8 / 1541 / `JiffyDOS_1541-II_6.00.bin`;
+B Off / Device 9 / 1541 / `1541.rom`; both “No disk mounted”. The existing
+source-launch plan explains the expected `-modified` suffix from the seven
+preserved untracked artifacts. Screenshots establish displayed identity/status,
+not authenticated physical identity or idleness; Beige identification and
+physical idle/normal-operation statements remain operator-reported.
+
+The configuration screenshots show A's configured 1541 JiffyDOS, `1571.rom`
+and `1581.rom`; B's configured `1541.rom`, `1571.rom` and **`1541.rom` for
+1581 mode**. Configuration display is not evidence of running every mode.
+
+| Cancellation intent | Drive A | Drive B |
+| --- | --- | --- |
+| Turn on | Operator-reported PASS, later cancellation | Operator-reported PASS |
+| Turn off | Operator-reported PASS | Operator-reported PASS |
+| Eject | Operator-reported PASS | Operator-reported PASS |
+| Type 1541 | Operator-reported PASS | Operator-reported PASS |
+| Type 1571 | Operator-reported PASS | Operator-reported PASS |
+| Type 1581 | Operator-reported PASS | Operator-reported PASS |
+
+All 12 cancellations are operator-reported PASS. Cancellation does not itself
+refresh drive status; a selected type is not proof of the running type.
+Zero command dispatch on cancellation is not independently measured here.
+
+**Separate procedural incident:** the initial Drive A Turn on was confirmed
+instead of cancelled. The operator explicitly reported the mistake and later
+“it's operating normally”. A retained screenshot shows “Command completed;
+drive status refreshed” with the baseline cards. This is a normal-result
+incident, not a cancellation pass or retroactive authorization. The implementation
+warns that Turn on while already on resets the drive; no physical Reset dispatch
+count is inferred. The later successful A Turn on cancellation supplies that
+cancellation case.
+
+| Confirmed command sequence | Disposition |
+| --- | --- |
+| A off, then on | Operator-reported PASS |
+| A 1541 → 1571 → 1581 → 1541 | Operator-reported PASS |
+| A empty Eject | Operator-reported PASS; no-media case only |
+| B on, then off | Operator-reported PASS |
+| B 1541 → 1571 → 1541 | Operator-reported PASS |
+| B empty Eject | Operator-reported PASS; no-media case only |
+| B transition to 1581 | **NOT TESTED — accepted exception** |
+
+The owner accepted omission of B 1581 with no retesting this acceptance cycle;
+its configured ROM was `1541.rom`. This is not a B 1581 pass, compatible-ROM
+qualification or a general waiver. The B 1581 cancellation remains distinct.
+
+Final A On / 1541 / JiffyDOS and B Off / 1541 / `1541.rom`, both with no media,
+idle and operating normally, are operator-reported. Exact post-command messages,
+ROM/status details and other-drive invariance for every step were not independently
+observed and are not inferred from the planned expectations. The source/test
+contract of one command and one readback remains synthetic evidence; physical
+network dispatch counts were not captured. Mounted-media eject, stale-session
+race physical qualification, Founders acceptance and recovery remain untested
+by this cycle. No hardware operation or application launch was repeated for
+this evidence preparation, and no application regression tests were rerun.
+
+Retained implementation review/test results below are unchanged, including the
+known 114/115 adjacent suite. Flash-file stale-session safeguards, broader
+disconnected-button presentation, mandatory category-wide LED Apply containment,
+unresolved intermittent lockup and indirect/Auto SID risks remain outstanding.
+Bruce's residual-risk ownership, unmet/unwaived #49 criteria 2, 3, 5, 6, 7 and 8,
+incomplete C1, #48 tooling-only scope, #26 dependencies and RM-026/028/029 gates
+remain unchanged. #24 remains Open / Backlog / P1 — High / Ultimate Menu.
+This bounded operator-reported acceptance does not complete #24 or release
+qualification. Applying/publishing this evidence record and posting its tracking
+comment remain separate owner gates; this proposal does neither.
+
 ### Drive A/B command confirmation safety — integrated, unpublished
+
+Historical integration checkpoint: the acceptance/publication record above
+supersedes the pending status below within its stated bounds.
 
 On 15 November 2026, the exact independently reviewed four-file candidate was
 integrated into primary `development` at published HEAD

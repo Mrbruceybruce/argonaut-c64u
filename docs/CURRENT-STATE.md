@@ -1,6 +1,33 @@
 # Current development state
 
-## Issue #24 — Drive A/B confirmation safety integrated, unpublished, 15 November 2026
+## Issue #24 — bounded Beige Drive A/B acceptance, 15 November 2026
+
+The Drive A/B confirmation safety slice is published on `development` at
+`152e3885590e9fe62e19e68eb30e83f1f3025c4f`; primary and live GitHub HEADs
+were verified equal during this preparation, with clean tracked files, empty
+staging and all seven preserved artifacts matching retained hashes. This
+supersedes the earlier unpublished checkpoint below for this slice only.
+
+On Beige, all 12 cancellation checks and the bounded A/B commands are
+operator-reported PASS: A off/on, 1541 → 1571 → 1581 → 1541 and empty Eject;
+B on/off, 1541 → 1571 → 1541 and empty Eject. The initial accidental A Turn on
+confirmation is a separate normal-result incident, not a cancellation pass;
+the later A Turn on cancellation passed. **B 1581 is NOT TESTED**, accepted
+as an exception because its configured ROM was `1541.rom`; no retesting is
+planned this acceptance cycle. Final baseline, no media, idleness and normal
+operation are operator-reported. See [evidence and limits](ISSUE24-IDENTITY-EVIDENCE.md#beige-drive-ab--bounded-operator-reported-acceptance).
+
+This does not establish network dispatch counts, mounted-media eject,
+physical stale-session race qualification, Founders acceptance or broader
+release acceptance. Retained synthetic results remain separate, including the
+known 114/115 adjacent-suite result. Flash-file stale-session safeguards,
+broader disconnected presentation, mandatory LED Apply containment, unresolved
+lockup and indirect/Auto SID risks remain outstanding. Transferred #49 criteria
+2, 3, 5, 6, 7 and 8 remain unmet and unwaived; C1, #48 tooling-only scope,
+#26 dependencies and RM-026/028/029 gates remain unchanged.
+Issue #24 remains Open / Backlog / P1 — High / Ultimate Menu.
+
+## Issue #24 — historical Drive A/B integration checkpoint, 15 November 2026
 
 The reviewed four-file correction is integrated in primary `development` above
 published HEAD `5312370990e10d437bddb2e301098334da2cb5c6`; local and live GitHub

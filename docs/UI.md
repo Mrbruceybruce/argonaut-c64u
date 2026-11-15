@@ -1938,6 +1938,20 @@ It does not include or qualify the later command correction below.
 
 ## Issue #24 — Drive A/B command confirmation safety
 
+Current disposition, 15 November 2026: this slice is published at
+`152e3885590e9fe62e19e68eb30e83f1f3025c4f`. The
+[bounded Beige acceptance record](ISSUE24-IDENTITY-EVIDENCE.md#beige-drive-ab--bounded-operator-reported-acceptance)
+records 12 operator-reported cancellation passes, A off/on and
+1541 → 1571 → 1581 → 1541, B on/off and 1541 → 1571 → 1541, and empty Eject
+on both drives. The accidental initial A Turn on confirmation is recorded
+separately; its later cancellation passed. B 1581 remains **NOT TESTED**, an
+accepted exception with no retesting planned this cycle because its configured
+ROM was `1541.rom`. Final baseline/no media/idleness/normal operation are
+operator-reported. This does not qualify mounted-media eject, dispatch counts,
+physical session races, Founders or release acceptance. Outstanding safety and
+release obligations below remain unchanged. The following paragraphs preserve
+the earlier integration checkpoint; their unpublished/pending wording is historical.
+
 The on/off/eject and type (1541/1571/1581) correction is integrated locally above
 `5312370990e10d437bddb2e301098334da2cb5c6`, but remains unstaged, uncommitted and
 unpublished. Both drive cards capture the originating session and exact command
