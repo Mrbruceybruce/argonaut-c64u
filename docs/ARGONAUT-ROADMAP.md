@@ -1,5 +1,52 @@
 # Argonaut roadmap
 
+## Issue #24 — Flash correction published, 22 November 2026 UTC
+
+The Flash stale-session correction is **implemented, independently reviewed and
+published** on `development` at
+[`86f84ca866b6a87574ccfb24d385996c9271bdde`](https://github.com/Mrbruceybruce/argonaut-c64u/commit/86f84ca866b6a87574ccfb24d385996c9271bdde),
+parent `489fae08c8a8e73d77047370e5fade55401a1541`. Publication contained exactly
+15 reviewed files: 14 modifications and one new test. Primary
+`/home/bruce/Documents/ChatGPT/Local Projects/argonaut-repository` and direct live
+GitHub `development` HEADs were verified synchronized at this commit before this
+reconciliation. Primary fetch/push origin is `Mrbruceybruce/argonaut-c64u` on GitHub;
+the stale cached `origin/development` was not used as live authority.
+
+Independent Class C, integration and documentation reviews passed. Retained local
+automated validation passed, including the separately audited focused suites.
+[Argonaut Test Lab #234](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/44976580896)
+completed **8/8 jobs successfully for this exact commit**: offline checks, normal
+and optimized units, normal and optimized regressions, media, GTK and Markdown.
+This hosted result is separate from the retained local counts below; it does not
+claim that the deferred foreground, CFG GTK or R6 focused suites ran in standard CI.
+No application tests or physical operations were rerun for this reconciliation.
+
+The [publication progress record](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-7072996601)
+records the completed publication. Read-only tracking verification confirms
+**Issue #24 Open / Argonaut Development Backlog**. Complete native Flash
+window/chooser lifecycle qualification and physical C64U acceptance remain pending.
+Mandatory LED Apply containment, intermittent lockup and indirect/Auto SID risks,
+transferred #49 criteria 2, 3, 5, 6, 7 and 8 (unmet and unwaived), C1, #48 tooling-only
+scope, #26 dependencies and RM-026/028/029 gates remain unchanged. The bounded Beige
+B 1581 NOT TESTED exception and historical 114/115 adjacent-suite result remain.
+Publication and passing automation do not establish acceptance or issue completion.
+
+The seven existing artifacts, exact 19 authorized ignored-cache paths/hashes,
+existing worktrees and detached source candidate remain preserved. This subsequent
+four-document reconciliation is **unstaged, uncommitted and unpublished**; staging
+remains empty and publication is unauthorized. No Issue or Project changes are
+included. Next: review this documentation reconciliation and obtain separate
+publication authorization if desired; agree the remaining native/physical acceptance
+scope separately. No package, installation, release or hardware operation is authorized.
+
+The unpublished-candidate and earlier records below are **historical checkpoints**.
+This publication record supersedes their pending-publication status and former
+next-publication steps for the Flash correction only. Their implementation evidence,
+coverage limits, safety obligations and acceptance exceptions remain intact.
+
+See the [Flash evidence and acceptance limits](ISSUE24-IDENTITY-EVIDENCE.md#issue-24--flash-correction-published-22-november-2026-utc) and
+[Flash architecture](R6-MANAGED-FLASH-PUBLICATION.md#issue-24--flash-correction-published-22-november-2026-utc).
+
 ## Issue #24 — Flash session correction, unpublished candidate, 22 November 2026 UTC
 
 The reviewed Flash stale-session correction is integrated into the primary
