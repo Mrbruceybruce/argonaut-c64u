@@ -155,6 +155,12 @@
           "tests": 16,
           "timeout_seconds": 120,
           "audit": "Issue #24 ordinary worker status: controlled Futures, mocked pool/header/idle scheduling and inert labels; imports GUI without constructing windows. Tests success, worker/callback/submission failure, rejected overlap, reentrant subsequent workers and foreground status ownership. No tasks, transports, device requests or application launch; mandatory network-isolated runner."
+        },
+        {
+          "selector": "test_flash_session.FlashSessionTests",
+          "tests": 20,
+          "timeout_seconds": 120,
+          "audit": "Real synthetic Core with inert GTK; sockets/DNS blocked, temporary local ROM bytes, session and callback admission only. No hardware."
         }
       ]
     },

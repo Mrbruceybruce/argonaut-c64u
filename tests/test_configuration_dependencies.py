@@ -343,7 +343,7 @@ class UIDependencies(Offline,unittest.TestCase):
                             ResponseType=SimpleNamespace(OK=1,CANCEL=0))
         patch.object(settings_tab,'Gtk',gtk).start();patch.object(backup_dialog,'Gtk',gtk).start()
         tab=self.tab=SettingsTab.__new__(SettingsTab)
-        tab.app=SimpleNamespace(busy=False,window=None,status=Mock(),preferences=self.core.preferences,
+        tab.app=SimpleNamespace(core=self.core,busy=False,window=None,status=Mock(),preferences=self.core.preferences,
                                 active_profile=self.profile,run=lambda task,done:done(task()))
         tab.client=self.ops;tab.pending={};tab.drafts={};tab.errors={};tab.requires_refresh=False
         tab.all_settings=self.settings();tab.loaded=True
@@ -410,13 +410,15 @@ class UIDependencies(Offline,unittest.TestCase):
     def test_native_cfg_actual_preview_refuses_invalid_combination(self):
         from c64u_browser.flash_dialog import FlashFiles
         native=FlashFiles.__new__(FlashFiles);native.tab=self.tab;native.client=self.ops
+        native.app=self.tab.app;native.session=self.core.device_session();native.closed=False
+        native.chooser=None;native.confirmation=None;native.plan_id=None
         native.dialog=Widget();native.folder=lambda:'/Flash/configs'
         native.listing=SimpleNamespace(get_selected_row=lambda:SimpleNamespace(name='test.cfg'))
         native.run=lambda task,done:done(task())
         captured=[];original=self.tab.backups.preview
         def preview(*args,**kwargs):
             result=original(*args,**kwargs);captured.append(result);return result
-        with patch('c64u_browser.flash_dialog.read_remote',return_value=b'[Keyboard Lighting]\nStrip Intensity=15\n'), patch.object(self.tab.backups,'preview',side_effect=preview):
+        with patch('c64u_browser.native_files.read_remote',return_value=b'[Keyboard Lighting]\nStrip Intensity=15\n'), patch.object(self.tab.backups,'preview',side_effect=preview):
             native.preview()
         dialog,checks=captured[0]
         for check in checks:check.set_active(True)

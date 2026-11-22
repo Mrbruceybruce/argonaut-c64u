@@ -174,7 +174,10 @@ class Admission(unittest.TestCase):
     def test_flash_delayed_prepare_refuses_before_submission(self):
         owner=SimpleNamespace(app=self.app,tab=SimpleNamespace(client='same'),client='same',
             controls=Mock(),status=Mock(),folder=lambda:'/Flash/roms')
-        owner.run_core_job=lambda *args:FlashFiles.run_core_job(owner,*args)
+        owner.session=DeviceSession('synthetic','one');owner.closed=False
+        self.app.core.device_session=lambda:owner.session
+        owner.current=lambda:FlashFiles.current(owner)
+        owner.run_core_job=lambda *args,**kwargs:FlashFiles.run_core_job(owner,*args,**kwargs)
         self.app.core.files.prepare_native_upload=Mock()
         a=self.start()
         FlashFiles.prepare(owner,'/tmp/fake.rom',False)
@@ -215,6 +218,12 @@ class Admission(unittest.TestCase):
         tree=ast.parse((Path(__file__).parents[1]/'c64u_browser'/filename).read_text())
         owner=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name==method)
         response=next(n for n in ast.walk(owner) if isinstance(n,ast.FunctionDef) and n.name==callback)
+        if any(isinstance(n,ast.Nonlocal) for n in ast.walk(response)):
+            factory=ast.parse('def factory():\n    consumed=False\n').body[0]
+            factory.body.extend([response,ast.Return(value=ast.Name(id=callback,ctx=ast.Load()))])
+            module=ast.fix_missing_locations(ast.Module(body=[factory],type_ignores=[]))
+            exec(compile(module,filename,'exec'),namespace)
+            return namespace['factory']()
         exec(compile(ast.Module(body=[response],type_ignores=[]),filename,'exec'),namespace)
         return namespace[callback]
 
@@ -241,13 +250,18 @@ class Admission(unittest.TestCase):
         submit('new');self.app.core.files.create_folder.assert_not_called()
         owner=SimpleNamespace(app=self.app,tab=SimpleNamespace(client='same'),client='same',
             controls=Mock(),status=Mock(),refresh=Mock())
-        owner.run_core_job=lambda *args:FlashFiles.run_core_job(owner,*args)
+        owner.session=DeviceSession('synthetic','one');owner.closed=False
+        self.app.core.device_session=lambda:owner.session
+        owner.current=lambda:FlashFiles.current(owner)
+        owner.run_core_job=lambda *args,**kwargs:FlashFiles.run_core_job(owner,*args,**kwargs)
         self.app.core.files.execute_native_upload=Mock()
+        self.app.core.files.discard_plan=Mock()
         # prepare contains the chooser-independent upload confirmation callback.
         answer=self.callback('flash_dialog.py','prepare','response',
             {'self':owner,'preview':SimpleNamespace(plan_id='reviewed'),'dialog':Mock(),'Gtk':Gtk})
         answer(Mock(),Gtk.ResponseType.OK)
         self.app.core.files.execute_native_upload.assert_not_called()
+        self.app.core.files.discard_plan.assert_called_once_with('reviewed')
         self.assertIs(a,self.app.transfer_job)
 
     def test_submission_failure_batch_continues_and_terminal_failure_releases(self):

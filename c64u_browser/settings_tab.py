@@ -75,6 +75,8 @@ class SettingsTab:
         if not self.client or self.app.busy:return
         if self.pending or self.drafts:
             self.app.status.set_text('Apply or discard edits before opening Flash files.');return
+        old=getattr(self,'flash_files',None)
+        if old is not None:old.retire()
         self.flash_files=FlashFiles(self)
 
     @staticmethod
@@ -82,6 +84,8 @@ class SettingsTab:
         while box.get_first_child():box.remove(box.get_first_child())
 
     def bind(self, client):
+        flash=getattr(self,'flash_files',None)
+        if flash is not None:flash.retire()
         self.requires_refresh=False
         self.rows.set_sensitive(True)
         self.client=client;self.loaded=False;self.category=None;self.all_settings={};self.favorites=set(self.app.preferences.setting_favorites)
@@ -92,6 +96,8 @@ class SettingsTab:
 
     def require_fresh_settings(self):
         """Retain drafts while gating the snapshot from the previous session."""
+        flash=getattr(self,'flash_files',None)
+        if flash is not None:flash.retire()
         self.loaded=False
         self.requires_refresh=True
         self.rows.set_sensitive(False)

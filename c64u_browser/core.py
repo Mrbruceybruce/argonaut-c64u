@@ -997,6 +997,35 @@ class ArgonautCore:
         from .managed_d64_execution import execute
         return execute(self, plan_id)
 
+    def read_flash(self, session, folder, *, name=None):
+        """Worker-only Flash listing/CFG preview bound to its opening session."""
+        from .native_files import FLASH_FOLDERS, read_remote, config_backup
+        from .configuration import Configuration
+        if folder not in FLASH_FOLDERS.values():
+            raise CoreError('argument', 'Unsupported Flash folder.')
+        if name is not None and (folder != '/Flash/configs' or
+                not name or '/' in name or '\\' in name or name in ('.', '..') or
+                not name.lower().endswith('.cfg')):
+            raise CoreError('argument', 'Unsupported Flash configuration.')
+        with self._session_admission():
+            def validate():
+                if session != self.device_session() or not session.session_id:
+                    raise CoreError('session', 'Connection changed. Reopen Flash files.')
+            validate()
+            client = self._require_client()
+            with self.scheduler.inline(JobBinding.device(session), reject_busy=True):
+                validate()
+                if name is None:
+                    root = client.list_directory('/Flash')[1]
+                    if not any(e.name == folder.rsplit('/', 1)[1] and e.kind == 'dir' for e in root):
+                        return []
+                    return client.list_directory(folder)[1]
+                data = read_remote(client, folder + '/' + name)
+                model = Configuration(client)
+                settings = model.all_settings(model.categories())
+                converted, skipped = config_backup(data, settings)
+                return converted, settings, skipped
+
     def execute_drive_reset(self, session, drive):
         """Worker-only Reset bound to the confirmation's originating session."""
         if drive not in ('a', 'b'):

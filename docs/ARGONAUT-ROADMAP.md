@@ -1,5 +1,48 @@
 # Argonaut roadmap
 
+## Issue #24 — Flash session correction, unpublished candidate, 22 November 2026 UTC
+
+The reviewed Flash stale-session correction is integrated into the primary
+`argonaut-repository` working tree on `development`, whose HEAD remains
+`489fae08c8a8e73d77047370e5fade55401a1541`. The complete publication candidate
+contains 15 files. Changes remain **unstaged, uncommitted and unpublished**;
+the detached source candidate is preserved. Independent integration review passed.
+Publication stopped first at cache preservation and then at documentation
+synchronization. The owner authorized only the 19 audited ignored cache paths at
+their exact recorded hashes as preservation exceptions; caches remain untouched.
+This documentation correction records the integrated state. Publication
+authorization remains expired; no staging, commit, push or tracking change is
+included in this documentation pass.
+
+Flash now binds to the immutable opening session, uses Core admission for listings
+and configuration reads, retires stale dialogs and rejects delayed callbacks or
+stale configuration staging. Existing prepared-upload safeguards remain intact.
+See the [implementation, evidence and acceptance limits](ISSUE24-IDENTITY-EVIDENCE.md#flash-session-correction--unpublished-candidate)
+and [Flash architecture update](R6-MANAGED-FLASH-PUBLICATION.md#issue-24-flash-session-binding--unpublished-candidate).
+
+Retained passing results: **280/280 units** and **356/356 broader regressions** in
+each normal/optimized Python mode; **27/27 standard GTK**, **11/11 CFG GTK**,
+**28/28 foreground admission** and **30/30 R6** in each supported Python mode
+(the GTK suites run normal only). The corrected session inventory contains
+**20 tests**, included in the unit totals. All final runs have zero failures,
+errors, skips and timeouts. Independent **Class C PASS** covers this reviewed
+implementation slice and focused automated validation; the earlier P2 omitted-test
+gap is closed. All required automated suites also passed in the primary checkout
+after integration, with the counts above. These are inspected retained results,
+not tests rerun for this documentation reconciliation and not hosted CI results
+for a published candidate.
+
+Complete native Flash window/chooser lifecycle qualification and physical C64U
+acceptance remain outstanding. Broader disconnected presentation, mandatory LED
+Apply containment, intermittent lockup and indirect/Auto SID risks remain outside
+this correction. Transferred #49 criteria 2, 3, 5, 6, 7 and 8 remain unmet and
+unwaived; C1, #48 tooling-only scope, #26 dependencies and RM-026/028/029 gates
+remain unchanged. Issue #24 remains open. No closure or acceptance waiver is implied.
+The older records below retain their historical scope; their Flash follow-up
+wording is superseded only for this candidate's implementation/automated-review
+status, not for acceptance or publication. The bounded Beige B 1581 exception and
+known historical 114/115 adjacent-suite result remain as recorded.
+
 ## Issue #24 — bounded Beige Drive A/B acceptance, 15 November 2026
 
 The Drive A/B confirmation safety implementation is published on `development`

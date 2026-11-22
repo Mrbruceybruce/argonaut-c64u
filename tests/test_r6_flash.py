@@ -429,7 +429,7 @@ class FlashTests(unittest.TestCase):
         self.assertFalse(names&{'connect','ftplib','upload_managed'})
         self.assertFalse(attributes&{'open_ftp','storbinary','retrbinary','reset','reboot','apply','activate'})
         gui=Path('c64u_browser/flash_dialog.py').read_text()
-        self.assertIn('self.prepare(path,False)',gui);self.assertIn('self.prepare(path,True)',gui)
+        self.assertIn('self.prepare(path,False,folder=folder)',gui);self.assertIn('self.prepare(path,True)',gui)
         self.assertIn('result.result.message if result.result',gui)
         self.assertNotIn('def connect(',Path('c64u_browser/transfers.py').read_text())
         self.assertNotIn('def open_ftp(',Path('c64u_browser/core.py').read_text())

@@ -14,13 +14,28 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
                     self.tab.revert()
                     self.client.metadata[category] = metadata(category, mode)
                     self.tab.reload()
-                    for name in metadata(category):
-                        expander = self.expander(category, name)
-                        self.assertTrue(expander.get_visible())
-                        expander.set_expanded(True)
-                        allocated_frame(self.window, expander)
-                        self.assertFalse(any(isinstance(w, (Gtk.ComboBoxText, Gtk.Entry)) for w in descendants(expander)))
-                        self.assertTrue(any(isinstance(w, Gtk.Label) and 'blocked by Argonaut' in w.get_text() for w in descendants(expander)))
+                    allocated_frame(self.window, self.tab.rows)
+                    widgets = list(descendants(self.tab.rows))
+                    labels = [w for w in widgets if isinstance(w, Gtk.Label)]
+                    texts = [w.get_text() for w in labels]
+                    self.assertIn('Native layout unknown', texts)
+                    self.assertIn('Read-only — safety qualification pending', texts)
+                    self.assertFalse(any(isinstance(w, (Gtk.ComboBoxText, Gtk.Entry)) for w in widgets))
+                    display_names = {'LedStrip Mode': 'Mode', 'LedStrip Auto SID Mode': 'Music Detect',
+                                     'LedStrip Pattern': 'Pattern', 'Strip Intensity': 'Brightness',
+                                     'Fixed Color': 'Color', 'Color tint': 'Tint'}
+                    for name, item in metadata(category, mode).items():
+                        identity = f'{category} / {name}'
+                        matches = [w for w in labels if identity in w.get_text().splitlines()]
+                        self.assertEqual(len(matches), 1, identity)
+                        row = matches[0]
+                        self.assertTrue(row.get_visible())
+                        self.assertTrue(row.get_mapped())
+                        lines = row.get_text().splitlines()
+                        self.assertEqual(lines[0], f'{display_names.get(name, name)} — {item["current"]}')
+                        self.assertEqual(lines[1], 'Native availability unknown')
+                        self.assertEqual(lines[2], identity)
+                    self.no_writes()
         self.no_writes()
 
     def test_led_fields_read_only_and_unrelated_draft_preserved(self):
@@ -134,13 +149,16 @@ class RealGtkMenu(MenuFixture, unittest.TestCase):
     def test_actual_native_file_preview_refuses_invalid_batch(self):
         from types import SimpleNamespace
         from c64u_browser.flash_dialog import FlashFiles
+        self.app.core = self.core
         native = FlashFiles.__new__(FlashFiles)
         native.tab = self.tab; native.client = self.ops
+        native.app = self.app; native.session = self.core.device_session(); native.closed = False
+        native.chooser = None; native.confirmation = None; native.plan_id = None
         native.dialog = Gtk.Dialog(transient_for=self.window)
         native.folder = lambda: '/Flash/configs'
         native.listing = SimpleNamespace(get_selected_row=lambda: SimpleNamespace(name='synthetic.cfg'))
         native.run = lambda task, done: done(task())
-        with patch('c64u_browser.flash_dialog.read_remote', return_value=b'[Keyboard Lighting]\nStrip Intensity=15\n') as read:
+        with patch('c64u_browser.native_files.read_remote', return_value=b'[Keyboard Lighting]\nStrip Intensity=15\n') as read:
             native.preview()
         self.assertEqual(read.call_count, 1)
         dialog = next(w for w in Gtk.Window.get_toplevels() if isinstance(w, Gtk.Dialog) and w is not native.dialog)

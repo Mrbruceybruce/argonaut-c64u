@@ -1,5 +1,9 @@
 # Issue #24 — identity evidence and regression design
 
+The [Flash session candidate record](#flash-session-correction--unpublished-candidate)
+adds the 22 November 2026 UTC implementation and validation status. Earlier
+investigation and acceptance sections retain their original scope and dates.
+
 ## Scope and baseline
 
 This documentation-only slice records the source investigation preceding it;
@@ -497,3 +501,149 @@ indirect/Auto SID safety remain unresolved. #48 is tooling only; C1 physical
 acceptance is incomplete. RM-026/028/029 gates and #26 blockers remain intact.
 Documentation completion, acceptance, publication and issue closure are distinct;
 staging, committing, pushing and issue updates remain outside this slice.
+
+## Flash session correction — unpublished candidate
+
+### Status and authority
+
+Record date: 22 November 2026 UTC. The reviewed Flash correction is integrated into
+`/home/bruce/Documents/ChatGPT/Local Projects/argonaut-repository` on `development`
+at HEAD `489fae08c8a8e73d77047370e5fade55401a1541`. The complete publication
+candidate contains 14 modified tracked files and new `tests/test_flash_session.py`;
+all 15 remain unstaged, uncommitted and unpublished. Staging is empty and the seven
+pre-existing untracked artifacts are preserved. Primary origin is GitHub
+`Mrbruceybruce/argonaut-c64u`. The original source candidate remains preserved in
+`/tmp/argonaut-issue24-flash-20261122`, detached at the same baseline with the local
+primary as origin; this documentation correction is in primary only.
+No current local/live remote HEAD equality or candidate hosted-CI result is claimed.
+
+Independent integration review passed, followed by passing required primary
+automated suites. Publication stopped at preservation drift from six added and
+13 changed ignored Python caches. The subsequent audit found no other file drift.
+The owner authorized an exception only for those 19 exact paths and recorded
+SHA-256 hashes, without modification or deletion; all other drift remains a failure.
+A later publication attempt stopped at stale integration wording in these documents.
+This documentation-only pass corrects that status; publication authorization remains
+expired. The original inventories, failed-gate evidence and isolated candidate are
+preserved. Audit evidence is retained at
+`/tmp/argonaut-python-cache-audit-20261122/cache-audit-report.txt` and
+`/tmp/argonaut-python-cache-audit-20261122/cache-inventory.tsv`.
+
+Read-only inspection confirms Issue #24 remains open; the prior tracking record
+places it in Argonaut Development Backlog. No Issue or Project fields were changed.
+This bounded correction does not complete the issue's capability/dependency mapping
+or authorize staging, committing, pushing, release or physical operations.
+
+### Implementation and preserved contract
+
+The [Flash architecture update](R6-MANAGED-FLASH-PUBLICATION.md#issue-24-flash-session-binding--unpublished-candidate)
+describes immutable opening-session identity, Core admission/device-lane checks,
+Settings-triggered retirement and callback guards. Empty or changed sessions
+cannot start fresh Flash work through these guards; rebinding Settings or requiring
+fresh settings retires the window, chooser, confirmation and pending plan.
+This does not qualify every disconnected control or native window event sequence.
+
+Listings and CFG reads are Core-owned and session-bound. Local chooser destinations
+are captured before delayed responses; responses/completions are consumed once.
+Preparation and save-copy forward `expected_session`; stale preparation results
+are discarded. Late upload consequence evidence remains visible through application
+status. Native CFG preview checks the originating session at opening and staging;
+existing busy/draft/refresh, dependency and whole-batch refusal protections remain.
+No preview automatically applies configuration.
+
+Existing immutable prepared bytes, expiring single-use plans, exact Flash path,
+name/content/collision checks, managed transport, cancellation and consequential
+evidence are preserved. No overwrite, raw transport fallback, automatic retry,
+replay, cleanup, ROM activation or settings application is introduced. Existing
+R6 same-size external-writer windows and non-atomic no-replace/compare-delete
+limitations remain; the session correction does not eliminate them.
+
+### Inspected automated evidence
+
+These are retained final passing runs inspected for reconciliation, not application
+tests rerun during the documentation pass. All required suites below also passed
+in primary after integration, as recorded in the previous publication closeout. Counts below are per suite/run, not a
+sum of distinct tests across overlapping suites. The 20 new session tests are
+included in the 280-unit totals and use synthetic Core/inert widgets.
+
+| Gate | Normal | Optimized | Coverage boundary |
+| --- | ---: | ---: | --- |
+| Full units | 280/280 | 280/280 | Includes corrected 20-test Flash session inventory. |
+| Broader regression | 356/356 | 356/356 | Standard selected regression suite. |
+| Standard GTK | 27/27 | Not run | Device Details/Settings lifecycle and geometry; not full native Flash lifecycle. |
+| Foreground admission | 28/28 | 28/28 | Focused synthetic admission/callback fixtures. |
+| CFG GTK | 11/11 | Not run | Real GTK native CFG fixtures, synthetic device data. |
+| Focused R6 Flash | 30/30 | 30/30 | Loopback fake FTP, preserved upload protections. |
+
+All final runs have zero failures, errors, skips and timeouts. GTK remains normal
+only because its fixtures contain ordinary assertions. Foreground, CFG and R6
+remain deferred from the standard CI allowlist; their separately audited focused
+runs close the review gap without claiming they now execute in standard CI.
+
+Local evidence roots (temporary retained artifacts, not portable repository files):
+
+- `/tmp/argonaut-flash-publication-20261122/session-closeout.txt`: integrated primary validation, stopped publication and acceptance limits.
+- `/tmp/argonaut-flash-publication-20261122/{unit-normal,unit-optimized,regression-normal,regression-optimized,gtk,foreground-normal,foreground-optimized,cfg-gtk,r6-normal,r6-optimized}`: passing primary suite evidence.
+- `/tmp/argonaut-flash-publication-20261122/independent-review.txt`: exact 15-file integration review PASS.
+- `/tmp/argonaut-flash-unit-validation-20261122/{normal,optimized}`: unit summaries and per-class records.
+- `/tmp/argonaut-flash-regression-validation-20261122/{normal,optimized}`: broader summaries and per-class records.
+- `/tmp/argonaut-flash-gtk-validation-20261122/gtk`: standard GTK evidence.
+- `/tmp/argonaut-flash-focused-validation-20261122/foreground-{normal,optimized}`: focused admission evidence and audited launcher in the parent directory.
+- `/tmp/argonaut-led-test-correction-20261122/cfg-gtk`: final CFG evidence.
+- `/tmp/argonaut-r6-correction-20261122/r6-{normal,optimized}`: final R6 summaries, test IDs/logs, namespace and environment records.
+- `/tmp/argonaut-r6-correction-20261122/executions.json`: exact final R6 commands and counts; `preservation.json` and before/after hashes record preservation.
+
+Execution retained separate loopback-only network namespaces, nonroot UID/EUID
+1000, zero capabilities and `NoNewPrivs=1`, fresh HOME/XDG paths and no external
+probes. GTK used private Xvfb and D-Bus. The unchanged focused launcher ran outside
+the restrictive outer command sandbox while retaining these inner boundaries;
+this was not host-network or privileged application execution. R6 used an in-memory
+fake remote mutation tree and temporary local files; no physical C64U operations.
+See the [test isolation policy](DEVELOPMENT.md) for the general runner contract.
+
+Earlier failed gates remain part of the audit trail: declared session count 18
+was corrected to 20; the moved CFG helper fixture was corrected without dropping
+assertions; native CFG gained its existing synthetic `app.core`; the LED visibility
+lookup was matched to the existing read-only labels after identical baseline and
+candidate failure; the R6 local-routing literal was updated to include the captured
+folder. No production change was needed for those validation corrections. The
+baseline comparison is retained in `/tmp/argonaut-cfg-visibility-investigation-20261122`.
+Final reruns supersede the failed validation status, not the historical evidence.
+
+### Review disposition and remaining gates
+
+Independent Class C **PASS** covers the reviewed implementation slice and focused
+automated qualification. The initial P2 finding was omitted directly affected
+foreground/CFG/R6 execution; the final focused results close that validation gap.
+The final R6 test correction also received independent review before execution.
+No confirmed production defect or additional corrective action was identified.
+Full initial review: `/tmp/argonaut-flash-class-c-review-20261122/class-c-review.txt`;
+final reassessment: `/tmp/argonaut-r6-correction-20261122/class-c-reassessment.txt`.
+This is not a waiver of [mandatory applicable physical acceptance](DEVELOPMENT.md).
+
+Remaining coverage limits are explicit: complete real Flash window/native chooser
+retirement across reconnect; direct `read_flash` busy-lane and invalid-argument
+matrices; and explicit valid save-copy completion in the new session suite.
+Source safeguards and existing regressions are not exhaustive scenario execution.
+These are untested scenarios, not confirmed defects. No new physical C64U acceptance
+is claimed. Historical R6 hardware storage qualification and bounded Beige Drive
+acceptance do not qualify this new stale-session workflow.
+
+Existing category-wide LED Apply containment remains mandatory. Intermittent LED
+lockup and indirect/Auto SID safety remain unresolved; Bruce's residual-risk
+ownership does not waive transferred #49 criteria 2, 3, 5, 6, 7 and 8. They remain
+unmet/unwaived. C1 physical acceptance is incomplete; #48 remains tooling only;
+#26 dependencies and RM-026/028/029 gates remain intact. The historical Beige
+B 1581 NOT TESTED exception (configured `1541.rom`), 114/115 adjacent-suite result,
+and unavailable original Drive-confirmation evidence remain as recorded above.
+No new exception or Issue #24 closure is authorized.
+
+Next steps require separate authorization: settle applicable native/physical
+acceptance scope without silently waiving requirements, verify the complete exact
+revised 15-file inventory and primary branch/local/live GitHub HEAD/remotes/index,
+and recheck preservation against the original inventory plus the exact authorized
+19-cache exception. Integration is complete; do not reapply the original patch.
+Fresh publication authorization, publication, subsequent CI verification and
+tracking reconciliation remain later gates. Follow [release guidance](RELEASING.md);
+this record authorizes no package, installation or release. Implementation
+completion, acceptance, publication and issue closure remain separate states.

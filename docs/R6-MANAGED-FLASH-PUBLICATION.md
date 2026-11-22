@@ -1,5 +1,50 @@
 # R6 — Managed Flash publication
 
+## Issue #24 Flash session binding — unpublished candidate
+
+This 22 November 2026 UTC update describes the reviewed Flash correction integrated
+into the primary `development` working tree at HEAD `489fae08`. Its 15-file
+publication candidate remains unstaged, uncommitted and unpublished; publication
+authorization is expired. Independent integration review and all required primary
+automated validation passed. This update does not revise historical R6 qualification
+records below. See the [complete evidence and acceptance boundaries](ISSUE24-IDENTITY-EVIDENCE.md#flash-session-correction--unpublished-candidate).
+
+[FlashFiles](../c64u_browser/flash_dialog.py) captures the immutable `DeviceSession`
+(device identity and connection incarnation) when opened. It does not rely only
+on the stable service object's identity. Rebinding Settings or requiring fresh
+settings retires the Flash window, chooser and confirmation and discards its
+pending plan. Action/completion guards also retire stale or empty sessions;
+opening a replacement retires the prior window. This is bounded Flash behavior,
+not a general disconnected-controls redesign.
+
+[Core.read_flash](../c64u_browser/core.py) validates the destination/CFG name,
+holds session admission, rechecks the opening session before and after acquiring
+the device lane, and refuses busy admission. Listing and CFG conversion use that
+concrete client under admission. [FileService](../c64u_browser/file_service.py)
+preparation and save-copy accept `expected_session`; existing scheduled binding,
+client/session checks and private prepared-plan execution remain in force.
+
+Chooser responses and asynchronous completions are consumed once. Local upload
+captures the folder before opening the chooser; delayed responses cannot silently
+retarget it. Stale preparation completions discard returned plans; late upload
+consequence evidence is retained in application status. Native CFG preview passes
+the opening session into [BackupActions](../c64u_browser/backup_dialog.py), which
+checks it before displaying and before staging. Preview remains staging-only,
+with existing draft, busy, refresh and whole-batch admission protections.
+
+The managed uploader, private immutable reviewed bytes, expiring single-use plans,
+exact destination/content/collision rules, managed transport, no automatic replay
+or cleanup, and consequence evidence are preserved. No ROM activation or settings
+application is added. The historical external-writer/atomicity limitations below
+remain. The final R6 regression is 30/30 in each Python mode; independent Class C
+PASS is for the implementation and automated evidence, not new physical acceptance.
+
+The original R6 checkpoint wording below is historical. Its later bounded physical
+qualification cannot qualify the new Flash stale-session workflows. Integration
+is complete; publication, complete native Flash lifecycle qualification and
+applicable physical acceptance remain pending separate gates. Issue #24 remains
+open with its existing safety obligations.
+
 Status: **implementation complete; deterministic verification passed; stopped for
 R6 implementation review. Not physically qualified, not committed/pushed**.
 The resumed pass used the user-supplied **41% remaining** RU baseline, not a fresh

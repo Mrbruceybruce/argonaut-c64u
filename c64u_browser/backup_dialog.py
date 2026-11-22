@@ -34,8 +34,9 @@ class BackupActions:
     else:tab.app.status.set_text('Settings backup saved. Passwords, read-only information and C64U Model are omitted; ROM and media files are not included.')
    tab.request(task,done)
   chooser.connect('response',response);chooser.show()
- def preview(self,data,settings,extra_skipped=0,title='Restore preview'):
+ def preview(self,data,settings,extra_skipped=0,title='Restore preview',*,expected_session=None):
   tab=self.tab;client=tab.client
+  if expected_session is not None and expected_session!=tab.app.core.device_session():return
   changes,skipped=differences(data,settings)
   skipped+=extra_skipped
   dialog=Gtk.Dialog(title=title,transient_for=tab.app.window,modal=True)
@@ -56,8 +57,13 @@ class BackupActions:
   for check in checks:check.connect('toggled',update)
   update()
   scroll=Gtk.ScrolledWindow(vexpand=True,hexpand=True);scroll.set_child(box);dialog.get_content_area().append(scroll)
+  consumed=False
   def response(_,code):
+   nonlocal consumed
+   if consumed:return
+   consumed=True
    dialog.destroy()
+   if expected_session is not None and expected_session!=tab.app.core.device_session():return
    if code!=Gtk.ResponseType.OK or tab.client is not client or tab.app.busy or tab.pending or tab.drafts or tab.requires_refresh:return
    selected={(category,setting.name):value for check,(category,setting,value) in zip(checks,changes) if check.get_active()}
    if not selected or tab.admit_changes(selected,settings) is None:return

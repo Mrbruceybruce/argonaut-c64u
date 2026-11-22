@@ -774,10 +774,11 @@ class FileService:
                                           new_name=new_name,check=job.check_cancel)
         return self._job('file.rename',task,session=session)
 
-    def prepare_native_upload(self, source, destination_folder, name):
+    def prepare_native_upload(self, source, destination_folder, name, *, expected_session=None):
         self._local(source)
         destination=FileLocation.c64u(posixpath.join(destination_folder,name))
-        session=self._session((source,destination))
+        session=expected_session if expected_session is not None else self._session((source,destination))
+        self._check_session(session)
         def task(job):
             def check():
                 self._check_session(session);job.check_cancel()
@@ -854,10 +855,11 @@ class FileService:
             raise
 
 
-    def save_native_copy(self, source, destination):
+    def save_native_copy(self, source, destination, *, expected_session=None):
         if source.scope!=C64U or destination.scope!=CORE_HOST:
             raise BrowserError('Native save-copy currently requires a C64U source and Core-host destination.')
-        session=self._session((source,));self._local(destination)
+        session=expected_session if expected_session is not None else self._session((source,))
+        self._check_session(session);self._local(destination)
         def task(job):
             job.check_cancel();self._check_session(session)
             data=read_remote(self._client((source,),session),source.path);job.check_cancel()
