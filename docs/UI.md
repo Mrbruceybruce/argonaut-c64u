@@ -1938,8 +1938,12 @@ It does not include or qualify the later command correction below.
 
 ## Issue #24 — Drive A/B command confirmation safety
 
-Current disposition, 15 November 2026: this slice is published at
-`152e3885590e9fe62e19e68eb30e83f1f3025c4f`. The
+Published disposition, 15 November 2026: the implementation is published at
+`152e3885590e9fe62e19e68eb30e83f1f3025c4f`; the acceptance record is published
+at `033658dc9b0b60111cb73869f30ed01309e605f7`, confirmed by the
+[final Issue #24 tracking comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6903355263).
+The latter commit was verified as primary and live `development` HEAD before
+this documentation correction. The
 [bounded Beige acceptance record](ISSUE24-IDENTITY-EVIDENCE.md#beige-drive-ab--bounded-operator-reported-acceptance)
 records 12 operator-reported cancellation passes, A off/on and
 1541 → 1571 → 1581 → 1541, B on/off and 1541 → 1571 → 1541, and empty Eject
@@ -1951,6 +1955,9 @@ operator-reported. This does not qualify mounted-media eject, dispatch counts,
 physical session races, Founders or release acceptance. Outstanding safety and
 release obligations below remain unchanged. The following paragraphs preserve
 the earlier integration checkpoint; their unpublished/pending wording is historical.
+The original local Drive-confirmation evidence directories are now absent, as
+noted in the acceptance record; historical test/review reports were not reinspected
+and no application or hardware tests were repeated for this correction.
 
 The on/off/eject and type (1541/1571/1581) correction is integrated locally above
 `5312370990e10d437bddb2e301098334da2cb5c6`, but remains unstaged, uncommitted and

@@ -199,13 +199,28 @@ acceptance criterion, safety requirement or publication gate is waived.
 
 ### Beige Drive A/B — bounded operator-reported acceptance
 
-Record prepared 15 November 2026 for owner approval. The implementation is
-published at `152e3885590e9fe62e19e68eb30e83f1f3025c4f`, confirmed by the
-[publication comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6902156008).
-Local and live `development` match that commit; tracked files and index are
-clean and seven preserved artifacts match retained hashes. The earlier
-integrated/unpublished section below is a historical checkpoint, superseded
-only for publication and the bounded acceptance recorded here.
+Record published 15 November 2026 at
+`033658dc9b0b60111cb73869f30ed01309e605f7`, confirmed by the
+[final Issue #24 tracking comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6903355263).
+The implementation is separately published at
+`152e3885590e9fe62e19e68eb30e83f1f3025c4f`, confirmed by the earlier
+[implementation publication comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6902156008).
+Primary and live `development` HEADs were verified equal at `033658dc…` before
+this documentation correction, with clean tracked files, empty staging and seven
+preserved untracked artifacts. Current artifact hashes were recorded; equality
+with historical hashes was not independently reverified. The integrated/unpublished
+section below is a historical checkpoint, superseded only for publication and the
+bounded acceptance recorded here.
+
+**Evidence availability at this reconciliation:** the original directories
+`/tmp/argonaut-issue24-drive-confirmations-integration-20261115` and
+`/tmp/argonaut-issue24-drive-confirmations-evidence-20261115` are absent.
+The historical test/review results remain recorded in published documentation and
+GitHub; their original local reports cannot presently be reinspected. References
+below to retained evidence and inspected results describe the original record,
+not fresh inspection in this reconciliation. Screenshot observations below likewise
+remain the published historical record; screenshots, application tests and hardware
+acceptance were not repeated or reinspected for this correction.
 
 Evidence sources are the operator reports and retained screenshots from
 **Continue issue 24** (conversation `6af0e31f-b0d8-83ea-919f-681a71f30feb`),
@@ -282,8 +297,11 @@ Bruce's residual-risk ownership, unmet/unwaived #49 criteria 2, 3, 5, 6, 7 and 8
 incomplete C1, #48 tooling-only scope, #26 dependencies and RM-026/028/029 gates
 remain unchanged. #24 remains Open / Backlog / P1 — High / Ultimate Menu.
 This bounded operator-reported acceptance does not complete #24 or release
-qualification. Applying/publishing this evidence record and posting its tracking
-comment remain separate owner gates; this proposal does neither.
+qualification. This acceptance record was published at `033658dc…` and its
+[final tracking comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6903355263)
+was posted. These completed steps supersede the former approval/publication-pending
+proposal wording. Publication of this documentation correction remains a separate
+owner gate; no GitHub issue or Project fields are changed by the correction.
 
 ### Drive A/B command confirmation safety — integrated, unpublished
 

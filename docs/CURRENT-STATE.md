@@ -2,11 +2,17 @@
 
 ## Issue #24 — bounded Beige Drive A/B acceptance, 15 November 2026
 
-The Drive A/B confirmation safety slice is published on `development` at
-`152e3885590e9fe62e19e68eb30e83f1f3025c4f`; primary and live GitHub HEADs
-were verified equal during this preparation, with clean tracked files, empty
-staging and all seven preserved artifacts matching retained hashes. This
-supersedes the earlier unpublished checkpoint below for this slice only.
+The Drive A/B confirmation safety implementation is published on `development`
+at `152e3885590e9fe62e19e68eb30e83f1f3025c4f`. The bounded acceptance record
+is published at `033658dc9b0b60111cb73869f30ed01309e605f7`, confirmed by the
+[final Issue #24 tracking comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-6903355263).
+Primary and live GitHub `development` HEADs were verified equal at the acceptance
+record commit before this documentation correction, with clean tracked files,
+empty staging and seven preserved untracked artifacts. Current artifact hashes
+were recorded; equality with historical hashes was not independently reverified.
+This supersedes the earlier unpublished checkpoint below for this slice only.
+Original local Drive-confirmation reports are currently unavailable; see the
+[evidence availability note](ISSUE24-IDENTITY-EVIDENCE.md#beige-drive-ab--bounded-operator-reported-acceptance).
 
 On Beige, all 12 cancellation checks and the bounded A/B commands are
 operator-reported PASS: A off/on, 1541 → 1571 → 1581 → 1541 and empty Eject;
@@ -28,6 +34,10 @@ lockup and indirect/Auto SID risks remain outstanding. Transferred #49 criteria
 Issue #24 remains Open / Backlog / P1 — High / Ultimate Menu.
 
 ## Issue #24 — historical Drive A/B integration checkpoint, 15 November 2026
+
+The pending statuses and evidence-inspection statements below describe the original
+integration checkpoint; the published acceptance record above supersedes its
+publication and bounded physical-acceptance status.
 
 The reviewed four-file correction is integrated in primary `development` above
 published HEAD `5312370990e10d437bddb2e301098334da2cb5c6`; local and live GitHub
