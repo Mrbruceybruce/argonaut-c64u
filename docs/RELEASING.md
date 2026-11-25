@@ -5,6 +5,14 @@ The published Stable baseline is [1.9](../packaging/RELEASE-1.9.md); its tag and
 release artifacts are immutable. Current development targets 1.10. No public
 Stable 1.10 tag or release exists.
 
+## Authorization boundary
+
+The [standard bounded offline procedure](DEVELOPMENT.md#standard-bounded-offline-development-procedure)
+permits routine work only within an explicitly approved offline slice. It does
+not authorize package builds/installations, hosted dispatch, physical C64U
+operations, Flash writes/reset/recovery or Git publication. Existing release
+gates and manual owner publication remain unchanged unless separately authorized.
+
 ## Local Debian Development build
 
 The following is the authoritative local build example, for the separately

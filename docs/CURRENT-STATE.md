@@ -1,5 +1,25 @@
 # Current development state
 
+## Standard offline workflow — documentation candidate, 24 November 2026
+
+The owner approved adoption of the [bounded offline development procedure](DEVELOPMENT.md#standard-bounded-offline-development-procedure)
+as the standard. Its repository documentation is drafted, unstaged, uncommitted
+and unpublished. Adoption approval is distinct from publication and from approval
+to execute a particular slice. This session changes procedural documentation only;
+no tests or hardware operations are authorized. The proposed Issue #24 88-test R2
+model-validation slice remains separately unapproved and unexecuted in this session.
+
+Primary and live GitHub `development` were verified at `4609c85dce14b5b6832be3af679466f06866149a`,
+which published the prior four-document reconciliation described below. That older
+entry's unpublished/next-publication wording is a historical checkpoint. The current
+procedural candidate is separate. Issue #24 remains Open / Backlog / P1 — High;
+LED containment, lockup/Auto SID risks, transferred #49 obligations, incomplete C1,
+#48 tooling-only scope and #26/RM-026/028/029 gates remain unchanged. R2 static
+review supports offline model validation only; full physical containment tooling
+and physical acceptance remain incomplete. No tracking change or acceptance waiver
+is included. Next: review the exact procedural diff; publication and the proposed
+offline execution slice each require separate authorization.
+
 ## Issue #24 — Flash correction published, 22 November 2026 UTC
 
 The Flash stale-session correction is **implemented, independently reviewed and

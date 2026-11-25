@@ -45,6 +45,149 @@ launcher and service unit. Test Lab can create its private pairing, start or
 restart the service, and generate the matching C64 program without `petcat`.
 Ollama and firewall configuration remain separate, visible prerequisites.
 
+## Standard bounded offline development procedure
+
+Owner-approved standard, 24 November 2026 (America/Chicago). This procedure
+implements slice-level authorization for offline/synthetic work. Adoption of the
+standard does not authorize any particular execution slice, hardware operation,
+publication or tracking change. The initial documentation candidate remains
+unpublished until separately verified publication.
+
+### Agree one bounded slice
+
+Begin each session by reading CURRENT-STATE, the roadmap and relevant architecture,
+testing and release procedures; consult the GitHub Project and related issues.
+Verify the primary checkout, branch/detached HEAD, commit, fetch/push remotes,
+live remote HEAD, complete working-tree inventory, index and unpublished work.
+Preserve existing files, evidence and isolated workspaces. Give a concise readiness
+summary; stop if required context cannot be verified.
+
+Record a slice contract before execution: approved issue and objective, exact
+baseline and source/harness manifests, permitted files and operations, fixed test
+identities/counts, isolation and preflight requirements, output/evidence location,
+run/time limits, success criteria, exclusions and mandatory stop gates. Record the
+owner's approval against that contract. A suggested slice is not an approved one.
+Approval may cover preparation, execution and review together when explicitly
+included; approval limited to preparation or review does not authorize execution.
+
+Within that approved offline/synthetic slice, proceed through harness preparation,
+isolated execution, minor fixture corrections, necessary reruns and cumulative
+independent review without asking again for each routine step. Minor corrections
+must preserve test intent, assertions, coverage, accepted behavior, isolation and
+safety policy. Diagnose ordinary test failures inside the slice; retain every
+failure and explain the correction. Do not turn failures into passes by weakening
+expectations, reducing counts, skipping cases or changing acceptance criteria.
+Respect the agreed run/time budget; stop for a new disposition when it is exhausted.
+Production changes require their own explicitly approved implementation scope;
+a harness/fixture authorization does not include them.
+
+“I'm ready” still authorizes only the next previously agreed step. That step may
+be a clearly presented bounded slice, but must not silently absorb later slices,
+physical operations or publication. On resumption, verify the recorded scope,
+remaining budget and unchanged inputs; ambiguity, expiry or changed scope requires
+a new disposition. Historical one-run/preparation-only permissions are not
+retroactively expanded by adopting this standard.
+
+### Immutable evidence and cumulative independent review
+
+Use the established workspace and integration layout. Keep each reviewed baseline
+and run immutable: retain a SHA-256 manifest with paths, sizes and modes, source
+commit, provenance, dependency/environment identity, test inventory and the exact
+launcher/containment policy. Verify the complete inventory against the sealed
+manifest before execution, including unexpected/missing files. Record the manifest
+hash separately. Hashes bind evidence to bytes; they do not prove correctness or
+protect against a hostile same-user writer.
+
+Create a new revision for corrections and a fresh output directory for every run;
+never overwrite original bundles, failed results, logs or earlier reviews. Persist
+commands, containment/preflight and cleanup evidence, per-case outcomes, counts,
+timeouts, partial results and limitations in the established evidence store.
+Retain evidence beyond temporary workspace or hosted-artifact expiry; identify its
+location and retention owner in the slice record. Do not regenerate unchanged
+bundles or repeat unchanged suites merely to create another checkpoint.
+
+An independent reviewer assesses the complete cumulative scope under the risk
+classes below. Reuse verified unchanged evidence; review the exact delta and its
+impact on dependent contracts, retaining references to prior dispositions. Changed
+inputs invalidate affected review/test claims; revalidate affected contracts and
+broaden review when coupling or unexplained discrepancies require it. A hash match
+alone is not a review. Final review binds the complete final manifest/diff and
+results, including failed attempts and residual limits, to an explicit disposition.
+Safety-sensitive launcher/containment changes require independent static review
+before execution; cumulative review never bypasses an existing pre-execution gate.
+Deterministic regression coverage and applicable physical acceptance remain required.
+No review waiver is implicit in this procedure or in approval to edit documents.
+
+### Mandatory stops and separately authorized gates
+
+Stop execution and preserve evidence on containment failure or missing containment
+proof, unexpected hardware access, uncertain Flash outcomes, unexplained integrity
+or cleanup discrepancies, a failed independent review, or a required production
+safety change outside scope. Do not bypass isolation, retry an uncertain physical
+operation, reset/recover a device, or perform destructive Git actions to continue.
+After a failed independent review, report the finding and obtain an explicit
+corrective scope/disposition before resuming; routine fixture corrections do not
+override that gate. Retain partial results as incomplete, never as acceptance.
+
+Physical C64U operations (including discovery and read-only contact) require
+separate explicit device/procedure authorization and applicable identity, build,
+idleness, containment and observation prerequisites. Flash writes, reset and
+recovery require their own explicit bounded authorization; offline success cannot
+grant it. Preserve category-wide LED Apply containment, unresolved lockup/Auto SID
+risks, incomplete C1, #48 tooling-only scope, transferred #49 obligations and
+RM-026/028/029 dependencies. Synthetic fault cases do not establish physical safety.
+
+Git staging, committing, pushing and publication verification remain manual owner
+steps unless separately explicitly authorized. Destructive Git actions require
+specific authorization. Verify branch, local/live remote HEADs, full changed-file
+inventory and index before publication; present exact commands in execution order
+and stop at verification gates. Preserve the established primary integration
+procedure and repository layout; changes to either require additional approval.
+Package builds/installations, hosted dispatch and release gates in
+[RELEASING.md](RELEASING.md) remain separate. Issue comments, closure and Project
+changes require their own authorization; a review pass does not authorize them.
+
+At closeout distinguish implementation, acceptance, publication and issue closure.
+Report completed work, unpublished changes, unresolved limits, preserved workspaces
+and the next agreed step. Reconcile documentation/tracking only within authorization;
+identify pending synchronization instead of claiming completion.
+
+### Proposed example: Issue #24 R2 offline model validation
+
+**Proposed only; no test execution or hardware contact is authorized by this
+procedural documentation session.** A future approval could cover preparation,
+fixed-case isolated execution, minor fixture fixes, bounded reruns and cumulative
+independent runtime review in one slice, subject to the stops above.
+
+- Baseline: primary/live `development` at `4609c85dce14b5b6832be3af679466f06866149a`;
+  reverify at entry. R2 is the retained `offline-containment-r2-20261124` bundle in
+  `argonaut-qualification/issue24-native-flash/tooling`, containing 1,897 files.
+  Manifest SHA-256: `ef1ee345facbb60a6e52c404b9f92e1a787b2b745fd2384d28ae15560690934b`.
+- Scope: 88 fixed offline memory-message-model definitions in CASE-INVENTORY.csv;
+  use only the reviewed launch.py with its reviewed manifest and fresh
+  `Argonaut-Evidence/Issue24/NativeFlash/runs/offline-rNNNNNN` evidence directory.
+  Bruce / Argonaut maintainer retains evidence ownership. Preserve all prior runs.
+- Proposed budget: one initial run and at most two corrective reruns, retaining
+  the launcher's 60-second outer limit per run. No test discovery, direct test
+  invocation, other suite, production modification or containment-policy change.
+  Minor fixture revisions require new manifests and affected independent review.
+- Entry: reverify complete R2 inventory and retained static PASS, exact launcher,
+  fixed case inventory and runtime prerequisites without probing a device. Kernel
+  isolation/socket denial and cleanup must be proven by retained runtime evidence;
+  failed startup is a stop, never permission to relax containment.
+- Success: exactly 88/88 passing cases, zero failures/errors/skips/timeouts, verified
+  containment and cleanup, preserved evidence, and independent runtime review
+  reconciling endpoint receipts and intentional trace-fault cases. A fixture change
+  must retain all 88 intended contracts; an unexplained discrepancy stops the slice.
+- Limit: offline model validation only. The wire gateway, production Core observer,
+  GUI/portal integration and physical preflight remain incomplete. No physical
+  acceptance, Flash write/reset/recovery, Git publication or issue closure follows.
+
+The retained R2 preparation and independent static review reports are under
+`Argonaut-Evidence/Issue24/NativeFlash/reviews/offline-containment-r1-20261124`.
+Their original single-run execution gate remains intact until the owner explicitly
+approves a new bounded slice; this example does not amend historical authorization.
+
 ## Risk-based independent review
 
 Review requirements follow the risk of the complete change, not its file type
