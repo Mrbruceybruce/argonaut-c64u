@@ -1,5 +1,18 @@
 # Issue #24 — identity evidence and regression design
 
+## Publication status — 25 November 2026 UTC
+
+This document's reconciliation was published in the six-document commit `5a635d8`;
+Test Lab #237 passed **8/8 jobs for that exact commit**. See the fixed
+[publication record](CURRENT-STATE.md#verified-publication-record--25-november-2026-utc)
+for the full commit identity and CI link, and
+[pending work and unchanged acceptance limits](CURRENT-STATE.md#pending-work-and-unchanged-acceptance-limits).
+The original text below is retained as historical checkpoint evidence, including
+its unpublished-candidate and then-current HEAD/preservation wording. Those status
+claims do not apply to the later publication or establish complete preservation
+of the missing `/tmp/argonaut-issue24-flash-20261122` checkout. File-level matches
+remain limited evidence; acceptance exceptions and unresolved audit gaps persist.
+
 ## Preservation qualification — 25 November 2026 UTC
 
 The publication and preservation assertions below describe their dated checkpoints,

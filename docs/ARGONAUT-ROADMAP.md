@@ -1,5 +1,17 @@
 # Argonaut roadmap
 
+## Verified publication and pending work — 25 November 2026 UTC
+
+The six-document reconciliation is published at `5a635d8d77a0bb790cde857bd917316f39185747`;
+Test Lab #237 passed **8/8 jobs for that exact commit**. See the immutable
+[publication record](CURRENT-STATE.md#verified-publication-record--25-november-2026-utc)
+and [pending work and unchanged acceptance limits](CURRENT-STATE.md#pending-work-and-unchanged-acceptance-limits).
+The older sections below retain historical checkpoint wording, including their
+unpublished/next-publication and HEAD/preservation assertions. They do not describe
+current Git state or prove preservation of the missing historical candidate.
+Future publication evidence belongs to the session record for that exact candidate;
+this dated record does not require updating for the commit that later contains it.
+
 ## Workflow publication and preservation reconciliation — 25 November 2026 UTC
 
 The bounded offline workflow is published on `development` at

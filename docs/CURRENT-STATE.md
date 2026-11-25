@@ -1,5 +1,53 @@
 # Current development state
 
+## Verified publication record — 25 November 2026 UTC
+
+The six-document workflow/publication and preservation reconciliation was published
+on `development` as
+[`5a635d8d77a0bb790cde857bd917316f39185747`](https://github.com/Mrbruceybruce/argonaut-c64u/commit/5a635d8d77a0bb790cde857bd917316f39185747),
+parent `22bb4ba6c35f42db7fb2de38b96f609216fdd30c`: **177 additions, 2 deletions**.
+Primary and direct live GitHub `development` HEADs were verified equal to that
+commit on this date. [Argonaut Test Lab #237](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/45524870792)
+completed successfully: **8/8 jobs for that exact commit**. This is hosted CI
+evidence, not a new local test run or native/physical acceptance.
+
+This fixed record establishes publication of `5a635d8` only. The reconciliation,
+workflow-candidate and older publication sections below retain their original
+checkpoint wording. Their references to unpublished edits, next review/publication,
+HEAD equality and candidate preservation describe those checkpoints, not current
+Git state or restored evidence. In particular, the reconciliation at `5a635d8`
+is no longer awaiting publication. The same applies to its preservation
+qualification and audit notes. No rewrite of this record is required merely
+because a later documentation commit publishes it: publication of later edits is
+verified separately against their exact reviewed diff and hashes in the session
+publication/closeout evidence.
+
+## Pending work and unchanged acceptance limits
+
+As verified on 25 November 2026 UTC, Issue #24 remains **Open / Backlog /
+P1 — High / Ultimate Menu** in Argonaut Development. Its
+[prior progress comment](https://github.com/Mrbruceybruce/argonaut-c64u/issues/24#issuecomment-7149365290)
+is a dated pre-publication checkpoint; it has not been updated for `5a635d8`.
+No issue or Project change is included, and full tracking synchronization is not
+claimed. Publication and passing CI do not establish issue completion.
+
+The R2 88-test offline model-validation slice remains proposed, unapproved and
+unexecuted in this reconciliation. Full physical containment tooling, complete
+native Flash window/chooser lifecycle qualification and physical C64U acceptance
+remain incomplete. LED Apply containment, unresolved intermittent lockup and
+indirect/Auto SID risks, transferred #49 criteria 2/3/5/6/7/8 (unmet and unwaived),
+incomplete C1, #48 tooling-only scope, #26 dependencies and RM-026/028/029 gates,
+Beige B 1581 NOT TESTED and the historical 114/115 result remain unchanged.
+
+The historical `/tmp/argonaut-issue24-flash-20261122` candidate remains absent.
+Retained file-level matches do not prove complete checkout preservation or
+equivalence. Disappearance timing/cause, final complete inventory, missing original
+run evidence and exact historical 19-cache equivalence remain unresolved; see
+[the preservation audit](ISSUE24-PRESERVATION-AUDIT.md). Future work depending on
+that candidate requires a separately agreed verified baseline and explicit gaps.
+Any offline execution, hardware operation or Git publication requires its own
+applicable authorization; this record grants none.
+
 ## Workflow publication and preservation reconciliation — 25 November 2026 UTC
 
 The bounded offline workflow is published on `development` at
