@@ -1,5 +1,17 @@
 # Issue #24 — identity evidence and regression design
 
+## Preservation qualification — 25 November 2026 UTC
+
+The publication and preservation assertions below describe their dated checkpoints,
+not present availability of the historical temporary checkout. The Flash correction
+remains published at `86f84ca`; its four-document status reconciliation was published
+at `4609c85`, followed by workflow documentation at `22bb4ba` (Test Lab #236: 8/8).
+The historical `/tmp/argonaut-issue24-flash-20261122` candidate is now absent.
+Partial retained byte equivalence does not prove preservation of that checkout;
+see [the provenance audit](ISSUE24-PRESERVATION-AUDIT.md) for exact scope and gaps.
+This qualification is a new unpublished documentation edit. Acceptance limits and
+safety obligations below remain unchanged; no physical operation or test ran here.
+
 ## Issue #24 — Flash correction published, 22 November 2026 UTC
 
 The Flash stale-session correction is **implemented, independently reviewed and

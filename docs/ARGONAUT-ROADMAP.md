@@ -1,5 +1,39 @@
 # Argonaut roadmap
 
+## Workflow publication and preservation reconciliation — 25 November 2026 UTC
+
+The bounded offline workflow is published on `development` at
+[`22bb4ba6c35f42db7fb2de38b96f609216fdd30c`](https://github.com/Mrbruceybruce/argonaut-c64u/commit/22bb4ba6c35f42db7fb2de38b96f609216fdd30c),
+parent `4609c85dce14b5b6832be3af679466f06866149a`: four documents,
+191 additions and no deletions. Primary and direct live GitHub `development`
+match this commit. [Test Lab #236](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/45523190846)
+completed successfully, **8/8 jobs for that exact commit**. The earlier workflow
+candidate and publication-next-step wording below is a historical checkpoint.
+The four-document Flash publication-status reconciliation was already published
+at `4609c85`; its older pending-publication wording is also historical.
+
+This new documentation reconciliation remains **unstaged, uncommitted and
+unpublished**. No staging, commit, push, package operation or hardware contact is
+authorized. The proposed R2 88-test model-validation slice remains unapproved and
+unexecuted here. Issue #24 remains **Open / Backlog / P1 — High / Ultimate Menu**;
+the authorized factual progress comment changes no issue state or Project field.
+LED Apply containment, unresolved lockup/Auto SID risks, transferred #49 criteria
+2/3/5/6/7/8, incomplete C1, #48 tooling-only scope, #26/RM-026/028/029 gates,
+Beige B 1581 NOT TESTED and the historical 114/115 result remain unchanged.
+Full physical containment tooling and physical acceptance remain incomplete.
+
+The historical `/tmp/argonaut-issue24-flash-20261122` checkout is absent; its
+preservation and disappearance timing cannot be verified. Ten retained historical
+candidate backups match their recorded hashes; eight match the published Flash
+correction, while two contain documented earlier test versions. All ten corresponding
+files in the persistent S1 R2 source bundle match the published correction.
+These file-level findings do not establish complete missing-checkout equivalence.
+See [the provenance audit and remaining gaps](ISSUE24-PRESERVATION-AUDIT.md).
+
+Next: cumulative independent review of this bounded reconciliation, then separate
+owner authorization for any Git publication. Synchronization remains incomplete
+while these edits are unpublished and the preservation uncertainty is unresolved.
+
 ## Standard offline workflow — documentation candidate, 24 November 2026
 
 The owner approved adoption of the [bounded offline development procedure](DEVELOPMENT.md#standard-bounded-offline-development-procedure)

@@ -50,8 +50,11 @@ Ollama and firewall configuration remain separate, visible prerequisites.
 Owner-approved standard, 24 November 2026 (America/Chicago). This procedure
 implements slice-level authorization for offline/synthetic work. Adoption of the
 standard does not authorize any particular execution slice, hardware operation,
-publication or tracking change. The initial documentation candidate remains
-unpublished until separately verified publication.
+publication or tracking change. The initial documentation was published at
+`22bb4ba6c35f42db7fb2de38b96f609216fdd30c`; [Test Lab #236](https://github.com/Mrbruceybruce/argonaut-c64u/actions/runs/45523190846)
+passed all eight jobs for that commit. This publication does not authorize the
+proposed example slice below. Its `4609c85` baseline is historical and must be
+reverified before any separately authorized execution.
 
 ### Agree one bounded slice
 
